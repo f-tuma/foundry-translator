@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.5.1` hardens
-> Chrome translation markers and adds translation controls directly to world
-> Journal Entry headers.
+> The module is currently an early development build. Version `0.6.0` adds
+> non-destructive full Journal translation storage, source change detection,
+> and direct switching between the translation and its original.
 
 ## Installation
 
@@ -103,7 +103,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.5.1`
+The production module is generated in `dist/`. A release tag such as `v0.6.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 
