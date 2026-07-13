@@ -30,7 +30,7 @@ describe("Journal translation", () => {
           _id: "page-one",
           _stats: { modifiedTime: 123 },
           name: "Arrival",
-          type: "text",
+          type: "ember.lore",
           text: {
             format: 1,
             content:
@@ -78,6 +78,7 @@ describe("Journal translation", () => {
     expect(translated.data.pages[0]?.text?.content).toBe(
       '<p>Strahd vítá <strong data-secret="keep">hrdiny</strong>. @UUID[Actor.strahd]{Strahd}</p>',
     );
+    expect(translated.data.pages[0]?.type).toBe("ember.lore");
     expect(translated.data.pages[1]?.name).toBe("Dodatek");
     expect(translated.data.pages[1]?.text?.markdown).toBe("# Raw markdown");
     expect(translated.translatedTextPages).toBe(1);

@@ -1,9 +1,11 @@
 import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
+import { readJournalTranslationFlag } from "./journal";
 import { JournalTranslationService } from "./journal-service";
 
 interface JournalEntrySheetApplication {
-  entry?: FoundryJournalWorldDocument;
+  entry?: FoundryJournalDocument;
+  close?(options?: Record<string, unknown>): Promise<unknown>;
   window?: {
     header: HTMLElement;
     controls: HTMLButtonElement;
@@ -30,12 +32,30 @@ function formatDoneMessage(pages: number, skipped: number): string {
     .replace("{skipped}", String(skipped));
 }
 
-function worldJournal(entry: FoundryJournalWorldDocument | undefined): FoundryJournalWorldDocument | null {
+function worldJournal(entry: FoundryJournalDocument | undefined): FoundryJournalWorldDocument | null {
   if (!entry?.id) return null;
   return game.journal.contents.find(({ id }) => id === entry.id) ?? null;
 }
 
-async function translateFromHeader(journal: FoundryJournalWorldDocument): Promise<void> {
+function sourceJournal(entry: FoundryJournalDocument | undefined): FoundryJournalWorldDocument | null {
+  if (!entry) return null;
+  const flag = readJournalTranslationFlag(entry.flags);
+  if (!flag) return null;
+  return game.journal.contents.find(({ uuid }) => uuid === flag.sourceUuid) ?? null;
+}
+
+async function showDocument(
+  application: JournalEntrySheetApplication,
+  document: FoundryJournalDocument,
+): Promise<void> {
+  await application.close?.();
+  document.sheet?.render(true);
+}
+
+async function translateFromHeader(
+  journal: FoundryJournalWorldDocument,
+  application: JournalEntrySheetApplication,
+): Promise<void> {
   if (translationsInProgress.has(journal.uuid)) {
     ui.notifications.info(
       localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning"),
@@ -60,7 +80,7 @@ async function translateFromHeader(journal: FoundryJournalWorldDocument): Promis
     const result = await service.translate(journal);
     const message = formatDoneMessage(result.translatedTextPages, result.skippedTextPages);
     ui.notifications.success(message);
-    result.document.sheet?.render(true);
+    await showDocument(application, result.document);
   } catch (error) {
     logger.error("Journal translation from its header failed.", error);
     ui.notifications.error(
@@ -79,17 +99,31 @@ export function addJournalTranslationHeaderButton(
 ): void {
   if (!game.user?.isGM) return;
   const journal = worldJournal(application.entry);
+  const original = sourceJournal(application.entry);
   const frame = application.window;
-  if (!journal || !frame || frame.header.querySelector(".ft-journal-translate-header")) return;
-
-  const label = localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.Action");
+  if ((!journal && !original) || !frame || frame.header.querySelector(".ft-journal-translate-header")) {
+    return;
+  }
+  const label = localized(
+    original
+      ? "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original"
+      : "FOUNDRY_TRANSLATE.JournalTranslation.Header.Action",
+  );
   const button = document.createElement("button");
   button.type = "button";
   button.className = "header-control ft-journal-translate-header";
   button.title = label;
   button.setAttribute("aria-label", label);
-  button.innerHTML = `<i class="fa-solid fa-language" aria-hidden="true"></i><span>${label}</span>`;
-  button.addEventListener("click", () => void translateFromHeader(journal));
+  const icon = document.createElement("i");
+  icon.className = original ? "fa-solid fa-arrow-left" : "fa-solid fa-language";
+  icon.setAttribute("aria-hidden", "true");
+  const text = document.createElement("span");
+  text.textContent = label;
+  button.append(icon, text);
+  button.addEventListener("click", () => {
+    if (original) void showDocument(application, original);
+    else if (journal) void translateFromHeader(journal, application);
+  });
   frame.controls.before(button);
 }
 
@@ -99,14 +133,22 @@ export function addJournalTranslationHeaderControl(
 ): void {
   if (!game.user?.isGM) return;
   const journal = worldJournal(application.entry);
-  if (!journal) return;
+  const original = sourceJournal(application.entry);
+  if (!journal && !original) return;
 
   controls.unshift({
-    action: "foundry-translate-translate-journal",
-    label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.Action",
-    icon: "fa-solid fa-language",
+    action: original
+      ? "foundry-translate-show-original-journal"
+      : "foundry-translate-translate-journal",
+    label: original
+      ? "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original"
+      : "FOUNDRY_TRANSLATE.JournalTranslation.Header.Action",
+    icon: original ? "fa-solid fa-arrow-left" : "fa-solid fa-language",
     visible: true,
-    onClick: () => void translateFromHeader(journal),
+    onClick: () => {
+      if (original) void showDocument(application, original);
+      else if (journal) void translateFromHeader(journal, application);
+    },
   });
 }
 

@@ -71,7 +71,7 @@ export function renderJournalTranslationView(
     </div>
 
     <aside class="ft-settings__privacy">
-      <i class="fa-solid fa-copy" aria-hidden="true"></i>
+      <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
       <p>${localize("FOUNDRY_TRANSLATE.JournalTranslation.CopyHint")}</p>
     </aside>
 

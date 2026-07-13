@@ -3,14 +3,22 @@ import { createTranslationProvider } from "../providers/factory";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
 import { getTranslatorSettings } from "../settings/settings";
 import { CompendiumTranslationCache } from "./compendium-cache";
-import { translateJournalData, type JournalData, type TranslatedJournal } from "./journal";
+import { CompendiumJournalTranslationRepository } from "./compendium-translation-repository";
+import {
+  journalSourceHash,
+  readJournalTranslationFlag,
+  translateJournalData,
+  type JournalData,
+  type TranslatedJournal,
+} from "./journal";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
 }
 
 export interface JournalTranslationResult extends TranslatedJournal {
-  document: FoundryJournalWorldDocument;
+  document: FoundryJournalDocument;
+  reused: boolean;
 }
 
 function translationSample(source: JournalData): string {
@@ -48,10 +56,26 @@ export class JournalTranslationService {
       format: "text",
     });
 
-    const [glossary] = await Promise.all([
+    const translations = new CompendiumJournalTranslationRepository();
+    const [glossary, sourceHash, existing] = await Promise.all([
       new GlossaryCompendiumRepository().load(),
+      journalSourceHash(source),
+      translations.find(sourceDocument.uuid, settings.targetLanguage),
       preparation ?? Promise.resolve(),
     ]);
+    const existingFlag = existing
+      ? readJournalTranslationFlag(existing.flags)
+      : null;
+    if (existing && existingFlag?.sourceHash === sourceHash) {
+      return {
+        data: existing.toObject() as JournalData,
+        translatedTextPages: existingFlag.translatedTextPages,
+        skippedTextPages: existingFlag.skippedTextPages,
+        document: existing,
+        reused: true,
+      };
+    }
+
     const translated = await translateJournalData({
       source,
       sourceUuid: sourceDocument.uuid,
@@ -64,9 +88,8 @@ export class JournalTranslationService {
       },
       cache: new CompendiumTranslationCache(),
     });
-    const created = await foundry.documents.JournalEntry.implementation.create(translated.data);
-    if (!created) throw new Error("Přeloženou kopii deníku se nepodařilo vytvořit.");
+    const document = await translations.save(translated.data);
 
-    return { ...translated, document: created };
+    return { ...translated, document, reused: false };
   }
 }

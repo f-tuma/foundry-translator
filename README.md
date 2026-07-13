@@ -72,13 +72,14 @@ instead of returning a corrupted name.
 
 As Game Master open **Configure Settings → Module Settings → Journal
 translation** and select **Translate Journal Entry**. Choose one world Journal
-Entry and create a translated copy. The source document is never modified.
+Entry and open its stored translation. The source document is never modified.
 
 You can also open a world Journal Entry and select **Translate this journal**
 directly in its header. A visible header button and the standard header controls
 menu provide the same safe translation action.
 
-Version `0.5.1` translates the journal name, page names, and HTML text pages.
+The current development build translates the journal name, page names, and
+HTML-backed pages, including custom page types used by adventure modules.
 Inline markup and attributes remain local, while Foundry references such as
 `@UUID[...]` and inline rolls such as `[[/r 1d20]]` are integrity-protected.
 Markdown source pages are deliberately left unchanged for now and reported in
@@ -86,8 +87,12 @@ the completion summary.
 
 Translated blocks are cached in the `Foundry Translate — Translation Cache`
 world compendium. Cache keys include source text, provider, language pair, and a
-glossary fingerprint. The translated copy also records its source UUID and hash
-for later change detection.
+glossary fingerprint. A single full translation per source Journal and target
+language is stored in `Foundry Translate — Translations`, outside the world
+Journal sidebar. Opening the translated Journal provides a **Show original**
+action. Its source UUID and hash allow an unchanged translation to be reused and
+a changed source to update the same stored document instead of creating a
+duplicate.
 
 ## Development
 
@@ -104,6 +109,4 @@ both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 
 ## Planned functionality
 
-- Provider API keys stored in Foundry module settings
-- Detection of changed source documents and selective retranslation
 - Portable export and import of translation bundles

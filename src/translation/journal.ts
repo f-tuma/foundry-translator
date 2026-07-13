@@ -7,7 +7,7 @@ import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
 import { translateUnits } from "./unit-translator";
 
-const TRANSLATION_SCHEMA_VERSION = 1;
+export const TRANSLATION_SCHEMA_VERSION = 1;
 const HTML_FORMAT = 1;
 
 export interface JournalPageData extends Record<string, unknown> {
@@ -54,6 +54,40 @@ export interface TranslatedJournal {
   skippedTextPages: number;
 }
 
+export interface JournalTranslationFlag {
+  schemaVersion: typeof TRANSLATION_SCHEMA_VERSION;
+  sourceUuid: string;
+  sourceHash: string;
+  providerId: ProviderId;
+  sourceLanguage: string;
+  targetLanguage: string;
+  translatedAt: string;
+  translatedTextPages: number;
+  skippedTextPages: number;
+}
+
+export function readJournalTranslationFlag(
+  flags: JournalData["flags"],
+): JournalTranslationFlag | null {
+  const value = flags?.[MODULE_ID]?.translation;
+  if (!value || typeof value !== "object") return null;
+  const flag = value as Partial<JournalTranslationFlag>;
+  if (
+    flag.schemaVersion !== TRANSLATION_SCHEMA_VERSION ||
+    typeof flag.sourceUuid !== "string" ||
+    typeof flag.sourceHash !== "string" ||
+    (flag.providerId !== "chrome-local" && flag.providerId !== "google-cloud-basic") ||
+    typeof flag.sourceLanguage !== "string" ||
+    typeof flag.targetLanguage !== "string" ||
+    typeof flag.translatedAt !== "string" ||
+    typeof flag.translatedTextPages !== "number" ||
+    typeof flag.skippedTextPages !== "number"
+  ) {
+    return null;
+  }
+  return flag as JournalTranslationFlag;
+}
+
 interface TranslationTarget {
   segments: readonly string[];
   translatedSegments?: readonly string[];
@@ -76,6 +110,10 @@ function sourceSnapshot(source: JournalData): string {
       text: page.text,
     })),
   });
+}
+
+export async function journalSourceHash(source: JournalData): Promise<string> {
+  return sha256(sourceSnapshot(source));
 }
 
 export async function translateJournalData(
@@ -109,12 +147,11 @@ export async function translateJournalData(
     const text = page.text;
     const content = text?.content;
     const isHtmlTextPage =
-      page.type === "text" &&
       typeof content === "string" &&
       (text?.format === undefined || text.format === HTML_FORMAT) &&
       !text?.markdown;
     if (!isHtmlTextPage) {
-      if (page.type === "text" && typeof content === "string" && content.trim()) {
+      if (typeof content === "string" && content.trim()) {
         skippedTextPages += 1;
       }
       continue;
@@ -158,7 +195,7 @@ export async function translateJournalData(
     );
   }
 
-  const sourceHash = await sha256(sourceSnapshot(options.source));
+  const sourceHash = await journalSourceHash(options.source);
   copy.flags = {
     ...copy.flags,
     [MODULE_ID]: {
@@ -171,6 +208,8 @@ export async function translateJournalData(
         sourceLanguage: options.settings.sourceLanguage,
         targetLanguage: options.settings.targetLanguage,
         translatedAt: new Date().toISOString(),
+        translatedTextPages,
+        skippedTextPages,
       },
     },
   };

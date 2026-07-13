@@ -68,4 +68,92 @@ describe("Journal header translation action", () => {
     addJournalTranslationHeaderControl({ entry: source }, controls);
     expect(controls).toHaveLength(0);
   });
+
+  it("offers a return to the source from a stored translation", () => {
+    const source = journal();
+    const translated: FoundryJournalDocument = {
+      id: "translated-id",
+      uuid: "Compendium.world.foundry-translate-translations.JournalEntry.translated-id",
+      name: "A Journal [CS]",
+      flags: {
+        "foundry-translate": {
+          translation: {
+            schemaVersion: 1,
+            sourceUuid: source.uuid,
+            sourceHash: "hash",
+            providerId: "chrome-local",
+            sourceLanguage: "en",
+            targetLanguage: "cs",
+            translatedAt: "2026-07-13T18:00:00.000Z",
+            translatedTextPages: 1,
+            skippedTextPages: 0,
+          },
+        },
+      },
+      toObject: () => ({}),
+    };
+    vi.stubGlobal("game", {
+      user: { isGM: true },
+      journal: { contents: [source] },
+      i18n: { localize: (key: string) => key },
+    });
+    const controls: import("../src/translation/journal-header-control").ApplicationHeaderControl[] = [];
+
+    addJournalTranslationHeaderControl({ entry: translated }, controls);
+
+    expect(controls[0]).toMatchObject({
+      action: "foundry-translate-show-original-journal",
+      label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original",
+      icon: "fa-solid fa-arrow-left",
+    });
+  });
+
+  it("handles a direct header click through the application frame", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const renderSource = vi.fn();
+    const source = { ...journal(), sheet: { render: renderSource } };
+    const translated: FoundryJournalDocument = {
+      id: "translated-id",
+      uuid: "Compendium.world.foundry-translate-translations.JournalEntry.translated-id",
+      flags: {
+        "foundry-translate": {
+          translation: {
+            schemaVersion: 1,
+            sourceUuid: source.uuid,
+            sourceHash: "hash",
+            providerId: "chrome-local",
+            sourceLanguage: "en",
+            targetLanguage: "cs",
+            translatedAt: "2026-07-13T18:00:00.000Z",
+            translatedTextPages: 1,
+            skippedTextPages: 0,
+          },
+        },
+      },
+      toObject: () => ({}),
+    };
+    const element = document.createElement("section");
+    const header = document.createElement("header");
+    const controlsButton = document.createElement("button");
+    header.append(controlsButton);
+    element.append(header);
+    document.body.append(element);
+    vi.stubGlobal("document", document);
+    vi.stubGlobal("game", {
+      user: { isGM: true },
+      journal: { contents: [source] },
+      i18n: { localize: () => "Zobrazit originál" },
+    });
+    const close = vi.fn().mockResolvedValue(undefined);
+
+    addJournalTranslationHeaderButton({
+      entry: translated,
+      close,
+      window: { header, controls: controlsButton },
+    });
+    header.querySelector<HTMLButtonElement>(".ft-journal-translate-header")?.click();
+    await vi.waitFor(() => expect(renderSource).toHaveBeenCalledWith(true));
+
+    expect(close).toHaveBeenCalledOnce();
+  });
 });

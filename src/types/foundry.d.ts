@@ -60,14 +60,19 @@ interface FoundryFolderData {
 }
 
 interface FoundryJournalEntryData {
+  [key: string]: unknown;
   _id?: string;
   name: string;
-  flags: Record<string, Record<string, unknown>>;
+  flags?: Record<string, Record<string, unknown>>;
 }
 
 interface FoundryJournalDocument {
   id: string | null;
+  name?: string;
+  uuid?: string;
   flags?: Record<string, Record<string, unknown>>;
+  toObject(): Record<string, unknown>;
+  sheet?: { render(options?: boolean | Record<string, unknown>): unknown };
 }
 
 interface FoundryJournalWorldDocument extends FoundryJournalDocument {
