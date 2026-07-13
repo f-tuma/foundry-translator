@@ -1,0 +1,50 @@
+import { MODULE_ID } from "../constants";
+import { GoogleSettingsApplication } from "./google-settings-app";
+import { SETTINGS } from "./settings";
+
+export function registerSettings(): void {
+  game.settings.register(MODULE_ID, SETTINGS.PROVIDER, {
+    name: "FOUNDRY_TRANSLATE.Settings.Provider.Name",
+    hint: "FOUNDRY_TRANSLATE.Settings.Provider.Hint",
+    scope: "world",
+    config: false,
+    type: String,
+    default: "google-cloud-basic",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.GOOGLE_API_KEY, {
+    name: "FOUNDRY_TRANSLATE.Settings.ApiKey.Name",
+    hint: "FOUNDRY_TRANSLATE.Settings.ApiKey.Hint",
+    scope: "client",
+    config: false,
+    type: String,
+    default: "",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.SOURCE_LANGUAGE, {
+    name: "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Name",
+    hint: "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Hint",
+    scope: "world",
+    config: false,
+    type: String,
+    default: "auto",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.TARGET_LANGUAGE, {
+    name: "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Name",
+    hint: "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Hint",
+    scope: "world",
+    config: false,
+    type: String,
+    default: "cs",
+  });
+
+  game.settings.registerMenu(MODULE_ID, "googleProvider", {
+    name: "FOUNDRY_TRANSLATE.Settings.Menu.Name",
+    label: "FOUNDRY_TRANSLATE.Settings.Menu.Label",
+    hint: "FOUNDRY_TRANSLATE.Settings.Menu.Hint",
+    icon: "fa-solid fa-language",
+    type: GoogleSettingsApplication,
+    restricted: true,
+  });
+}

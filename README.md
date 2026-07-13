@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.1.0` only verifies
-> that Foundry can discover and activate the module; translation controls are not
-> implemented yet.
+> The module is currently an early development build. Version `0.2.0` adds the
+> first Google Cloud Translation provider settings and connection test; document
+> translation is not implemented yet.
 
 ## Installation
 
@@ -32,7 +32,17 @@ game.modules.get("foundry-translate")?.api;
 ```
 
 The first expression should return `true`. The API object should report
-`isReady: true` after the world finishes loading.
+`isReady(): true` after the world finishes loading.
+
+## Google Cloud Translation setup
+
+As Game Master open **Configure Settings → Module Settings → Foundry Translate**
+and select **Configure translator**. The API key is a client-scoped setting: it
+stays in the current browser and is not stored in the world or shared with players.
+
+The connection test sends one short translation request to the official Google
+Cloud Translation Basic v2 endpoint. A Google Cloud project with billing and the
+Cloud Translation API enabled is required.
 
 ## Development
 
@@ -43,7 +53,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.1.0`
+The production module is generated in `dist/`. A release tag such as `v0.2.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 
