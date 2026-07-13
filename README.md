@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.6.2` makes
-> Chromium's local translator fallback preserve glossary tokens and whitespace
-> around inline Journal elements, including custom Ember Journal pages.
+> The module is currently an early development build. Version `0.6.3` translates
+> schema-defined custom HTML fields in Journal pages, including Ember's
+> player-facing overviews, Gamemaster content, exposition, and event summaries.
 
 ## Installation
 
@@ -103,7 +103,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.6.2`
+The production module is generated in `dist/`. A release tag such as `v0.6.3`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

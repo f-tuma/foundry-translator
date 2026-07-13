@@ -5,6 +5,7 @@ import type { ProviderId } from "../settings/settings";
 import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
+import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import { translateUnits } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
@@ -21,6 +22,7 @@ export interface JournalPageData extends Record<string, unknown> {
     markdown?: string;
     [key: string]: unknown;
   };
+  system?: Record<string, unknown>;
 }
 
 export interface JournalData extends Record<string, unknown> {
@@ -46,6 +48,7 @@ export interface TranslateJournalOptions {
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
+  systemHtmlFieldPaths?: readonly (readonly HtmlFieldPath[])[];
 }
 
 export interface TranslatedJournal {
@@ -108,6 +111,7 @@ function sourceSnapshot(source: JournalData): string {
       name: page.name,
       type: page.type,
       text: page.text,
+      system: page.system,
     })),
   });
 }
@@ -135,7 +139,7 @@ export async function translateJournalData(
     },
   });
 
-  for (const page of copy.pages) {
+  for (const [pageIndex, page] of copy.pages.entries()) {
     delete page._stats;
     targets.push({
       segments: [page.name],
@@ -143,6 +147,23 @@ export async function translateJournalData(
         page.name = translatedName ?? page.name;
       },
     });
+
+    let translatedPage = false;
+    let skippedPage = false;
+    const queueHtml = (content: string, apply: (translated: string) => void): void => {
+      const plan = planHtmlTranslation(content, options.ownerDocument);
+      if (!plan.units.length) return;
+      const start = targets.length;
+      for (const segments of plan.units) {
+        targets.push({ segments, apply: () => undefined });
+      }
+      htmlTargets.push({
+        start,
+        length: plan.units.length,
+        apply: (translated) => apply(plan.apply(translated)),
+      });
+      translatedPage = true;
+    };
 
     const text = page.text;
     const content = text?.content;
@@ -152,25 +173,26 @@ export async function translateJournalData(
       !text?.markdown;
     if (!isHtmlTextPage) {
       if (typeof content === "string" && content.trim()) {
-        skippedTextPages += 1;
+        skippedPage = true;
       }
-      continue;
+    } else {
+      queueHtml(content, (translated) => {
+        if (page.text) page.text.content = translated;
+      });
     }
 
-    const plan = planHtmlTranslation(content, options.ownerDocument);
-    if (!plan.units.length) continue;
-    const start = targets.length;
-    for (const segments of plan.units) {
-      targets.push({ segments, apply: () => undefined });
+    for (const path of options.systemHtmlFieldPaths?.[pageIndex] ?? []) {
+      const systemContent = readPath(page.system, path);
+      if (typeof systemContent !== "string" || !systemContent.trim()) continue;
+      queueHtml(systemContent, (translated) => {
+        if (!writePath(page.system, path, translated)) {
+          throw new Error(`Nepodařilo se zapsat vlastní HTML pole Journalu: ${path.join(".")}`);
+        }
+      });
     }
-    htmlTargets.push({
-      start,
-      length: plan.units.length,
-      apply: (translated) => {
-        if (page.text) page.text.content = plan.apply(translated);
-      },
-    });
-    translatedTextPages += 1;
+
+    if (translatedPage) translatedTextPages += 1;
+    else if (skippedPage) skippedTextPages += 1;
   }
 
   const translatedUnits = await translateUnits({

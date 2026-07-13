@@ -12,7 +12,9 @@ const translationProvider: TranslationProvider = {
         .replace("Arrival", "Příchod")
         .replace("Appendix", "Dodatek")
         .replace("welcomes", "vítá")
-        .replace("the heroes", "hrdiny"),
+        .replace("the heroes", "hrdiny")
+        .replace("Player overview", "Přehled pro hráče")
+        .replace("Hidden history", "Skrytá historie"),
     }));
   },
   async testConnection() {},
@@ -35,6 +37,12 @@ describe("Journal translation", () => {
             format: 1,
             content:
               '<p>Strahd welcomes <strong data-secret="keep">the heroes</strong>. @UUID[Actor.strahd]{Strahd}</p>',
+          },
+          system: {
+            content: {
+              overview: "<p>Player overview</p>",
+              gamemaster: "<p>Hidden history</p>",
+            },
           },
         },
         {
@@ -67,6 +75,13 @@ describe("Journal translation", () => {
       },
       ownerDocument: document,
       nonceFactory: () => "JOURNAL",
+      systemHtmlFieldPaths: [
+        [
+          ["content", "overview"],
+          ["content", "gamemaster"],
+        ],
+        [],
+      ],
     });
 
     expect(source).toEqual(original);
@@ -79,6 +94,12 @@ describe("Journal translation", () => {
       '<p>Strahd vítá <strong data-secret="keep">hrdiny</strong>. @UUID[Actor.strahd]{Strahd}</p>',
     );
     expect(translated.data.pages[0]?.type).toBe("ember.lore");
+    expect(translated.data.pages[0]?.system).toMatchObject({
+      content: {
+        overview: "<p>Přehled pro hráče</p>",
+        gamemaster: "<p>Skrytá historie</p>",
+      },
+    });
     expect(translated.data.pages[1]?.name).toBe("Dodatek");
     expect(translated.data.pages[1]?.text?.markdown).toBe("# Raw markdown");
     expect(translated.translatedTextPages).toBe(1);

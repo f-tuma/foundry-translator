@@ -11,6 +11,11 @@ import {
   type JournalData,
   type TranslatedJournal,
 } from "./journal";
+import {
+  discoverSystemHtmlFieldPaths,
+  readPath,
+  type HtmlFieldPath,
+} from "./system-html-fields";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
@@ -21,9 +26,40 @@ export interface JournalTranslationResult extends TranslatedJournal {
   reused: boolean;
 }
 
-function translationSample(source: JournalData): string {
+interface RuntimePageSystem {
+  constructor?: {
+    schema?: {
+      fields?: Record<string, unknown>;
+    };
+  };
+}
+
+interface RuntimeJournalPage {
+  system?: RuntimePageSystem;
+}
+
+function systemHtmlFieldPaths(
+  sourceDocument: FoundryJournalWorldDocument,
+  source: JournalData,
+): readonly (readonly HtmlFieldPath[])[] {
+  const pages = (sourceDocument as FoundryJournalWorldDocument & {
+    pages?: { contents?: RuntimeJournalPage[] };
+  }).pages?.contents ?? [];
+  return source.pages.map((page, index) => discoverSystemHtmlFieldPaths(
+    pages[index]?.system?.constructor?.schema?.fields,
+    page.system,
+  ));
+}
+
+function translationSample(
+  source: JournalData,
+  htmlFieldPaths: readonly (readonly HtmlFieldPath[])[],
+): string {
   const contents = source.pages
-    .map((page) => page.text?.content)
+    .flatMap((page, index) => [
+      page.text?.content,
+      ...(htmlFieldPaths[index] ?? []).map((path) => readPath(page.system, path)),
+    ])
     .filter((content): content is string => typeof content === "string")
     .join(" ")
     .replace(/<[^>]+>/g, " ")
@@ -44,13 +80,14 @@ export class JournalTranslationService {
 
     const settings = getTranslatorSettings();
     const source = sourceDocument.toObject() as JournalData;
+    const htmlFieldPaths = systemHtmlFieldPaths(sourceDocument, source);
     const provider = createTranslationProvider(settings, {
       ...(this.#onChromeStatus ? { onChromeStatus: this.#onChromeStatus } : {}),
     });
 
     // Calling prepare before the first await preserves Chrome's user activation.
     const preparation = provider.prepare?.({
-      texts: [translationSample(source)],
+      texts: [translationSample(source, htmlFieldPaths)],
       sourceLanguage: settings.sourceLanguage,
       targetLanguage: settings.targetLanguage,
       format: "text",
@@ -87,6 +124,7 @@ export class JournalTranslationService {
         targetLanguage: settings.targetLanguage,
       },
       cache: new CompendiumTranslationCache(),
+      systemHtmlFieldPaths: htmlFieldPaths,
     });
     const document = await translations.save(translated.data);
 
