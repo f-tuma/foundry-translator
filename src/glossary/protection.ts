@@ -86,16 +86,8 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function exactCount(text: string, value: string): number {
-  let count = 0;
-  let index = 0;
-
-  while ((index = text.indexOf(value, index)) !== -1) {
-    count += 1;
-    index += value.length;
-  }
-
-  return count;
+function asciiTokenPattern(token: string): RegExp {
+  return new RegExp(escapeRegExp(token), "giu");
 }
 
 export function protectGlossaryTerms(
@@ -149,27 +141,28 @@ export function restoreGlossaryTerms(
   translatedText: string,
   protection: GlossaryProtection,
 ): string {
-  const knownTokens = new Set(protection.tokens.map(({ token }) => token));
+  const knownTokens = new Set(protection.tokens.map(({ token }) => token.toUpperCase()));
   const tokenPattern = new RegExp(
     `__FTG_${escapeRegExp(protection.nonce)}_[A-Z0-9]+__`,
-    "gu",
+    "giu",
   );
 
   for (const found of translatedText.matchAll(tokenPattern)) {
-    if (!knownTokens.has(found[0])) {
+    if (!knownTokens.has(found[0].toUpperCase())) {
       throw new GlossaryIntegrityError(`Translation returned an unknown glossary token: ${found[0]}`);
     }
   }
 
   let restored = translatedText;
   for (const { token, replacement } of protection.tokens) {
-    const count = exactCount(restored, token);
+    const pattern = asciiTokenPattern(token);
+    const count = [...restored.matchAll(pattern)].length;
     if (count !== 1) {
       throw new GlossaryIntegrityError(
         `Translation must contain glossary token ${token} exactly once; found ${count}.`,
       );
     }
-    restored = restored.replace(token, replacement);
+    restored = restored.replace(asciiTokenPattern(token), () => replacement);
   }
 
   return restored;

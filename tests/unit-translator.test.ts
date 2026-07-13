@@ -84,7 +84,7 @@ describe("translation units", () => {
             }));
           }
           return texts.map((text) => ({
-            translatedText: text.replace("Hello", "Ahoj").replace("world", "světe"),
+            translatedText: text.trim().replace("Hello", "Ahoj").replace("world", "světe"),
           }));
         },
         async testConnection() {},

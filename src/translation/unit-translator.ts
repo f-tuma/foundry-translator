@@ -121,16 +121,34 @@ async function translateSegmentsSeparately(
   provider: TranslationProvider,
   settings: TranslationUnitSettings,
 ): Promise<string[]> {
+  const segments = prepared.segmentProtections.map(({ text }) => {
+    const leading = text.match(/^\s*/u)?.[0] ?? "";
+    const withoutLeading = text.slice(leading.length);
+    const trailing = withoutLeading.match(/\s*$/u)?.[0] ?? "";
+    return {
+      leading,
+      core: withoutLeading.slice(0, withoutLeading.length - trailing.length),
+      trailing,
+    };
+  });
+  const translatable = segments
+    .map(({ core }, index) => ({ core, index }))
+    .filter(({ core }) => core.length > 0);
   const results = await provider.translate({
-    texts: prepared.segmentProtections.map(({ text }) => text),
+    texts: translatable.map(({ core }) => core),
     sourceLanguage: settings.sourceLanguage,
     targetLanguage: settings.targetLanguage,
     format: "text",
   });
-  if (results.length !== prepared.segmentProtections.length) {
+  if (results.length !== translatable.length) {
     throw new Error("Překladač vrátil jiný počet HTML segmentů, než kolik dostal.");
   }
-  return results.map(({ translatedText }) => translatedText);
+  const translatedCores = new Map(
+    translatable.map(({ index }, resultIndex) => [index, results[resultIndex]?.translatedText ?? ""]),
+  );
+  return segments.map(({ leading, core, trailing }, index) =>
+    `${leading}${translatedCores.get(index) ?? core}${trailing}`,
+  );
 }
 
 export async function translateUnits(

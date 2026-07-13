@@ -70,6 +70,21 @@ describe("glossary protection", () => {
     );
   });
 
+  it("accepts ASCII case changes made to otherwise exact glossary tokens", () => {
+    const protection = protectGlossaryTerms(
+      "Meet Strahd at Castle Ravenloft.",
+      [entry("Strahd"), entry("Castle Ravenloft")],
+      { nonce: "CHROME" },
+    );
+
+    expect(
+      restoreGlossaryTerms(
+        "Potkejte __ftg_chrome_0000__ na __FtG_ChRoMe_0001__.",
+        protection,
+      ),
+    ).toBe("Potkejte Strahd na Castle Ravenloft.");
+  });
+
   it("refuses missing, duplicated, and unknown tokens", () => {
     const protection = protectGlossaryTerms("Strahd waits.", [entry("Strahd")], {
       nonce: "SAFE",
@@ -84,6 +99,9 @@ describe("glossary protection", () => {
       restoreGlossaryTerms(`${token?.token} ${token?.token}`, protection),
     ).toThrow(GlossaryIntegrityError);
     expect(() => restoreGlossaryTerms("__FTG_SAFE_9999__ čeká.", protection)).toThrow(
+      GlossaryIntegrityError,
+    );
+    expect(() => restoreGlossaryTerms("__ftg_safe_9999__ čeká.", protection)).toThrow(
       GlossaryIntegrityError,
     );
   });
