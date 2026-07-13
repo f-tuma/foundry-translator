@@ -3,9 +3,10 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.4.0` adds a
-> world-compendium glossary for protected character, location, and custom names.
-> Document translation is not implemented yet.
+> The module is currently an early development build. Version `0.4.1` adds a
+> world-compendium glossary for protected character, location, and custom names,
+> organized in a dedicated Compendium folder. Document translation is not
+> implemented yet.
 
 ## Installation
 
@@ -57,7 +58,9 @@ requires a project with billing and the Cloud Translation API enabled.
 As Game Master open **Configure Settings → Module Settings → Name glossary** and
 select **Manage glossary**. The module discovers the names of world Actors and
 Scenes without modifying those documents. **Synchronize names** creates or
-updates entries in the `Foundry Translate — Name glossary` world compendium.
+updates entries in the `Foundry Translate — Glossary` world compendium. Module
+compendia are grouped in a gray `Foundry Translate` folder in the Compendium
+sidebar.
 
 Repeated synchronization does not create duplicates. Renamed Actors and Scenes
 are detected by UUID, while manually customized replacements are preserved. You
@@ -75,7 +78,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.4.0`
+The production module is generated in `dist/`. A release tag such as `v0.4.1`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 
