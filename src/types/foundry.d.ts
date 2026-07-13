@@ -15,6 +15,34 @@ interface FoundryGame {
     get(namespace: string, key: string): unknown;
     set(namespace: string, key: string, value: unknown): Promise<unknown>;
   };
+  actors: { contents: FoundryNamedDocument[] };
+  scenes: { contents: FoundryNamedDocument[] };
+  packs: Map<string, FoundryCompendiumCollection>;
+  user?: { isGM: boolean };
+}
+
+interface FoundryNamedDocument {
+  name?: string | null;
+  uuid?: string;
+}
+
+interface FoundryCompendiumIndexEntry {
+  _id: string;
+  name?: string;
+  flags?: Record<string, Record<string, unknown>>;
+}
+
+interface FoundryCompendiumCollection {
+  collection: string;
+  locked: boolean;
+  getIndex(options?: { fields?: string[] }): Promise<Map<string, FoundryCompendiumIndexEntry>>;
+  render(options?: boolean | Record<string, unknown>): unknown;
+}
+
+interface FoundryJournalEntryData {
+  _id?: string;
+  name: string;
+  flags: Record<string, Record<string, unknown>>;
 }
 
 interface FoundrySettingConfig {
@@ -54,6 +82,28 @@ declare const foundry: {
       data?: RequestInit,
       options?: { timeoutMs?: number | null; onTimeout?: () => void },
     ): Promise<Response>;
+  };
+  documents: {
+    JournalEntry: {
+      implementation: {
+        createDocuments(
+          data: FoundryJournalEntryData[],
+          operation: { pack: string },
+        ): Promise<unknown[]>;
+        updateDocuments(
+          data: FoundryJournalEntryData[],
+          operation: { pack: string },
+        ): Promise<unknown[]>;
+      };
+    };
+    collections: {
+      CompendiumCollection: {
+        createCompendium(
+          metadata: Record<string, unknown>,
+          options?: Record<string, unknown>,
+        ): Promise<FoundryCompendiumCollection>;
+      };
+    };
   };
 };
 
