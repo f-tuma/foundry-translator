@@ -2,7 +2,7 @@
   "id": "foundry-translate",
   "title": "Foundry Translate",
   "description": "Reliable, glossary-aware adventure translation with portable translation bundles.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "authors": [
     {
       "name": "f-tuma",
@@ -11,7 +11,7 @@
   ],
   "url": "https://github.com/f-tuma/foundry-translator",
   "manifest": "https://github.com/f-tuma/foundry-translator/releases/latest/download/module.json",
-  "download": "https://github.com/f-tuma/foundry-translator/releases/download/v0.6.0/foundry-translate.zip",
+  "download": "https://github.com/f-tuma/foundry-translator/releases/download/v0.6.1/foundry-translate.zip",
   "readme": "https://github.com/f-tuma/foundry-translator#readme",
   "bugs": "https://github.com/f-tuma/foundry-translator/issues",
   "compatibility": {
@@ -19,7 +19,7 @@
     "verified": "14"
   },
   "esmodules": [
-    "foundry-translate-0.6.0.js"
+    "foundry-translate-0.6.1.js"
   ],
   "styles": [
     "styles/foundry-translate.css"

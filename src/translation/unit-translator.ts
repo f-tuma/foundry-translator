@@ -116,6 +116,23 @@ function randomNonce(): string {
   return crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 }
 
+async function translateSegmentsSeparately(
+  prepared: PreparedUnit,
+  provider: TranslationProvider,
+  settings: TranslationUnitSettings,
+): Promise<string[]> {
+  const results = await provider.translate({
+    texts: prepared.segmentProtections.map(({ text }) => text),
+    sourceLanguage: settings.sourceLanguage,
+    targetLanguage: settings.targetLanguage,
+    format: "text",
+  });
+  if (results.length !== prepared.segmentProtections.length) {
+    throw new Error("Překladač vrátil jiný počet HTML segmentů, než kolik dostal.");
+  }
+  return results.map(({ translatedText }) => translatedText);
+}
+
 export async function translateUnits(
   options: TranslateUnitsOptions,
 ): Promise<readonly (readonly string[])[]> {
@@ -134,7 +151,9 @@ export async function translateUnits(
     }
 
     const nonce = options.nonceFactory?.() ?? randomNonce();
-    const boundaryTokens = createBoundaryTokens(segments.length, nonce);
+    const boundaryTokens = segments.length > 1
+      ? createBoundaryTokens(segments.length, nonce)
+      : [];
     const segmentProtections = segments.map((segment, segmentIndex) =>
       protectGlossaryTerms(
         segment,
@@ -146,10 +165,9 @@ export async function translateUnits(
       index,
       key,
       boundaryTokens,
-      protectedText: combineSegments(
-        segmentProtections.map(({ text }) => text),
-        boundaryTokens,
-      ),
+      protectedText: boundaryTokens.length
+        ? combineSegments(segmentProtections.map(({ text }) => text), boundaryTokens)
+        : (segmentProtections[0]?.text ?? ""),
       segmentProtections,
     });
   }
@@ -171,10 +189,24 @@ export async function translateUnits(
     for (const [resultIndex, result] of results.entries()) {
       const prepared = batch[resultIndex];
       if (!prepared) throw new Error("Chybí metadata přeloženého bloku.");
-      const protectedSegments = splitTranslatedSegments(
-        result.translatedText,
-        prepared.boundaryTokens,
-      );
+      let protectedSegments: readonly string[];
+      if (!prepared.boundaryTokens.length) {
+        protectedSegments = [result.translatedText];
+      } else {
+        try {
+          protectedSegments = splitTranslatedSegments(
+            result.translatedText,
+            prepared.boundaryTokens,
+          );
+        } catch (error) {
+          if (!(error instanceof GlossaryIntegrityError)) throw error;
+          protectedSegments = await translateSegmentsSeparately(
+            prepared,
+            options.provider,
+            options.settings,
+          );
+        }
+      }
       const segments = protectedSegments.map((segment, index) => {
         const protection = prepared.segmentProtections[index];
         if (!protection) throw new Error("Chybí ochrana přeloženého HTML segmentu.");

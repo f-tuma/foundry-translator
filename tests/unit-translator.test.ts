@@ -70,21 +70,49 @@ describe("translation units", () => {
     expect(batchSizes).toEqual([1]);
   });
 
-  it("rejects missing or reordered HTML boundary tokens", async () => {
-    await expect(
-      translateUnits({
-        units: [["Hello ", "world"]],
-        glossary: [],
-        provider: provider((text) => {
-          const tokens = [...text.matchAll(/__FTN_[A-Z0-9]+_[A-Z0-9]+__/gu)].map(
-            ([token]) => token,
-          );
-          return text.replace(tokens[0] ?? "", tokens[1] ?? "");
-        }),
-        settings,
-        nonceFactory: () => "BROKEN",
+  it("falls back to separate segments when HTML boundary tokens are changed", async () => {
+    let request = 0;
+    const result = await translateUnits({
+      units: [["Hello ", "world"]],
+      glossary: [],
+      provider: {
+        async translate({ texts }) {
+          request += 1;
+          if (request === 1) {
+            return texts.map((text) => ({
+              translatedText: text.replaceAll(/__FTN_[A-Z0-9]+_[A-Z0-9]+__/gu, ""),
+            }));
+          }
+          return texts.map((text) => ({
+            translatedText: text.replace("Hello", "Ahoj").replace("world", "světe"),
+          }));
+        },
+        async testConnection() {},
+      },
+      settings,
+      nonceFactory: () => "BROKEN",
+    });
+
+    expect(request).toBe(2);
+    expect(result).toEqual([["Ahoj ", "světe"]]);
+  });
+
+  it("does not use HTML boundary tokens for a single segment", async () => {
+    let providerInput = "";
+    const result = await translateUnits({
+      units: [["Welcome to the castle."]],
+      glossary: [],
+      provider: provider((text) => {
+        providerInput = text;
+        return "Vítejte na hradě.";
       }),
-    ).rejects.toThrow(/boundary token/);
+      settings,
+      nonceFactory: () => "SINGLE",
+    });
+
+    expect(providerInput).toBe("Welcome to the castle.");
+    expect(providerInput).not.toContain("__FTN_");
+    expect(result).toEqual([["Vítejte na hradě."]]);
   });
 
   it("uses ASCII markers that survive Unicode bracket normalization", async () => {
