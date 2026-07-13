@@ -1,5 +1,8 @@
 import { logger } from "../logger";
-import { ChromeLocalProvider } from "../providers/chrome-local";
+import {
+  ChromeLocalProvider,
+  type ChromeLocalProviderStatus,
+} from "../providers/chrome-local";
 import { GoogleCloudBasicProvider } from "../providers/google-cloud-basic";
 import type { TranslationProvider } from "../providers/types";
 import {
@@ -88,16 +91,8 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     );
 
     try {
-      const provider = this.#createProvider(settings, (progress) => {
-        const template = game.i18n.localize(
-          "FOUNDRY_TRANSLATE.Settings.Status.DownloadingChrome",
-        );
-        this.#setStatus(
-          form,
-          "testing",
-          template.replace("{progress}", String(Math.round(progress * 100))),
-          false,
-        );
+      const provider = this.#createProvider(settings, (status) => {
+        this.#setChromeStatus(form, status);
       });
       await provider.testConnection(settings.targetLanguage);
       this.#setStatus(
@@ -121,13 +116,51 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
 
   #createProvider(
     settings: TranslatorSettings,
-    onDownloadProgress: (progress: number) => void,
+    onStatus: (status: ChromeLocalProviderStatus) => void,
   ): TranslationProvider {
     if (settings.provider === "chrome-local") {
-      return new ChromeLocalProvider({ onDownloadProgress });
+      return new ChromeLocalProvider({ onStatus });
     }
 
     return new GoogleCloudBasicProvider(settings.apiKey);
+  }
+
+  #setChromeStatus(form: HTMLFormElement, status: ChromeLocalProviderStatus): void {
+    if (status.component !== "translator") return;
+
+    if (status.phase === "download") {
+      const template = game.i18n.localize(
+        "FOUNDRY_TRANSLATE.Settings.Status.DownloadingChrome",
+      );
+      this.#setStatus(
+        form,
+        "testing",
+        template.replace("{progress}", String(Math.round(status.progress * 100))),
+        false,
+      );
+      return;
+    }
+
+    if (status.phase === "ready") {
+      this.#setStatus(
+        form,
+        "testing",
+        "FOUNDRY_TRANSLATE.Settings.Status.ChromeModelReady",
+      );
+      return;
+    }
+
+    const statusKey = {
+      available: "FOUNDRY_TRANSLATE.Settings.Status.ChromeModelAvailable",
+      downloadable: "FOUNDRY_TRANSLATE.Settings.Status.ChromeDownloadStarting",
+      downloading: "FOUNDRY_TRANSLATE.Settings.Status.ChromeDownloading",
+      unavailable: "FOUNDRY_TRANSLATE.Settings.Status.ChromeUnavailable",
+    }[status.availability];
+    this.#setStatus(
+      form,
+      status.availability === "unavailable" ? "error" : "testing",
+      statusKey,
+    );
   }
 
   #providerChanged(form: HTMLFormElement): void {
