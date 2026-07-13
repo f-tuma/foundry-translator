@@ -2,6 +2,7 @@ import { MODULE_ID } from "../constants";
 import { GlossaryApplication } from "../glossary/glossary-app";
 import { SETTINGS } from "./settings";
 import { TranslatorSettingsApplication } from "./translator-settings-app";
+import { JournalTranslationApplication } from "../translation/journal-translation-app";
 
 export function registerSettings(): void {
   game.settings.register(MODULE_ID, SETTINGS.PROVIDER, {
@@ -55,6 +56,15 @@ export function registerSettings(): void {
     hint: "FOUNDRY_TRANSLATE.Glossary.Menu.Hint",
     icon: "fa-solid fa-book-bookmark",
     type: GlossaryApplication,
+    restricted: true,
+  });
+
+  game.settings.registerMenu(MODULE_ID, "translateJournal", {
+    name: "FOUNDRY_TRANSLATE.JournalTranslation.Menu.Name",
+    label: "FOUNDRY_TRANSLATE.JournalTranslation.Menu.Label",
+    hint: "FOUNDRY_TRANSLATE.JournalTranslation.Menu.Hint",
+    icon: "fa-solid fa-book-open-reader",
+    type: JournalTranslationApplication,
     restricted: true,
   });
 }

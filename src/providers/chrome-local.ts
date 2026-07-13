@@ -157,6 +157,42 @@ export class ChromeLocalProvider implements TranslationProvider {
     return results;
   }
 
+  async prepare(request: TranslateRequest): Promise<void> {
+    this.#validateRequest(request);
+    const sample = request.texts.find((text) => text.trim());
+    if (!sample) return;
+
+    // Start model creation synchronously while the click still has transient user activation.
+    if (request.sourceLanguage && request.sourceLanguage !== "auto") {
+      await this.#getTranslator({
+        sourceLanguage: request.sourceLanguage,
+        targetLanguage: request.targetLanguage,
+      });
+      return;
+    }
+
+    const detectorPromise = this.#getLanguageDetector();
+    const detector = await detectorPromise;
+    const detections = await detector.detect(sample);
+    const detected = detections.find(
+      (candidate) =>
+        typeof candidate.detectedLanguage === "string" &&
+        candidate.detectedLanguage.trim() &&
+        Number.isFinite(candidate.confidence),
+    );
+    if (!detected) {
+      throw new ChromeLocalTranslationError(
+        "Chrome nedokázal rozpoznat zdrojový jazyk. Vyberte jej ručně.",
+      );
+    }
+    if (detected.detectedLanguage !== request.targetLanguage) {
+      await this.#getTranslator({
+        sourceLanguage: detected.detectedLanguage,
+        targetLanguage: request.targetLanguage,
+      });
+    }
+  }
+
   async testConnection(targetLanguage: string): Promise<void> {
     const sourceLanguage = targetLanguage === "en" ? "cs" : "en";
     const text = sourceLanguage === "en" ? "Connection test." : "Test připojení.";
