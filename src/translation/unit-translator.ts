@@ -11,6 +11,7 @@ import { sha256 } from "./hash";
 import { foundrySyntaxEntries } from "./foundry-syntax";
 
 const MAX_UNITS_PER_REQUEST = 128;
+const MAX_CHROME_UNITS_PER_REQUEST = 16;
 export const MAX_REQUEST_CHARACTERS = 4_500;
 
 export interface TranslationUnitSettings {
@@ -168,15 +169,21 @@ function prepareSegment(
   };
 }
 
-function requestBatches(misses: readonly PreparedUnit[]): PreparedUnit[][] {
+function requestBatches(
+  misses: readonly PreparedUnit[],
+  providerId: ProviderId,
+): PreparedUnit[][] {
   const batches: PreparedUnit[][] = [];
   let batch: PreparedUnit[] = [];
   let characters = 0;
+  const maxUnits = providerId === "chrome-local"
+    ? MAX_CHROME_UNITS_PER_REQUEST
+    : MAX_UNITS_PER_REQUEST;
   for (const prepared of misses) {
     const size = prepared.protectedText.length;
     if (
       batch.length &&
-      (batch.length >= MAX_UNITS_PER_REQUEST || characters + size > MAX_REQUEST_CHARACTERS)
+      (batch.length >= maxUnits || characters + size > MAX_REQUEST_CHARACTERS)
     ) {
       batches.push(batch);
       batch = [];
@@ -252,7 +259,7 @@ export async function translateUnits(
     missesByKey.set(key, prepared);
   }
 
-  for (const batch of requestBatches(misses)) {
+  for (const batch of requestBatches(misses, options.settings.providerId)) {
     const results = await options.provider.translate({
       texts: batch.map(({ protectedText }) => protectedText),
       sourceLanguage: options.settings.sourceLanguage,

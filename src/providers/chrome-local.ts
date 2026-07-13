@@ -85,7 +85,21 @@ interface ChromeLocalProviderOptions {
   modelTimeoutMs?: number;
 }
 
-const DEFAULT_MODEL_TIMEOUT_MS = 180_000;
+const DEFAULT_MODEL_TIMEOUT_MS = 300_000;
+const EMPTY_TRANSLATION_ATTEMPTS = 3;
+const PROTECTION_TOKEN = /__(?:FTN|FTG)_[A-Z0-9]+_[A-Z0-9]+__/giu;
+const TRANSLATABLE_CONTENT = /[\p{L}\p{N}]/u;
+
+function isProtectionToken(value: string): boolean {
+  return /^__(?:FTN|FTG)_[A-Z0-9]+_[A-Z0-9]+__$/iu.test(value);
+}
+
+function protectedTextParts(text: string): string[] {
+  PROTECTION_TOKEN.lastIndex = 0;
+  if (!PROTECTION_TOKEN.test(text)) return [text];
+  PROTECTION_TOKEN.lastIndex = 0;
+  return text.split(/(__(?:FTN|FTG)_[A-Z0-9]+_[A-Z0-9]+__)/giu);
+}
 
 const getBrowserApis = (): ChromeLocalApis =>
   globalThis as unknown as ChromeLocalApis;
@@ -140,13 +154,7 @@ export class ChromeLocalProvider implements TranslationProvider {
         sourceLanguage: detectedSourceLanguage,
         targetLanguage: request.targetLanguage,
       });
-      const translatedText = await translator.translate(text);
-
-      if (typeof translatedText !== "string" || !translatedText.trim()) {
-        throw new ChromeLocalTranslationError(
-          "Chrome Local Translator vrátil prázdný nebo neplatný překlad.",
-        );
-      }
+      const translatedText = await this.#translateProtectedText(translator, text);
 
       results.push({
         translatedText,
@@ -155,6 +163,35 @@ export class ChromeLocalProvider implements TranslationProvider {
     }
 
     return results;
+  }
+
+  async #translateProtectedText(
+    translator: ChromeTranslatorSession,
+    text: string,
+  ): Promise<string> {
+    const parts = protectedTextParts(text);
+    const translated: string[] = [];
+    for (const part of parts) {
+      if (!part || isProtectionToken(part) || !TRANSLATABLE_CONTENT.test(part)) {
+        translated.push(part);
+        continue;
+      }
+      let translatedPart = "";
+      for (let attempt = 0; attempt < EMPTY_TRANSLATION_ATTEMPTS; attempt += 1) {
+        const candidate = await translator.translate(part);
+        if (typeof candidate === "string" && candidate.trim()) {
+          translatedPart = candidate;
+          break;
+        }
+      }
+      if (!translatedPart) {
+        throw new ChromeLocalTranslationError(
+          "Chrome Local Translator vrátil prázdný nebo neplatný překlad i po 3 pokusech.",
+        );
+      }
+      translated.push(translatedPart);
+    }
+    return translated.join("");
   }
 
   async prepare(request: TranslateRequest): Promise<void> {
@@ -377,7 +414,7 @@ export class ChromeLocalProvider implements TranslationProvider {
       const timeout = globalThis.setTimeout(() => {
         reject(
           new ChromeLocalTranslationError(
-            `Chrome nedokončil ${label} do 3 minut. Zkontrolujte připojení, volné místo a nastavení překladu v Chromu.`,
+            `Chrome nedokončil ${label} do 5 minut. Zkontrolujte připojení, volné místo a nastavení překladu v Chromu.`,
           ),
         );
       }, this.#modelTimeoutMs);

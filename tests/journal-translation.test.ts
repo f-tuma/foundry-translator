@@ -12,6 +12,7 @@ const translationProvider: TranslationProvider = {
         .replace("The Invitation", "Pozvání")
         .replace("Arrival", "Příchod")
         .replace("Appendix", "Dodatek")
+        .replace("Opening Chapters", "Úvodní kapitoly")
         .replace("welcomes", "vítá")
         .replace("the heroes", "hrdiny")
         .replace("Player overview", "Přehled pro hráče")
@@ -28,11 +29,19 @@ describe("Journal translation", () => {
       _id: "journal-id",
       _stats: { modifiedTime: 123 },
       name: "The Invitation",
+      categories: [
+        {
+          _id: "category-one",
+          name: "Opening Chapters",
+          sort: 100_000,
+        },
+      ],
       pages: [
         {
           _id: "page-one",
           _stats: { modifiedTime: 123 },
           name: "Arrival",
+          category: "category-one",
           type: "ember.lore",
           text: {
             format: 1,
@@ -89,6 +98,14 @@ describe("Journal translation", () => {
     expect(translated.data._id).toBeUndefined();
     expect(translated.data._stats).toBeUndefined();
     expect(translated.data.name).toBe("Pozvání [CS]");
+    expect(translated.data.categories).toEqual([
+      {
+        _id: "category-one",
+        name: "Úvodní kapitoly",
+        sort: 100_000,
+      },
+    ]);
+    expect(translated.data.pages[0]?.category).toBe("category-one");
     expect(translated.data.pages[0]?._stats).toBeUndefined();
     expect(translated.data.pages[0]?.name).toBe("Příchod");
     expect(translated.data.pages[0]?.text?.content).toBe(

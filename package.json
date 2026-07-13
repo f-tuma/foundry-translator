@@ -1,6 +1,6 @@
 {
   "name": "foundry-translate",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "type": "module",
   "description": "Reliable, glossary-aware adventure translation for Foundry VTT v14.",
@@ -14,10 +14,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm run test && npm run build",
+    "diagnose:chrome": "node scripts/diagnose-chrome-translator.mjs",
     "release:verify": "node scripts/verify-release.mjs"
   },
   "devDependencies": {
     "linkedom": "^0.18.13",
+    "playwright-core": "^1.61.1",
     "typescript": "^5.8.3",
     "vite": "^7.0.0",
     "vitest": "^3.2.4"

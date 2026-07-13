@@ -3,8 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.7.0` processes
-> long Journals page by page, bounds provider request sizes, resumes from the
+> The module is currently an early development build. Version `0.7.1` processes
+> long Journals page by page, preserves glossary and HTML protection markers
+> outside Chrome's model, translates Journal page categories, resumes from the
 > server cache after failures, and reports live page progress.
 
 ## Installation
@@ -78,8 +79,8 @@ You can also open a world Journal Entry and select **Translate this journal**
 directly in its header. A visible header button and the standard header controls
 menu provide the same safe translation action.
 
-The current development build translates the journal name, page names, and
-HTML-backed pages, including custom page types used by adventure modules.
+The current development build translates the journal name, page-category names,
+page names, and HTML-backed pages, including custom page types used by adventure modules.
 Inline markup and attributes remain local, while Foundry references such as
 `@UUID[...]` and inline rolls such as `[[/r 1d20]]` are integrity-protected.
 Markdown source pages are deliberately left unchanged for now and reported in
@@ -107,7 +108,19 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.7.0`
+For a real Chrome Translator diagnostic against a running local Foundry, use:
+
+```bash
+npm run diagnose:chrome
+```
+
+The diagnostic launches the installed Chromium/Chrome directly and connects over
+DevTools. This intentionally avoids automation defaults which disable Chromium's
+component updater and can produce a false TranslateKit failure. `FOUNDRY_URL`,
+`CHROMIUM_PATH`, `CHROMIUM_PROFILE`, `SOURCE_LANGUAGE`, and `TARGET_LANGUAGE` can
+be overridden through environment variables.
+
+The production module is generated in `dist/`. A release tag such as `v0.7.1`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

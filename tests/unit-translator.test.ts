@@ -150,13 +150,26 @@ describe("translation units", () => {
     expect(result).toEqual([["Strahd", " vstoupil do Castle Ravenloft."]]);
   });
 
-  it("batches at most 128 units per provider request", async () => {
+  it("uses smaller checkpoint batches for the sequential Chrome provider", async () => {
     const batchSizes: number[] = [];
     await translateUnits({
       units: Array.from({ length: 130 }, (_, index) => [`Text ${index}`]),
       glossary: [],
       provider: provider((text) => text, batchSizes),
       settings,
+      nonceFactory: () => crypto.randomUUID().replaceAll("-", ""),
+    });
+
+    expect(batchSizes).toEqual([16, 16, 16, 16, 16, 16, 16, 16, 2]);
+  });
+
+  it("keeps full request batches for network providers", async () => {
+    const batchSizes: number[] = [];
+    await translateUnits({
+      units: Array.from({ length: 130 }, (_, index) => [`Text ${index}`]),
+      glossary: [],
+      provider: provider((text) => text, batchSizes),
+      settings: { ...settings, providerId: "google-cloud-basic" },
       nonceFactory: () => crypto.randomUUID().replaceAll("-", ""),
     });
 

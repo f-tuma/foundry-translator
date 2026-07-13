@@ -138,6 +138,57 @@ describe("ChromeLocalProvider", () => {
     ).resolves.toEqual([{ translatedText: "cs:Castle" }]);
   });
 
+  it("retries sporadic empty translations from a long-running Chrome session", async () => {
+    let calls = 0;
+    const Translator = createTranslatorFactory((text) => {
+      calls += 1;
+      return calls === 1 ? "" : `cs:${text}`;
+    });
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+
+    await expect(
+      provider.translate({ texts: ["Castle"], sourceLanguage: "en", targetLanguage: "cs" }),
+    ).resolves.toEqual([{ translatedText: "cs:Castle" }]);
+    expect(calls).toBe(2);
+  });
+
+  it("fails after three consecutive empty Chrome translations", async () => {
+    let calls = 0;
+    const Translator = createTranslatorFactory(() => {
+      calls += 1;
+      return "";
+    });
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+
+    await expect(
+      provider.translate({ texts: ["Castle"], sourceLanguage: "en", targetLanguage: "cs" }),
+    ).rejects.toThrow("po 3 pokusech");
+    expect(calls).toBe(3);
+  });
+
+  it("keeps HTML and glossary protection tokens out of Chrome", async () => {
+    const translatedInputs: string[] = [];
+    const Translator = createTranslatorFactory((text) => {
+      translatedInputs.push(text);
+      return text.replace("Hello", "Ahoj").replace("world", "světe");
+    });
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+    const first = "__FTN_BOUNDARY_0000__";
+    const second = "__FTN_BOUNDARY_0001__";
+    const third = "__FTN_BOUNDARY_0002__";
+
+    const glossary = "__FTG_GLOSSARY0_0000__";
+    await expect(provider.translate({
+      texts: [`${first}Hello ${glossary} ${second}world${third}`],
+      sourceLanguage: "en",
+      targetLanguage: "cs",
+    })).resolves.toEqual([{
+      translatedText: `${first}Ahoj ${glossary} ${second}světe${third}`,
+    }]);
+    expect(translatedInputs).toEqual(["Hello ", "world"]);
+    expect(translatedInputs.join(" ")).not.toMatch(/__FT[NG]_/u);
+  });
+
   it("prepares the selected language pair immediately from a user action", async () => {
     const Translator = createTranslatorFactory();
     const provider = new ChromeLocalProvider({ apis: { Translator } });
@@ -175,7 +226,7 @@ describe("ChromeLocalProvider", () => {
     });
 
     const expectation = expect(provider.testConnection("cs")).rejects.toThrow(
-      "do 3 minut",
+      "do 5 minut",
     );
     await vi.advanceTimersByTimeAsync(100);
     await expectation;

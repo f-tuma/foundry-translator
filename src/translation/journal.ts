@@ -25,11 +25,18 @@ export interface JournalPageData extends Record<string, unknown> {
   system?: Record<string, unknown>;
 }
 
+export interface JournalCategoryData extends Record<string, unknown> {
+  _id?: string;
+  id?: string;
+  name: string;
+}
+
 export interface JournalData extends Record<string, unknown> {
   _id?: string;
   _stats?: unknown;
   name: string;
   pages: JournalPageData[];
+  categories?: JournalCategoryData[];
   flags?: Record<string, Record<string, unknown>>;
 }
 
@@ -147,6 +154,7 @@ async function translateTargets(
 function sourceSnapshot(source: JournalData): string {
   return JSON.stringify({
     name: source.name,
+    categories: source.categories,
     pages: source.pages.map((page) => ({
       id: page._id,
       name: page.name,
@@ -177,6 +185,24 @@ export async function translateJournalData(
       copy.name = `${translatedName ?? copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
     },
   }], []);
+
+  if (copy.categories?.length) {
+    const categoryTargets = copy.categories.map<TranslationTarget>((category) => ({
+      segments: [category.name],
+      apply: ([translatedName]) => {
+        category.name = translatedName ?? category.name;
+      },
+    }));
+    try {
+      await translateTargets(options, categoryTargets, []);
+    } catch (error) {
+      const detail = error instanceof Error ? ` ${error.message}` : "";
+      throw new Error(
+        `Překlad skupin stránek deníku selhal.${detail} Hotové části zůstávají v cache pro další pokus.`,
+        { cause: error },
+      );
+    }
+  }
 
   for (const [pageIndex, page] of copy.pages.entries()) {
     const sourcePageName = page.name;
