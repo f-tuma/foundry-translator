@@ -1,4 +1,5 @@
 import { MODULE_ID } from "../constants";
+import { GlossaryApplication } from "../glossary/glossary-app";
 import { SETTINGS } from "./settings";
 import { TranslatorSettingsApplication } from "./translator-settings-app";
 
@@ -45,6 +46,15 @@ export function registerSettings(): void {
     hint: "FOUNDRY_TRANSLATE.Settings.Menu.Hint",
     icon: "fa-solid fa-language",
     type: TranslatorSettingsApplication,
+    restricted: true,
+  });
+
+  game.settings.registerMenu(MODULE_ID, "glossary", {
+    name: "FOUNDRY_TRANSLATE.Glossary.Menu.Name",
+    label: "FOUNDRY_TRANSLATE.Glossary.Menu.Label",
+    hint: "FOUNDRY_TRANSLATE.Glossary.Menu.Hint",
+    icon: "fa-solid fa-book-bookmark",
+    type: GlossaryApplication,
     restricted: true,
   });
 }

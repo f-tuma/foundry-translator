@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.3.2` adds a
-> free on-device Chrome translator alongside Google Cloud, with explicit model
-> download and readiness states; document translation is not implemented yet.
+> The module is currently an early development build. Version `0.4.0` adds a
+> world-compendium glossary for protected character, location, and custom names.
+> Document translation is not implemented yet.
 
 ## Installation
 
@@ -52,6 +52,20 @@ stored in the world or shared with players.
 The provider test performs one short English-to-Czech translation. Google Cloud
 requires a project with billing and the Cloud Translation API enabled.
 
+## Protected name glossary
+
+As Game Master open **Configure Settings → Module Settings → Name glossary** and
+select **Manage glossary**. The module discovers the names of world Actors and
+Scenes without modifying those documents. **Synchronize names** creates or
+updates entries in the `Foundry Translate — Name glossary` world compendium.
+
+Repeated synchronization does not create duplicates. Renamed Actors and Scenes
+are detected by UUID, while manually customized replacements are preserved. You
+can also add custom names such as factions or artifacts. Before future document
+translation, exact glossary matches will be replaced by unique tokens; if a
+provider loses, duplicates, or changes a token, the translation will be rejected
+instead of returning a corrupted name.
+
 ## Development
 
 Requires Node.js 22 or newer.
@@ -61,14 +75,13 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.3.2`
+The production module is generated in `dist/`. A release tag such as `v0.4.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 
 ## Planned functionality
 
 - Provider API keys stored in Foundry module settings
-- Exact protection of character and location names using a glossary
 - Translation cache stored in a world compendium
 - Detection of changed source documents and selective retranslation
 - Portable export and import of translation bundles
