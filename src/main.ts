@@ -1,10 +1,13 @@
 import { createApi } from "./api";
 import { MODULE_HOOKS, MODULE_ID, MODULE_TITLE } from "./constants";
 import { logger } from "./logger";
+import { registerSettings } from "./settings/register-settings";
 
 let ready = false;
 
 Hooks.once("init", () => {
+  registerSettings();
+
   const module = game.modules.get(MODULE_ID);
 
   if (!module) {
