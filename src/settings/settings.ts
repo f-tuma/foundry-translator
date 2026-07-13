@@ -7,16 +7,26 @@ export const SETTINGS = {
   TARGET_LANGUAGE: "targetLanguage",
 } as const;
 
-export interface GoogleSettings {
-  provider: "google-cloud-basic";
+export type ProviderId = "chrome-local" | "google-cloud-basic";
+
+export interface TranslatorSettings {
+  provider: ProviderId;
   apiKey: string;
   sourceLanguage: string;
   targetLanguage: string;
 }
 
-export function getGoogleSettings(): GoogleSettings {
+export function isProviderId(value: string): value is ProviderId {
+  return value === "chrome-local" || value === "google-cloud-basic";
+}
+
+export function getTranslatorSettings(): TranslatorSettings {
+  const storedProvider = String(
+    game.settings.get(MODULE_ID, SETTINGS.PROVIDER) ?? "chrome-local",
+  );
+
   return {
-    provider: "google-cloud-basic",
+    provider: isProviderId(storedProvider) ? storedProvider : "chrome-local",
     apiKey: String(game.settings.get(MODULE_ID, SETTINGS.GOOGLE_API_KEY) ?? ""),
     sourceLanguage: String(
       game.settings.get(MODULE_ID, SETTINGS.SOURCE_LANGUAGE) ?? "auto",
@@ -27,7 +37,7 @@ export function getGoogleSettings(): GoogleSettings {
   };
 }
 
-export async function saveGoogleSettings(settings: GoogleSettings): Promise<void> {
+export async function saveTranslatorSettings(settings: TranslatorSettings): Promise<void> {
   await game.settings.set(MODULE_ID, SETTINGS.PROVIDER, settings.provider);
   await game.settings.set(MODULE_ID, SETTINGS.GOOGLE_API_KEY, settings.apiKey.trim());
   await game.settings.set(MODULE_ID, SETTINGS.SOURCE_LANGUAGE, settings.sourceLanguage);

@@ -1,13 +1,24 @@
-import { GoogleCloudBasicProvider } from "../providers/google-cloud-basic";
 import { logger } from "../logger";
-import { getGoogleSettings, saveGoogleSettings, type GoogleSettings } from "./settings";
-import { renderGoogleSettingsForm } from "./google-settings-view";
+import { ChromeLocalProvider } from "../providers/chrome-local";
+import { GoogleCloudBasicProvider } from "../providers/google-cloud-basic";
+import type { TranslationProvider } from "../providers/types";
+import {
+  getTranslatorSettings,
+  isProviderId,
+  saveTranslatorSettings,
+  type ProviderId,
+  type TranslatorSettings,
+} from "./settings";
+import {
+  renderTranslatorSettingsForm,
+  updateProviderFields,
+} from "./translator-settings-view";
 
 type ConnectionState = "idle" | "testing" | "success" | "error";
 
-export class GoogleSettingsApplication extends foundry.applications.api.ApplicationV2 {
+export class TranslatorSettingsApplication extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
-    id: "foundry-translate-google-settings",
+    id: "foundry-translate-settings",
     classes: ["foundry-translate", "foundry-translate-settings-window"],
     position: {
       width: 620,
@@ -21,7 +32,7 @@ export class GoogleSettingsApplication extends foundry.applications.api.Applicat
   };
 
   protected async _renderHTML(): Promise<HTMLFormElement> {
-    return renderGoogleSettingsForm(getGoogleSettings());
+    return renderTranslatorSettingsForm(getTranslatorSettings());
   }
 
   protected _replaceHTML(result: HTMLFormElement, content: HTMLElement): void {
@@ -39,6 +50,10 @@ export class GoogleSettingsApplication extends foundry.applications.api.Applicat
     form
       .querySelector<HTMLElement>("[data-action='toggle-key']")
       ?.addEventListener("click", (event) => this.#toggleKey(event, form));
+    const providerSelect = form.elements.namedItem("provider");
+    if (providerSelect instanceof HTMLSelectElement) {
+      providerSelect.addEventListener("change", () => this.#providerChanged(form));
+    }
   }
 
   async #save(event: SubmitEvent, form: HTMLFormElement): Promise<void> {
@@ -46,10 +61,10 @@ export class GoogleSettingsApplication extends foundry.applications.api.Applicat
     const settings = this.#readForm(form);
 
     try {
-      await saveGoogleSettings(settings);
+      await saveTranslatorSettings(settings);
       ui.notifications.success("FOUNDRY_TRANSLATE.Settings.Status.Saved", { localize: true });
     } catch (error) {
-      logger.error("Google Cloud Translation connection test failed.", error);
+      logger.error("Translator settings could not be saved.", error);
       const message =
         error instanceof Error
           ? error.message
@@ -64,13 +79,36 @@ export class GoogleSettingsApplication extends foundry.applications.api.Applicat
     const button = form.querySelector<HTMLButtonElement>("[data-action='test-connection']");
 
     button?.setAttribute("disabled", "");
-    this.#setStatus(form, "testing", "FOUNDRY_TRANSLATE.Settings.Status.Testing");
+    this.#setStatus(
+      form,
+      "testing",
+      settings.provider === "chrome-local"
+        ? "FOUNDRY_TRANSLATE.Settings.Status.TestingChrome"
+        : "FOUNDRY_TRANSLATE.Settings.Status.TestingGoogle",
+    );
 
     try {
-      const provider = new GoogleCloudBasicProvider(settings.apiKey);
+      const provider = this.#createProvider(settings, (progress) => {
+        const template = game.i18n.localize(
+          "FOUNDRY_TRANSLATE.Settings.Status.DownloadingChrome",
+        );
+        this.#setStatus(
+          form,
+          "testing",
+          template.replace("{progress}", String(Math.round(progress * 100))),
+          false,
+        );
+      });
       await provider.testConnection(settings.targetLanguage);
-      this.#setStatus(form, "success", "FOUNDRY_TRANSLATE.Settings.Status.Connected");
+      this.#setStatus(
+        form,
+        "success",
+        settings.provider === "chrome-local"
+          ? "FOUNDRY_TRANSLATE.Settings.Status.ConnectedChrome"
+          : "FOUNDRY_TRANSLATE.Settings.Status.ConnectedGoogle",
+      );
     } catch (error) {
+      logger.error("Translation provider test failed.", error);
       const message =
         error instanceof Error
           ? error.message
@@ -79,6 +117,23 @@ export class GoogleSettingsApplication extends foundry.applications.api.Applicat
     } finally {
       button?.removeAttribute("disabled");
     }
+  }
+
+  #createProvider(
+    settings: TranslatorSettings,
+    onDownloadProgress: (progress: number) => void,
+  ): TranslationProvider {
+    if (settings.provider === "chrome-local") {
+      return new ChromeLocalProvider({ onDownloadProgress });
+    }
+
+    return new GoogleCloudBasicProvider(settings.apiKey);
+  }
+
+  #providerChanged(form: HTMLFormElement): void {
+    const provider = this.#readProvider(form);
+    updateProviderFields(form, provider);
+    this.#setStatus(form, "idle", "FOUNDRY_TRANSLATE.Settings.Status.NotTested");
   }
 
   #toggleKey(event: Event, form: HTMLFormElement): void {
@@ -100,10 +155,16 @@ export class GoogleSettingsApplication extends foundry.applications.api.Applicat
     if (accessibleLabel) accessibleLabel.textContent = button.title;
   }
 
-  #readForm(form: HTMLFormElement): GoogleSettings {
+  #readProvider(form: HTMLFormElement): ProviderId {
+    const data = new FormData(form);
+    const provider = String(data.get("provider") ?? "chrome-local");
+    return isProviderId(provider) ? provider : "chrome-local";
+  }
+
+  #readForm(form: HTMLFormElement): TranslatorSettings {
     const data = new FormData(form);
     return {
-      provider: "google-cloud-basic",
+      provider: this.#readProvider(form),
       apiKey: String(data.get("apiKey") ?? "").trim(),
       sourceLanguage: String(data.get("sourceLanguage") ?? "auto"),
       targetLanguage: String(data.get("targetLanguage") ?? "cs"),

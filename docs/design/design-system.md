@@ -55,7 +55,8 @@ No gradients or glow. Shadows are exceptional; separation comes from fine border
 
 - Compact 620px Foundry ApplicationV2 surface, not a separate full-screen shell.
 - The established dark background, fine borders, brass primary action and sparse outline icons remain unchanged.
-- Form order: provider, protected API key, source/target language, privacy note, connection status, actions.
+- Form order: provider, provider-specific credentials when needed, source/target language, privacy note, connection status, actions.
+- Chrome Local Translator is the no-key default; Google Cloud remains an optional provider.
 - Connection status has idle, testing, success and error states using muted, warning, success and danger tokens.
 - The API key visibility control and all buttons require visible keyboard focus.
 
