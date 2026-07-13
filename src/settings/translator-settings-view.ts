@@ -1,10 +1,18 @@
-import type { GoogleSettings } from "./settings";
+import type { ProviderId, TranslatorSettings } from "./settings";
 
 function localize(key: string): string {
   return game.i18n.localize(key);
 }
 
-export function renderGoogleSettingsForm(settings: GoogleSettings): HTMLFormElement {
+export function updateProviderFields(form: HTMLFormElement, provider: ProviderId): void {
+  for (const element of form.querySelectorAll<HTMLElement>("[data-provider-only]")) {
+    element.hidden = element.dataset.providerOnly !== provider;
+  }
+}
+
+export function renderTranslatorSettingsForm(
+  settings: TranslatorSettings,
+): HTMLFormElement {
   const form = document.createElement("form");
   form.className = "ft-settings";
   form.autocomplete = "off";
@@ -22,13 +30,15 @@ export function renderGoogleSettingsForm(settings: GoogleSettings): HTMLFormElem
     <div class="ft-settings__fields">
       <div class="ft-field">
         <label for="ft-provider">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Name")}</label>
-        <select id="ft-provider" disabled>
+        <select id="ft-provider" name="provider">
+          <option value="chrome-local">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Chrome")}</option>
           <option value="google-cloud-basic">Google Cloud Translation — Basic v2</option>
         </select>
-        <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Hint")}</p>
+        <p class="ft-field__hint" data-provider-only="chrome-local">${localize("FOUNDRY_TRANSLATE.Settings.Provider.ChromeHint")}</p>
+        <p class="ft-field__hint" data-provider-only="google-cloud-basic">${localize("FOUNDRY_TRANSLATE.Settings.Provider.GoogleHint")}</p>
       </div>
 
-      <div class="ft-field">
+      <div class="ft-field" data-provider-only="google-cloud-basic">
         <label for="ft-api-key">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Name")}</label>
         <div class="ft-secret-input">
           <input id="ft-api-key" name="apiKey" type="password" spellcheck="false" autocomplete="off">
@@ -65,9 +75,14 @@ export function renderGoogleSettingsForm(settings: GoogleSettings): HTMLFormElem
       </div>
     </div>
 
-    <aside class="ft-settings__privacy">
+    <aside class="ft-settings__privacy" data-provider-only="chrome-local">
       <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-      <p>${localize("FOUNDRY_TRANSLATE.Settings.Privacy")}</p>
+      <p>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyChrome")}</p>
+    </aside>
+
+    <aside class="ft-settings__privacy" data-provider-only="google-cloud-basic">
+      <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+      <p>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyGoogle")}</p>
     </aside>
 
     <div class="ft-connection-status" data-state="idle" role="status" aria-live="polite">
@@ -76,7 +91,11 @@ export function renderGoogleSettingsForm(settings: GoogleSettings): HTMLFormElem
     </div>
 
     <footer class="ft-settings__actions">
-      <a class="ft-settings__cloud-link" href="https://console.cloud.google.com/apis/library/translate.googleapis.com" target="_blank" rel="noreferrer">
+      <a class="ft-settings__cloud-link" data-provider-only="chrome-local" href="https://developer.chrome.com/docs/ai/translator-api" target="_blank" rel="noreferrer">
+        ${localize("FOUNDRY_TRANSLATE.Settings.OpenChromeHelp")}
+        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+      </a>
+      <a class="ft-settings__cloud-link" data-provider-only="google-cloud-basic" href="https://console.cloud.google.com/apis/library/translate.googleapis.com" target="_blank" rel="noreferrer">
         ${localize("FOUNDRY_TRANSLATE.Settings.OpenGoogleCloud")}
         <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
       </a>
@@ -93,13 +112,16 @@ export function renderGoogleSettingsForm(settings: GoogleSettings): HTMLFormElem
     </footer>
   `;
 
+  const provider = form.elements.namedItem("provider");
   const apiKey = form.elements.namedItem("apiKey");
   const sourceLanguage = form.elements.namedItem("sourceLanguage");
   const targetLanguage = form.elements.namedItem("targetLanguage");
 
+  if (provider instanceof HTMLSelectElement) provider.value = settings.provider;
   if (apiKey instanceof HTMLInputElement) apiKey.value = settings.apiKey;
   if (sourceLanguage instanceof HTMLSelectElement) sourceLanguage.value = settings.sourceLanguage;
   if (targetLanguage instanceof HTMLSelectElement) targetLanguage.value = settings.targetLanguage;
 
+  updateProviderFields(form, settings.provider);
   return form;
 }

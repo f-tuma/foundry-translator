@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.2.1` adds the
-> first Google Cloud Translation provider settings and connection test; document
-> translation is not implemented yet.
+> The module is currently an early development build. Version `0.3.0` adds a
+> free on-device Chrome translator alongside Google Cloud; document translation
+> is not implemented yet.
 
 ## Installation
 
@@ -34,15 +34,23 @@ game.modules.get("foundry-translate")?.api;
 The first expression should return `true`. The API object should report
 `isReady(): true` after the world finishes loading.
 
-## Google Cloud Translation setup
+## Translation provider setup
 
 As Game Master open **Configure Settings → Module Settings → Foundry Translate**
-and select **Configure translator**. The API key is a client-scoped setting: it
-stays in the current browser and is not stored in the world or shared with players.
+and select **Configure translator**.
 
-The connection test sends one short translation request to the official Google
-Cloud Translation Basic v2 endpoint. A Google Cloud project with billing and the
-Cloud Translation API enabled is required.
+**Chrome Local Translator** is the default for new worlds. It requires desktop
+Chrome 138 or newer, downloads the selected language pack on first use, and then
+translates on-device without an API key, character quota, or sending adventure
+text to a translation service. Automatic source-language detection also runs in
+the browser.
+
+**Google Cloud Translation Basic v2** remains available as an optional provider.
+Its API key is a client-scoped setting: it stays in the current browser and is not
+stored in the world or shared with players.
+
+The provider test performs one short English-to-Czech translation. Google Cloud
+requires a project with billing and the Cloud Translation API enabled.
 
 ## Development
 
@@ -53,7 +61,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.2.1`
+The production module is generated in `dist/`. A release tag such as `v0.3.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

@@ -1,6 +1,6 @@
 import { MODULE_ID } from "../constants";
-import { GoogleSettingsApplication } from "./google-settings-app";
 import { SETTINGS } from "./settings";
+import { TranslatorSettingsApplication } from "./translator-settings-app";
 
 export function registerSettings(): void {
   game.settings.register(MODULE_ID, SETTINGS.PROVIDER, {
@@ -9,7 +9,7 @@ export function registerSettings(): void {
     scope: "world",
     config: false,
     type: String,
-    default: "google-cloud-basic",
+    default: "chrome-local",
   });
 
   game.settings.register(MODULE_ID, SETTINGS.GOOGLE_API_KEY, {
@@ -44,7 +44,7 @@ export function registerSettings(): void {
     label: "FOUNDRY_TRANSLATE.Settings.Menu.Label",
     hint: "FOUNDRY_TRANSLATE.Settings.Menu.Hint",
     icon: "fa-solid fa-language",
-    type: GoogleSettingsApplication,
+    type: TranslatorSettingsApplication,
     restricted: true,
   });
 }
