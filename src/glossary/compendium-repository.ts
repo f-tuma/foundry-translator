@@ -1,9 +1,11 @@
 import { MODULE_ID, MODULE_TITLE } from "../constants";
+import { findStorageFolder, storageFolderData } from "../storage/compendium-folder";
 import { GLOSSARY_SCHEMA_VERSION, type GlossaryDocumentFlag, type GlossaryEntry } from "./types";
 import { planGlossarySync } from "./sync";
 
 export const GLOSSARY_PACK_NAME = "foundry-translate-glossary" as const;
 export const GLOSSARY_PACK_ID = `world.${GLOSSARY_PACK_NAME}` as const;
+export const GLOSSARY_PACK_LABEL = `${MODULE_TITLE} — Glossary` as const;
 export const GLOSSARY_FLAG_PATH = `flags.${MODULE_ID}.glossary` as const;
 
 export interface GlossarySyncResult {
@@ -68,18 +70,38 @@ function toDocumentData(entry: GlossaryEntry): FoundryJournalEntryData {
 
 async function ensureGlossaryPack(): Promise<FoundryCompendiumCollection> {
   const existing = game.packs.get(GLOSSARY_PACK_ID);
-  if (existing) return existing;
+  if (existing) {
+    await ensurePackOrganization(existing);
+    return existing;
+  }
 
   if (!game.user?.isGM) {
     throw new Error("Slovník ještě neexistuje a vytvořit jej může pouze Game Master.");
   }
 
-  return foundry.documents.collections.CompendiumCollection.createCompendium({
-    label: `${MODULE_TITLE} — Slovník názvů`,
+  const created = await foundry.documents.collections.CompendiumCollection.createCompendium({
+    label: GLOSSARY_PACK_LABEL,
     name: GLOSSARY_PACK_NAME,
     type: "JournalEntry",
     package: "world",
   });
+  await ensurePackOrganization(created);
+  return created;
+}
+
+async function ensurePackOrganization(pack: FoundryCompendiumCollection): Promise<void> {
+  if (!game.user?.isGM) return;
+
+  let folder = findStorageFolder(game.folders.contents) as FoundryFolder | undefined;
+  if (!folder) {
+    const created = await foundry.documents.Folder.implementation.create(storageFolderData());
+    if (!created || Array.isArray(created)) {
+      throw new Error("Složku Foundry Translate se nepodařilo vytvořit.");
+    }
+    folder = created;
+  }
+
+  if (pack.folder?.id !== folder.id) await pack.setFolder(folder);
 }
 
 async function loadFromPack(pack: FoundryCompendiumCollection): Promise<GlossaryEntry[]> {

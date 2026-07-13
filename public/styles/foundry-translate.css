@@ -336,59 +336,6 @@
   text-align: center;
 }
 
-.ft-glossary__preview {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  padding: 1px;
-  border: 1px solid var(--ft-color-border);
-  border-radius: var(--ft-radius-md);
-  overflow: hidden;
-  list-style: none;
-  background: var(--ft-color-border);
-}
-
-.ft-glossary__preview li {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr) auto 16px;
-  align-items: center;
-  gap: var(--ft-space-2);
-  min-height: 38px;
-  padding: 7px 10px;
-  background: var(--ft-color-surface);
-}
-
-.ft-glossary__term {
-  overflow: hidden;
-  color: var(--ft-color-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ft-glossary__category {
-  color: var(--ft-color-text-muted);
-  font-size: 11px;
-}
-
-.ft-glossary__preview .fa-circle-check {
-  color: var(--ft-color-success);
-}
-
-.ft-glossary__preview .fa-circle-plus {
-  color: var(--ft-color-accent);
-}
-
-.ft-glossary__preview .ft-glossary__more {
-  display: block;
-  grid-column: 1 / -1;
-  min-height: 0;
-  color: var(--ft-color-text-muted);
-  font-size: 12px;
-  text-align: center;
-}
-
 .ft-glossary__manual {
   display: flex;
   gap: var(--ft-space-2);
@@ -505,8 +452,7 @@
     width: 100%;
   }
 
-  .ft-glossary__stats,
-  .ft-glossary__preview {
+  .ft-glossary__stats {
     grid-template-columns: 1fr;
   }
 
