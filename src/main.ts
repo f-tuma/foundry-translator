@@ -2,11 +2,13 @@ import { createApi } from "./api";
 import { MODULE_HOOKS, MODULE_ID, MODULE_TITLE } from "./constants";
 import { logger } from "./logger";
 import { registerSettings } from "./settings/register-settings";
+import { registerJournalTranslationHeaderControl } from "./translation/journal-header-control";
 
 let ready = false;
 
 Hooks.once("init", () => {
   registerSettings();
+  registerJournalTranslationHeaderControl();
 
   const module = game.modules.get(MODULE_ID);
 

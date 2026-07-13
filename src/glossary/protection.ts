@@ -103,7 +103,7 @@ export function protectGlossaryTerms(
   entries: Iterable<GlossaryEntry>,
   options: ProtectGlossaryOptions = {},
 ): GlossaryProtection {
-  const nonce = options.nonce ?? createNonce();
+  const nonce = (options.nonce ?? createNonce()).toUpperCase();
   assertNonce(nonce);
 
   const candidates = collectCandidates(entries);
@@ -132,7 +132,7 @@ export function protectGlossaryTerms(
       continue;
     }
 
-    const token = `⟦FT:${nonce}:${tokens.length.toString(36).padStart(4, "0")}⟧`;
+    const token = `__FTG_${nonce}_${tokens.length.toString(36).toUpperCase().padStart(4, "0")}__`;
     tokens.push({
       token,
       source: candidate.term,
@@ -150,7 +150,10 @@ export function restoreGlossaryTerms(
   protection: GlossaryProtection,
 ): string {
   const knownTokens = new Set(protection.tokens.map(({ token }) => token));
-  const tokenPattern = new RegExp(`⟦FT:${escapeRegExp(protection.nonce)}:[^⟧]+⟧`, "gu");
+  const tokenPattern = new RegExp(
+    `__FTG_${escapeRegExp(protection.nonce)}_[A-Z0-9]+__`,
+    "gu",
+  );
 
   for (const found of translatedText.matchAll(tokenPattern)) {
     if (!knownTokens.has(found[0])) {

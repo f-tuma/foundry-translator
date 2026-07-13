@@ -84,5 +84,9 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Translating": "Překládám názvy a obsah deníku…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Missing": "Vybraný deník už ve světě neexistuje.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done": "Kopie je hotová: {pages} HTML stránek přeloženo, {skipped} nepodporovaných přeskočeno.",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Status.Error": "Deník se nepodařilo přeložit."
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.Error": "Deník se nepodařilo přeložit.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.Action": "Přeložit tento deník",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting": "Foundry Translate připravuje tento deník…",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading": "Chrome stahuje lokální překladový model. Překlad bude automaticky pokračovat…",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "Tento deník se už překládá."
 }

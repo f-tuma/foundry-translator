@@ -147,12 +147,14 @@ declare const foundry: {
 
 declare const ui: {
   notifications: {
+    info(message: string, options?: { localize?: boolean; permanent?: boolean }): unknown;
     success(message: string, options?: { localize?: boolean }): unknown;
     error(message: string, options?: { localize?: boolean; permanent?: boolean }): unknown;
   };
 };
 
 interface FoundryHooks {
+  on(hook: string, callback: (...args: any[]) => void): number;
   once(hook: string, callback: (...args: unknown[]) => void): number;
   callAll(hook: string, ...args: unknown[]): boolean;
 }
