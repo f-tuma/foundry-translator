@@ -1,0 +1,44 @@
+{
+  "id": "foundry-translate",
+  "title": "Foundry Translate",
+  "description": "Reliable, glossary-aware adventure translation with portable translation bundles.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "f-tuma",
+      "url": "https://github.com/f-tuma"
+    }
+  ],
+  "url": "https://github.com/f-tuma/foundry-translator",
+  "manifest": "https://github.com/f-tuma/foundry-translator/releases/latest/download/module.json",
+  "download": "https://github.com/f-tuma/foundry-translator/releases/download/v0.1.0/foundry-translate.zip",
+  "readme": "https://github.com/f-tuma/foundry-translator#readme",
+  "bugs": "https://github.com/f-tuma/foundry-translator/issues",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "esmodules": [
+    "foundry-translate.js"
+  ],
+  "styles": [
+    "styles/foundry-translate.css"
+  ],
+  "languages": [
+    {
+      "lang": "cs",
+      "name": "Čeština",
+      "path": "lang/cs.json"
+    },
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "socket": true,
+  "persistentStorage": true,
+  "flags": {
+    "canUpload": true
+  }
+}

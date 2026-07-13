@@ -1,0 +1,26 @@
+:root {
+  --ft-color-bg: #101414;
+  --ft-color-surface: #171b1b;
+  --ft-color-surface-raised: #1d2120;
+  --ft-color-border: #3b403d;
+  --ft-color-text: #e7dfcc;
+  --ft-color-text-muted: #a8aaa4;
+  --ft-color-accent: #d7a925;
+  --ft-color-success: #54c9a3;
+  --ft-color-warning: #e4ad2f;
+  --ft-color-danger: #ec5f52;
+  --ft-radius-sm: 4px;
+  --ft-radius-md: 6px;
+  --ft-space-1: 4px;
+  --ft-space-2: 8px;
+  --ft-space-3: 12px;
+  --ft-space-4: 16px;
+  --ft-space-5: 24px;
+  --ft-space-6: 32px;
+}
+
+.foundry-translate {
+  color: var(--ft-color-text);
+  background: var(--ft-color-bg);
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
