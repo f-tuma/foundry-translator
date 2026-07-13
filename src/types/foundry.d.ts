@@ -17,6 +17,7 @@ interface FoundryGame {
   };
   actors: { contents: FoundryNamedDocument[] };
   scenes: { contents: FoundryNamedDocument[] };
+  journal: { contents: FoundryJournalWorldDocument[] };
   folders: { contents: FoundryFolder[] };
   packs: Map<string, FoundryCompendiumCollection>;
   user?: { isGM: boolean };
@@ -38,6 +39,7 @@ interface FoundryCompendiumCollection {
   locked: boolean;
   folder: FoundryFolder | null;
   getIndex(options?: { fields?: string[] }): Promise<Map<string, FoundryCompendiumIndexEntry>>;
+  getDocument(id: string): Promise<FoundryJournalDocument | undefined>;
   render(options?: boolean | Record<string, unknown>): unknown;
   setFolder(folder: string | FoundryFolder | null): Promise<void>;
 }
@@ -61,6 +63,18 @@ interface FoundryJournalEntryData {
   _id?: string;
   name: string;
   flags: Record<string, Record<string, unknown>>;
+}
+
+interface FoundryJournalDocument {
+  id: string | null;
+  flags?: Record<string, Record<string, unknown>>;
+}
+
+interface FoundryJournalWorldDocument extends FoundryJournalDocument {
+  name: string;
+  uuid: string;
+  toObject(): Record<string, unknown>;
+  sheet?: { render(options?: boolean | Record<string, unknown>): unknown };
 }
 
 interface FoundrySettingConfig {
@@ -109,10 +123,11 @@ declare const foundry: {
     };
     JournalEntry: {
       implementation: {
+        create(data: Record<string, unknown>): Promise<FoundryJournalWorldDocument | undefined>;
         createDocuments(
           data: FoundryJournalEntryData[],
           operation: { pack: string },
-        ): Promise<unknown[]>;
+        ): Promise<FoundryJournalDocument[]>;
         updateDocuments(
           data: FoundryJournalEntryData[],
           operation: { pack: string },

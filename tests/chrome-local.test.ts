@@ -138,6 +138,20 @@ describe("ChromeLocalProvider", () => {
     ).resolves.toEqual([{ translatedText: "cs:Castle" }]);
   });
 
+  it("prepares the selected language pair immediately from a user action", async () => {
+    const Translator = createTranslatorFactory();
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+
+    const preparation = provider.prepare({
+      texts: ["Castle Ravenloft"],
+      sourceLanguage: "en",
+      targetLanguage: "cs",
+    });
+
+    expect(Translator.create).toHaveBeenCalledOnce();
+    await preparation;
+  });
+
   it("reports when Chrome rejects creation of a language pair", async () => {
     const Translator = createTranslatorFactory();
     vi.mocked(Translator.create).mockRejectedValue(

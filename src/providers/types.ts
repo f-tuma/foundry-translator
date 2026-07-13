@@ -15,4 +15,5 @@ export interface TranslationResult {
 export interface TranslationProvider {
   translate(request: TranslateRequest): Promise<TranslationResult[]>;
   testConnection(targetLanguage: string): Promise<void>;
+  prepare?(request: TranslateRequest): Promise<void>;
 }

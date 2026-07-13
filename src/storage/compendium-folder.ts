@@ -42,3 +42,26 @@ export function storageFolderData(): FoundryFolderData {
     },
   };
 }
+
+export async function ensureStorageFolder(): Promise<FoundryFolder> {
+  let folder = findStorageFolder(game.folders.contents) as FoundryFolder | undefined;
+  if (folder) return folder;
+
+  if (!game.user?.isGM) {
+    throw new Error("Složku Foundry Translate může vytvořit pouze Game Master.");
+  }
+
+  const created = await foundry.documents.Folder.implementation.create(storageFolderData());
+  if (!created || Array.isArray(created)) {
+    throw new Error("Složku Foundry Translate se nepodařilo vytvořit.");
+  }
+  return created;
+}
+
+export async function organizeCompendiumPack(
+  pack: FoundryCompendiumCollection,
+): Promise<void> {
+  if (!game.user?.isGM) return;
+  const folder = await ensureStorageFolder();
+  if (pack.folder?.id !== folder.id) await pack.setFolder(folder);
+}
