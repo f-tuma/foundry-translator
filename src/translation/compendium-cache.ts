@@ -90,6 +90,23 @@ export class CompendiumTranslationCache implements TranslationCache {
     return flag?.key === key ? flag.translatedSegments : null;
   }
 
+  async getMany(keys: readonly string[]): Promise<Map<string, readonly string[]>> {
+    const pack = await this.#getPack();
+    const index = await this.#getKeyIndex(pack);
+    const uniqueKeys = [...new Set(keys)];
+    const documents = await Promise.all(uniqueKeys.map(async (key) => {
+      const id = index.get(key);
+      return { key, document: id ? await pack.getDocument(id) : undefined };
+    }));
+    const values = new Map<string, readonly string[]>();
+    for (const { key, document } of documents) {
+      if (!document) continue;
+      const flag = readDocumentFlag(document);
+      if (flag?.key === key) values.set(key, flag.translatedSegments);
+    }
+    return values;
+  }
+
   async set(key: string, translatedSegments: readonly string[]): Promise<void> {
     await this.setMany([{ key, translatedSegments }]);
   }

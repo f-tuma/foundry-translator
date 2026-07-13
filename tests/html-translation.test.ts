@@ -1,7 +1,10 @@
 import { parseHTML } from "linkedom";
 import { describe, expect, it } from "vitest";
 
-import { planHtmlTranslation } from "../src/translation/html";
+import {
+  MAX_HTML_UNIT_CHARACTERS,
+  planHtmlTranslation,
+} from "../src/translation/html";
 
 describe("HTML translation planning", () => {
   it("groups inline text for context while preserving markup and attributes", () => {
@@ -35,5 +38,20 @@ describe("HTML translation planning", () => {
     const plan = planHtmlTranslation("<p>Hello <em>world</em>.</p>", document);
 
     expect(() => plan.apply([["Ahoj světe."]])).toThrow(/Struktura/);
+  });
+
+  it("splits very long text at safe boundaries and joins it into the original node", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const source = "A long sentence for the translator. ".repeat(260);
+    const plan = planHtmlTranslation(`<p>${source}</p>`, document);
+
+    expect(plan.units.length).toBeGreaterThan(2);
+    expect(plan.units.every((unit) => unit.join("").length <= MAX_HTML_UNIT_CHARACTERS)).toBe(true);
+    const translated = plan.units.map((unit) =>
+      unit.map((segment) => segment.replaceAll("long sentence", "dlouhá věta")),
+    );
+    expect(plan.apply(translated)).toBe(
+      `<p>${source.replaceAll("long sentence", "dlouhá věta")}</p>`,
+    );
   });
 });

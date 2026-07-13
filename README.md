@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.6.3` translates
-> schema-defined custom HTML fields in Journal pages, including Ember's
-> player-facing overviews, Gamemaster content, exposition, and event summaries.
+> The module is currently an early development build. Version `0.7.0` processes
+> long Journals page by page, bounds provider request sizes, resumes from the
+> server cache after failures, and reports live page progress.
 
 ## Installation
 
@@ -87,7 +87,11 @@ the completion summary.
 
 Translated blocks are cached in the `Foundry Translate — Translation Cache`
 world compendium. Cache keys include source text, provider, language pair, and a
-glossary fingerprint. A single full translation per source Journal and target
+glossary fingerprint. Long HTML blocks are divided at safe text boundaries and
+provider requests are size-limited. Each page commits its blocks to cache before
+the next page starts, so retrying after a failure reuses completed work. If the
+source changes during translation, the stale result is rejected instead of
+being saved. A single full translation per source Journal and target
 language is stored in `Foundry Translate — Translations`, outside the world
 Journal sidebar. Opening the translated Journal provides a **Show original**
 action. Its source UUID and hash allow an unchanged translation to be reused and
@@ -103,7 +107,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.6.3`
+The production module is generated in `dist/`. A release tag such as `v0.7.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

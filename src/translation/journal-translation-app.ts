@@ -52,6 +52,14 @@ export class JournalTranslationApplication extends foundry.applications.api.Appl
     try {
       const service = new JournalTranslationService({
         onChromeStatus: (status) => this.#setChromeStatus(status),
+        onProgress: (progress) => {
+          const message = game.i18n
+            .localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress")
+            .replace("{current}", String(progress.completedPages))
+            .replace("{total}", String(progress.totalPages))
+            .replace("{page}", progress.pageName);
+          this.#setStatus("testing", message, false);
+        },
       });
       const result = await service.translate(journal);
       const template = game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.Done");

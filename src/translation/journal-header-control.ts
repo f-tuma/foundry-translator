@@ -1,6 +1,6 @@
 import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
-import { readJournalTranslationFlag } from "./journal";
+import { readJournalTranslationFlag, type JournalTranslationProgress } from "./journal";
 import { JournalTranslationService } from "./journal-service";
 
 interface JournalEntrySheetApplication {
@@ -30,6 +30,13 @@ function formatDoneMessage(pages: number, skipped: number): string {
   return localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.Done")
     .replace("{pages}", String(pages))
     .replace("{skipped}", String(skipped));
+}
+
+function formatProgress(progress: JournalTranslationProgress): string {
+  return localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress")
+    .replace("{current}", String(progress.completedPages))
+    .replace("{total}", String(progress.totalPages))
+    .replace("{page}", progress.pageName);
 }
 
 function worldJournal(entry: FoundryJournalDocument | undefined): FoundryJournalWorldDocument | null {
@@ -66,6 +73,10 @@ async function translateFromHeader(
   translationsInProgress.add(journal.uuid);
   ui.notifications.info(localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting"));
   let downloadNoticeShown = false;
+  const progressButton = application.window?.header.querySelector<HTMLButtonElement>(
+    ".ft-journal-translate-header",
+  );
+  const originalButtonLabel = progressButton?.querySelector("span")?.textContent ?? "";
 
   try {
     const service = new JournalTranslationService({
@@ -75,6 +86,15 @@ async function translateFromHeader(
         ui.notifications.info(
           localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading"),
         );
+      },
+      onProgress: (progress) => {
+        const message = formatProgress(progress);
+        const label = progressButton?.querySelector("span");
+        if (label) label.textContent = message;
+        if (progressButton) {
+          progressButton.title = message;
+          progressButton.setAttribute("aria-label", message);
+        }
       },
     });
     const result = await service.translate(journal);
@@ -90,6 +110,12 @@ async function translateFromHeader(
       { permanent: true },
     );
   } finally {
+    const label = progressButton?.querySelector("span");
+    if (label) label.textContent = originalButtonLabel;
+    if (progressButton) {
+      progressButton.title = originalButtonLabel;
+      progressButton.setAttribute("aria-label", originalButtonLabel);
+    }
     translationsInProgress.delete(journal.uuid);
   }
 }

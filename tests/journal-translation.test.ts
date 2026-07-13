@@ -1,7 +1,8 @@
 import { parseHTML } from "linkedom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { TranslationProvider } from "../src/providers/types";
+import { MemoryTranslationCache } from "../src/translation/cache";
 import { translateJournalData, type JournalData } from "../src/translation/journal";
 
 const translationProvider: TranslationProvider = {
@@ -112,5 +113,60 @@ describe("Journal translation", () => {
       sourceLanguage: "en",
       targetLanguage: "cs",
     });
+  });
+
+  it("commits cache page by page and resumes after a middle page fails", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const source: JournalData = {
+      name: "Long Journal",
+      pages: ["First", "Second", "Third"].map((name) => ({
+        name,
+        type: "text",
+        text: { format: 1, content: `<p>${name} content.</p>` },
+      })),
+    };
+    const cache = new MemoryTranslationCache();
+    const translatedInputs: string[] = [];
+    let failSecond = true;
+    const provider: TranslationProvider = {
+      async translate({ texts }) {
+        translatedInputs.push(...texts);
+        if (failSecond && texts.some((text) => text.includes("Second"))) {
+          failSecond = false;
+          throw new Error("Temporary provider failure");
+        }
+        return texts.map((text) => ({ translatedText: text }));
+      },
+      async testConnection() {},
+    };
+    const firstProgress = vi.fn();
+    const options = {
+      source,
+      sourceUuid: "JournalEntry.long",
+      glossary: [],
+      provider,
+      settings: {
+        providerId: "chrome-local" as const,
+        sourceLanguage: "en",
+        targetLanguage: "cs",
+      },
+      cache,
+      ownerDocument: document,
+      nonceFactory: () => "LONG",
+    };
+
+    await expect(translateJournalData({ ...options, onProgress: firstProgress })).rejects.toThrow(
+      /stránky 2\/3.*Second.*cache/,
+    );
+    expect(firstProgress).toHaveBeenCalledTimes(1);
+
+    const secondProgress = vi.fn();
+    const translated = await translateJournalData({ ...options, onProgress: secondProgress });
+
+    expect(translated.translatedTextPages).toBe(3);
+    expect(secondProgress.mock.calls.map(([progress]) => progress.completedPages)).toEqual([1, 2, 3]);
+    expect(translatedInputs.filter((text) => text.includes("Long Journal"))).toHaveLength(1);
+    expect(translatedInputs.filter((text) => text.includes("First"))).toHaveLength(2);
+    expect(translatedInputs.filter((text) => text.includes("Second"))).toHaveLength(4);
   });
 });

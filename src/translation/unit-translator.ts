@@ -11,6 +11,7 @@ import { sha256 } from "./hash";
 import { foundrySyntaxEntries } from "./foundry-syntax";
 
 const MAX_UNITS_PER_REQUEST = 128;
+export const MAX_REQUEST_CHARACTERS = 4_500;
 
 export interface TranslationUnitSettings {
   providerId: ProviderId;
@@ -28,11 +29,17 @@ export interface TranslateUnitsOptions {
 }
 
 interface PreparedUnit {
-  index: number;
+  indices: number[];
   key: string;
   protectedText: string;
-  segmentProtections: ReturnType<typeof protectGlossaryTerms>[];
+  segments: PreparedSegment[];
   boundaryTokens: string[];
+}
+
+interface PreparedSegment {
+  protection: ReturnType<typeof protectGlossaryTerms>;
+  leading: string;
+  trailing: string;
 }
 
 function glossarySnapshot(entries: readonly GlossaryEntry[]): string {
@@ -121,21 +128,11 @@ async function translateSegmentsSeparately(
   provider: TranslationProvider,
   settings: TranslationUnitSettings,
 ): Promise<string[]> {
-  const segments = prepared.segmentProtections.map(({ text }) => {
-    const leading = text.match(/^\s*/u)?.[0] ?? "";
-    const withoutLeading = text.slice(leading.length);
-    const trailing = withoutLeading.match(/\s*$/u)?.[0] ?? "";
-    return {
-      leading,
-      core: withoutLeading.slice(0, withoutLeading.length - trailing.length),
-      trailing,
-    };
-  });
-  const translatable = segments
-    .map(({ core }, index) => ({ core, index }))
-    .filter(({ core }) => core.length > 0);
+  const translatable = prepared.segments
+    .map(({ protection }, index) => ({ text: protection.text, index }))
+    .filter(({ text }) => text.length > 0);
   const results = await provider.translate({
-    texts: translatable.map(({ core }) => core),
+    texts: translatable.map(({ text }) => text),
     sourceLanguage: settings.sourceLanguage,
     targetLanguage: settings.targetLanguage,
     format: "text",
@@ -146,9 +143,50 @@ async function translateSegmentsSeparately(
   const translatedCores = new Map(
     translatable.map(({ index }, resultIndex) => [index, results[resultIndex]?.translatedText ?? ""]),
   );
-  return segments.map(({ leading, core, trailing }, index) =>
-    `${leading}${translatedCores.get(index) ?? core}${trailing}`,
+  return prepared.segments.map(({ protection }, index) =>
+    translatedCores.get(index) ?? protection.text,
   );
+}
+
+function prepareSegment(
+  segment: string,
+  glossary: readonly GlossaryEntry[],
+  nonce: string,
+): PreparedSegment {
+  const leading = segment.match(/^\s*/u)?.[0] ?? "";
+  const withoutLeading = segment.slice(leading.length);
+  const trailing = withoutLeading.match(/\s*$/u)?.[0] ?? "";
+  const core = withoutLeading.slice(0, withoutLeading.length - trailing.length);
+  return {
+    leading,
+    trailing,
+    protection: protectGlossaryTerms(
+      core,
+      [...glossary, ...foundrySyntaxEntries(core)],
+      { nonce },
+    ),
+  };
+}
+
+function requestBatches(misses: readonly PreparedUnit[]): PreparedUnit[][] {
+  const batches: PreparedUnit[][] = [];
+  let batch: PreparedUnit[] = [];
+  let characters = 0;
+  for (const prepared of misses) {
+    const size = prepared.protectedText.length;
+    if (
+      batch.length &&
+      (batch.length >= MAX_UNITS_PER_REQUEST || characters + size > MAX_REQUEST_CHARACTERS)
+    ) {
+      batches.push(batch);
+      batch = [];
+      characters = 0;
+    }
+    batch.push(prepared);
+    characters += size;
+  }
+  if (batch.length) batches.push(batch);
+  return batches;
 }
 
 export async function translateUnits(
@@ -159,12 +197,34 @@ export async function translateUnits(
   const glossaryFingerprint = await sha256(glossarySnapshot(options.glossary));
   const translated: (readonly string[] | undefined)[] = Array(options.units.length);
   const misses: PreparedUnit[] = [];
+  const missesByKey = new Map<string, PreparedUnit>();
+  const keyedUnits = await Promise.all(options.units.map(async (segments, index) => ({
+    index,
+    segments,
+    key: await cacheKey(segments, glossaryFingerprint, options.settings),
+  })));
+  let cachedValues = new Map<string, readonly string[]>();
+  if (options.cache?.getMany) {
+    cachedValues = await options.cache.getMany(keyedUnits.map(({ key }) => key));
+  } else if (options.cache) {
+    const values = await Promise.all(keyedUnits.map(async ({ key }) => ({
+      key,
+      value: await options.cache?.get(key),
+    })));
+    for (const { key, value } of values) {
+      if (value) cachedValues.set(key, value);
+    }
+  }
 
-  for (const [index, segments] of options.units.entries()) {
-    const key = await cacheKey(segments, glossaryFingerprint, options.settings);
-    const cached = await options.cache?.get(key);
+  for (const { index, segments, key } of keyedUnits) {
+    const cached = cachedValues.get(key);
     if (cached && cached.length === segments.length) {
       translated[index] = cached;
+      continue;
+    }
+    const duplicate = missesByKey.get(key);
+    if (duplicate) {
+      duplicate.indices.push(index);
       continue;
     }
 
@@ -172,26 +232,27 @@ export async function translateUnits(
     const boundaryTokens = segments.length > 1
       ? createBoundaryTokens(segments.length, nonce)
       : [];
-    const segmentProtections = segments.map((segment, segmentIndex) =>
-      protectGlossaryTerms(
+    const preparedSegments = segments.map((segment, segmentIndex) =>
+      prepareSegment(
         segment,
-        [...options.glossary, ...foundrySyntaxEntries(segment)],
-        { nonce: `${nonce}${segmentIndex.toString(36)}` },
+        options.glossary,
+        `${nonce}${segmentIndex.toString(36)}`,
       ),
     );
-    misses.push({
-      index,
+    const prepared: PreparedUnit = {
+      indices: [index],
       key,
       boundaryTokens,
       protectedText: boundaryTokens.length
-        ? combineSegments(segmentProtections.map(({ text }) => text), boundaryTokens)
-        : (segmentProtections[0]?.text ?? ""),
-      segmentProtections,
-    });
+        ? combineSegments(preparedSegments.map(({ protection }) => protection.text), boundaryTokens)
+        : (preparedSegments[0]?.protection.text ?? ""),
+      segments: preparedSegments,
+    };
+    misses.push(prepared);
+    missesByKey.set(key, prepared);
   }
 
-  for (let offset = 0; offset < misses.length; offset += MAX_UNITS_PER_REQUEST) {
-    const batch = misses.slice(offset, offset + MAX_UNITS_PER_REQUEST);
+  for (const batch of requestBatches(misses)) {
     const results = await options.provider.translate({
       texts: batch.map(({ protectedText }) => protectedText),
       sourceLanguage: options.settings.sourceLanguage,
@@ -226,11 +287,12 @@ export async function translateUnits(
         }
       }
       const segments = protectedSegments.map((segment, index) => {
-        const protection = prepared.segmentProtections[index];
-        if (!protection) throw new Error("Chybí ochrana přeloženého HTML segmentu.");
-        return restoreGlossaryTerms(segment, protection);
+        const preparedSegment = prepared.segments[index];
+        if (!preparedSegment) throw new Error("Chybí ochrana přeloženého HTML segmentu.");
+        const restored = restoreGlossaryTerms(segment, preparedSegment.protection);
+        return `${preparedSegment.leading}${restored}${preparedSegment.trailing}`;
       });
-      translated[prepared.index] = segments;
+      for (const index of prepared.indices) translated[index] = segments;
       cacheWrites.push({ key: prepared.key, translatedSegments: segments });
     }
 

@@ -9,6 +9,7 @@ import {
   readJournalTranslationFlag,
   translateJournalData,
   type JournalData,
+  type JournalTranslationProgress,
   type TranslatedJournal,
 } from "./journal";
 import {
@@ -19,6 +20,7 @@ import {
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
+  onProgress?: (progress: JournalTranslationProgress) => void;
 }
 
 export interface JournalTranslationResult extends TranslatedJournal {
@@ -68,11 +70,25 @@ function translationSample(
   return `${source.name}. ${contents}`.slice(0, 4000);
 }
 
+export async function assertJournalSourceUnchanged(
+  sourceDocument: FoundryJournalWorldDocument,
+  expectedHash: string,
+): Promise<void> {
+  const currentSourceHash = await journalSourceHash(sourceDocument.toObject() as JournalData);
+  if (currentSourceHash !== expectedHash) {
+    throw new Error(
+      "Zdrojový deník se během překladu změnil. Překlad nebyl uložen; spusťte jej znovu a hotové stránky se načtou z cache.",
+    );
+  }
+}
+
 export class JournalTranslationService {
   readonly #onChromeStatus: ((status: ChromeLocalProviderStatus) => void) | undefined;
+  readonly #onProgress: ((progress: JournalTranslationProgress) => void) | undefined;
 
   constructor(options: JournalTranslationServiceOptions = {}) {
     this.#onChromeStatus = options.onChromeStatus;
+    this.#onProgress = options.onProgress;
   }
 
   async translate(sourceDocument: FoundryJournalWorldDocument): Promise<JournalTranslationResult> {
@@ -125,7 +141,9 @@ export class JournalTranslationService {
       },
       cache: new CompendiumTranslationCache(),
       systemHtmlFieldPaths: htmlFieldPaths,
+      ...(this.#onProgress ? { onProgress: this.#onProgress } : {}),
     });
+    await assertJournalSourceUnchanged(sourceDocument, sourceHash);
     const document = await translations.save(translated.data);
 
     return { ...translated, document, reused: false };

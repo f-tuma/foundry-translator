@@ -163,6 +163,55 @@ describe("translation units", () => {
     expect(batchSizes).toEqual([128, 2]);
   });
 
+  it("keeps provider requests near the recommended character size", async () => {
+    const requestSizes: number[] = [];
+    await translateUnits({
+      units: [
+        ["A".repeat(2_000)],
+        ["B".repeat(2_000)],
+        ["C".repeat(2_000)],
+      ],
+      glossary: [],
+      provider: {
+        async translate({ texts }) {
+          requestSizes.push(texts.reduce((total, text) => total + text.length, 0));
+          return texts.map((text) => ({ translatedText: text }));
+        },
+        async testConnection() {},
+      },
+      settings,
+      nonceFactory: () => crypto.randomUUID().replaceAll("-", ""),
+    });
+
+    expect(requestSizes).toEqual([4_000, 2_000]);
+  });
+
+  it("deduplicates identical units within the same translation run", async () => {
+    const batchSizes: number[] = [];
+    const result = await translateUnits({
+      units: [["Repeated text"], ["Repeated text"], ["Repeated text"]],
+      glossary: [],
+      provider: provider((text) => text.replace("Repeated", "Opakovaný"), batchSizes),
+      settings,
+      nonceFactory: () => "DUPLICATE",
+    });
+
+    expect(batchSizes).toEqual([1]);
+    expect(result).toEqual([["Opakovaný text"], ["Opakovaný text"], ["Opakovaný text"]]);
+  });
+
+  it("reattaches exact outer whitespace even when the provider trims it", async () => {
+    const result = await translateUnits({
+      units: [["  Welcome.\n"]],
+      glossary: [],
+      provider: provider((text) => text.trim().replace("Welcome", "Vítejte")),
+      settings,
+      nonceFactory: () => "WHITESPACE",
+    });
+
+    expect(result).toEqual([["  Vítejte.\n"]]);
+  });
+
   it("keeps Foundry document references and inline rolls exact", async () => {
     const result = await translateUnits({
       units: [["Open @UUID[JournalEntry.abc]{the journal} and roll [[/r 1d20+5]]."]],

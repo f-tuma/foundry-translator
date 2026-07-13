@@ -26,6 +26,7 @@ const BLOCK_SELECTOR = [
 
 const EXCLUDED_SELECTOR = "code,pre,script,style,textarea,noscript,template";
 const TRANSLATABLE_TEXT = /[\p{L}\p{N}]/u;
+export const MAX_HTML_UNIT_CHARACTERS = 3_200;
 
 export interface HtmlTranslationPlan {
   units: readonly (readonly string[])[];
@@ -53,6 +54,62 @@ function hasTranslatableText(nodes: readonly Text[]): boolean {
   return TRANSLATABLE_TEXT.test(nodes.map(({ data }) => data).join(""));
 }
 
+function safeSliceEnd(text: string, end: number): number {
+  const previous = text.charCodeAt(end - 1);
+  const next = text.charCodeAt(end);
+  return previous >= 0xd800 && previous <= 0xdbff && next >= 0xdc00 && next <= 0xdfff
+    ? end - 1
+    : end;
+}
+
+function splitLongText(text: string): string[] {
+  if (text.length <= MAX_HTML_UNIT_CHARACTERS) return [text];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(text.length, start + MAX_HTML_UNIT_CHARACTERS);
+    if (end < text.length) {
+      const minimum = start + Math.floor(MAX_HTML_UNIT_CHARACTERS * 0.6);
+      for (let cursor = end; cursor > minimum; cursor -= 1) {
+        if (/\s|[.!?;:…]/u.test(text[cursor - 1] ?? "")) {
+          end = cursor;
+          break;
+        }
+      }
+      end = safeSliceEnd(text, end);
+    }
+    chunks.push(text.slice(start, end));
+    start = end;
+  }
+  return chunks;
+}
+
+interface PlannedSegment {
+  node: Text;
+  source: string;
+}
+
+function planBoundedUnits(groups: readonly (readonly Text[])[]): PlannedSegment[][] {
+  const units: PlannedSegment[][] = [];
+  for (const nodes of groups) {
+    let unit: PlannedSegment[] = [];
+    let length = 0;
+    for (const node of nodes) {
+      for (const source of splitLongText(node.data)) {
+        if (unit.length && length + source.length > MAX_HTML_UNIT_CHARACTERS) {
+          units.push(unit);
+          unit = [];
+          length = 0;
+        }
+        unit.push({ node, source });
+        length += source.length;
+      }
+    }
+    if (unit.length) units.push(unit);
+  }
+  return units;
+}
+
 export function planHtmlTranslation(
   html: string,
   ownerDocument: Document = document,
@@ -76,22 +133,27 @@ export function planHtmlTranslation(
   for (const node of remaining) {
     if (hasTranslatableText([node])) groups.push([node]);
   }
+  const plannedUnits = planBoundedUnits(groups);
 
   return {
-    units: groups.map((nodes) => nodes.map(({ data }) => data)),
+    units: plannedUnits.map((unit) => unit.map(({ source }) => source)),
     apply(translatedUnits) {
-      if (translatedUnits.length !== groups.length) {
+      if (translatedUnits.length !== plannedUnits.length) {
         throw new Error("Počet přeložených HTML bloků neodpovídá zdroji.");
       }
-      groups.forEach((nodes, groupIndex) => {
-        const segments = translatedUnits[groupIndex];
-        if (!segments || segments.length !== nodes.length) {
+      const translatedByNode = new Map<Text, string[]>();
+      plannedUnits.forEach((unit, unitIndex) => {
+        const segments = translatedUnits[unitIndex];
+        if (!segments || segments.length !== unit.length) {
           throw new Error("Struktura přeloženého HTML bloku neodpovídá zdroji.");
         }
-        nodes.forEach((node, nodeIndex) => {
-          node.data = segments[nodeIndex] ?? "";
+        unit.forEach(({ node }, segmentIndex) => {
+          const values = translatedByNode.get(node) ?? [];
+          values.push(segments[segmentIndex] ?? "");
+          translatedByNode.set(node, values);
         });
       });
+      for (const [node, translated] of translatedByNode) node.data = translated.join("");
       const serializer = ownerDocument.createElement("div");
       serializer.append(template.content.cloneNode(true));
       return serializer.innerHTML;

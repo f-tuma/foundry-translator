@@ -49,6 +49,16 @@ export interface TranslateJournalOptions {
   ownerDocument?: Document;
   nonceFactory?: () => string;
   systemHtmlFieldPaths?: readonly (readonly HtmlFieldPath[])[];
+  onProgress?: (progress: JournalTranslationProgress) => void;
+}
+
+export interface JournalTranslationProgress {
+  completedPages: number;
+  totalPages: number;
+  pageIndex: number;
+  pageName: string;
+  translatedText: boolean;
+  skippedText: boolean;
 }
 
 export interface TranslatedJournal {
@@ -103,6 +113,37 @@ interface HtmlTranslationTarget {
   apply(units: readonly (readonly string[])[]): void;
 }
 
+async function translateTargets(
+  options: TranslateJournalOptions,
+  targets: TranslationTarget[],
+  htmlTargets: readonly HtmlTranslationTarget[],
+): Promise<void> {
+  const translatedUnits = await translateUnits({
+    units: targets.map(({ segments }) => segments),
+    glossary: options.glossary,
+    provider: options.provider,
+    settings: options.settings,
+    ...(options.cache ? { cache: options.cache } : {}),
+    ...(options.nonceFactory ? { nonceFactory: options.nonceFactory } : {}),
+  });
+
+  targets.forEach((target, index) => {
+    const translatedSegments = translatedUnits[index] ?? [];
+    if (translatedSegments.some((segment) => /__FT[NG]_/iu.test(segment))) {
+      throw new Error("Překlad obsahuje neobnovený ochranný token.");
+    }
+    target.translatedSegments = translatedSegments;
+    target.apply(translatedSegments);
+  });
+  for (const target of htmlTargets) {
+    target.apply(
+      targets
+        .slice(target.start, target.start + target.length)
+        .map(({ translatedSegments }) => translatedSegments ?? []),
+    );
+  }
+}
+
 function sourceSnapshot(source: JournalData): string {
   return JSON.stringify({
     name: source.name,
@@ -127,20 +168,21 @@ export async function translateJournalData(
   delete copy._id;
   delete copy._stats;
 
-  const targets: TranslationTarget[] = [];
-  const htmlTargets: HtmlTranslationTarget[] = [];
   let translatedTextPages = 0;
   let skippedTextPages = 0;
 
-  targets.push({
+  await translateTargets(options, [{
     segments: [copy.name],
     apply: ([translatedName]) => {
       copy.name = `${translatedName ?? copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
     },
-  });
+  }], []);
 
   for (const [pageIndex, page] of copy.pages.entries()) {
+    const sourcePageName = page.name;
     delete page._stats;
+    const targets: TranslationTarget[] = [];
+    const htmlTargets: HtmlTranslationTarget[] = [];
     targets.push({
       segments: [page.name],
       apply: ([translatedName]) => {
@@ -191,30 +233,26 @@ export async function translateJournalData(
       });
     }
 
+    try {
+      await translateTargets(options, targets, htmlTargets);
+    } catch (error) {
+      const detail = error instanceof Error ? ` ${error.message}` : "";
+      throw new Error(
+        `Překlad stránky ${pageIndex + 1}/${copy.pages.length} „${sourcePageName}“ selhal.${detail} Hotové stránky zůstávají v cache pro další pokus.`,
+        { cause: error },
+      );
+    }
+
     if (translatedPage) translatedTextPages += 1;
     else if (skippedPage) skippedTextPages += 1;
-  }
-
-  const translatedUnits = await translateUnits({
-    units: targets.map(({ segments }) => segments),
-    glossary: options.glossary,
-    provider: options.provider,
-    settings: options.settings,
-    ...(options.cache ? { cache: options.cache } : {}),
-    ...(options.nonceFactory ? { nonceFactory: options.nonceFactory } : {}),
-  });
-
-  targets.forEach((target, index) => {
-    const translatedSegments = translatedUnits[index] ?? [];
-    target.translatedSegments = translatedSegments;
-    target.apply(translatedSegments);
-  });
-  for (const target of htmlTargets) {
-    target.apply(
-      targets
-        .slice(target.start, target.start + target.length)
-        .map(({ translatedSegments }) => translatedSegments ?? []),
-    );
+    options.onProgress?.({
+      completedPages: pageIndex + 1,
+      totalPages: copy.pages.length,
+      pageIndex,
+      pageName: sourcePageName,
+      translatedText: translatedPage,
+      skippedText: skippedPage && !translatedPage,
+    });
   }
 
   const sourceHash = await journalSourceHash(options.source);
