@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check and build module
+        run: npm run check
+
+      - name: Verify tag and manifest metadata
+        run: npm run release:verify -- "$GITHUB_REF_NAME"
+
+      - name: Package Foundry module
+        working-directory: dist
+        run: zip -r ../foundry-translate.zip .
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          foundry-translate.zip
+          dist/module.json
+          --title "$GITHUB_REF_NAME"
+          --generate-notes
+          --verify-tag
