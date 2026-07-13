@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.5.0` adds the
-> first end-to-end translation flow: translate one world Journal Entry into a
-> safe copy using the configured provider, protected glossary, and server cache.
+> The module is currently an early development build. Version `0.5.1` hardens
+> Chrome translation markers and adds translation controls directly to world
+> Journal Entry headers.
 
 ## Installation
 
@@ -74,7 +74,11 @@ As Game Master open **Configure Settings → Module Settings → Journal
 translation** and select **Translate Journal Entry**. Choose one world Journal
 Entry and create a translated copy. The source document is never modified.
 
-Version `0.5.0` translates the journal name, page names, and HTML text pages.
+You can also open a world Journal Entry and select **Translate this journal**
+directly in its header. A visible header button and the standard header controls
+menu provide the same safe translation action.
+
+Version `0.5.1` translates the journal name, page names, and HTML text pages.
 Inline markup and attributes remain local, while Foundry references such as
 `@UUID[...]` and inline rolls such as `[[/r 1d20]]` are integrity-protected.
 Markdown source pages are deliberately left unchanged for now and reported in
@@ -94,7 +98,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.5.0`
+The production module is generated in `dist/`. A release tag such as `v0.5.1`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

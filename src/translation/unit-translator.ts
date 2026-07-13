@@ -30,7 +30,8 @@ export interface TranslateUnitsOptions {
 interface PreparedUnit {
   index: number;
   key: string;
-  protectedText: ReturnType<typeof protectGlossaryTerms>;
+  protectedText: string;
+  segmentProtections: ReturnType<typeof protectGlossaryTerms>[];
   boundaryTokens: string[];
 }
 
@@ -63,9 +64,11 @@ async function cacheKey(
 }
 
 function createBoundaryTokens(segmentCount: number, nonce: string): string[] {
+  const normalizedNonce = nonce.toUpperCase();
   return Array.from(
     { length: segmentCount + 1 },
-    (_, index) => `⟦FTN:${nonce}:${index.toString(36).padStart(4, "0")}⟧`,
+    (_, index) =>
+      `__FTN_${normalizedNonce}_${index.toString(36).toUpperCase().padStart(4, "0")}__`,
   );
 }
 
@@ -132,20 +135,29 @@ export async function translateUnits(
 
     const nonce = options.nonceFactory?.() ?? randomNonce();
     const boundaryTokens = createBoundaryTokens(segments.length, nonce);
-    const combined = combineSegments(segments, boundaryTokens);
-    const protectedEntries = [...options.glossary, ...foundrySyntaxEntries(combined)];
+    const segmentProtections = segments.map((segment, segmentIndex) =>
+      protectGlossaryTerms(
+        segment,
+        [...options.glossary, ...foundrySyntaxEntries(segment)],
+        { nonce: `${nonce}${segmentIndex.toString(36)}` },
+      ),
+    );
     misses.push({
       index,
       key,
       boundaryTokens,
-      protectedText: protectGlossaryTerms(combined, protectedEntries, { nonce }),
+      protectedText: combineSegments(
+        segmentProtections.map(({ text }) => text),
+        boundaryTokens,
+      ),
+      segmentProtections,
     });
   }
 
   for (let offset = 0; offset < misses.length; offset += MAX_UNITS_PER_REQUEST) {
     const batch = misses.slice(offset, offset + MAX_UNITS_PER_REQUEST);
     const results = await options.provider.translate({
-      texts: batch.map(({ protectedText }) => protectedText.text),
+      texts: batch.map(({ protectedText }) => protectedText),
       sourceLanguage: options.settings.sourceLanguage,
       targetLanguage: options.settings.targetLanguage,
       format: "text",
@@ -159,8 +171,15 @@ export async function translateUnits(
     for (const [resultIndex, result] of results.entries()) {
       const prepared = batch[resultIndex];
       if (!prepared) throw new Error("Chybí metadata přeloženého bloku.");
-      const restored = restoreGlossaryTerms(result.translatedText, prepared.protectedText);
-      const segments = splitTranslatedSegments(restored, prepared.boundaryTokens);
+      const protectedSegments = splitTranslatedSegments(
+        result.translatedText,
+        prepared.boundaryTokens,
+      );
+      const segments = protectedSegments.map((segment, index) => {
+        const protection = prepared.segmentProtections[index];
+        if (!protection) throw new Error("Chybí ochrana přeloženého HTML segmentu.");
+        return restoreGlossaryTerms(segment, protection);
+      });
       translated[prepared.index] = segments;
       cacheWrites.push({ key: prepared.key, translatedSegments: segments });
     }

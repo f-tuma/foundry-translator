@@ -76,13 +76,50 @@ describe("translation units", () => {
         units: [["Hello ", "world"]],
         glossary: [],
         provider: provider((text) => {
-          const tokens = [...text.matchAll(/⟦FTN:[^⟧]+⟧/gu)].map(([token]) => token);
+          const tokens = [...text.matchAll(/__FTN_[A-Z0-9]+_[A-Z0-9]+__/gu)].map(
+            ([token]) => token,
+          );
           return text.replace(tokens[0] ?? "", tokens[1] ?? "");
         }),
         settings,
         nonceFactory: () => "BROKEN",
       }),
     ).rejects.toThrow(/boundary token/);
+  });
+
+  it("uses ASCII markers that survive Unicode bracket normalization", async () => {
+    let providerInput = "";
+    const result = await translateUnits({
+      units: [["Strahd", " entered Castle Ravenloft."]],
+      glossary: [
+        {
+          source: "Strahd",
+          replacement: "Strahd",
+          category: "character",
+          aliases: [],
+        },
+        {
+          source: "Castle Ravenloft",
+          replacement: "Castle Ravenloft",
+          category: "location",
+          aliases: [],
+        },
+      ],
+      provider: provider((text) => {
+        providerInput = text;
+        return text
+          .replaceAll("⟦", "[")
+          .replaceAll("⟧", "]")
+          .replace("entered", "vstoupil do");
+      }),
+      settings,
+      nonceFactory: () => "CHROME",
+    });
+
+    expect(providerInput).toContain("__FTN_CHROME_0000__");
+    expect(providerInput).toContain("__FTG_CHROME0_0000__");
+    expect(providerInput).not.toContain("⟦");
+    expect(result).toEqual([["Strahd", " vstoupil do Castle Ravenloft."]]);
   });
 
   it("batches at most 128 units per provider request", async () => {

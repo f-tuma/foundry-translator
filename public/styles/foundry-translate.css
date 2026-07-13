@@ -34,6 +34,27 @@
   background: var(--ft-color-bg);
 }
 
+.ft-journal-translate-header {
+  display: inline-flex;
+  width: auto;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 8px;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.ft-journal-translate-header span {
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .ft-journal-translate-header span {
+    display: none;
+  }
+}
+
 .ft-settings {
   display: flex;
   flex-direction: column;

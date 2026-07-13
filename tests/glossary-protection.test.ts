@@ -25,9 +25,9 @@ describe("glossary protection", () => {
     );
 
     expect(protection.text).toBe(
-      "⟦FT:TEST:0000⟧ entered ⟦FT:TEST:0001⟧. ⟦FT:TEST:0002⟧ smiled.",
+      "__FTG_TEST_0000__ entered __FTG_TEST_0001__. __FTG_TEST_0002__ smiled.",
     );
-    expect(restoreGlossaryTerms("Do ⟦FT:TEST:0000⟧ vstoupil ⟦FT:TEST:0001⟧. ⟦FT:TEST:0002⟧ se usmál.", protection)).toBe(
+    expect(restoreGlossaryTerms("Do __FTG_TEST_0000__ vstoupil __FTG_TEST_0001__. __FTG_TEST_0002__ se usmál.", protection)).toBe(
       "Do Strahd vstoupil Castle Ravenloft. Strahd se usmál.",
     );
   });
@@ -83,7 +83,7 @@ describe("glossary protection", () => {
     expect(() =>
       restoreGlossaryTerms(`${token?.token} ${token?.token}`, protection),
     ).toThrow(GlossaryIntegrityError);
-    expect(() => restoreGlossaryTerms("⟦FT:SAFE:9999⟧ čeká.", protection)).toThrow(
+    expect(() => restoreGlossaryTerms("__FTG_SAFE_9999__ čeká.", protection)).toThrow(
       GlossaryIntegrityError,
     );
   });
