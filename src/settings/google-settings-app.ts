@@ -1,4 +1,5 @@
 import { GoogleCloudBasicProvider } from "../providers/google-cloud-basic";
+import { logger } from "../logger";
 import { getGoogleSettings, saveGoogleSettings, type GoogleSettings } from "./settings";
 import { renderGoogleSettingsForm } from "./google-settings-view";
 
@@ -48,6 +49,7 @@ export class GoogleSettingsApplication extends foundry.applications.api.Applicat
       await saveGoogleSettings(settings);
       ui.notifications.success("FOUNDRY_TRANSLATE.Settings.Status.Saved", { localize: true });
     } catch (error) {
+      logger.error("Google Cloud Translation connection test failed.", error);
       const message =
         error instanceof Error
           ? error.message

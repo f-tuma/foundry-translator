@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   GoogleCloudBasicProvider,
@@ -14,6 +14,10 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
 }
 
 describe("GoogleCloudBasicProvider", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("sends the API key in a header and translates a batch", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
@@ -64,6 +68,19 @@ describe("GoogleCloudBasicProvider", () => {
       source: "en",
       target: "cs",
     });
+  });
+
+  it("uses Foundry's timeout-aware fetch in the browser", async () => {
+    const fetchWithTimeout = vi.fn().mockResolvedValue(
+      jsonResponse({ data: { translations: [{ translatedText: "Test připojení." }] } }),
+    );
+    vi.stubGlobal("foundry", { utils: { fetchWithTimeout } });
+    const provider = new GoogleCloudBasicProvider("key");
+
+    await provider.testConnection("cs");
+
+    expect(fetchWithTimeout).toHaveBeenCalledOnce();
+    expect(fetchWithTimeout.mock.calls[0]?.[2]).toEqual({ timeoutMs: 30_000 });
   });
 
   it("returns a safe provider error without including the API key", async () => {

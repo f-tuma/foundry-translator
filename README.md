@@ -3,7 +3,7 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.2.0` adds the
+> The module is currently an early development build. Version `0.2.1` adds the
 > first Google Cloud Translation provider settings and connection test; document
 > translation is not implemented yet.
 
@@ -53,7 +53,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.2.0`
+The production module is generated in `dist/`. A release tag such as `v0.2.1`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

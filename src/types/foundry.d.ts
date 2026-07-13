@@ -48,6 +48,13 @@ declare const foundry: {
       ApplicationV2: typeof FoundryApplicationV2;
     };
   };
+  utils: {
+    fetchWithTimeout(
+      url: string,
+      data?: RequestInit,
+      options?: { timeoutMs?: number | null; onTimeout?: () => void },
+    ): Promise<Response>;
+  };
 };
 
 declare const ui: {
