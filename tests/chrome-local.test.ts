@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ChromeLocalProvider,
@@ -39,6 +39,10 @@ function createDetectorFactory(language = "en"): ChromeLanguageDetectorFactory {
 }
 
 describe("ChromeLocalProvider", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("detects the source language and translates locally", async () => {
     const Translator = createTranslatorFactory();
     const LanguageDetector = createDetectorFactory();
@@ -74,6 +78,17 @@ describe("ChromeLocalProvider", () => {
     expect(progress).toHaveBeenCalledWith(0.42);
   });
 
+  it("starts model creation synchronously while the click activation is active", async () => {
+    const Translator = createTranslatorFactory();
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+
+    const connectionTest = provider.testConnection("cs");
+
+    expect(Translator.create).toHaveBeenCalledOnce();
+    expect(Translator.availability).not.toHaveBeenCalled();
+    await connectionTest;
+  });
+
   it("does not require language detection when the source is selected", async () => {
     const Translator = createTranslatorFactory();
     const provider = new ChromeLocalProvider({ apis: { Translator } });
@@ -83,15 +98,33 @@ describe("ChromeLocalProvider", () => {
     ).resolves.toEqual([{ translatedText: "cs:Castle" }]);
   });
 
-  it("rejects an unavailable language pair before creating a translator", async () => {
+  it("reports when Chrome rejects creation of a language pair", async () => {
     const Translator = createTranslatorFactory();
-    vi.mocked(Translator.availability).mockResolvedValue("unavailable");
+    vi.mocked(Translator.create).mockRejectedValue(
+      new DOMException("Language pair unavailable", "NotSupportedError"),
+    );
     const provider = new ChromeLocalProvider({ apis: { Translator } });
 
     await expect(provider.testConnection("cs")).rejects.toBeInstanceOf(
       ChromeLocalTranslationError,
     );
-    expect(Translator.create).not.toHaveBeenCalled();
+    expect(Translator.create).toHaveBeenCalledOnce();
+  });
+
+  it("times out instead of waiting indefinitely for a model download", async () => {
+    vi.useFakeTimers();
+    const Translator = createTranslatorFactory();
+    vi.mocked(Translator.create).mockReturnValue(new Promise(() => undefined));
+    const provider = new ChromeLocalProvider({
+      apis: { Translator },
+      modelTimeoutMs: 100,
+    });
+
+    const expectation = expect(provider.testConnection("cs")).rejects.toThrow(
+      "do 3 minut",
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    await expectation;
   });
 
   it("explains when the browser does not expose the Translator API", async () => {

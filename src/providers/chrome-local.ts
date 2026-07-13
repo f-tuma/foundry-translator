@@ -65,7 +65,10 @@ interface ChromeModelCreationOptions {
 interface ChromeLocalProviderOptions {
   apis?: ChromeLocalApis;
   onDownloadProgress?: (progress: number) => void;
+  modelTimeoutMs?: number;
 }
+
+const DEFAULT_MODEL_TIMEOUT_MS = 180_000;
 
 const getBrowserApis = (): ChromeLocalApis =>
   globalThis as unknown as ChromeLocalApis;
@@ -80,12 +83,14 @@ export class ChromeLocalTranslationError extends Error {
 export class ChromeLocalProvider implements TranslationProvider {
   readonly #apis: ChromeLocalApis;
   readonly #onDownloadProgress: ((progress: number) => void) | undefined;
+  readonly #modelTimeoutMs: number;
   readonly #translators = new Map<string, Promise<ChromeTranslatorSession>>();
   #detector?: Promise<ChromeLanguageDetectorSession>;
 
   constructor(options: ChromeLocalProviderOptions = {}) {
     this.#apis = options.apis ?? getBrowserApis();
     this.#onDownloadProgress = options.onDownloadProgress;
+    this.#modelTimeoutMs = options.modelTimeoutMs ?? DEFAULT_MODEL_TIMEOUT_MS;
   }
 
   async translate(request: TranslateRequest): Promise<TranslationResult[]> {
@@ -136,13 +141,19 @@ export class ChromeLocalProvider implements TranslationProvider {
   async testConnection(targetLanguage: string): Promise<void> {
     const sourceLanguage = targetLanguage === "en" ? "cs" : "en";
     const text = sourceLanguage === "en" ? "Connection test." : "Test připojení.";
+    this.#validateRequest({ texts: [text], sourceLanguage, targetLanguage });
 
-    await this.translate({
-      texts: [text],
-      sourceLanguage,
-      targetLanguage,
-      format: "text",
-    });
+    // Chrome requires create() to be called while transient user activation from the
+    // button click is still active. Do not await availability() or another operation first.
+    const translatorPromise = this.#getTranslator({ sourceLanguage, targetLanguage });
+    const translator = await translatorPromise;
+    const translatedText = await translator.translate(text);
+
+    if (typeof translatedText !== "string" || !translatedText.trim()) {
+      throw new ChromeLocalTranslationError(
+        "Chrome Local Translator vrátil prázdný nebo neplatný testovací překlad.",
+      );
+    }
   }
 
   #validateRequest(request: TranslateRequest): void {
@@ -204,12 +215,11 @@ export class ChromeLocalProvider implements TranslationProvider {
   async #createLanguageDetector(
     factory: ChromeLanguageDetectorFactory,
   ): Promise<ChromeLanguageDetectorSession> {
-    const availability = await factory.availability();
-    this.#assertAvailable(availability, "detekce jazyka");
-
     try {
-      return await factory.create({ monitor: this.#monitorDownloads });
+      const creation = factory.create({ monitor: this.#monitorDownloads });
+      return await this.#withModelTimeout(creation, "lokální detekci jazyka");
     } catch (error) {
+      if (error instanceof ChromeLocalTranslationError) throw error;
       throw new ChromeLocalTranslationError(
         "Chrome nedokázal připravit lokální detekci jazyka.",
         { cause: error },
@@ -239,23 +249,17 @@ export class ChromeLocalProvider implements TranslationProvider {
       throw new ChromeLocalTranslationError("Chrome Local Translator není dostupný.");
     }
 
-    const availability = await factory.availability(pair);
-    this.#assertAvailable(availability, `${pair.sourceLanguage} → ${pair.targetLanguage}`);
-
     try {
-      return await factory.create({ ...pair, monitor: this.#monitorDownloads });
+      const creation = factory.create({ ...pair, monitor: this.#monitorDownloads });
+      return await this.#withModelTimeout(
+        creation,
+        `překlad ${pair.sourceLanguage} → ${pair.targetLanguage}`,
+      );
     } catch (error) {
+      if (error instanceof ChromeLocalTranslationError) throw error;
       throw new ChromeLocalTranslationError(
         `Chrome nedokázal připravit překlad ${pair.sourceLanguage} → ${pair.targetLanguage}.`,
         { cause: error },
-      );
-    }
-  }
-
-  #assertAvailable(availability: ChromeModelAvailability, label: string): void {
-    if (availability === "unavailable") {
-      throw new ChromeLocalTranslationError(
-        `Lokální model pro ${label} není v tomto prohlížeči dostupný.`,
       );
     }
   }
@@ -266,4 +270,27 @@ export class ChromeLocalProvider implements TranslationProvider {
       this.#onDownloadProgress?.(progress);
     });
   };
+
+  #withModelTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timeout = globalThis.setTimeout(() => {
+        reject(
+          new ChromeLocalTranslationError(
+            `Chrome nedokončil ${label} do 3 minut. Zkontrolujte připojení, volné místo a nastavení překladu v Chromu.`,
+          ),
+        );
+      }, this.#modelTimeoutMs);
+
+      promise.then(
+        (value) => {
+          globalThis.clearTimeout(timeout);
+          resolve(value);
+        },
+        (error: unknown) => {
+          globalThis.clearTimeout(timeout);
+          reject(error);
+        },
+      );
+    });
+  }
 }
