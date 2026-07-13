@@ -7,7 +7,9 @@ import type {
 const GOOGLE_TRANSLATE_ENDPOINT =
   "https://translation.googleapis.com/language/translate/v2";
 const MAX_TEXTS_PER_REQUEST = 128;
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 30_000;
+
+type FetchImplementation = (input: string, init?: RequestInit) => Promise<Response>;
 
 interface GoogleTranslation {
   translatedText?: unknown;
@@ -37,11 +39,14 @@ export class GoogleCloudTranslationError extends Error {
 
 export class GoogleCloudBasicProvider implements TranslationProvider {
   readonly #apiKey: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: FetchImplementation;
 
-  constructor(apiKey: string, fetchImplementation: typeof fetch = globalThis.fetch) {
+  constructor(apiKey: string, fetchImplementation?: FetchImplementation) {
     this.#apiKey = apiKey.trim();
-    this.#fetch = fetchImplementation;
+    this.#fetch =
+      fetchImplementation ??
+      ((input, init) =>
+        foundry.utils.fetchWithTimeout(input, init, { timeoutMs: REQUEST_TIMEOUT_MS }));
   }
 
   async translate(request: TranslateRequest): Promise<TranslationResult[]> {
@@ -68,7 +73,6 @@ export class GoogleCloudBasicProvider implements TranslationProvider {
           "X-goog-api-key": this.#apiKey,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (error) {
       throw new GoogleCloudTranslationError(

@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import packageJson from "./package.json";
 
 export default defineConfig({
   build: {
@@ -6,7 +7,7 @@ export default defineConfig({
     lib: {
       entry: "src/main.ts",
       formats: ["es"],
-      fileName: () => "foundry-translate.js",
+      fileName: () => `foundry-translate-${packageJson.version}.js`,
     },
     outDir: "dist",
     sourcemap: true,

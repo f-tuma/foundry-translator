@@ -8,6 +8,7 @@ const tag = process.argv[2] ?? `v${packageJson.version}`;
 const expectedTag = `v${packageJson.version}`;
 const expectedManifest = `https://github.com/${repository}/releases/latest/download/module.json`;
 const expectedDownload = `https://github.com/${repository}/releases/download/${expectedTag}/foundry-translate.zip`;
+const expectedScript = `foundry-translate-${packageJson.version}.js`;
 
 const failures = [];
 
@@ -25,6 +26,10 @@ if (moduleJson.manifest !== expectedManifest) {
 
 if (moduleJson.download !== expectedDownload) {
   failures.push(`download URL must be ${expectedDownload}`);
+}
+
+if (moduleJson.esmodules?.length !== 1 || moduleJson.esmodules[0] !== expectedScript) {
+  failures.push(`ES module path must be ${expectedScript}`);
 }
 
 if (failures.length > 0) {
