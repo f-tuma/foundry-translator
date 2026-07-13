@@ -66,27 +66,67 @@ describe("ChromeLocalProvider", () => {
     );
   });
 
-  it("reports language-pack download progress", async () => {
+  it("reports language-pack download progress and readiness", async () => {
     const progress = vi.fn();
+    const statuses = vi.fn();
     const provider = new ChromeLocalProvider({
       apis: { Translator: createTranslatorFactory() },
       onDownloadProgress: progress,
+      onStatus: statuses,
     });
 
     await provider.testConnection("cs");
 
     expect(progress).toHaveBeenCalledWith(0.42);
+    expect(statuses.mock.calls.map(([status]) => status.phase)).toEqual([
+      "download",
+      "ready",
+    ]);
   });
 
-  it("starts model creation synchronously while the click activation is active", async () => {
+  it("starts model creation before checking availability", async () => {
     const Translator = createTranslatorFactory();
     const provider = new ChromeLocalProvider({ apis: { Translator } });
 
     const connectionTest = provider.testConnection("cs");
 
     expect(Translator.create).toHaveBeenCalledOnce();
-    expect(Translator.availability).not.toHaveBeenCalled();
     await connectionTest;
+    expect(Translator.availability).toHaveBeenCalledOnce();
+    expect(vi.mocked(Translator.create).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(Translator.availability).mock.invocationCallOrder[0] ?? Infinity,
+    );
+  });
+
+  it("reports when Chrome needs to start downloading a language pack", async () => {
+    let finishCreation: ((session: { translate(text: string): Promise<string> }) => void) | undefined;
+    const Translator = createTranslatorFactory();
+    vi.mocked(Translator.create).mockReturnValue(
+      new Promise((resolve) => {
+        finishCreation = resolve;
+      }),
+    );
+    const statuses = vi.fn();
+    const provider = new ChromeLocalProvider({
+      apis: { Translator },
+      onStatus: statuses,
+    });
+
+    const connectionTest = provider.testConnection("cs");
+    await vi.waitFor(() => {
+      expect(statuses).toHaveBeenCalledWith({
+        phase: "availability",
+        component: "translator",
+        availability: "downloadable",
+      });
+    });
+    finishCreation?.({ translate: async (text) => `cs:${text}` });
+    await connectionTest;
+
+    expect(statuses).toHaveBeenLastCalledWith({
+      phase: "ready",
+      component: "translator",
+    });
   });
 
   it("does not require language detection when the source is selected", async () => {

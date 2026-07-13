@@ -53,6 +53,22 @@ export interface ChromeLocalApis {
   LanguageDetector?: ChromeLanguageDetectorFactory;
 }
 
+export type ChromeLocalProviderStatus =
+  | {
+      phase: "availability";
+      component: "translator" | "language-detector";
+      availability: ChromeModelAvailability;
+    }
+  | {
+      phase: "download";
+      component: "translator" | "language-detector";
+      progress: number;
+    }
+  | {
+      phase: "ready";
+      component: "translator" | "language-detector";
+    };
+
 interface ChromeLanguagePair {
   sourceLanguage: string;
   targetLanguage: string;
@@ -65,6 +81,7 @@ interface ChromeModelCreationOptions {
 interface ChromeLocalProviderOptions {
   apis?: ChromeLocalApis;
   onDownloadProgress?: (progress: number) => void;
+  onStatus?: (status: ChromeLocalProviderStatus) => void;
   modelTimeoutMs?: number;
 }
 
@@ -83,6 +100,7 @@ export class ChromeLocalTranslationError extends Error {
 export class ChromeLocalProvider implements TranslationProvider {
   readonly #apis: ChromeLocalApis;
   readonly #onDownloadProgress: ((progress: number) => void) | undefined;
+  readonly #onStatus: ((status: ChromeLocalProviderStatus) => void) | undefined;
   readonly #modelTimeoutMs: number;
   readonly #translators = new Map<string, Promise<ChromeTranslatorSession>>();
   #detector?: Promise<ChromeLanguageDetectorSession>;
@@ -90,6 +108,7 @@ export class ChromeLocalProvider implements TranslationProvider {
   constructor(options: ChromeLocalProviderOptions = {}) {
     this.#apis = options.apis ?? getBrowserApis();
     this.#onDownloadProgress = options.onDownloadProgress;
+    this.#onStatus = options.onStatus;
     this.#modelTimeoutMs = options.modelTimeoutMs ?? DEFAULT_MODEL_TIMEOUT_MS;
   }
 
@@ -216,8 +235,19 @@ export class ChromeLocalProvider implements TranslationProvider {
     factory: ChromeLanguageDetectorFactory,
   ): Promise<ChromeLanguageDetectorSession> {
     try {
-      const creation = factory.create({ monitor: this.#monitorDownloads });
-      return await this.#withModelTimeout(creation, "lokální detekci jazyka");
+      const lifecycle = this.#createModelLifecycle("language-detector");
+      const creation = factory.create({ monitor: lifecycle.monitor });
+      try {
+        lifecycle.observeAvailability(factory.availability());
+      } catch {
+        // Creation is authoritative; availability is informational only.
+      }
+      const detector = await this.#withModelTimeout(
+        creation,
+        "lokální detekci jazyka",
+      );
+      lifecycle.ready();
+      return detector;
     } catch (error) {
       if (error instanceof ChromeLocalTranslationError) throw error;
       throw new ChromeLocalTranslationError(
@@ -250,11 +280,19 @@ export class ChromeLocalProvider implements TranslationProvider {
     }
 
     try {
-      const creation = factory.create({ ...pair, monitor: this.#monitorDownloads });
-      return await this.#withModelTimeout(
+      const lifecycle = this.#createModelLifecycle("translator");
+      const creation = factory.create({ ...pair, monitor: lifecycle.monitor });
+      try {
+        lifecycle.observeAvailability(factory.availability(pair));
+      } catch {
+        // Creation is authoritative; availability is informational only.
+      }
+      const translator = await this.#withModelTimeout(
         creation,
         `překlad ${pair.sourceLanguage} → ${pair.targetLanguage}`,
       );
+      lifecycle.ready();
+      return translator;
     } catch (error) {
       if (error instanceof ChromeLocalTranslationError) throw error;
       throw new ChromeLocalTranslationError(
@@ -264,12 +302,39 @@ export class ChromeLocalProvider implements TranslationProvider {
     }
   }
 
-  readonly #monitorDownloads = (monitor: ChromeDownloadMonitor): void => {
-    monitor.addEventListener("downloadprogress", (event) => {
-      const progress = Math.min(1, Math.max(0, event.loaded));
-      this.#onDownloadProgress?.(progress);
-    });
-  };
+  #createModelLifecycle(component: "translator" | "language-detector"): {
+    monitor: (monitor: ChromeDownloadMonitor) => void;
+    observeAvailability: (availability: Promise<ChromeModelAvailability>) => void;
+    ready: () => void;
+  } {
+    let downloadStarted = false;
+    let finished = false;
+
+    return {
+      monitor: (monitor) => {
+        monitor.addEventListener("downloadprogress", (event) => {
+          if (finished) return;
+          downloadStarted = true;
+          const progress = Math.min(1, Math.max(0, event.loaded));
+          this.#onDownloadProgress?.(progress);
+          this.#onStatus?.({ phase: "download", component, progress });
+        });
+      },
+      observeAvailability: (availability) => {
+        void availability.then(
+          (value) => {
+            if (downloadStarted || finished) return;
+            this.#onStatus?.({ phase: "availability", component, availability: value });
+          },
+          () => undefined,
+        );
+      },
+      ready: () => {
+        finished = true;
+        this.#onStatus?.({ phase: "ready", component });
+      },
+    };
+  }
 
   #withModelTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
     return new Promise<T>((resolve, reject) => {

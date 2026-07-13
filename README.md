@@ -3,9 +3,9 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.3.1` adds a
-> free on-device Chrome translator alongside Google Cloud and fixes first-time
-> language-pack initialization; document translation is not implemented yet.
+> The module is currently an early development build. Version `0.3.2` adds a
+> free on-device Chrome translator alongside Google Cloud, with explicit model
+> download and readiness states; document translation is not implemented yet.
 
 ## Installation
 
@@ -61,7 +61,7 @@ npm ci
 npm run check
 ```
 
-The production module is generated in `dist/`. A release tag such as `v0.3.1`
+The production module is generated in `dist/`. A release tag such as `v0.3.2`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 
