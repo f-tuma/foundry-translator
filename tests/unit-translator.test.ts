@@ -349,4 +349,36 @@ describe("translation units", () => {
     expect(result).toEqual([["The Shattered Moon"]]);
     expect(calls).toBe(1);
   });
+
+  it("allows a short Title Case proper name to remain unchanged without a glossary entry", async () => {
+    let calls = 0;
+    const result = await translateUnits({
+      units: [["Shard of Fear"]],
+      glossary: [],
+      provider: provider((text) => {
+        calls += 1;
+        return text;
+      }),
+      settings,
+      nonceFactory: () => "PROPERTITLE",
+    });
+
+    expect(result).toEqual([["Shard of Fear"]]);
+    expect(calls).toBe(1);
+  });
+
+  it("still rejects a sentence that only starts with a capital letter", async () => {
+    let calls = 0;
+    await expect(translateUnits({
+      units: [["The heroes enter the castle."]],
+      glossary: [],
+      provider: provider((text) => {
+        calls += 1;
+        return text;
+      }),
+      settings,
+      nonceFactory: () => "NOTATITLE",
+    })).rejects.toThrow(/původním jazyce.*3 pokusech/u);
+    expect(calls).toBe(3);
+  });
 });

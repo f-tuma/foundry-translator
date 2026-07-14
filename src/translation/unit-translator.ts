@@ -106,6 +106,32 @@ function comparableText(text: string): string {
     .trim();
 }
 
+function visibleSourceWords(text: string): string[] {
+  PROTECTION_TOKEN.lastIndex = 0;
+  return text
+    .replace(PROTECTION_TOKEN, " ")
+    .normalize("NFKC")
+    .match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu) ?? [];
+}
+
+function looksLikeProperTitle(
+  source: string,
+  settings: TranslationUnitSettings,
+): boolean {
+  const words = visibleSourceWords(source);
+  if (words.length < 2 || words.length > 6) return false;
+  const hints = SOURCE_LANGUAGE_HINTS[settings.sourceLanguage] ??
+    (settings.sourceLanguage === "auto" ? SOURCE_LANGUAGE_HINTS.en : undefined);
+  let namedWords = 0;
+  for (const word of words) {
+    const normalized = word.toLocaleLowerCase();
+    if (hints?.has(normalized)) continue;
+    if (!/^\p{Lu}/u.test(word)) return false;
+    namedWords += 1;
+  }
+  return namedWords >= 2;
+}
+
 function suspiciouslyUnchanged(
   source: string,
   translated: string,
@@ -119,6 +145,7 @@ function suspiciouslyUnchanged(
   const words = sourceText.match(/[\p{L}\p{N}]+/gu) ?? [];
   const letters = (sourceText.match(/\p{L}/gu) ?? []).length;
   if (letters < 8 || words.length < 2) return false;
+  if (looksLikeProperTitle(source, settings)) return false;
   if (words.length >= 5 && letters >= 20) return true;
 
   const hints = SOURCE_LANGUAGE_HINTS[settings.sourceLanguage] ??
