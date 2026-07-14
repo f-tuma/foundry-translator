@@ -10,6 +10,7 @@ import {
   translateActorData,
   type ActorData,
 } from "./actor";
+import { activeTranslations, type TranslationPlan } from "./active-translations";
 import { CompendiumTranslationCache } from "./compendium-cache";
 import { CompendiumActorTranslationRepository } from "./compendium-actor-translation-repository";
 import { CompendiumJournalTranslationRepository } from "./compendium-translation-repository";
@@ -39,6 +40,7 @@ import {
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
   onProgress?: (progress: JournalTranslationProgress) => void;
+  onPlan?: (plan: TranslationPlan) => void;
 }
 
 export interface JournalTranslationResult extends TranslatedJournal {
@@ -77,6 +79,8 @@ interface ResolvedJournalDependency {
 
 interface JournalGraphNode {
   dependencies: ResolvedJournalDependency[];
+  children?: readonly GraphSourceDocument[];
+  units?: number;
   result?: GraphTranslationResult;
 }
 
@@ -227,13 +231,24 @@ function actorHtmlFieldPaths(
   return { system, items };
 }
 
+function documentTranslationUnits(document: GraphSourceDocument): number {
+  if (isActorDocument(document)) {
+    const source = document.toObject() as ActorData;
+    const paths = actorHtmlFieldPaths(document, source);
+    return paths.system.length + paths.items.reduce((total, item) => total + item.length, 0);
+  }
+  return (document.toObject() as JournalData).pages.length;
+}
+
 export class JournalTranslationService {
   readonly #onChromeStatus: ((status: ChromeLocalProviderStatus) => void) | undefined;
   readonly #onProgress: ((progress: JournalTranslationProgress) => void) | undefined;
+  readonly #onPlan: ((plan: TranslationPlan) => void) | undefined;
 
   constructor(options: JournalTranslationServiceOptions = {}) {
     this.#onChromeStatus = options.onChromeStatus;
     this.#onProgress = options.onProgress;
+    this.#onPlan = options.onPlan;
   }
 
   async translate(sourceDocument: FoundryJournalWorldDocument): Promise<JournalTranslationResult> {
@@ -266,12 +281,21 @@ export class JournalTranslationService {
       translations: new CompendiumJournalTranslationRepository(),
       actorTranslations: new CompendiumActorTranslationRepository(),
     };
-    return this.#translateGraph(sourceDocument, runtime);
+    const runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
+    try {
+      const result = await this.#translateGraph(sourceDocument, runtime, runId);
+      activeTranslations.finish(runId);
+      return result;
+    } catch (error) {
+      activeTranslations.finish(runId, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 
   async #translateGraph(
     sourceDocument: FoundryJournalWorldDocument,
     runtime: TranslationRuntime,
+    runId: number,
   ): Promise<JournalTranslationResult> {
     const nodes = new Map<string, JournalGraphNode>();
     const warnings: JournalDependencyWarning[] = [];
@@ -291,11 +315,11 @@ export class JournalTranslationService {
       return node;
     };
 
-    const graph = await traverseDependencyGraph({
-      root: sourceDocument as GraphSourceDocument,
-      key: (document) => document.uuid,
-      dependencies: async (document) => {
+    const resolveNodeDependencies = async (
+      document: GraphSourceDocument,
+    ): Promise<readonly GraphSourceDocument[]> => {
         const node = nodeFor(document);
+        if (node.children) return node.children;
         const source = document.toObject() as GraphData;
         const childDocuments = new Map<string, GraphSourceDocument>();
         const references = isJournalDocument(document)
@@ -332,11 +356,59 @@ export class JournalTranslationService {
           childDocuments.set(root.uuid, root);
           nodeFor(root);
         }
-        return [...childDocuments.values()];
+        node.children = [...childDocuments.values()];
+        return node.children;
+    };
+
+    // Write-free scan of the whole graph so the total size is known upfront.
+    const scan = await traverseDependencyGraph({
+      root: sourceDocument as GraphSourceDocument,
+      key: (document) => document.uuid,
+      dependencies: resolveNodeDependencies,
+      process: (document) => {
+        nodeFor(document).units = documentTranslationUnits(document);
       },
+    });
+    const plan: TranslationPlan = {
+      totalDocuments: scan.completed.length,
+      totalUnits: scan.completed.reduce(
+        (total, document) => total + (nodes.get(document.uuid)?.units ?? 0),
+        0,
+      ),
+    };
+    activeTranslations.update(runId, { state: "translating", plan });
+    this.#onPlan?.(plan);
+
+    const overall = { completedUnits: 0, completedDocuments: 0 };
+    const emitProgress = (progress: JournalTranslationProgress): void => {
+      const enriched: JournalTranslationProgress = {
+        ...progress,
+        overallCompletedUnits: overall.completedUnits + progress.completedPages,
+        overallTotalUnits: plan.totalUnits,
+        completedDocuments: overall.completedDocuments,
+        totalDocuments: plan.totalDocuments,
+      };
+      activeTranslations.update(runId, {
+        completedUnits: enriched.overallCompletedUnits ?? 0,
+        ...(progress.documentName ? { currentDocument: progress.documentName } : {}),
+        currentUnit: progress.pageName,
+      });
+      this.#onProgress?.(enriched);
+    };
+
+    const graph = await traverseDependencyGraph({
+      root: sourceDocument as GraphSourceDocument,
+      key: (document) => document.uuid,
+      dependencies: resolveNodeDependencies,
       process: async (document) => {
         const node = nodeFor(document);
-        node.result = await this.#translateOne(document, runtime);
+        node.result = await this.#translateOne(document, runtime, emitProgress);
+        overall.completedUnits += node.units ?? 0;
+        overall.completedDocuments += 1;
+        activeTranslations.update(runId, {
+          completedUnits: overall.completedUnits,
+          completedDocuments: overall.completedDocuments,
+        });
       },
       onCycle: (from, to) => {
         logger.info("Journal dependency cycle detected and safely deferred.", {
@@ -410,14 +482,18 @@ export class JournalTranslationService {
   async #translateOne(
     sourceDocument: GraphSourceDocument,
     runtime: TranslationRuntime,
+    onProgress: (progress: JournalTranslationProgress) => void,
   ): Promise<GraphTranslationResult> {
-    if (isActorDocument(sourceDocument)) return this.#translateActorOne(sourceDocument, runtime);
-    return this.#translateJournalOne(sourceDocument, runtime);
+    if (isActorDocument(sourceDocument)) {
+      return this.#translateActorOne(sourceDocument, runtime, onProgress);
+    }
+    return this.#translateJournalOne(sourceDocument, runtime, onProgress);
   }
 
   async #translateJournalOne(
     sourceDocument: FoundryJournalWorldDocument,
     runtime: TranslationRuntime,
+    onProgress: (progress: JournalTranslationProgress) => void,
   ): Promise<JournalTranslationResult> {
     const source = sourceDocument.toObject() as JournalData;
     const sourceHash = await journalSourceHash(source);
@@ -455,12 +531,10 @@ export class JournalTranslationService {
       onQualityFallback: (fallback) => {
         logger.warn("Translation quality fallback kept the original fragment.", fallback);
       },
-      ...(this.#onProgress ? {
-        onProgress: (progress: JournalTranslationProgress) => this.#onProgress?.({
-          ...progress,
-          documentName: sourceDocument.name,
-        }),
-      } : {}),
+      onProgress: (progress: JournalTranslationProgress) => onProgress({
+        ...progress,
+        documentName: sourceDocument.name,
+      }),
     });
     await assertJournalSourceUnchanged(sourceDocument, sourceHash);
     const document = await runtime.translations.save(translated.data);
@@ -477,6 +551,7 @@ export class JournalTranslationService {
   async #translateActorOne(
     sourceDocument: FoundryActorWorldDocument,
     runtime: TranslationRuntime,
+    onProgress: (progress: JournalTranslationProgress) => void,
   ): Promise<GraphTranslationResult> {
     const source = sourceDocument.toObject() as ActorData;
     const sourceHash = await actorSourceHash(source);
@@ -511,18 +586,16 @@ export class JournalTranslationService {
       onQualityFallback: (fallback) => {
         logger.warn("Actor translation quality fallback kept the original fragment.", fallback);
       },
-      ...(this.#onProgress ? {
-        onProgress: (progress) => this.#onProgress?.({
-          kind: "actor-field",
-          completedPages: progress.completedFields,
-          totalPages: progress.totalFields,
-          pageIndex: progress.completedFields - 1,
-          pageName: progress.itemName ?? progress.fieldPath.join("."),
-          translatedText: true,
-          skippedText: false,
-          documentName: sourceDocument.name,
-        }),
-      } : {}),
+      onProgress: (progress) => onProgress({
+        kind: "actor-field",
+        completedPages: progress.completedFields,
+        totalPages: progress.totalFields,
+        pageIndex: progress.completedFields - 1,
+        pageName: progress.itemName ?? progress.fieldPath.join("."),
+        translatedText: true,
+        skippedText: false,
+        documentName: sourceDocument.name,
+      }),
     });
     await assertActorSourceUnchanged(sourceDocument, sourceHash);
     const document = await runtime.actorTranslations.save(translated.data);

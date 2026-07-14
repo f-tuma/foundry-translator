@@ -1,6 +1,7 @@
 import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
 import { getTranslatorSettings } from "../settings/settings";
+import { formatOverallSuffix } from "./journal-header-control";
 import { JournalTranslationService } from "./journal-service";
 import { renderJournalTranslationView } from "./journal-translation-view";
 
@@ -52,6 +53,13 @@ export class JournalTranslationApplication extends foundry.applications.api.Appl
     try {
       const service = new JournalTranslationService({
         onChromeStatus: (status) => this.#setChromeStatus(status),
+        onPlan: (plan) => {
+          const message = game.i18n
+            .localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.Plan")
+            .replace("{documents}", String(plan.totalDocuments))
+            .replace("{units}", String(plan.totalUnits));
+          this.#setStatus("testing", message, false);
+        },
         onProgress: (progress) => {
           const key = progress.kind === "actor-field"
             ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress"
@@ -61,7 +69,8 @@ export class JournalTranslationApplication extends foundry.applications.api.Appl
             .replace("{current}", String(progress.completedPages))
             .replace("{total}", String(progress.totalPages))
             .replace("{page}", progress.pageName)
-            .replace("{document}", progress.documentName ?? "");
+            .replace("{document}", progress.documentName ?? "")
+            + formatOverallSuffix(progress);
           this.#setStatus("testing", message, false);
         },
       });

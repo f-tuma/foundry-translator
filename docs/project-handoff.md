@@ -38,6 +38,20 @@ and the recommended implementation order.
   script now selects the Gamemaster user and joins before waiting for
   `game.ready`.
 - 2026-07-14: Released as `v0.10.0`.
+- 2026-07-14: Added a global active-translations overview and an upfront
+  dependency-graph size scan. Before translating, the whole graph is traversed
+  write-free and the total number of documents and translation units (journal
+  pages plus Actor HTML fields) is computed, so progress and a remaining-time
+  estimate can be shown from the first unit. The overview window lives in the
+  module settings menu (`Probíhající překlady`), tracks every run regardless of
+  entry point via the `activeTranslations` registry in
+  `src/translation/active-translations.ts`, and shows state, progress bar,
+  counts, ETA, and the current document/page. Verified with a real-Foundry E2E
+  (`/tmp/test-foundry-active-translations.mjs`): a 2-page Journal with an Actor
+  embed reported 5/5 units and 2/2 documents and finished with a full progress
+  bar. Per-run status strings now include the overall totals.
+- 2026-07-14: The user asked that commits contain no `Co-Authored-By: Claude`
+  trailer.
 
 ### Actor milestone state (released in v0.10.0)
 

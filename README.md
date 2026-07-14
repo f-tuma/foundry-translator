@@ -91,6 +91,13 @@ translated without exposing UUIDs or configuration to the model. Markdown
 source pages are deliberately left unchanged for now and reported in the
 completion summary.
 
+Before the first request, the module scans the complete dependency graph
+without writing anything and reports the total number of documents and
+translatable parts. Progress messages therefore show both the current page and
+the overall total. The **Active translations** window in the module settings
+provides a global overview of every running translation with a progress bar,
+totals, the current document, and an estimate of the remaining time.
+
 Empty, structurally damaged, and suspicious unchanged results are retried up to
 three times and are never written to cache. Intentionally preserved glossary
 terms are excluded from this check. Translated blocks are cached in the

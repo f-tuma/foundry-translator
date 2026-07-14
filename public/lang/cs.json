@@ -84,6 +84,8 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Translating": "Překládám názvy a obsah deníku…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress": "{document} — stránka {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress": "{document} — pole Actoru {current}/{total}: {page}",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.OverallSuffix": " · celkem {current}/{total} částí, dokument {documents}/{totalDocuments}",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.Plan": "K překladu je {documents} dokumentů a {units} částí.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Missing": "Vybraný deník už ve světě neexistuje.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done": "Překlad je hotový: {pages} HTML stránek přeloženo, {skipped} nepodporovaných přeskočeno.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback": "Překlad je hotový s upozorněním: {pages} HTML stránek přeloženo, {skipped} nepodporovaných přeskočeno, {fallback} fragmentů po kontrole kvality ponecháno v originále.",
@@ -94,5 +96,17 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Zobrazit originál",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting": "Foundry Translate připravuje tento deník…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading": "Chrome stahuje lokální překladový model. Překlad bude automaticky pokračovat…",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "Tento deník se už překládá."
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "Tento deník se už překládá.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Name": "Probíhající překlady",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Label": "Zobrazit probíhající překlady",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Hint": "Globální přehled běžících překladů s celkovým rozsahem a odhadem zbývajícího času.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.WindowTitle": "Foundry Translate — Probíhající překlady",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Empty": "Žádný překlad právě neprobíhá.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Scanning": "Zjišťuji celkový rozsah překladu…",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Counts": "{units}/{totalUnits} částí · {documents}/{totalDocuments} dokumentů",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Eta": "zbývá ~{eta}",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning": "Analyzuji",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Překládám",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Hotovo",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error": "Chyba"
 }

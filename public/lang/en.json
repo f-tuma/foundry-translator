@@ -84,6 +84,8 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Translating": "Translating journal names and content…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress": "{document} — page {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress": "{document} — Actor field {current}/{total}: {page}",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.OverallSuffix": " · overall {current}/{total} parts, document {documents}/{totalDocuments}",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.Plan": "There are {documents} documents and {units} parts to translate.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Missing": "The selected journal no longer exists in the world.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done": "Translation ready: {pages} HTML pages translated, {skipped} unsupported pages skipped.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback": "Translation ready with warnings: {pages} HTML pages translated, {skipped} unsupported pages skipped, {fallback} fragments kept in the original after quality checks.",
@@ -94,5 +96,17 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Show original",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting": "Foundry Translate is preparing this journal…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading": "Chrome is downloading the local translation model. Translation will continue automatically…",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "This journal is already being translated."
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "This journal is already being translated.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Name": "Active translations",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Label": "Show active translations",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Hint": "A global overview of running translations with the total scope and an estimate of the remaining time.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.WindowTitle": "Foundry Translate — Active translations",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Empty": "No translation is currently running.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Scanning": "Determining the total translation scope…",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Counts": "{units}/{totalUnits} parts · {documents}/{totalDocuments} documents",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Eta": "~{eta} remaining",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning": "Scanning",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Translating",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Done",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error": "Error"
 }

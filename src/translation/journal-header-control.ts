@@ -44,6 +44,15 @@ function formatDoneMessage(
     .replace("{dependencies}", String(dependencyWarnings));
 }
 
+export function formatOverallSuffix(progress: JournalTranslationProgress): string {
+  if (progress.overallTotalUnits === undefined) return "";
+  return localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.OverallSuffix")
+    .replace("{current}", String(progress.overallCompletedUnits ?? 0))
+    .replace("{total}", String(progress.overallTotalUnits))
+    .replace("{documents}", String((progress.completedDocuments ?? 0) + 1))
+    .replace("{totalDocuments}", String(progress.totalDocuments ?? 0));
+}
+
 function formatProgress(progress: JournalTranslationProgress): string {
   const key = progress.kind === "actor-field"
     ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress"
@@ -52,7 +61,8 @@ function formatProgress(progress: JournalTranslationProgress): string {
     .replace("{current}", String(progress.completedPages))
     .replace("{total}", String(progress.totalPages))
     .replace("{page}", progress.pageName)
-    .replace("{document}", progress.documentName ?? "");
+    .replace("{document}", progress.documentName ?? "")
+    + formatOverallSuffix(progress);
 }
 
 function worldJournal(entry: FoundryJournalDocument | undefined): FoundryJournalWorldDocument | null {

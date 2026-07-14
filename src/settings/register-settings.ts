@@ -3,6 +3,7 @@ import { GlossaryApplication } from "../glossary/glossary-app";
 import { SETTINGS } from "./settings";
 import { TranslatorSettingsApplication } from "./translator-settings-app";
 import { JournalTranslationApplication } from "../translation/journal-translation-app";
+import { ActiveTranslationsApplication } from "../translation/active-translations-app";
 
 export function registerSettings(): void {
   game.settings.register(MODULE_ID, SETTINGS.PROVIDER, {
@@ -65,6 +66,15 @@ export function registerSettings(): void {
     hint: "FOUNDRY_TRANSLATE.JournalTranslation.Menu.Hint",
     icon: "fa-solid fa-book-open-reader",
     type: JournalTranslationApplication,
+    restricted: true,
+  });
+
+  game.settings.registerMenu(MODULE_ID, "activeTranslations", {
+    name: "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Name",
+    label: "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Label",
+    hint: "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Hint",
+    icon: "fa-solid fa-list-check",
+    type: ActiveTranslationsApplication,
     restricted: true,
   });
 }

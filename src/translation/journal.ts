@@ -73,6 +73,10 @@ export interface JournalTranslationProgress {
   translatedText: boolean;
   skippedText: boolean;
   documentName?: string;
+  overallCompletedUnits?: number;
+  overallTotalUnits?: number;
+  completedDocuments?: number;
+  totalDocuments?: number;
 }
 
 export interface TranslatedJournal {
