@@ -57,20 +57,24 @@ export class JournalTranslationApplication extends foundry.applications.api.Appl
             .localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress")
             .replace("{current}", String(progress.completedPages))
             .replace("{total}", String(progress.totalPages))
-            .replace("{page}", progress.pageName);
+            .replace("{page}", progress.pageName)
+            .replace("{document}", progress.documentName ?? "");
           this.#setStatus("testing", message, false);
         },
       });
       const result = await service.translate(journal);
-      const doneKey = result.fallbackTextSegments > 0
-        ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback"
-        : "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done";
+      const hasWarnings = result.fallbackTextSegments > 0 || result.dependencyWarnings.length > 0;
+      const doneKey = hasWarnings
+        ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneRecursiveWithWarnings"
+        : "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneRecursive";
       const template = game.i18n.localize(doneKey);
       const message = template
         .replace("{pages}", String(result.translatedTextPages))
         .replace("{skipped}", String(result.skippedTextPages))
-        .replace("{fallback}", String(result.fallbackTextSegments));
-      if (result.fallbackTextSegments > 0) {
+        .replace("{fallback}", String(result.fallbackTextSegments))
+        .replace("{documents}", String(result.processedDocuments))
+        .replace("{dependencies}", String(result.dependencyWarnings.length));
+      if (hasWarnings) {
         this.#setStatus("warning", message, false);
         ui.notifications.warn(message, { permanent: true });
       } else {

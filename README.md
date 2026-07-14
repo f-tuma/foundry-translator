@@ -3,11 +3,11 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.8.4` processes
+> The module is currently an early development build. Version `0.9.0` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
 > safely keeps an isolated failed fragment in the original, translates human text
-> inside Foundry embeds, invalidates stale engine results, resumes from the server
-> cache, and reports live progress.
+> inside Foundry embeds, recursively translates linked Journals, rewrites links to
+> their stored translations, resumes from the server cache, and reports live progress.
 
 ## Installation
 
@@ -106,6 +106,14 @@ action. Its source UUID and hash allow an unchanged translation to be reused and
 a changed source to update the same stored document instead of creating a
 duplicate.
 
+Linked Journal Entries are translated recursively. Shared dependencies are
+processed only once, cycles are handled without deadlocks, and links in the
+translated copy are rewritten to stable translated compendium UUIDs. Links to a
+specific Journal page preserve that page's original ID. Missing references and
+document types that are not supported recursively yet remain pointed at the
+source and are reported as warnings instead of failing the whole translation.
+Actor and Item dependency copies are the next implementation stage.
+
 ## Development
 
 Requires Node.js 22 or newer.
@@ -127,7 +135,7 @@ component updater and can produce a false TranslateKit failure. `FOUNDRY_URL`,
 `CHROMIUM_PATH`, `CHROMIUM_PROFILE`, `SOURCE_LANGUAGE`, and `TARGET_LANGUAGE` can
 be overridden through environment variables.
 
-The production module is generated in `dist/`. A release tag such as `v0.8.4`
+The production module is generated in `dist/`. A release tag such as `v0.9.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

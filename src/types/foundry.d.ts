@@ -70,9 +70,20 @@ interface FoundryJournalDocument {
   id: string | null;
   name?: string;
   uuid?: string;
+  documentName?: string;
+  parent?: FoundryUuidDocument | null;
   flags?: Record<string, Record<string, unknown>>;
   toObject(): Record<string, unknown>;
   sheet?: { render(options?: boolean | Record<string, unknown>): unknown };
+}
+
+interface FoundryUuidDocument {
+  id: string | null;
+  uuid: string;
+  documentName?: string;
+  parent?: FoundryUuidDocument | null;
+  flags?: Record<string, Record<string, unknown>>;
+  toObject?(): Record<string, unknown>;
 }
 
 interface FoundryJournalWorldDocument extends FoundryJournalDocument {
@@ -167,3 +178,7 @@ interface FoundryHooks {
 
 declare const game: FoundryGame;
 declare const Hooks: FoundryHooks;
+declare function fromUuid(
+  uuid: string,
+  options?: { relative?: FoundryUuidDocument; invalid?: boolean },
+): Promise<FoundryUuidDocument | null>;

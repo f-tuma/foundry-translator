@@ -12,7 +12,7 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
-export const TRANSLATION_ENGINE_REVISION = 2;
+export const TRANSLATION_ENGINE_REVISION = 3;
 const HTML_FORMAT = 1;
 
 export interface JournalPageData extends Record<string, unknown> {
@@ -71,6 +71,7 @@ export interface JournalTranslationProgress {
   pageName: string;
   translatedText: boolean;
   skippedText: boolean;
+  documentName?: string;
 }
 
 export interface TranslatedJournal {

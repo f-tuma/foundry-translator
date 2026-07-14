@@ -1,6 +1,6 @@
 export const MODULE_ID = "foundry-translate" as const;
 export const MODULE_TITLE = "Foundry Translate" as const;
-export const MODULE_VERSION = "0.8.4" as const;
+export const MODULE_VERSION = "0.9.0" as const;
 
 export const MODULE_HOOKS = {
   READY: `${MODULE_ID}.ready`,

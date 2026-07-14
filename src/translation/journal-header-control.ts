@@ -26,21 +26,30 @@ function localized(key: string): string {
   return game.i18n.localize(key);
 }
 
-function formatDoneMessage(pages: number, skipped: number, fallback: number): string {
-  const key = fallback > 0
-    ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback"
-    : "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done";
+function formatDoneMessage(
+  pages: number,
+  skipped: number,
+  fallback: number,
+  documents: number,
+  dependencyWarnings: number,
+): string {
+  const key = fallback > 0 || dependencyWarnings > 0
+    ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneRecursiveWithWarnings"
+    : "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneRecursive";
   return localized(key)
     .replace("{pages}", String(pages))
     .replace("{skipped}", String(skipped))
-    .replace("{fallback}", String(fallback));
+    .replace("{fallback}", String(fallback))
+    .replace("{documents}", String(documents))
+    .replace("{dependencies}", String(dependencyWarnings));
 }
 
 function formatProgress(progress: JournalTranslationProgress): string {
   return localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress")
     .replace("{current}", String(progress.completedPages))
     .replace("{total}", String(progress.totalPages))
-    .replace("{page}", progress.pageName);
+    .replace("{page}", progress.pageName)
+    .replace("{document}", progress.documentName ?? "");
 }
 
 function worldJournal(entry: FoundryJournalDocument | undefined): FoundryJournalWorldDocument | null {
@@ -106,8 +115,12 @@ async function translateFromHeader(
       result.translatedTextPages,
       result.skippedTextPages,
       result.fallbackTextSegments,
+      result.processedDocuments,
+      result.dependencyWarnings.length,
     );
-    if (result.fallbackTextSegments > 0) ui.notifications.warn(message, { permanent: true });
+    if (result.fallbackTextSegments > 0 || result.dependencyWarnings.length > 0) {
+      ui.notifications.warn(message, { permanent: true });
+    }
     else ui.notifications.success(message);
     await showDocument(application, result.document);
   } catch (error) {

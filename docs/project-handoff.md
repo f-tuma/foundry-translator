@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-14
-- Repository state: `main`, release `v0.8.4`
+- Repository state: `main`, release `v0.9.0`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -24,7 +24,7 @@ The user's main priorities are:
 - API keys are entered through the module settings;
 - everything runs inside Foundry, with no separate service;
 - translations should eventually be exportable and importable between instances;
-- the priority after `v0.8.4` is recursive translation of referenced documents.
+- the priority after `v0.9.0` is translating Actor and Item dependencies.
 
 ## Implemented functionality
 
@@ -45,6 +45,12 @@ The user's main priorities are:
 - Protection of `@UUID`, inline rolls, glossary tokens, and HTML boundaries.
 - Translation of human-readable `@Embed` parts, including `readaloud`, without
   changing the UUID.
+- Recursive Journal-to-Journal translation with dependency-first traversal.
+- Deduplication of shared dependencies and safe cycle handling.
+- Rewriting to translated compendium UUIDs after every graph node is stored.
+- Stable JournalEntryPage IDs across rewritten page references.
+- Missing and unsupported dependencies fall back to their source UUID with a
+  non-fatal warning.
 - Long-content chunking, bounded request batches, and page-by-page progress.
 - Server-side cache in the `Foundry Translate — Translation Cache` compendium.
 - Quality retries for empty, structurally damaged, or suspiciously unchanged
@@ -57,7 +63,7 @@ The user's main priorities are:
 - The translation-engine revision invalidates stored results after logic changes.
 - The translation cache uses a versioned key schema; the current schema is `3`.
 - Module compendia are grouped in the shared grey `Foundry Translate` folder.
-- 81 automated tests across 16 test files.
+- 88 automated tests across 18 test files.
 
 ## Verified real-world cases
 
@@ -79,6 +85,12 @@ world, and Chromium 148 with the Chrome Built-in Translator model.
   duplicate.
 - Journal minimization changes the translate action from
   `flex -> none -> flex` across expanded, minimized, and restored states.
+- A real Foundry `A -> B -> A` graph test translated both Journals, rewrote both
+  directions, preserved the linked page ID, and removed all source UUIDs from
+  the translated copies.
+- `Gamemaster's Guide` contains 44 distinct Actor references. Real Actor data
+  confirms that the main visible fields are `system.details.biography.*`, with
+  additional HTML in taxonomy, archetype, and embedded Item descriptions.
 
 Known `prepareGrimoire` console errors involving `life` and `illusion` originate
 in the Crucible system and are unrelated to this module.
@@ -99,6 +111,10 @@ in the Crucible system and are unrelated to this module.
   source hash, and stored translation.
 - `src/translation/compendium-translation-repository.ts` maintains one stored
   translation per source UUID and target language.
+- `src/translation/document-dependencies.ts` discovers and rewrites `@UUID`,
+  `@Embed`, and enriched `data-uuid` references.
+- `src/translation/dependency-graph.ts` provides dependency-first traversal,
+  deduplication, cycle protection, and isolated dependency failures.
 
 ### Safety rules
 
@@ -129,7 +145,7 @@ timestamp, translated/skipped page counts, fallback-fragment count, and engine
 revision. A legacy flag without an engine revision remains readable but must not
 be reused as a current translation.
 
-## Main remaining work: recursive translation
+## Main remaining work: Actor and Item recursion
 
 ### Required user outcome
 
@@ -149,7 +165,7 @@ reference, the module should:
 
 ### Recommended implementation plan
 
-#### 1. Dependency discovery without writes
+#### 1. Dependency discovery without writes — completed for Journals
 
 - Introduce a normalized `TranslationDependency` type containing `sourceUuid`,
   `rootUuid`, `documentType`, `pageId`, `syntaxKind`, and `fieldPath`.
@@ -164,7 +180,7 @@ reference, the module should:
 - Add tests for world UUIDs, compendium UUIDs, page UUIDs, embeds, duplicates,
   and missing UUIDs.
 
-#### 2. Translation graph orchestrator
+#### 2. Translation graph orchestrator — completed for Journals
 
 - Use `sourceUuid + targetLanguage` as the graph node key.
 - Node states: `queued`, `translating`, `translated`, `failed`, `unresolved`.
@@ -204,7 +220,7 @@ Each document type needs its own world compendium in the `Foundry Translate`
 folder, for example translated Actors and Items. The source UUID plus target
 language to translated UUID mapping must remain consistent across packs.
 
-#### 4. Reference rewriting
+#### 4. Reference rewriting — completed for Journal targets
 
 - Rewrite `@UUID[JournalEntry.X.JournalEntryPage.Y]` to the translated Journal
   UUID while preserving page ID `Y`.
@@ -227,7 +243,7 @@ language to translated UUID mapping must remain consistent across packs.
   - text fallbacks;
   - unresolved documents;
   - dependency documents that failed translation.
-- Hide Translate/Show Original controls while minimized, as in `v0.8.4`.
+- Hide Translate/Show Original controls while minimized, as in `v0.9.0`.
 
 #### 6. Mandatory recursion regression tests
 
@@ -245,9 +261,10 @@ language to translated UUID mapping must remain consistent across packs.
 
 ## Known remaining limitations
 
-- Recursive translation and reference rewriting are not implemented yet.
-- Dynamically rendered content from a source Actor may therefore remain in
-  English.
+- Recursive translation and reference rewriting currently support Journal
+  targets. Actor and Item targets remain pointed at their source UUID and produce
+  a warning.
+- Dynamically rendered content from a source Actor therefore remains in English.
 - Markdown source pages are intentionally not translated yet.
 - Portable translation-bundle export/import is not implemented yet.
 - Helium does not support Chrome Local Translator; the tested Chromium profile
@@ -314,9 +331,10 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
 
 1. Read this document and the README.
 2. Run `git status -sb` and `npm run check`.
-3. Start with dependency-discovery types and the parser, without Foundry writes.
-4. Add synthetic graph tests before the orchestrator creates compendia.
-5. Implement Journal-to-Journal recursion first.
-6. Then add the Actor adapter for Ember `@Embed`, which is the main current use
-   case.
-7. Only then add **Translate this page** and run the full Ember smoke test.
+3. Add an Actor translation repository and adapter without changing source Actors.
+4. Translate schema-confirmed Actor HTML fields, starting with
+   `system.details.biography.*`; preserve all mechanical data and embedded IDs.
+5. Extend graph nodes to Actor dependencies and rewrite Journal `@Embed` UUIDs.
+6. Add Item handling only after Actor fields and embedded Item ownership are
+   covered by tests.
+7. Then add **Translate this page** and run the full `Gamemaster's Guide` smoke test.
