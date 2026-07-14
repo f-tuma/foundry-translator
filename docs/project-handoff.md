@@ -129,6 +129,15 @@ and the recommended implementation order.
   compendia, so the next run resumes where the cancelled one stopped —
   verified by a real-Foundry E2E with a slowed translator (cancelled at 2/6
   units, resume completed from cache).
+- 2026-07-14: The user asked whether manually editing stored translations is
+  safe, and proposed a learn-from-corrections feature. Current behavior:
+  manual edits to translated compendium documents survive as long as reuse
+  holds (same source hash, glossary fingerprint, and engine revision), but ANY
+  retranslation trigger silently overwrites them. Future feature idea, in
+  order of value: (1) store a content hash of the saved translation in the
+  flag, detect manual edits before overwriting, and warn or skip; (2) diff the
+  manual edit against the machine output to propose glossary replacement
+  entries ("learning from mistakes"). Not implemented yet.
 - 2026-07-14: Remaining known causes of unresolved references in real Ember
   data: genuinely missing world documents, and `Compendium.dnd5e.*` links
   pointing to packs that are not present in the user's world. Unsupported
