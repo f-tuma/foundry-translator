@@ -56,6 +56,24 @@ and the recommended implementation order.
   and the public manifest and `foundry-translate.zip` assets verified. The
   user confirmed that the active-translations overview and the upfront graph
   totals work in their Foundry instance.
+- 2026-07-14: Standalone Item recursion implemented for `v0.11.0`, mirroring
+  the Actor pipeline: complete Item copy in `world.foundry-translate-items`,
+  only live-schema `HTMLField` paths translated, references rewritten. A
+  real-Foundry E2E (`/tmp/test-foundry-item-recursion.mjs`) passed on the first
+  run: a Crucible weapon's `system.description.public` was translated, all
+  mechanical fields stayed byte-for-byte, the Journal `@UUID` was rewritten,
+  and the source Item was unchanged.
+- 2026-07-14: A scripted whole-`Gamemaster's Guide` smoke test with a stubbed
+  translator was started locally but crashed mid-run because its Chromium
+  window was closed while the user worked on the machine. Its automatic
+  cleanup did not run, so the local `ember-test` world may still contain
+  stub artifacts: translated documents whose names start with `CZ ` and cache
+  entries containing `CZ `-prefixed units. `/tmp/cleanup-guide-smoke.mjs`
+  removes exactly those; it still needs to be run once the user approves.
+- 2026-07-14: The user ran a full `Gamemaster's Guide` translation on another
+  machine with real data: it completed, a small number of parts did not pass
+  (isolated fallbacks/warnings), and the overall result looked good for the
+  document count involved.
 
 ### Actor milestone state (released in v0.10.0)
 
@@ -137,6 +155,13 @@ The user's main priorities are:
   IDs in the `world.foundry-translate-actors` compendium, translation limited to
   live-schema-confirmed `HTMLField` paths, and Journal `@Embed[Actor...]`
   references rewritten to the translated Actor UUID.
+- Recursive standalone Item translation: complete Item copies in the
+  `world.foundry-translate-items` compendium with only live-schema-confirmed
+  `HTMLField` paths translated and references rewritten, mirroring the Actor
+  pipeline. Embedded Actor Items continue to travel inside the Actor copy.
+- A write-free scan of the whole dependency graph before translation computes
+  total documents and units, powering overall progress and the global
+  active-translations overview window with a remaining-time estimate.
 - Deduplication of shared dependencies and safe cycle handling.
 - Rewriting to translated compendium UUIDs after every graph node is stored.
 - Stable JournalEntryPage IDs across rewritten page references.
@@ -231,6 +256,7 @@ in the Crucible system and are unrelated to this module.
 - `world.foundry-translate-cache` — translated-unit cache.
 - `world.foundry-translate-translations` — JournalEntry translations.
 - `world.foundry-translate-actors` — translated Actor copies.
+- `world.foundry-translate-items` — translated standalone Item copies.
 
 The translation flag contains the source UUID and hash, provider, language pair,
 timestamp, translated/skipped page counts, fallback-fragment count, and engine
@@ -305,7 +331,8 @@ Recommended adapter order:
 
 1. `JournalEntry` with stable `JournalEntryPage` IDs — completed.
 2. `Actor`, especially Ember biography/readaloud/system HTML — completed.
-3. `Item` and other types discovered during real Ember traversal.
+3. `Item` and other types discovered during real Ember traversal — standalone
+   Items completed.
 4. Additional types only when supported by evidence from actual content.
 
 Each document type needs its own world compendium in the `Foundry Translate`
@@ -353,9 +380,9 @@ language to translated UUID mapping must remain consistent across packs.
 
 ## Known remaining limitations
 
-- Recursive translation and reference rewriting support Journal and Actor
-  targets. Standalone Item targets remain pointed at their source UUID and
-  produce a warning.
+- Recursive translation and reference rewriting support Journal, Actor, and
+  standalone Item targets. Other document types remain pointed at their source
+  UUID and produce a warning.
 - Markdown source pages are intentionally not translated yet.
 - Portable translation-bundle export/import is not implemented yet.
 - Helium does not support Chrome Local Translator; the tested Chromium profile

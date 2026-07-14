@@ -3,12 +3,12 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.10.0` processes
+> The module is currently an early development build. Version `0.11.0` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
 > safely keeps an isolated failed fragment in the original, translates human text
-> inside Foundry embeds, recursively translates linked Journals and Actors,
-> rewrites links and Actor embeds to their stored translations, resumes from the
-> server cache, and reports live progress.
+> inside Foundry embeds, recursively translates linked Journals, Actors, and
+> Items, rewrites links and embeds to their stored translations, resumes from
+> the server cache, and reports live progress with overall totals.
 
 ## Installation
 
@@ -114,7 +114,7 @@ action. Its source UUID and hash allow an unchanged translation to be reused and
 a changed source to update the same stored document instead of creating a
 duplicate.
 
-Linked Journal Entries and Actors are translated recursively. Shared
+Linked Journal Entries, Actors, and Items are translated recursively. Shared
 dependencies are processed only once, cycles are handled without deadlocks, and
 links in the translated copy are rewritten to stable translated compendium
 UUIDs. Links to a specific Journal page preserve that page's original ID.
@@ -123,10 +123,12 @@ Referenced Actors are copied completely into the
 the live system schema — such as Ember biography text — are translated, while
 all mechanical values, identifiers, and actions stay byte-for-byte source data.
 Journal `@Embed[Actor...]` references are rewritten to the translated Actor so
-dynamically rendered Actor text loads in the target language. Missing references
-and document types that are not supported recursively yet remain pointed at the
-source and are reported as warnings instead of failing the whole translation.
-Standalone Item dependency copies are the next implementation stage.
+dynamically rendered Actor text loads in the target language. Referenced
+standalone Items are copied the same way into the
+`Foundry Translate — Translated Items` world compendium with only their
+schema-confirmed HTML fields translated. Missing references and document types
+that are not supported recursively yet remain pointed at the source and are
+reported as warnings instead of failing the whole translation.
 
 ## Development
 

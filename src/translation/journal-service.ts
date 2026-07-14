@@ -11,6 +11,14 @@ import {
   type ActorData,
 } from "./actor";
 import { activeTranslations, type TranslationPlan } from "./active-translations";
+import {
+  canReuseItemTranslation,
+  itemSourceHash,
+  readItemTranslationFlag,
+  translateItemData,
+  type ItemData,
+} from "./item";
+import { CompendiumItemTranslationRepository } from "./compendium-item-translation-repository";
 import { CompendiumTranslationCache } from "./compendium-cache";
 import { CompendiumActorTranslationRepository } from "./compendium-actor-translation-repository";
 import { CompendiumJournalTranslationRepository } from "./compendium-translation-repository";
@@ -60,9 +68,15 @@ export interface JournalDependencyWarning {
   message: string;
 }
 
-type GraphSourceDocument = FoundryJournalWorldDocument | FoundryActorWorldDocument;
-type GraphTranslatedDocument = FoundryJournalDocument | FoundryActorDocument;
-type GraphData = JournalData | ActorData;
+type GraphSourceDocument =
+  | FoundryJournalWorldDocument
+  | FoundryActorWorldDocument
+  | FoundryItemWorldDocument;
+type GraphTranslatedDocument =
+  | FoundryJournalDocument
+  | FoundryActorDocument
+  | FoundryItemWorldDocument;
+type GraphData = JournalData | ActorData | ItemData;
 
 interface GraphTranslationResult {
   data: GraphData;
@@ -91,6 +105,7 @@ interface TranslationRuntime {
   cache: CompendiumTranslationCache;
   translations: CompendiumJournalTranslationRepository;
   actorTranslations: CompendiumActorTranslationRepository;
+  itemTranslations: CompendiumItemTranslationRepository;
 }
 
 interface RuntimePageSystem {
@@ -153,14 +168,20 @@ function isActorDocument(document: FoundryUuidDocument): document is FoundryActo
     typeof document.toObject === "function";
 }
 
+function isItemDocument(document: FoundryUuidDocument): document is FoundryItemWorldDocument {
+  return document.documentName === "Item" &&
+    typeof document.uuid === "string" &&
+    typeof document.toObject === "function";
+}
+
 function isSupportedSourceDocument(document: FoundryUuidDocument): document is GraphSourceDocument {
-  return isJournalDocument(document) || isActorDocument(document);
+  return isJournalDocument(document) || isActorDocument(document) || isItemDocument(document);
 }
 
 function isTranslatedDocument(document: FoundryUuidDocument): boolean {
-  return isJournalDocument(document)
-    ? Boolean(readJournalTranslationFlag(document.flags))
-    : isActorDocument(document) && Boolean(readActorTranslationFlag(document.flags));
+  if (isJournalDocument(document)) return Boolean(readJournalTranslationFlag(document.flags));
+  if (isActorDocument(document)) return Boolean(readActorTranslationFlag(document.flags));
+  return isItemDocument(document) && Boolean(readItemTranslationFlag(document.flags));
 }
 
 export function translatedDocumentReferenceUuid(
@@ -205,6 +226,28 @@ export async function assertActorSourceUnchanged(
   }
 }
 
+export async function assertItemSourceUnchanged(
+  sourceDocument: FoundryItemWorldDocument,
+  expectedHash: string,
+): Promise<void> {
+  const currentSourceHash = await itemSourceHash(sourceDocument.toObject() as ItemData);
+  if (currentSourceHash !== expectedHash) {
+    throw new Error(
+      "Zdrojový Item se během překladu změnil. Překlad nebyl uložen; spusťte jej znovu a hotová pole se načtou z cache.",
+    );
+  }
+}
+
+function itemHtmlFieldPaths(
+  sourceDocument: FoundryItemWorldDocument,
+  source: ItemData,
+): readonly HtmlFieldPath[] {
+  return discoverSystemHtmlFieldPaths(
+    sourceDocument.system?.constructor?.schema?.fields,
+    source.system,
+  );
+}
+
 function actorHtmlFieldPaths(
   sourceDocument: FoundryActorWorldDocument,
   source: ActorData,
@@ -236,6 +279,9 @@ function documentTranslationUnits(document: GraphSourceDocument): number {
     const source = document.toObject() as ActorData;
     const paths = actorHtmlFieldPaths(document, source);
     return paths.system.length + paths.items.reduce((total, item) => total + item.length, 0);
+  }
+  if (isItemDocument(document)) {
+    return itemHtmlFieldPaths(document, document.toObject() as ItemData).length;
   }
   return (document.toObject() as JournalData).pages.length;
 }
@@ -280,6 +326,7 @@ export class JournalTranslationService {
       cache: new CompendiumTranslationCache(),
       translations: new CompendiumJournalTranslationRepository(),
       actorTranslations: new CompendiumActorTranslationRepository(),
+      itemTranslations: new CompendiumItemTranslationRepository(),
     };
     const runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
     try {
@@ -453,12 +500,18 @@ export class JournalTranslationService {
         if (flag) await assertJournalSourceUnchanged(document, flag.sourceHash);
         node.result.data = journalData;
         node.result.document = await runtime.translations.save(journalData);
-      } else {
+      } else if (isActorDocument(document)) {
         const actorData = rewritten as ActorData;
         const flag = readActorTranslationFlag(actorData.flags);
         if (flag) await assertActorSourceUnchanged(document, flag.sourceHash);
         node.result.data = actorData;
         node.result.document = await runtime.actorTranslations.save(actorData);
+      } else {
+        const itemData = rewritten as ItemData;
+        const flag = readItemTranslationFlag(itemData.flags);
+        if (flag) await assertItemSourceUnchanged(document, flag.sourceHash);
+        node.result.data = itemData;
+        node.result.document = await runtime.itemTranslations.save(itemData);
       }
     }
 
@@ -486,6 +539,9 @@ export class JournalTranslationService {
   ): Promise<GraphTranslationResult> {
     if (isActorDocument(sourceDocument)) {
       return this.#translateActorOne(sourceDocument, runtime, onProgress);
+    }
+    if (isItemDocument(sourceDocument)) {
+      return this.#translateItemOne(sourceDocument, runtime, onProgress);
     }
     return this.#translateJournalOne(sourceDocument, runtime, onProgress);
   }
@@ -599,6 +655,58 @@ export class JournalTranslationService {
     });
     await assertActorSourceUnchanged(sourceDocument, sourceHash);
     const document = await runtime.actorTranslations.save(translated.data);
+    return { ...translated, document, reused: false };
+  }
+
+  async #translateItemOne(
+    sourceDocument: FoundryItemWorldDocument,
+    runtime: TranslationRuntime,
+    onProgress: (progress: JournalTranslationProgress) => void,
+  ): Promise<GraphTranslationResult> {
+    const source = sourceDocument.toObject() as ItemData;
+    const sourceHash = await itemSourceHash(source);
+    const existing = await runtime.itemTranslations.find(
+      sourceDocument.uuid,
+      runtime.settings.targetLanguage,
+    );
+    const existingFlag = existing ? readItemTranslationFlag(existing.flags) : null;
+    if (existing && existingFlag && canReuseItemTranslation(existingFlag, sourceHash)) {
+      return {
+        data: existing.toObject() as ItemData,
+        document: existing,
+        reused: true,
+        fallbackTextSegments: existingFlag.fallbackTextSegments,
+      };
+    }
+
+    const translated = await translateItemData({
+      source,
+      sourceUuid: sourceDocument.uuid,
+      glossary: runtime.glossary,
+      provider: runtime.provider,
+      settings: {
+        providerId: runtime.settings.provider,
+        sourceLanguage: runtime.settings.sourceLanguage,
+        targetLanguage: runtime.settings.targetLanguage,
+      },
+      systemHtmlFieldPaths: itemHtmlFieldPaths(sourceDocument, source),
+      cache: runtime.cache,
+      onQualityFallback: (fallback) => {
+        logger.warn("Item translation quality fallback kept the original fragment.", fallback);
+      },
+      onProgress: (progress) => onProgress({
+        kind: "item-field",
+        completedPages: progress.completedFields,
+        totalPages: progress.totalFields,
+        pageIndex: progress.completedFields - 1,
+        pageName: progress.fieldPath.join("."),
+        translatedText: true,
+        skippedText: false,
+        documentName: sourceDocument.name,
+      }),
+    });
+    await assertItemSourceUnchanged(sourceDocument, sourceHash);
+    const document = await runtime.itemTranslations.save(translated.data);
     return { ...translated, document, reused: false };
   }
 }

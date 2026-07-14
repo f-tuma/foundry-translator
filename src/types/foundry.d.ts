@@ -119,8 +119,19 @@ interface FoundryActorWorldDocument extends FoundryActorDocument {
 
 interface FoundryItemDocument extends FoundryUuidDocument {
   id: string | null;
+  documentName?: "Item";
   name?: string;
+  type?: string;
   system?: FoundryRuntimeSystem;
+  flags?: Record<string, Record<string, unknown>>;
+  sheet?: { render(options?: boolean | Record<string, unknown>): unknown };
+}
+
+interface FoundryItemWorldDocument extends FoundryItemDocument {
+  uuid: string;
+  name: string;
+  type: string;
+  toObject(): Record<string, unknown>;
 }
 
 interface FoundrySettingConfig {
@@ -186,6 +197,18 @@ declare const foundry: {
           data: Record<string, unknown>[],
           operation: { pack: string; keepId?: boolean },
         ): Promise<FoundryActorDocument[]>;
+        updateDocuments(
+          data: Record<string, unknown>[],
+          operation: { pack: string },
+        ): Promise<unknown[]>;
+      };
+    };
+    Item: {
+      implementation: {
+        createDocuments(
+          data: Record<string, unknown>[],
+          operation: { pack: string; keepId?: boolean },
+        ): Promise<FoundryItemWorldDocument[]>;
         updateDocuments(
           data: Record<string, unknown>[],
           operation: { pack: string },

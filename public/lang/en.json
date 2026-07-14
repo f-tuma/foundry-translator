@@ -84,6 +84,7 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Translating": "Translating journal names and content…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress": "{document} — page {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress": "{document} — Actor field {current}/{total}: {page}",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.ItemProgress": "{document} — Item field {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.OverallSuffix": " · overall {current}/{total} parts, document {documents}/{totalDocuments}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Plan": "There are {documents} documents and {units} parts to translate.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Missing": "The selected journal no longer exists in the world.",

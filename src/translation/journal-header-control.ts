@@ -53,10 +53,14 @@ export function formatOverallSuffix(progress: JournalTranslationProgress): strin
     .replace("{totalDocuments}", String(progress.totalDocuments ?? 0));
 }
 
+export function progressStatusKey(kind: JournalTranslationProgress["kind"]): string {
+  if (kind === "actor-field") return "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress";
+  if (kind === "item-field") return "FOUNDRY_TRANSLATE.JournalTranslation.Status.ItemProgress";
+  return "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress";
+}
+
 function formatProgress(progress: JournalTranslationProgress): string {
-  const key = progress.kind === "actor-field"
-    ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress"
-    : "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress";
+  const key = progressStatusKey(progress.kind);
   return localized(key)
     .replace("{current}", String(progress.completedPages))
     .replace("{total}", String(progress.totalPages))

@@ -84,6 +84,7 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Translating": "Překládám názvy a obsah deníku…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress": "{document} — stránka {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress": "{document} — pole Actoru {current}/{total}: {page}",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.ItemProgress": "{document} — pole Itemu {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.OverallSuffix": " · celkem {current}/{total} částí, dokument {documents}/{totalDocuments}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Plan": "K překladu je {documents} dokumentů a {units} částí.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Missing": "Vybraný deník už ve světě neexistuje.",
