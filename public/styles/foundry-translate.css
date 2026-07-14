@@ -653,3 +653,21 @@
   align-self: flex-start;
   margin-top: var(--ft-space-1);
 }
+
+.ft-active-translations__actions {
+  display: flex;
+  gap: var(--ft-space-2);
+  margin-top: var(--ft-space-1);
+}
+
+.ft-active-translations__cancel {
+  color: var(--ft-color-danger);
+}
+
+.ft-active-translations__run[data-state="cancelled"] .ft-active-translations__state {
+  color: var(--ft-color-warning);
+}
+
+.ft-active-translations__run[data-state="cancelled"] .ft-progress__fill {
+  background: var(--ft-color-warning);
+}

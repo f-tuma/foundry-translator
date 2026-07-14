@@ -115,6 +115,9 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Translating",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Done",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error": "Error",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled": "Cancelled",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling": "Cancelling after the current part…",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Cancel": "Cancel",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Issues": "{count} issues",
   "FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog": "Copy log",
   "FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied": "The translation log was copied to the clipboard."

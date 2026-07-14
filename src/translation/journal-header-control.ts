@@ -7,7 +7,7 @@ import {
   TRANSLATIONS_PACK_ID,
 } from "./compendium-translation-repository";
 import { readJournalTranslationFlag, type JournalTranslationProgress } from "./journal";
-import { JournalTranslationService } from "./journal-service";
+import { JournalTranslationService, TranslationCancelledError } from "./journal-service";
 
 interface JournalEntrySheetApplication {
   entry?: FoundryJournalDocument;
@@ -160,6 +160,10 @@ async function translateFromHeader(
     else ui.notifications.success(message);
     await showDocument(application, result.document);
   } catch (error) {
+    if (error instanceof TranslationCancelledError) {
+      ui.notifications.info(error.message);
+      return;
+    }
     logger.error("Journal translation from its header failed.", error);
     ui.notifications.error(
       error instanceof Error

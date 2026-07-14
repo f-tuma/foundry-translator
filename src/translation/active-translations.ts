@@ -3,7 +3,12 @@ export interface TranslationPlan {
   totalUnits: number;
 }
 
-export type ActiveTranslationState = "scanning" | "translating" | "done" | "error";
+export type ActiveTranslationState =
+  | "scanning"
+  | "translating"
+  | "done"
+  | "error"
+  | "cancelled";
 
 export interface TranslationRunIssue {
   type: "fallback" | "unresolved" | "unsupported" | "failed";
@@ -34,6 +39,8 @@ export interface ActiveTranslationRun {
   issues: TranslationRunIssue[];
   /** Issues beyond the per-run cap are counted instead of stored. */
   droppedIssues?: number;
+  /** Set by the UI; the service stops at the next safe point. */
+  cancelRequested?: boolean;
 }
 
 const FINISHED_RUN_RETENTION_MS = 10 * 60 * 1000;
@@ -102,6 +109,25 @@ export class ActiveTranslationRegistry {
     run.finishedAt = this.#now();
     run.state = error === undefined ? "done" : "error";
     if (error !== undefined) run.error = error;
+    this.#notify();
+  }
+
+  requestCancel(id: number): void {
+    const run = this.#runs.get(id);
+    if (!run || run.finishedAt !== undefined || run.cancelRequested) return;
+    run.cancelRequested = true;
+    this.#notify();
+  }
+
+  isCancelRequested(id: number): boolean {
+    return this.#runs.get(id)?.cancelRequested === true;
+  }
+
+  finishCancelled(id: number): void {
+    const run = this.#runs.get(id);
+    if (!run || run.finishedAt !== undefined) return;
+    run.finishedAt = this.#now();
+    run.state = "cancelled";
     this.#notify();
   }
 

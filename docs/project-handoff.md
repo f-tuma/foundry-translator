@@ -121,6 +121,14 @@ and the recommended implementation order.
   (type, `documentType` for unsupported references) instead of the Czech UI
   message. Issues beyond the 500-per-run cap are counted and reported as
   `(+N more were not recorded)`.
+- 2026-07-14: The active-translations overview gained a **Cancel** button.
+  `activeTranslations.requestCancel` sets a flag; the service checks it before
+  each document and after each completed unit and throws
+  `TranslationCancelledError`, which finishes the run as `cancelled` (not an
+  error). Completed units stay in the cache and completed documents in the
+  compendia, so the next run resumes where the cancelled one stopped —
+  verified by a real-Foundry E2E with a slowed translator (cancelled at 2/6
+  units, resume completed from cache).
 - 2026-07-14: Remaining known causes of unresolved references in real Ember
   data: genuinely missing world documents, and `Compendium.dnd5e.*` links
   pointing to packs that are not present in the user's world. Unsupported

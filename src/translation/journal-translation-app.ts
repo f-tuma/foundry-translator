@@ -2,7 +2,7 @@ import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
 import { getTranslatorSettings } from "../settings/settings";
 import { formatOverallSuffix, progressStatusKey } from "./journal-header-control";
-import { JournalTranslationService } from "./journal-service";
+import { JournalTranslationService, TranslationCancelledError } from "./journal-service";
 import { renderJournalTranslationView } from "./journal-translation-view";
 
 type TranslationState = "idle" | "testing" | "success" | "warning" | "error";
@@ -92,6 +92,10 @@ export class JournalTranslationApplication extends foundry.applications.api.Appl
       }
       result.document.sheet?.render(true);
     } catch (error) {
+      if (error instanceof TranslationCancelledError) {
+        this.#setStatus("warning", error.message, false);
+        return;
+      }
       logger.error("Journal translation failed.", error);
       this.#setStatus(
         "error",

@@ -62,6 +62,17 @@ export interface JournalTranslationResult extends TranslatedJournal {
   dependencyWarnings: readonly JournalDependencyWarning[];
 }
 
+export class TranslationCancelledError extends Error {
+  constructor() {
+    super("Překlad byl zrušen. Hotové části zůstávají uložené a další spuštění na ně naváže.");
+    this.name = "TranslationCancelledError";
+  }
+}
+
+function throwIfCancelled(runId: number): void {
+  if (activeTranslations.isCancelRequested(runId)) throw new TranslationCancelledError();
+}
+
 export type JournalDependencyWarningKind = "unresolved" | "unsupported" | "failed";
 
 export interface JournalDependencyWarning {
@@ -368,7 +379,11 @@ export class JournalTranslationService {
       activeTranslations.finish(runId);
       return result;
     } catch (error) {
-      activeTranslations.finish(runId, error instanceof Error ? error.message : String(error));
+      if (error instanceof TranslationCancelledError) {
+        activeTranslations.finishCancelled(runId);
+      } else {
+        activeTranslations.finish(runId, error instanceof Error ? error.message : String(error));
+      }
       throw error;
     }
   }
@@ -492,6 +507,7 @@ export class JournalTranslationService {
       key: (document) => document.uuid,
       dependencies: resolveNodeDependencies,
       process: (document) => {
+        throwIfCancelled(runId);
         nodeFor(document).units = document.uuid === sourceDocument.uuid && scope.rootPageIds
           ? scope.rootPageIds.length
           : documentTranslationUnits(document);
@@ -509,6 +525,9 @@ export class JournalTranslationService {
 
     const overall = { completedUnits: 0, completedDocuments: 0 };
     const emitProgress = (progress: JournalTranslationProgress): void => {
+      // A cancel stops right after the unit that just finished; its result is
+      // already committed to the cache, so a later run resumes from here.
+      throwIfCancelled(runId);
       const enriched: JournalTranslationProgress = {
         ...progress,
         overallCompletedUnits: overall.completedUnits + progress.completedPages,
@@ -529,6 +548,7 @@ export class JournalTranslationService {
       key: (document) => document.uuid,
       dependencies: resolveNodeDependencies,
       process: async (document) => {
+        throwIfCancelled(runId);
         const node = nodeFor(document);
         node.result = await this.#translateOne(
           document,

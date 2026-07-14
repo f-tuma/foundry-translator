@@ -94,6 +94,22 @@ describe("Active translation registry", () => {
     expect(log).toContain("Recursive translation of Scene documents is not supported yet");
   });
 
+  it("handles a cancel request and a cancelled finish", () => {
+    const registry = new ActiveTranslationRegistry(() => 7);
+    const id = registry.start("Guide", "cs");
+
+    expect(registry.isCancelRequested(id)).toBe(false);
+    registry.requestCancel(id);
+    expect(registry.isCancelRequested(id)).toBe(true);
+    registry.finishCancelled(id);
+
+    const [run] = registry.list();
+    expect(run?.state).toBe("cancelled");
+    expect(run?.finishedAt).toBe(7);
+    registry.requestCancel(id);
+    expect(run?.state).toBe("cancelled");
+  });
+
   it("counts issues beyond the cap instead of storing them", () => {
     const registry = new ActiveTranslationRegistry(() => 0);
     const id = registry.start("Guide", "cs");

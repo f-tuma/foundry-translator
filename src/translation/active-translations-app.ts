@@ -27,12 +27,15 @@ function formatDuration(milliseconds: number): string {
 }
 
 function renderRun(run: ActiveTranslationRun, now: number): string {
-  const stateKey = {
-    scanning: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning",
-    translating: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating",
-    done: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done",
-    error: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error",
-  }[run.state];
+  const stateKey = run.cancelRequested && run.finishedAt === undefined
+    ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling"
+    : {
+        scanning: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning",
+        translating: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating",
+        done: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done",
+        error: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error",
+        cancelled: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled",
+      }[run.state];
   const percent = run.plan?.totalUnits
     ? Math.min(100, Math.round((run.completedUnits / run.plan.totalUnits) * 100))
     : 0;
@@ -60,6 +63,12 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog")}</span>
       </button>`
     : "";
+  const cancel = run.finishedAt === undefined
+    ? `<button type="button" class="ft-button ft-active-translations__cancel" data-run-cancel="${run.id}" ${run.cancelRequested ? "disabled" : ""}>
+        <i class="fa-solid fa-stop" aria-hidden="true"></i>
+        <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Cancel")}</span>
+      </button>`
+    : "";
   return `
     <li class="ft-active-translations__run" data-state="${run.state}">
       <div class="ft-active-translations__title">
@@ -73,7 +82,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         <span>${counts}${eta ? ` · ${eta}` : ""}${issues ? ` · ${issues}` : ""}</span>
         ${run.error ? `<span class="ft-active-translations__error">${escapeHtml(run.error)}</span>` : ""}
         ${current ? `<span class="ft-active-translations__current">${current}</span>` : ""}
-        ${copyLog}
+        <div class="ft-active-translations__actions">${cancel}${copyLog}</div>
       </div>
     </li>
   `;
@@ -126,6 +135,11 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
         void navigator.clipboard.writeText(formatRunLog(run, MODULE_VERSION)).then(() => {
           ui.notifications.info(localize("FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied"));
         });
+      });
+    }
+    for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-cancel]")) {
+      button.addEventListener("click", () => {
+        activeTranslations.requestCancel(Number(button.dataset.runCancel));
       });
     }
   }

@@ -110,7 +110,10 @@ provides a global overview of every running translation with a progress bar,
 totals, the current document, and an estimate of the remaining time. When a
 run has issues — quality fallbacks, unresolved references, or failed
 dependencies — a **Copy log** button copies a plain-text debug log with every
-issue, its reason, and a source preview.
+issue, its reason, and a source preview. A running translation can be
+cancelled from the overview: it stops after the part that is currently being
+translated, everything completed stays in the cache and compendia, and the
+next run resumes from that point.
 
 Empty, structurally damaged, and suspicious unchanged results are retried up to
 three times and are never written to cache. Intentionally preserved glossary

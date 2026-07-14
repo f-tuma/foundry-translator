@@ -115,6 +115,9 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Překládám",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Hotovo",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error": "Chyba",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled": "Zrušeno",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling": "Ruším po dokončení aktuální části…",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Cancel": "Zrušit",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Issues": "{count} problémů",
   "FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog": "Kopírovat log",
   "FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied": "Log překladu byl zkopírován do schránky."
