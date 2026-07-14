@@ -240,4 +240,113 @@ describe("translation units", () => {
       ["Otevři @UUID[JournalEntry.abc]{deník} a hoď [[/r 1d20+5]]."],
     ]);
   });
+
+  it("translates an Embed readaloud while keeping all mechanical configuration exact", async () => {
+    const providerInputs: string[] = [];
+    const source =
+      '@Embed[Actor.abc inline cite=false readaloud="The heroes enter Ordain."]{Example actor}';
+    const result = await translateUnits({
+      units: [[source]],
+      glossary: [{
+        source: "Ordain",
+        replacement: "Ordain",
+        category: "location",
+        aliases: [],
+      }],
+      provider: provider((text) => {
+        providerInputs.push(text);
+        return text
+          .replace("The heroes enter", "Hrdinové vstoupí do")
+          .replace("Example actor", "Ukázková postava");
+      }),
+      settings,
+      nonceFactory: () => "EMBED",
+    });
+
+    expect(providerInputs.join(" ")).not.toContain("Actor.abc");
+    expect(providerInputs.join(" ")).not.toContain("cite=false");
+    expect(result).toEqual([[
+      '@Embed[Actor.abc inline cite=false readaloud="Hrdinové vstoupí do Ordain."]{Ukázková postava}',
+    ]]);
+  });
+
+  it("retries a suspicious unchanged translation and only caches the verified result", async () => {
+    const cache = new MemoryTranslationCache();
+    let calls = 0;
+    const translationProvider = provider((text) => {
+      calls += 1;
+      return calls === 1 ? text : text.replace("The heroes enter the castle", "Hrdinové vstoupí do hradu");
+    });
+    const options = {
+      units: [["The heroes enter the castle."]],
+      glossary: [],
+      provider: translationProvider,
+      settings,
+      cache,
+      nonceFactory: () => "QUALITY",
+    } as const;
+
+    await expect(translateUnits(options)).resolves.toEqual([
+      ["Hrdinové vstoupí do hradu."],
+    ]);
+    await expect(translateUnits(options)).resolves.toEqual([
+      ["Hrdinové vstoupí do hradu."],
+    ]);
+    expect(calls).toBe(2);
+  });
+
+  it("fails closed after three suspicious unchanged translations", async () => {
+    let calls = 0;
+    await expect(translateUnits({
+      units: [["The heroes enter the castle."]],
+      glossary: [],
+      provider: provider((text) => {
+        calls += 1;
+        return text;
+      }),
+      settings,
+      nonceFactory: () => "UNCHANGED",
+    })).rejects.toThrow(/původním jazyce.*3 pokusech/u);
+    expect(calls).toBe(3);
+  });
+
+  it("retries a damaged Foundry syntax token before restoring the document", async () => {
+    let calls = 0;
+    const result = await translateUnits({
+      units: [["Open @UUID[JournalEntry.abc]{the journal}."]],
+      glossary: [],
+      provider: provider((text) => {
+        calls += 1;
+        if (calls === 1) return text.replace(/__FTS_[A-Z0-9_]+__/u, "");
+        return text.replace("Open", "Otevři").replace("the journal", "deník");
+      }),
+      settings,
+      nonceFactory: () => "DAMAGED",
+    });
+
+    expect(result).toEqual([["Otevři @UUID[JournalEntry.abc]{deník}."]]);
+    expect(calls).toBe(2);
+  });
+
+  it("allows an unchanged phrase when the glossary intentionally protects it", async () => {
+    let calls = 0;
+    const result = await translateUnits({
+      units: [["The Shattered Moon"]],
+      glossary: [{
+        source: "The Shattered Moon",
+        replacement: "The Shattered Moon",
+        category: "location",
+        aliases: [],
+      }],
+      provider: provider((text) => {
+        calls += 1;
+        return text;
+      }),
+      settings,
+      nonceFactory: () => "PROPERNAME",
+    });
+
+    expect(result).toEqual([["The Shattered Moon"]]);
+    expect(calls).toBe(1);
+  });
 });

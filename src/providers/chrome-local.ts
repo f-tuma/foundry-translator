@@ -87,18 +87,18 @@ interface ChromeLocalProviderOptions {
 
 const DEFAULT_MODEL_TIMEOUT_MS = 300_000;
 const EMPTY_TRANSLATION_ATTEMPTS = 3;
-const PROTECTION_TOKEN = /__(?:FTN|FTG)_[A-Z0-9]+_[A-Z0-9]+__/giu;
+const PROTECTION_TOKEN = /__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__/giu;
 const TRANSLATABLE_CONTENT = /[\p{L}\p{N}]/u;
 
 function isProtectionToken(value: string): boolean {
-  return /^__(?:FTN|FTG)_[A-Z0-9]+_[A-Z0-9]+__$/iu.test(value);
+  return /^__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__$/iu.test(value);
 }
 
 function protectedTextParts(text: string): string[] {
   PROTECTION_TOKEN.lastIndex = 0;
   if (!PROTECTION_TOKEN.test(text)) return [text];
   PROTECTION_TOKEN.lastIndex = 0;
-  return text.split(/(__(?:FTN|FTG)_[A-Z0-9]+_[A-Z0-9]+__)/giu);
+  return text.split(/(__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__)/giu);
 }
 
 const getBrowserApis = (): ChromeLocalApis =>

@@ -166,7 +166,7 @@ describe("ChromeLocalProvider", () => {
     expect(calls).toBe(3);
   });
 
-  it("keeps HTML and glossary protection tokens out of Chrome", async () => {
+  it("keeps HTML, glossary, and Foundry syntax protection tokens out of Chrome", async () => {
     const translatedInputs: string[] = [];
     const Translator = createTranslatorFactory((text) => {
       translatedInputs.push(text);
@@ -178,15 +178,16 @@ describe("ChromeLocalProvider", () => {
     const third = "__FTN_BOUNDARY_0002__";
 
     const glossary = "__FTG_GLOSSARY0_0000__";
+    const syntax = "__FTS_SYNTAX0_0000__";
     await expect(provider.translate({
-      texts: [`${first}Hello ${glossary} ${second}world${third}`],
+      texts: [`${first}Hello ${glossary} ${syntax} ${second}world${third}`],
       sourceLanguage: "en",
       targetLanguage: "cs",
     })).resolves.toEqual([{
-      translatedText: `${first}Ahoj ${glossary} ${second}světe${third}`,
+      translatedText: `${first}Ahoj ${glossary} ${syntax} ${second}světe${third}`,
     }]);
     expect(translatedInputs).toEqual(["Hello ", "world"]);
-    expect(translatedInputs.join(" ")).not.toMatch(/__FT[NG]_/u);
+    expect(translatedInputs.join(" ")).not.toMatch(/__FT[NGS]_/u);
   });
 
   it("prepares the selected language pair immediately from a user action", async () => {

@@ -25,7 +25,16 @@ const BLOCK_SELECTOR = [
 ].join(",");
 
 const EXCLUDED_SELECTOR = "code,pre,script,style,textarea,noscript,template";
+const TRANSLATABLE_ATTRIBUTES = new Set([
+  "alt",
+  "aria-label",
+  "data-tooltip",
+  "data-tooltip-text",
+  "placeholder",
+  "title",
+]);
 const TRANSLATABLE_TEXT = /[\p{L}\p{N}]/u;
+const LOCALIZATION_KEY = /^[A-Z][A-Z0-9_]*(?:\.[A-Za-z0-9_-]+)+$/u;
 export const MAX_HTML_UNIT_CHARACTERS = 3_200;
 
 export interface HtmlTranslationPlan {
@@ -50,8 +59,39 @@ function isExcluded(node: Text): boolean {
   return !!node.parentElement?.closest(EXCLUDED_SELECTOR);
 }
 
-function hasTranslatableText(nodes: readonly Text[]): boolean {
-  return TRANSLATABLE_TEXT.test(nodes.map(({ data }) => data).join(""));
+interface TranslationValue {
+  source: string;
+  apply(translated: string): void;
+}
+
+function textValue(node: Text): TranslationValue {
+  return {
+    source: node.data,
+    apply: (translated) => {
+      node.data = translated;
+    },
+  };
+}
+
+function hasTranslatableText(values: readonly TranslationValue[]): boolean {
+  return TRANSLATABLE_TEXT.test(values.map(({ source }) => source).join(""));
+}
+
+function attributeValues(root: DocumentFragment): TranslationValue[] {
+  const values: TranslationValue[] = [];
+  for (const element of root.querySelectorAll("*")) {
+    if (element.closest(EXCLUDED_SELECTOR)) continue;
+    for (const attribute of element.attributes) {
+      if (!TRANSLATABLE_ATTRIBUTES.has(attribute.name)) continue;
+      const source = attribute.value;
+      if (!TRANSLATABLE_TEXT.test(source) || LOCALIZATION_KEY.test(source)) continue;
+      values.push({
+        source,
+        apply: (translated) => element.setAttribute(attribute.name, translated),
+      });
+    }
+  }
+  return values;
 }
 
 function safeSliceEnd(text: string, end: number): number {
@@ -85,23 +125,23 @@ function splitLongText(text: string): string[] {
 }
 
 interface PlannedSegment {
-  node: Text;
+  value: TranslationValue;
   source: string;
 }
 
-function planBoundedUnits(groups: readonly (readonly Text[])[]): PlannedSegment[][] {
+function planBoundedUnits(groups: readonly (readonly TranslationValue[])[]): PlannedSegment[][] {
   const units: PlannedSegment[][] = [];
   for (const nodes of groups) {
     let unit: PlannedSegment[] = [];
     let length = 0;
-    for (const node of nodes) {
-      for (const source of splitLongText(node.data)) {
+    for (const value of nodes) {
+      for (const source of splitLongText(value.source)) {
         if (unit.length && length + source.length > MAX_HTML_UNIT_CHARACTERS) {
           units.push(unit);
           unit = [];
           length = 0;
         }
-        unit.push({ node, source });
+        unit.push({ value, source });
         length += source.length;
       }
     }
@@ -117,22 +157,25 @@ export function planHtmlTranslation(
   const template = ownerDocument.createElement("template");
   template.innerHTML = html;
   const covered = new Set<Text>();
-  const groups: Text[][] = [];
+  const groups: TranslationValue[][] = [];
   const blocks = [...template.content.querySelectorAll(BLOCK_SELECTOR)];
   const leafBlocks = blocks.filter((block) => !block.querySelector(BLOCK_SELECTOR));
 
   for (const block of leafBlocks) {
     const nodes = textDescendants(block).filter((node) => !isExcluded(node));
     nodes.forEach((node) => covered.add(node));
-    if (hasTranslatableText(nodes)) groups.push(nodes);
+    const values = nodes.map(textValue);
+    if (hasTranslatableText(values)) groups.push(values);
   }
 
   const remaining = textDescendants(template.content as unknown as Element).filter(
     (node) => !covered.has(node) && !isExcluded(node),
   );
   for (const node of remaining) {
-    if (hasTranslatableText([node])) groups.push([node]);
+    const value = textValue(node);
+    if (hasTranslatableText([value])) groups.push([value]);
   }
+  for (const value of attributeValues(template.content)) groups.push([value]);
   const plannedUnits = planBoundedUnits(groups);
 
   return {
@@ -141,19 +184,19 @@ export function planHtmlTranslation(
       if (translatedUnits.length !== plannedUnits.length) {
         throw new Error("Počet přeložených HTML bloků neodpovídá zdroji.");
       }
-      const translatedByNode = new Map<Text, string[]>();
+      const translatedByValue = new Map<TranslationValue, string[]>();
       plannedUnits.forEach((unit, unitIndex) => {
         const segments = translatedUnits[unitIndex];
         if (!segments || segments.length !== unit.length) {
           throw new Error("Struktura přeloženého HTML bloku neodpovídá zdroji.");
         }
-        unit.forEach(({ node }, segmentIndex) => {
-          const values = translatedByNode.get(node) ?? [];
+        unit.forEach(({ value }, segmentIndex) => {
+          const values = translatedByValue.get(value) ?? [];
           values.push(segments[segmentIndex] ?? "");
-          translatedByNode.set(node, values);
+          translatedByValue.set(value, values);
         });
       });
-      for (const [node, translated] of translatedByNode) node.data = translated.join("");
+      for (const [value, translated] of translatedByValue) value.apply(translated.join(""));
       const serializer = ownerDocument.createElement("div");
       serializer.append(template.content.cloneNode(true));
       return serializer.innerHTML;

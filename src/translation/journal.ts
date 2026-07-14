@@ -136,7 +136,7 @@ async function translateTargets(
 
   targets.forEach((target, index) => {
     const translatedSegments = translatedUnits[index] ?? [];
-    if (translatedSegments.some((segment) => /__FT[NG]_/iu.test(segment))) {
+    if (translatedSegments.some((segment) => /__FT[NGS]_/iu.test(segment))) {
       throw new Error("Překlad obsahuje neobnovený ochranný token.");
     }
     target.translatedSegments = translatedSegments;

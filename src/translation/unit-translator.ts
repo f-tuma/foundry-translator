@@ -8,11 +8,35 @@ import type { TranslationProvider } from "../providers/types";
 import type { ProviderId } from "../settings/settings";
 import type { TranslationCache, TranslationCacheEntry } from "./cache";
 import { sha256 } from "./hash";
-import { foundrySyntaxEntries } from "./foundry-syntax";
+import {
+  protectFoundrySyntax,
+  restoreFoundrySyntax,
+  type FoundrySyntaxProtection,
+} from "./foundry-syntax";
 
 const MAX_UNITS_PER_REQUEST = 128;
 const MAX_CHROME_UNITS_PER_REQUEST = 16;
+const QUALITY_ATTEMPTS = 3;
 export const MAX_REQUEST_CHARACTERS = 4_500;
+const PROTECTION_TOKEN = /__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__/giu;
+const SOURCE_LANGUAGE_HINTS: Readonly<Record<string, ReadonlySet<string>>> = {
+  en: new Set([
+    "a", "an", "and", "are", "as", "at", "be", "for", "from", "in", "is", "of",
+    "on", "that", "the", "this", "to", "with", "you", "your",
+  ]),
+  de: new Set([
+    "als", "auf", "das", "der", "die", "ein", "eine", "für", "ist", "mit", "und",
+    "von", "zu",
+  ]),
+  fr: new Set([
+    "au", "aux", "avec", "ce", "ces", "dans", "de", "des", "du", "est", "et", "la",
+    "le", "les", "pour", "un", "une",
+  ]),
+  pl: new Set([
+    "a", "do", "i", "jest", "na", "nie", "od", "po", "przez", "się", "to", "w", "z",
+    "za", "że",
+  ]),
+};
 
 export interface TranslationUnitSettings {
   providerId: ProviderId;
@@ -38,6 +62,7 @@ interface PreparedUnit {
 }
 
 interface PreparedSegment {
+  syntax: FoundrySyntaxProtection;
   protection: ReturnType<typeof protectGlossaryTerms>;
   leading: string;
   trailing: string;
@@ -63,12 +88,101 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       segments,
       glossaryFingerprint,
       ...settings,
     }),
   );
+}
+
+function comparableText(text: string): string {
+  PROTECTION_TOKEN.lastIndex = 0;
+  return text
+    .replace(PROTECTION_TOKEN, " ")
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function suspiciouslyUnchanged(
+  source: string,
+  translated: string,
+  settings: TranslationUnitSettings,
+): boolean {
+  if (settings.sourceLanguage === settings.targetLanguage) return false;
+  const sourceText = comparableText(source);
+  const translatedText = comparableText(translated);
+  if (!sourceText || sourceText !== translatedText) return false;
+
+  const words = sourceText.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const letters = (sourceText.match(/\p{L}/gu) ?? []).length;
+  if (letters < 8 || words.length < 2) return false;
+  if (words.length >= 5 && letters >= 20) return true;
+
+  const hints = SOURCE_LANGUAGE_HINTS[settings.sourceLanguage] ??
+    (settings.sourceLanguage === "auto" ? SOURCE_LANGUAGE_HINTS.en : undefined);
+  return !!hints && letters >= 10 && words.some((word) => hints.has(word));
+}
+
+function translationProblem(
+  prepared: PreparedSegment,
+  translated: string,
+  settings: TranslationUnitSettings,
+): string | null {
+  if (!translated.trim() && comparableText(prepared.protection.text)) {
+    return "Překladač vrátil prázdný text.";
+  }
+  try {
+    const glossaryRestored = restoreGlossaryTerms(translated, prepared.protection);
+    restoreFoundrySyntax(glossaryRestored, prepared.syntax);
+  } catch (error) {
+    return error instanceof Error ? error.message : "Překladač poškodil ochranné tokeny.";
+  }
+  if (suspiciouslyUnchanged(prepared.protection.text, translated, settings)) {
+    const preview = comparableText(prepared.protection.text).slice(0, 100);
+    return `Překladač ponechal text v původním jazyce: „${preview}“.`;
+  }
+  return null;
+}
+
+async function retrySuspiciousSegments(
+  prepared: PreparedUnit,
+  protectedSegments: readonly string[],
+  provider: TranslationProvider,
+  settings: TranslationUnitSettings,
+): Promise<readonly string[]> {
+  const checked: string[] = [];
+  for (const [index, initial] of protectedSegments.entries()) {
+    const preparedSegment = prepared.segments[index];
+    if (!preparedSegment) throw new Error("Chybí metadata kontrolovaného překladu.");
+    const source = preparedSegment.protection.text;
+    let candidate = initial;
+    let attempt = 1;
+    let problem = translationProblem(preparedSegment, candidate, settings);
+    while (attempt < QUALITY_ATTEMPTS && problem) {
+      const [retry] = await provider.translate({
+        texts: [source],
+        sourceLanguage: settings.sourceLanguage,
+        targetLanguage: settings.targetLanguage,
+        format: "text",
+      });
+      if (!retry || typeof retry.translatedText !== "string" || !retry.translatedText.trim()) {
+        throw new Error("Překladač vrátil při kontrole kvality prázdný výsledek.");
+      }
+      candidate = retry.translatedText;
+      attempt += 1;
+      problem = translationProblem(preparedSegment, candidate, settings);
+    }
+    if (problem) {
+      throw new Error(
+        `${problem} Kontrola selhala i po ${QUALITY_ATTEMPTS} pokusech.`,
+      );
+    }
+    checked.push(candidate);
+  }
+  return checked;
 }
 
 function createBoundaryTokens(segmentCount: number, nonce: string): string[] {
@@ -158,12 +272,14 @@ function prepareSegment(
   const withoutLeading = segment.slice(leading.length);
   const trailing = withoutLeading.match(/\s*$/u)?.[0] ?? "";
   const core = withoutLeading.slice(0, withoutLeading.length - trailing.length);
+  const syntax = protectFoundrySyntax(core, { nonce });
   return {
     leading,
     trailing,
+    syntax,
     protection: protectGlossaryTerms(
-      core,
-      [...glossary, ...foundrySyntaxEntries(core)],
+      syntax.text,
+      glossary,
       { nonce },
     ),
   };
@@ -293,10 +409,17 @@ export async function translateUnits(
           );
         }
       }
+      protectedSegments = await retrySuspiciousSegments(
+        prepared,
+        protectedSegments,
+        options.provider,
+        options.settings,
+      );
       const segments = protectedSegments.map((segment, index) => {
         const preparedSegment = prepared.segments[index];
         if (!preparedSegment) throw new Error("Chybí ochrana přeloženého HTML segmentu.");
-        const restored = restoreGlossaryTerms(segment, preparedSegment.protection);
+        const glossaryRestored = restoreGlossaryTerms(segment, preparedSegment.protection);
+        const restored = restoreFoundrySyntax(glossaryRestored, preparedSegment.syntax);
         return `${preparedSegment.leading}${restored}${preparedSegment.trailing}`;
       });
       for (const index of prepared.indices) translated[index] = segments;

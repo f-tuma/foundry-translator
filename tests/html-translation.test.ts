@@ -33,6 +33,27 @@ describe("HTML translation planning", () => {
     );
   });
 
+  it("translates visible accessibility attributes but preserves localization keys", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const plan = planHtmlTranslation(
+      '<figure title="Ancient city"><img src="city.webp" alt="Map of Ordain" data-tooltip="EMBER.OpenMap"><button aria-label="Open the map"></button></figure>',
+      document,
+    );
+
+    expect(plan.units).toEqual([
+      ["Ancient city"],
+      ["Map of Ordain"],
+      ["Open the map"],
+    ]);
+    expect(plan.apply([
+      ["Starobylé město"],
+      ["Mapa Ordainu"],
+      ["Otevřít mapu"],
+    ])).toBe(
+      '<figure title="Starobylé město"><img src="city.webp" alt="Mapa Ordainu" data-tooltip="EMBER.OpenMap"><button aria-label="Otevřít mapu"></button></figure>',
+    );
+  });
+
   it("rejects a translated structure with a different number of segments", () => {
     const { document } = parseHTML("<html><body></body></html>");
     const plan = planHtmlTranslation("<p>Hello <em>world</em>.</p>", document);
