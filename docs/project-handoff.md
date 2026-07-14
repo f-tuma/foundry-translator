@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-14
-- Repository state: `main`, release `v0.10.0`
+- Repository state: `main`, release `v0.11.0`; `v0.12.0` prepared locally
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -102,6 +102,10 @@ and the recommended implementation order.
   fingerprint.
 - 2026-07-14: Vitest now loads `tests/setup.ts`, which provides a minimal
   `foundry` global so ApplicationV2 subclasses can be imported in tests.
+- 2026-07-14: `v0.11.0` (standalone Item recursion) was tagged and released by
+  the user while the next features were still in progress, so page
+  translation, the copyable run log, and glossary custom translations ship as
+  `v0.12.0`.
 
 ### Actor milestone state (released in v0.10.0)
 
