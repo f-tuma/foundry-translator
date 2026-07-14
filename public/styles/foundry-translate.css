@@ -49,6 +49,10 @@
   font-size: 12px;
 }
 
+:is(.minimizing, .minimized) .ft-journal-translate-header {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .ft-journal-translate-header span {
     display: none;
