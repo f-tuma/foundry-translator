@@ -1,6 +1,8 @@
+import { MODULE_VERSION } from "../constants";
 import {
   activeTranslations,
   estimateRemainingMs,
+  formatRunLog,
   type ActiveTranslationRun,
 } from "./active-translations";
 
@@ -49,6 +51,15 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
   const current = run.finishedAt === undefined && run.currentDocument
     ? `${escapeHtml(run.currentDocument)}${run.currentUnit ? ` — ${escapeHtml(run.currentUnit)}` : ""}`
     : "";
+  const issues = run.issues.length
+    ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Issues").replace("{count}", String(run.issues.length))
+    : "";
+  const copyLog = run.issues.length || run.error
+    ? `<button type="button" class="ft-button ft-active-translations__copy" data-run-log="${run.id}">
+        <i class="fa-solid fa-copy" aria-hidden="true"></i>
+        <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog")}</span>
+      </button>`
+    : "";
   return `
     <li class="ft-active-translations__run" data-state="${run.state}">
       <div class="ft-active-translations__title">
@@ -59,12 +70,21 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         <div class="ft-progress__fill" style="width: ${run.state === "done" ? 100 : percent}%"></div>
       </div>
       <div class="ft-active-translations__detail">
-        <span>${counts}${eta ? ` · ${eta}` : ""}</span>
+        <span>${counts}${eta ? ` · ${eta}` : ""}${issues ? ` · ${issues}` : ""}</span>
         ${run.error ? `<span class="ft-active-translations__error">${escapeHtml(run.error)}</span>` : ""}
         ${current ? `<span class="ft-active-translations__current">${current}</span>` : ""}
+        ${copyLog}
       </div>
     </li>
   `;
+}
+
+let sharedInstance: ActiveTranslationsApplication | undefined;
+
+/** Opens (or focuses) the shared active-translations overview window. */
+export function openActiveTranslationsOverview(): void {
+  sharedInstance ??= new ActiveTranslationsApplication();
+  void sharedInstance.render(true);
 }
 
 export class ActiveTranslationsApplication extends foundry.applications.api.ApplicationV2 {
@@ -99,6 +119,15 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
 
   protected _onRender(): void {
     this.#unsubscribe ??= activeTranslations.subscribe(() => void this.render());
+    for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-log]")) {
+      button.addEventListener("click", () => {
+        const run = activeTranslations.get(Number(button.dataset.runLog));
+        if (!run) return;
+        void navigator.clipboard.writeText(formatRunLog(run, MODULE_VERSION)).then(() => {
+          ui.notifications.info(localize("FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied"));
+        });
+      });
+    }
   }
 
   override async close(options?: Record<string, unknown>): Promise<FoundryApplicationV2> {

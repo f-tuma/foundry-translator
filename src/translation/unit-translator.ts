@@ -387,6 +387,11 @@ function requestBatches(
   return batches;
 }
 
+/** Stable hash of the glossary contents, including custom replacements. */
+export async function glossaryFingerprint(entries: readonly GlossaryEntry[]): Promise<string> {
+  return sha256(glossarySnapshot(entries));
+}
+
 export async function translateUnits(
   options: TranslateUnitsOptions,
 ): Promise<readonly (readonly string[])[]> {

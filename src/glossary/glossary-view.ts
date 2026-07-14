@@ -61,6 +61,7 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
       </div>
       <div class="ft-glossary__manual">
         <input type="text" name="manualTerm" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.ManualHeading")}">
+        <input type="text" name="manualReplacement" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualReplacementPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.ManualReplacementPlaceholder")}">
         <button type="button" class="ft-button ft-button--secondary" data-action="add-term">
           <i class="fa-solid fa-plus" aria-hidden="true"></i>
           <span>${localize("FOUNDRY_TRANSLATE.Glossary.Add")}</span>

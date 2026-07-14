@@ -31,8 +31,10 @@ import {
   type DocumentReferenceReplacement,
 } from "./document-dependencies";
 import {
+  canReuseJournalPageTranslation,
   canReuseJournalTranslation,
   journalSourceHash,
+  mergePartialJournalTranslation,
   readJournalTranslationFlag,
   translateJournalData,
   type JournalData,
@@ -44,6 +46,7 @@ import {
   readPath,
   type HtmlFieldPath,
 } from "./system-html-fields";
+import { glossaryFingerprint } from "./unit-translator";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
@@ -98,7 +101,16 @@ interface JournalGraphNode {
   result?: GraphTranslationResult;
 }
 
+interface TranslationScope {
+  /** Translate only these root-journal pages (partial translation). */
+  rootPageIds?: readonly string[];
+  /** Do not expand dependencies of nodes at this depth or deeper. */
+  dependencyDepthLimit?: number;
+}
+
 interface TranslationRuntime {
+  runId: number;
+  glossaryHash: string;
   settings: ReturnType<typeof getTranslatorSettings>;
   provider: ReturnType<typeof createTranslationProvider>;
   glossary: Awaited<ReturnType<GlossaryCompendiumRepository["load"]>>;
@@ -298,6 +310,25 @@ export class JournalTranslationService {
   }
 
   async translate(sourceDocument: FoundryJournalWorldDocument): Promise<JournalTranslationResult> {
+    return this.#run(sourceDocument, {});
+  }
+
+  /**
+   * Translates only the given page plus one level of referenced documents:
+   * the page's direct dependencies are translated, but their own references
+   * are not followed further.
+   */
+  async translatePage(
+    sourceDocument: FoundryJournalWorldDocument,
+    pageId: string,
+  ): Promise<JournalTranslationResult> {
+    return this.#run(sourceDocument, { rootPageIds: [pageId], dependencyDepthLimit: 1 });
+  }
+
+  async #run(
+    sourceDocument: FoundryJournalWorldDocument,
+    scope: TranslationScope,
+  ): Promise<JournalTranslationResult> {
     if (!game.user?.isGM) throw new Error("Deník může překládat pouze Game Master.");
 
     const settings = getTranslatorSettings();
@@ -319,7 +350,10 @@ export class JournalTranslationService {
       new GlossaryCompendiumRepository().load(),
       preparation ?? Promise.resolve(),
     ]);
+    const runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
     const runtime: TranslationRuntime = {
+      runId,
+      glossaryHash: await glossaryFingerprint(glossary),
       settings,
       provider,
       glossary,
@@ -328,9 +362,8 @@ export class JournalTranslationService {
       actorTranslations: new CompendiumActorTranslationRepository(),
       itemTranslations: new CompendiumItemTranslationRepository(),
     };
-    const runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
     try {
-      const result = await this.#translateGraph(sourceDocument, runtime, runId);
+      const result = await this.#translateGraph(sourceDocument, runtime, runId, scope);
       activeTranslations.finish(runId);
       return result;
     } catch (error) {
@@ -343,7 +376,10 @@ export class JournalTranslationService {
     sourceDocument: FoundryJournalWorldDocument,
     runtime: TranslationRuntime,
     runId: number,
+    scope: TranslationScope,
   ): Promise<JournalTranslationResult> {
+    const depthLimit = scope.dependencyDepthLimit ?? Number.POSITIVE_INFINITY;
+    const depths = new Map<string, number>([[sourceDocument.uuid, 0]]);
     const nodes = new Map<string, JournalGraphNode>();
     const warnings: JournalDependencyWarning[] = [];
     const warningKeys = new Set<string>();
@@ -353,6 +389,12 @@ export class JournalTranslationService {
       warningKeys.add(key);
       warnings.push(warning);
       logger.warn("Journal dependency could not be translated recursively.", warning);
+      activeTranslations.addIssue(runId, {
+        type: warning.kind,
+        sourceUuid: warning.sourceUuid,
+        parentUuid: warning.parentUuid,
+        detail: warning.message,
+      });
     };
     const nodeFor = (document: GraphSourceDocument): JournalGraphNode => {
       const existing = nodes.get(document.uuid);
@@ -367,11 +409,26 @@ export class JournalTranslationService {
     ): Promise<readonly GraphSourceDocument[]> => {
         const node = nodeFor(document);
         if (node.children) return node.children;
+        const depth = depths.get(document.uuid) ?? 0;
+        if (depth >= depthLimit) {
+          node.children = [];
+          return node.children;
+        }
         const source = document.toObject() as GraphData;
         const childDocuments = new Map<string, GraphSourceDocument>();
-        const references = isJournalDocument(document)
+        let references = isJournalDocument(document)
           ? discoverJournalDependencies(source as JournalData)
           : discoverObjectDependencies(source);
+        if (document.uuid === sourceDocument.uuid && scope.rootPageIds) {
+          const selectedIndexes = new Set(
+            (source as JournalData).pages
+              .map((page, index) => ({ id: page._id, index }))
+              .filter(({ id }) => id && scope.rootPageIds?.includes(id))
+              .map(({ index }) => index),
+          );
+          references = references.filter(({ fieldPath }) =>
+            fieldPath[0] === "pages" && selectedIndexes.has(fieldPath[1] as number));
+        }
         for (const reference of references) {
           let resolved: FoundryUuidDocument | null = null;
           try {
@@ -402,6 +459,7 @@ export class JournalTranslationService {
           node.dependencies.push({ reference, resolved, root });
           childDocuments.set(root.uuid, root);
           nodeFor(root);
+          depths.set(root.uuid, Math.min(depths.get(root.uuid) ?? Number.POSITIVE_INFINITY, depth + 1));
         }
         node.children = [...childDocuments.values()];
         return node.children;
@@ -413,7 +471,9 @@ export class JournalTranslationService {
       key: (document) => document.uuid,
       dependencies: resolveNodeDependencies,
       process: (document) => {
-        nodeFor(document).units = documentTranslationUnits(document);
+        nodeFor(document).units = document.uuid === sourceDocument.uuid && scope.rootPageIds
+          ? scope.rootPageIds.length
+          : documentTranslationUnits(document);
       },
     });
     const plan: TranslationPlan = {
@@ -449,7 +509,12 @@ export class JournalTranslationService {
       dependencies: resolveNodeDependencies,
       process: async (document) => {
         const node = nodeFor(document);
-        node.result = await this.#translateOne(document, runtime, emitProgress);
+        node.result = await this.#translateOne(
+          document,
+          runtime,
+          emitProgress,
+          document.uuid === sourceDocument.uuid ? scope.rootPageIds : undefined,
+        );
         overall.completedUnits += node.units ?? 0;
         overall.completedDocuments += 1;
         activeTranslations.update(runId, {
@@ -536,6 +601,7 @@ export class JournalTranslationService {
     sourceDocument: GraphSourceDocument,
     runtime: TranslationRuntime,
     onProgress: (progress: JournalTranslationProgress) => void,
+    pageIds?: readonly string[],
   ): Promise<GraphTranslationResult> {
     if (isActorDocument(sourceDocument)) {
       return this.#translateActorOne(sourceDocument, runtime, onProgress);
@@ -543,13 +609,14 @@ export class JournalTranslationService {
     if (isItemDocument(sourceDocument)) {
       return this.#translateItemOne(sourceDocument, runtime, onProgress);
     }
-    return this.#translateJournalOne(sourceDocument, runtime, onProgress);
+    return this.#translateJournalOne(sourceDocument, runtime, onProgress, pageIds);
   }
 
   async #translateJournalOne(
     sourceDocument: FoundryJournalWorldDocument,
     runtime: TranslationRuntime,
     onProgress: (progress: JournalTranslationProgress) => void,
+    pageIds?: readonly string[],
   ): Promise<JournalTranslationResult> {
     const source = sourceDocument.toObject() as JournalData;
     const sourceHash = await journalSourceHash(source);
@@ -558,7 +625,11 @@ export class JournalTranslationService {
       runtime.settings.targetLanguage,
     );
     const existingFlag = existing ? readJournalTranslationFlag(existing.flags) : null;
-    if (existing && existingFlag && canReuseJournalTranslation(existingFlag, sourceHash)) {
+    const reusable = existing && existingFlag && (pageIds
+      ? pageIds.every((pageId) =>
+          canReuseJournalPageTranslation(existingFlag, sourceHash, pageId, runtime.glossaryHash))
+      : canReuseJournalTranslation(existingFlag, sourceHash, runtime.glossaryHash));
+    if (existing && existingFlag && reusable) {
       return {
         data: existing.toObject() as JournalData,
         translatedTextPages: existingFlag.translatedTextPages,
@@ -584,8 +655,18 @@ export class JournalTranslationService {
       },
       cache: runtime.cache,
       systemHtmlFieldPaths: systemHtmlFieldPaths(sourceDocument, source),
+      ...(pageIds ? { pageIds } : {}),
       onQualityFallback: (fallback) => {
         logger.warn("Translation quality fallback kept the original fragment.", fallback);
+        activeTranslations.addIssue(runtime.runId, {
+          type: "fallback",
+          documentName: sourceDocument.name,
+          reason: fallback.reason,
+          detail: fallback.detail,
+          sourcePreview: fallback.sourcePreview,
+          attempts: fallback.attempts,
+          occurrences: fallback.occurrences,
+        });
       },
       onProgress: (progress: JournalTranslationProgress) => onProgress({
         ...progress,
@@ -593,6 +674,12 @@ export class JournalTranslationService {
       }),
     });
     await assertJournalSourceUnchanged(sourceDocument, sourceHash);
+    if (pageIds && existing && existingFlag) {
+      translated.data = mergePartialJournalTranslation(
+        existing.toObject() as JournalData,
+        translated.data,
+      );
+    }
     const document = await runtime.translations.save(translated.data);
     return {
       ...translated,
@@ -616,7 +703,8 @@ export class JournalTranslationService {
       runtime.settings.targetLanguage,
     );
     const existingFlag = existing ? readActorTranslationFlag(existing.flags) : null;
-    if (existing && existingFlag && canReuseActorTranslation(existingFlag, sourceHash)) {
+    if (existing && existingFlag &&
+      canReuseActorTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
       return {
         data: existing.toObject() as ActorData,
         document: existing,
@@ -641,6 +729,15 @@ export class JournalTranslationService {
       cache: runtime.cache,
       onQualityFallback: (fallback) => {
         logger.warn("Actor translation quality fallback kept the original fragment.", fallback);
+        activeTranslations.addIssue(runtime.runId, {
+          type: "fallback",
+          documentName: sourceDocument.name,
+          reason: fallback.reason,
+          detail: fallback.detail,
+          sourcePreview: fallback.sourcePreview,
+          attempts: fallback.attempts,
+          occurrences: fallback.occurrences,
+        });
       },
       onProgress: (progress) => onProgress({
         kind: "actor-field",
@@ -670,7 +767,8 @@ export class JournalTranslationService {
       runtime.settings.targetLanguage,
     );
     const existingFlag = existing ? readItemTranslationFlag(existing.flags) : null;
-    if (existing && existingFlag && canReuseItemTranslation(existingFlag, sourceHash)) {
+    if (existing && existingFlag &&
+      canReuseItemTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
       return {
         data: existing.toObject() as ItemData,
         document: existing,
@@ -693,6 +791,15 @@ export class JournalTranslationService {
       cache: runtime.cache,
       onQualityFallback: (fallback) => {
         logger.warn("Item translation quality fallback kept the original fragment.", fallback);
+        activeTranslations.addIssue(runtime.runId, {
+          type: "fallback",
+          documentName: sourceDocument.name,
+          reason: fallback.reason,
+          detail: fallback.detail,
+          sourcePreview: fallback.sourcePreview,
+          attempts: fallback.attempts,
+          occurrences: fallback.occurrences,
+        });
       },
       onProgress: (progress) => onProgress({
         kind: "item-field",

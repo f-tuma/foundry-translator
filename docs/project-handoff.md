@@ -74,6 +74,34 @@ and the recommended implementation order.
   machine with real data: it completed, a small number of parts did not pass
   (isolated fallbacks/warnings), and the overall result looked good for the
   document count involved.
+- 2026-07-14: **Translate this page** implemented: the journal header controls
+  menu translates only the active page plus one dependency level
+  (`JournalTranslationService.translatePage`, `scope.dependencyDepthLimit`).
+  Partial translations carry an explicit `partial: boolean` +
+  `processedPageIds` in the flag and merge into one stored document
+  (`mergePartialJournalTranslation`); full page coverage flips the flag to a
+  complete translation. **Important Foundry finding:** update-in-place merges
+  flag objects recursively, so a key omitted from a new flag silently keeps its
+  old stored value — never encode state as "key absent"; use explicit values.
+  Verified by a two-phase real-Foundry E2E including depth-limit behavior
+  (the dependency of a dependency stays untranslated and keeps its source
+  reference).
+- 2026-07-14: Clicking the translate action of an already-running journal opens
+  the active-translations overview (`openActiveTranslationsOverview`).
+- 2026-07-14: Runs collect issues (quality fallbacks with source preview,
+  unresolved/unsupported/failed dependencies) in the registry; the overview
+  shows an issue count and a **Copy log** button producing a plain-text debug
+  log (`formatRunLog`). Verified via clipboard in a real-Foundry E2E.
+- 2026-07-14: The glossary now supports fixed custom translations: a second
+  input in Manage glossary sets `replacement`; entering an existing term
+  updates it (`planManualTerm`, `GlossaryCompendiumRepository.saveEntry`).
+  Journal/Actor/Item flags store a `glossaryFingerprint`, and reuse checks
+  reject translations made with a different glossary, so corrections re-apply
+  on the next run (verified end-to-end: replacement change → re-translate →
+  stored copy updated). The unit cache already keyed on the glossary
+  fingerprint.
+- 2026-07-14: Vitest now loads `tests/setup.ts`, which provides a minimal
+  `foundry` global so ApplicationV2 subclasses can be imported in tests.
 
 ### Actor milestone state (released in v0.10.0)
 
@@ -179,7 +207,13 @@ The user's main priorities are:
 - The translation-engine revision invalidates stored results after logic changes.
 - The translation cache uses a versioned key schema; the current schema is `3`.
 - Module compendia are grouped in the shared grey `Foundry Translate` folder.
-- 91 automated tests across 20 test files.
+- Translate this page: the active journal page plus one dependency level, with
+  partial-translation merging into the single stored document.
+- A global active-translations overview with progress, ETA, collected issues,
+  and a copyable plain-text debug log.
+- Glossary entries may carry a fixed custom translation; changing the glossary
+  invalidates translation reuse via a stored glossary fingerprint.
+- 104 automated tests across 24 test files.
 
 ## Verified real-world cases
 
@@ -355,7 +389,8 @@ language to translated UUID mapping must remain consistent across packs.
 
 - The existing **Translate this journal** action should process the complete
   dependency graph.
-- Add **Translate this page** for the active page and its recursive dependencies.
+- Add **Translate this page** for the active page and its recursive
+  dependencies — completed with a one-level dependency scope.
 - Show the current document, current page, completed/total count, and unresolved
   and fallback counts.
 - The completion warning should distinguish:
@@ -449,9 +484,11 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
 
 1. Read this document and the README.
 2. Run `git status -sb` and `npm run check`.
-3. Add standalone Item handling; embedded Actor Items are already covered by
-   the Actor copy with stable IDs.
-4. Add **Translate this page** for the active page and its recursive
-   dependencies.
-5. Run the full `Gamemaster's Guide` smoke test in Ember (44 distinct Actor
-   references) and record findings here.
+3. If the local `ember-test` world still contains `CZ `-prefixed stub
+   artifacts from the crashed smoke test, run `/tmp/cleanup-guide-smoke.mjs`
+   (see the work log) with the user's approval.
+4. Remaining roadmap in order: Markdown source pages, then portable
+   translation-bundle export/import (the user explicitly wants export last).
+5. If the user reports specific failed parts from their real `Gamemaster's
+   Guide` run, ask for the copyable log from the Active translations window
+   and address the reported fallbacks.

@@ -40,10 +40,14 @@ describe("Journal header translation action", () => {
     addJournalTranslationHeaderButton(application);
     addJournalTranslationHeaderButton(application);
 
-    expect(controls).toHaveLength(1);
+    expect(controls).toHaveLength(2);
     expect(controls[0]).toMatchObject({
       action: "foundry-translate-translate-journal",
       label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.Action",
+    });
+    expect(controls[1]).toMatchObject({
+      action: "foundry-translate-translate-page",
+      label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage",
     });
     expect(header.querySelectorAll(".ft-journal-translate-header")).toHaveLength(1);
     expect(header.firstElementChild?.textContent).toContain("Přeložit tento deník");

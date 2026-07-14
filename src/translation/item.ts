@@ -6,7 +6,11 @@ import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
-import { translateUnits, type TranslationQualityFallback } from "./unit-translator";
+import {
+  glossaryFingerprint,
+  translateUnits,
+  type TranslationQualityFallback,
+} from "./unit-translator";
 
 export const ITEM_TRANSLATION_SCHEMA_VERSION = 1;
 export const ITEM_TRANSLATION_ENGINE_REVISION = 1;
@@ -31,6 +35,8 @@ export interface ItemTranslationFlag {
   translatedAt: string;
   translatedHtmlFields: number;
   fallbackTextSegments: number;
+  /** Glossary hash at translation time; a changed glossary invalidates reuse. */
+  glossaryFingerprint?: string;
 }
 
 export interface ItemTranslationProgress {
@@ -87,9 +93,14 @@ export function readItemTranslationFlag(
   } as ItemTranslationFlag;
 }
 
-export function canReuseItemTranslation(flag: ItemTranslationFlag, sourceHash: string): boolean {
+export function canReuseItemTranslation(
+  flag: ItemTranslationFlag,
+  sourceHash: string,
+  glossaryHash?: string,
+): boolean {
   return flag.sourceHash === sourceHash &&
-    flag.engineRevision === ITEM_TRANSLATION_ENGINE_REVISION;
+    flag.engineRevision === ITEM_TRANSLATION_ENGINE_REVISION &&
+    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash);
 }
 
 function sourceSnapshot(source: ItemData): string {
@@ -146,6 +157,7 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
   }
 
   const sourceHash = await itemSourceHash(options.source);
+  const glossaryHash = await glossaryFingerprint(options.glossary);
   copy.flags = {
     ...copy.flags,
     [MODULE_ID]: {
@@ -161,6 +173,7 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
         translatedAt: new Date().toISOString(),
         translatedHtmlFields,
         fallbackTextSegments,
+        glossaryFingerprint: glossaryHash,
       },
     },
   };

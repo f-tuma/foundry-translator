@@ -648,3 +648,8 @@
   margin: 0;
   text-align: center;
 }
+
+.ft-active-translations__copy {
+  align-self: flex-start;
+  margin-top: var(--ft-space-1);
+}

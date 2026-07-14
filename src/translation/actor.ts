@@ -6,7 +6,11 @@ import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
-import { translateUnits, type TranslationQualityFallback } from "./unit-translator";
+import {
+  glossaryFingerprint,
+  translateUnits,
+  type TranslationQualityFallback,
+} from "./unit-translator";
 
 export const ACTOR_TRANSLATION_SCHEMA_VERSION = 1;
 export const ACTOR_TRANSLATION_ENGINE_REVISION = 1;
@@ -39,6 +43,8 @@ export interface ActorTranslationFlag {
   translatedAt: string;
   translatedHtmlFields: number;
   fallbackTextSegments: number;
+  /** Glossary hash at translation time; a changed glossary invalidates reuse. */
+  glossaryFingerprint?: string;
 }
 
 export interface ActorTranslationProgress {
@@ -97,9 +103,14 @@ export function readActorTranslationFlag(
   } as ActorTranslationFlag;
 }
 
-export function canReuseActorTranslation(flag: ActorTranslationFlag, sourceHash: string): boolean {
+export function canReuseActorTranslation(
+  flag: ActorTranslationFlag,
+  sourceHash: string,
+  glossaryHash?: string,
+): boolean {
   return flag.sourceHash === sourceHash &&
-    flag.engineRevision === ACTOR_TRANSLATION_ENGINE_REVISION;
+    flag.engineRevision === ACTOR_TRANSLATION_ENGINE_REVISION &&
+    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash);
 }
 
 function sourceSnapshot(source: ActorData): string {
@@ -179,6 +190,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
   }
 
   const sourceHash = await actorSourceHash(options.source);
+  const glossaryHash = await glossaryFingerprint(options.glossary);
   copy.flags = {
     ...copy.flags,
     [MODULE_ID]: {
@@ -194,6 +206,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
         translatedAt: new Date().toISOString(),
         translatedHtmlFields,
         fallbackTextSegments,
+        glossaryFingerprint: glossaryHash,
       },
     },
   };

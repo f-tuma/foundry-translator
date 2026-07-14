@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { planGlossarySync } from "../src/glossary/sync";
+import { planGlossarySync, planManualTerm } from "../src/glossary/sync";
 import type { GlossaryEntry } from "../src/glossary/types";
 
 function entry(overrides: Partial<GlossaryEntry> = {}): GlossaryEntry {
@@ -61,5 +61,24 @@ describe("glossary synchronization planning", () => {
       category: "character",
       sourceUuid: "Actor.strahd",
     });
+  });
+
+  it("plans manual terms: create, custom-translation update, and duplicate", () => {
+    const stored = [entry({ id: "doc", replacement: "Strahd" })];
+
+    expect(planManualTerm(stored, "Barovia", "")).toEqual({
+      action: "create",
+      entry: { source: "Barovia", replacement: "Barovia", category: "term", aliases: [] },
+    });
+    expect(planManualTerm(stored, "Ravenloft", "Havranov")).toEqual({
+      action: "create",
+      entry: { source: "Ravenloft", replacement: "Havranov", category: "term", aliases: [] },
+    });
+    expect(planManualTerm(stored, "strahd", "Hrabě Strahd")).toEqual({
+      action: "update",
+      entry: { ...stored[0], replacement: "Hrabě Strahd" },
+    });
+    expect(planManualTerm(stored, "Strahd", "Strahd")).toEqual({ action: "duplicate" });
+    expect(planManualTerm(stored, "Strahd", "")).toEqual({ action: "duplicate" });
   });
 });

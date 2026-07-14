@@ -66,10 +66,15 @@ sidebar.
 
 Repeated synchronization does not create duplicates. Renamed Actors and Scenes
 are detected by UUID, while manually customized replacements are preserved. You
-can also add custom names such as factions or artifacts. Before future document
-translation, exact glossary matches will be replaced by unique tokens; if a
-provider loses, duplicates, or changes a token, the translation will be rejected
-instead of returning a corrupted name.
+can also add custom names such as factions or artifacts, and optionally give a
+term a fixed custom translation — useful for correcting a strange machine
+translation of a specific word. Entering an existing term with a new
+translation updates it. During translation, exact glossary matches are
+replaced by unique integrity tokens and restored as the stored replacement; if
+a provider loses, duplicates, or changes a token, the translation is rejected
+instead of returning a corrupted name. Translations remember the glossary they
+were made with, so after a glossary change a re-run updates the stored copy
+instead of reusing it.
 
 ## Translate a Journal Entry
 
@@ -79,7 +84,13 @@ Entry and open its stored translation. The source document is never modified.
 
 You can also open a world Journal Entry and select **Translate this journal**
 directly in its header. A visible header button and the standard header controls
-menu provide the same safe translation action.
+menu provide the same safe translation action. The header controls menu also
+offers **Translate this page**: it translates only the currently viewed page
+plus one level of referenced documents, so a single chapter of a large journal
+is ready quickly. Page translations of the same journal merge into one stored
+translation, and once every page has been processed the result counts as a
+complete translation. Clicking the translate action of a journal that is
+already being translated opens the global overview instead.
 
 The current development build translates the journal name, page-category names,
 page names, and HTML-backed pages, including custom page types used by adventure modules.
@@ -96,7 +107,10 @@ without writing anything and reports the total number of documents and
 translatable parts. Progress messages therefore show both the current page and
 the overall total. The **Active translations** window in the module settings
 provides a global overview of every running translation with a progress bar,
-totals, the current document, and an estimate of the remaining time.
+totals, the current document, and an estimate of the remaining time. When a
+run has issues — quality fallbacks, unresolved references, or failed
+dependencies — a **Copy log** button copies a plain-text debug log with every
+issue, its reason, and a source preview.
 
 Empty, structurally damaged, and suspicious unchanged results are retried up to
 three times and are never written to cache. Intentionally preserved glossary

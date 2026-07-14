@@ -134,4 +134,26 @@ export class GlossaryCompendiumRepository {
       unchanged: plan.unchanged.length,
     };
   }
+
+  /** Overwrites the stored entry, e.g. with a user-supplied custom translation. */
+  async saveEntry(entry: GlossaryEntry): Promise<void> {
+    if (!game.user?.isGM) {
+      throw new Error("Slovník může měnit pouze Game Master.");
+    }
+    const pack = await ensureGlossaryPack();
+    if (pack.locked) {
+      throw new Error("Compendium se slovníkem je zamčené. Nejdřív jej ve Foundry odemkněte.");
+    }
+    if (entry.id) {
+      await foundry.documents.JournalEntry.implementation.updateDocuments(
+        [toDocumentData(entry)],
+        { pack: pack.collection },
+      );
+    } else {
+      await foundry.documents.JournalEntry.implementation.createDocuments(
+        [toDocumentData(entry)],
+        { pack: pack.collection },
+      );
+    }
+  }
 }

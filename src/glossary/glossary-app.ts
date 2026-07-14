@@ -1,6 +1,7 @@
 import { logger } from "../logger";
 import { GlossaryCompendiumRepository } from "./compendium-repository";
 import { discoverGlossaryEntries } from "./discovery";
+import { planManualTerm } from "./sync";
 import { renderGlossaryView } from "./glossary-view";
 import type { GlossaryEntry } from "./types";
 
@@ -52,14 +53,16 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
     this.element
       .querySelector<HTMLElement>("[data-action='open-pack']")
       ?.addEventListener("click", () => void this.#openPack());
-    this.element
-      .querySelector<HTMLInputElement>("[name='manualTerm']")
-      ?.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          void this.#addManualTerm();
-        }
-      });
+    for (const name of ["manualTerm", "manualReplacement"]) {
+      this.element
+        .querySelector<HTMLInputElement>(`[name='${name}']`)
+        ?.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            void this.#addManualTerm();
+          }
+        });
+    }
   }
 
   #discover(): GlossaryEntry[] {
@@ -94,20 +97,27 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
 
   async #addManualTerm(): Promise<void> {
     const input = this.element.querySelector<HTMLInputElement>("[name='manualTerm']");
+    const replacementInput =
+      this.element.querySelector<HTMLInputElement>("[name='manualReplacement']");
     const source = input?.value.normalize("NFC").trim() ?? "";
+    const replacement = replacementInput?.value.normalize("NFC").trim() ?? "";
     if (!source) return;
 
-    if (this.#stored.some((entry) => entry.source.toLowerCase() === source.toLowerCase())) {
+    const plan = planManualTerm(this.#stored, source, replacement);
+    if (plan.action === "duplicate") {
       this.#setStatus("error", "FOUNDRY_TRANSLATE.Glossary.Status.Duplicate");
       return;
     }
 
     this.#setStatus("testing", "FOUNDRY_TRANSLATE.Glossary.Status.Adding");
     try {
-      await this.#repository.sync([
-        { source, replacement: source, category: "term", aliases: [] },
-      ]);
-      ui.notifications.success("FOUNDRY_TRANSLATE.Glossary.Status.Added", { localize: true });
+      await this.#repository.saveEntry(plan.entry);
+      ui.notifications.success(
+        plan.action === "update"
+          ? "FOUNDRY_TRANSLATE.Glossary.Status.ReplacementUpdated"
+          : "FOUNDRY_TRANSLATE.Glossary.Status.Added",
+        { localize: true },
+      );
       await this.render({ force: true });
     } catch (error) {
       logger.error("Manual glossary term could not be added.", error);

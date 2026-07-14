@@ -1,15 +1,27 @@
 import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
+import { openActiveTranslationsOverview } from "./active-translations-app";
 import { readJournalTranslationFlag, type JournalTranslationProgress } from "./journal";
 import { JournalTranslationService } from "./journal-service";
 
 interface JournalEntrySheetApplication {
   entry?: FoundryJournalDocument;
+  pageId?: string;
+  pageIndex?: number;
+  _pages?: { _id?: string }[];
+  pagesInView?: { dataset?: { pageId?: string } }[];
   close?(options?: Record<string, unknown>): Promise<unknown>;
   window?: {
     header: HTMLElement;
     controls: HTMLButtonElement;
   };
+}
+
+function activePageId(application: JournalEntrySheetApplication): string | null {
+  return application.pageId
+    ?? application._pages?.[application.pageIndex ?? -1]?._id
+    ?? application.pagesInView?.[0]?.dataset?.pageId
+    ?? null;
 }
 
 export interface ApplicationHeaderControl {
@@ -92,11 +104,11 @@ async function showDocument(
 async function translateFromHeader(
   journal: FoundryJournalWorldDocument,
   application: JournalEntrySheetApplication,
+  pageId?: string,
 ): Promise<void> {
   if (translationsInProgress.has(journal.uuid)) {
-    ui.notifications.info(
-      localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning"),
-    );
+    // Clicking a running translation opens the global overview instead.
+    openActiveTranslationsOverview();
     return;
   }
 
@@ -127,7 +139,9 @@ async function translateFromHeader(
         }
       },
     });
-    const result = await service.translate(journal);
+    const result = pageId
+      ? await service.translatePage(journal, pageId)
+      : await service.translate(journal);
     const message = formatDoneMessage(
       result.translatedTextPages,
       result.skippedTextPages,
@@ -201,6 +215,24 @@ export function addJournalTranslationHeaderControl(
   const original = sourceJournal(application.entry);
   if (!journal && !original) return;
 
+  if (journal && !original) {
+    controls.unshift({
+      action: "foundry-translate-translate-page",
+      label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage",
+      icon: "fa-solid fa-file-lines",
+      visible: true,
+      onClick: () => {
+        const pageId = activePageId(application);
+        if (!pageId) {
+          ui.notifications.warn(
+            localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.NoActivePage"),
+          );
+          return;
+        }
+        void translateFromHeader(journal, application, pageId);
+      },
+    });
+  }
   controls.unshift({
     action: original
       ? "foundry-translate-show-original-journal"

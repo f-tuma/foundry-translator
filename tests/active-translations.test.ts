@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ActiveTranslationRegistry,
   estimateRemainingMs,
+  formatRunLog,
 } from "../src/translation/active-translations";
 
 describe("Active translation registry", () => {
@@ -55,6 +56,36 @@ describe("Active translation registry", () => {
     expect(registry.list().map(({ rootName }) => rootName)).toEqual(["New"]);
   });
 
+  it("collects issues and renders a copyable log", () => {
+    const registry = new ActiveTranslationRegistry(() => 0);
+    const id = registry.start("Guide", "cs");
+    registry.update(id, { plan: { totalDocuments: 2, totalUnits: 10 }, completedUnits: 10, completedDocuments: 2 });
+    registry.addIssue(id, {
+      type: "fallback",
+      documentName: "Guide",
+      reason: "unchanged",
+      attempts: 3,
+      occurrences: 2,
+      sourcePreview: "Shard of Fear",
+      detail: "Output identical to source.",
+    });
+    registry.addIssue(id, {
+      type: "unresolved",
+      sourceUuid: "Actor.missing",
+      parentUuid: "JournalEntry.guide",
+      detail: "Odkaz Actor.missing se nepodařilo najít.",
+    });
+    registry.finish(id);
+
+    const log = formatRunLog(registry.get(id)!, "0.11.0");
+    expect(log).toContain("Foundry Translate 0.11.0");
+    expect(log).toContain("Document: Guide -> cs");
+    expect(log).toContain("Issues: 2");
+    expect(log).toContain("1. [fallback] Guide reason=unchanged attempts=3 occurrences=2");
+    expect(log).toContain("   source: Shard of Fear");
+    expect(log).toContain("2. [unresolved] Actor.missing in=JournalEntry.guide");
+  });
+
   it("estimates the remaining time from completed units", () => {
     const run = {
       id: 1,
@@ -65,6 +96,7 @@ describe("Active translation registry", () => {
       plan: { totalDocuments: 2, totalUnits: 100 },
       completedUnits: 25,
       completedDocuments: 1,
+      issues: [],
     };
     // 25 units in 50s -> 75 remaining units take 150s.
     expect(estimateRemainingMs(run, 50_000)).toBe(150_000);

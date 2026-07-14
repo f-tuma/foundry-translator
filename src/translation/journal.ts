@@ -7,6 +7,7 @@ import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import {
+  glossaryFingerprint,
   translateUnits,
   type TranslationQualityFallback,
 } from "./unit-translator";
@@ -60,6 +61,8 @@ export interface TranslateJournalOptions {
   ownerDocument?: Document;
   nonceFactory?: () => string;
   systemHtmlFieldPaths?: readonly (readonly HtmlFieldPath[])[];
+  /** Translate only these pages; the rest stay source copies and the flag records a partial translation. */
+  pageIds?: readonly string[];
   onProgress?: (progress: JournalTranslationProgress) => void;
   onQualityFallback?: (fallback: TranslationQualityFallback) => void;
 }
@@ -98,6 +101,16 @@ export interface JournalTranslationFlag {
   translatedTextPages: number;
   skippedTextPages: number;
   fallbackTextSegments: number;
+  /**
+   * True while only a subset of pages is translated. Stored explicitly
+   * because Foundry's update merges flag objects, so a missing key would
+   * silently keep its previous stored value.
+   */
+  partial: boolean;
+  /** Source page IDs already processed by partial runs. */
+  processedPageIds?: string[];
+  /** Glossary hash at translation time; a changed glossary invalidates reuse. */
+  glossaryFingerprint?: string;
 }
 
 export function readJournalTranslationFlag(
@@ -125,15 +138,76 @@ export function readJournalTranslationFlag(
       typeof flag.engineRevision === "number" ? flag.engineRevision : 0,
     fallbackTextSegments:
       typeof flag.fallbackTextSegments === "number" ? flag.fallbackTextSegments : 0,
+    partial: flag.partial === true,
   } as JournalTranslationFlag;
 }
 
 export function canReuseJournalTranslation(
   flag: JournalTranslationFlag,
   sourceHash: string,
+  glossaryHash?: string,
 ): boolean {
   return flag.sourceHash === sourceHash &&
-    flag.engineRevision === TRANSLATION_ENGINE_REVISION;
+    flag.engineRevision === TRANSLATION_ENGINE_REVISION &&
+    !flag.partial &&
+    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash);
+}
+
+export function canReuseJournalPageTranslation(
+  flag: JournalTranslationFlag,
+  sourceHash: string,
+  pageId: string,
+  glossaryHash?: string,
+): boolean {
+  return flag.sourceHash === sourceHash &&
+    flag.engineRevision === TRANSLATION_ENGINE_REVISION &&
+    (!flag.partial || (flag.processedPageIds?.includes(pageId) ?? false)) &&
+    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash);
+}
+
+/**
+ * Merges a new partial translation into an existing hash-compatible partial
+ * translation: pages already processed earlier are taken from the stored
+ * translation, counters are combined, and once every source page is covered
+ * the merged flag becomes a complete translation.
+ */
+export function mergePartialJournalTranslation(
+  existing: JournalData,
+  partial: JournalData,
+): JournalData {
+  const existingFlag = readJournalTranslationFlag(existing.flags);
+  const partialFlag = readJournalTranslationFlag(partial.flags);
+  if (!existingFlag?.partial || !partialFlag?.partial) return partial;
+  if (!existingFlag.processedPageIds || !partialFlag.processedPageIds) return partial;
+  if (existingFlag.sourceHash !== partialFlag.sourceHash ||
+    existingFlag.engineRevision !== partialFlag.engineRevision) return partial;
+
+  const merged = structuredClone(partial);
+  const partialProcessed = new Set(partialFlag.processedPageIds);
+  const existingProcessed = new Set(existingFlag.processedPageIds);
+  const existingPages = new Map(existing.pages.map((page) => [page._id, page]));
+  merged.pages = merged.pages.map((page) => {
+    if (!page._id || partialProcessed.has(page._id) || !existingProcessed.has(page._id)) {
+      return page;
+    }
+    return structuredClone(existingPages.get(page._id) ?? page);
+  });
+
+  const processedPageIds = [...new Set([...existingFlag.processedPageIds, ...partialFlag.processedPageIds])];
+  const complete = merged.pages.every((page) => page._id && processedPageIds.includes(page._id));
+  const flag: JournalTranslationFlag = {
+    ...partialFlag,
+    translatedTextPages: existingFlag.translatedTextPages + partialFlag.translatedTextPages,
+    skippedTextPages: existingFlag.skippedTextPages + partialFlag.skippedTextPages,
+    fallbackTextSegments: existingFlag.fallbackTextSegments + partialFlag.fallbackTextSegments,
+    partial: !complete,
+    processedPageIds,
+  };
+  merged.flags = {
+    ...merged.flags,
+    [MODULE_ID]: { ...merged.flags?.[MODULE_ID], translation: flag },
+  };
+  return merged;
 }
 
 interface TranslationTarget {
@@ -239,9 +313,19 @@ export async function translateJournalData(
     }
   }
 
+  const selectedPageIds = options.pageIds ? new Set(options.pageIds) : null;
+  const selectedPages = copy.pages.filter(
+    (page) => !selectedPageIds || (page._id && selectedPageIds.has(page._id)),
+  );
+  if (selectedPageIds && !selectedPages.length) {
+    throw new Error("Vybraná stránka deníku už ve zdrojovém dokumentu neexistuje.");
+  }
+  let completedSelectedPages = 0;
+
   for (const [pageIndex, page] of copy.pages.entries()) {
-    const sourcePageName = page.name;
     delete page._stats;
+    if (selectedPageIds && (!page._id || !selectedPageIds.has(page._id))) continue;
+    const sourcePageName = page.name;
     const targets: TranslationTarget[] = [];
     const htmlTargets: HtmlTranslationTarget[] = [];
     targets.push({
@@ -306,9 +390,10 @@ export async function translateJournalData(
 
     if (translatedPage) translatedTextPages += 1;
     else if (skippedPage) skippedTextPages += 1;
+    completedSelectedPages += 1;
     options.onProgress?.({
-      completedPages: pageIndex + 1,
-      totalPages: copy.pages.length,
+      completedPages: completedSelectedPages,
+      totalPages: selectedPages.length,
       pageIndex,
       pageName: sourcePageName,
       translatedText: translatedPage,
@@ -317,6 +402,7 @@ export async function translateJournalData(
   }
 
   const sourceHash = await journalSourceHash(options.source);
+  const glossaryHash = await glossaryFingerprint(options.glossary);
   copy.flags = {
     ...copy.flags,
     [MODULE_ID]: {
@@ -333,6 +419,11 @@ export async function translateJournalData(
         translatedTextPages,
         skippedTextPages,
         fallbackTextSegments,
+        partial: Boolean(selectedPageIds) && selectedPages.length < copy.pages.length,
+        processedPageIds: selectedPages
+          .map((page) => page._id)
+          .filter((id): id is string => Boolean(id)),
+        glossaryFingerprint: glossaryHash,
       },
     },
   };
