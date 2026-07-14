@@ -52,6 +52,10 @@ and the recommended implementation order.
   bar. Per-run status strings now include the overall totals.
 - 2026-07-14: The user asked that commits contain no `Co-Authored-By: Claude`
   trailer.
+- 2026-07-14: `v0.10.0` was pushed and tagged, the GitHub release published,
+  and the public manifest and `foundry-translate.zip` assets verified. The
+  user confirmed that the active-translations overview and the upfront graph
+  totals work in their Foundry instance.
 
 ### Actor milestone state (released in v0.10.0)
 
