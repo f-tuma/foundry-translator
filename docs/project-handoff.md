@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-14
-- Repository state: `main`, release `v0.12.0`; `v0.12.1` prepared locally
+- Repository state: `main`, release `v0.12.1`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
