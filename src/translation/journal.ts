@@ -65,6 +65,7 @@ export interface TranslateJournalOptions {
 }
 
 export interface JournalTranslationProgress {
+  kind?: "journal-page" | "actor-field";
   completedPages: number;
   totalPages: number;
   pageIndex: number;

@@ -3,12 +3,21 @@ import { logger } from "../logger";
 import { createTranslationProvider } from "../providers/factory";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
 import { getTranslatorSettings } from "../settings/settings";
+import {
+  actorSourceHash,
+  canReuseActorTranslation,
+  readActorTranslationFlag,
+  translateActorData,
+  type ActorData,
+} from "./actor";
 import { CompendiumTranslationCache } from "./compendium-cache";
+import { CompendiumActorTranslationRepository } from "./compendium-actor-translation-repository";
 import { CompendiumJournalTranslationRepository } from "./compendium-translation-repository";
 import { traverseDependencyGraph } from "./dependency-graph";
 import {
   discoverJournalDependencies,
-  rewriteJournalDocumentReferences,
+  discoverObjectDependencies,
+  rewriteDocumentReferences,
   type DocumentDependency,
   type DocumentReferenceReplacement,
 } from "./document-dependencies";
@@ -49,16 +58,26 @@ export interface JournalDependencyWarning {
   message: string;
 }
 
+type GraphSourceDocument = FoundryJournalWorldDocument | FoundryActorWorldDocument;
+type GraphTranslatedDocument = FoundryJournalDocument | FoundryActorDocument;
+type GraphData = JournalData | ActorData;
+
+interface GraphTranslationResult {
+  data: GraphData;
+  document: GraphTranslatedDocument;
+  reused: boolean;
+  fallbackTextSegments: number;
+}
+
 interface ResolvedJournalDependency {
   reference: DocumentDependency;
   resolved: FoundryUuidDocument;
-  root: FoundryJournalWorldDocument;
+  root: GraphSourceDocument;
 }
 
 interface JournalGraphNode {
-  sourceDocument: FoundryJournalWorldDocument;
   dependencies: ResolvedJournalDependency[];
-  result?: JournalTranslationResult;
+  result?: GraphTranslationResult;
 }
 
 interface TranslationRuntime {
@@ -67,6 +86,7 @@ interface TranslationRuntime {
   glossary: Awaited<ReturnType<GlossaryCompendiumRepository["load"]>>;
   cache: CompendiumTranslationCache;
   translations: CompendiumJournalTranslationRepository;
+  actorTranslations: CompendiumActorTranslationRepository;
 }
 
 interface RuntimePageSystem {
@@ -123,10 +143,26 @@ function isJournalDocument(document: FoundryUuidDocument): document is FoundryJo
     typeof document.toObject === "function";
 }
 
+function isActorDocument(document: FoundryUuidDocument): document is FoundryActorWorldDocument {
+  return document.documentName === "Actor" &&
+    typeof document.uuid === "string" &&
+    typeof document.toObject === "function";
+}
+
+function isSupportedSourceDocument(document: FoundryUuidDocument): document is GraphSourceDocument {
+  return isJournalDocument(document) || isActorDocument(document);
+}
+
+function isTranslatedDocument(document: FoundryUuidDocument): boolean {
+  return isJournalDocument(document)
+    ? Boolean(readJournalTranslationFlag(document.flags))
+    : isActorDocument(document) && Boolean(readActorTranslationFlag(document.flags));
+}
+
 export function translatedDocumentReferenceUuid(
   resolved: FoundryUuidDocument,
-  sourceRoot: FoundryJournalWorldDocument,
-  translatedRoot: FoundryJournalDocument,
+  sourceRoot: FoundryUuidDocument,
+  translatedRoot: FoundryUuidDocument | FoundryJournalDocument,
 ): string | null {
   if (!translatedRoot.uuid) return null;
   if (resolved.uuid === sourceRoot.uuid) return translatedRoot.uuid;
@@ -151,6 +187,44 @@ export async function assertJournalSourceUnchanged(
       "Zdrojový deník se během překladu změnil. Překlad nebyl uložen; spusťte jej znovu a hotové stránky se načtou z cache.",
     );
   }
+}
+
+export async function assertActorSourceUnchanged(
+  sourceDocument: FoundryActorWorldDocument,
+  expectedHash: string,
+): Promise<void> {
+  const currentSourceHash = await actorSourceHash(sourceDocument.toObject() as ActorData);
+  if (currentSourceHash !== expectedHash) {
+    throw new Error(
+      "Zdrojový Actor se během překladu změnil. Překlad nebyl uložen; spusťte jej znovu a hotová pole se načtou z cache.",
+    );
+  }
+}
+
+function actorHtmlFieldPaths(
+  sourceDocument: FoundryActorWorldDocument,
+  source: ActorData,
+): {
+  system: readonly HtmlFieldPath[];
+  items: readonly (readonly HtmlFieldPath[])[];
+} {
+  const system = discoverSystemHtmlFieldPaths(
+    sourceDocument.system?.constructor?.schema?.fields,
+    source.system,
+  );
+  const runtimeItems = new Map(
+    (sourceDocument.items?.contents ?? [])
+      .filter((item): item is FoundryItemDocument & { id: string } => Boolean(item.id))
+      .map((item) => [item.id, item]),
+  );
+  const items = (source.items ?? []).map((item) => {
+    const runtime = item._id ? runtimeItems.get(item._id) : undefined;
+    return discoverSystemHtmlFieldPaths(
+      runtime?.system?.constructor?.schema?.fields,
+      item.system,
+    );
+  });
+  return { system, items };
 }
 
 export class JournalTranslationService {
@@ -190,6 +264,7 @@ export class JournalTranslationService {
       glossary,
       cache: new CompendiumTranslationCache(),
       translations: new CompendiumJournalTranslationRepository(),
+      actorTranslations: new CompendiumActorTranslationRepository(),
     };
     return this.#translateGraph(sourceDocument, runtime);
   }
@@ -208,22 +283,25 @@ export class JournalTranslationService {
       warnings.push(warning);
       logger.warn("Journal dependency could not be translated recursively.", warning);
     };
-    const nodeFor = (document: FoundryJournalWorldDocument): JournalGraphNode => {
+    const nodeFor = (document: GraphSourceDocument): JournalGraphNode => {
       const existing = nodes.get(document.uuid);
       if (existing) return existing;
-      const node = { sourceDocument: document, dependencies: [] };
+      const node = { dependencies: [] };
       nodes.set(document.uuid, node);
       return node;
     };
 
     const graph = await traverseDependencyGraph({
-      root: sourceDocument,
+      root: sourceDocument as GraphSourceDocument,
       key: (document) => document.uuid,
       dependencies: async (document) => {
         const node = nodeFor(document);
-        const source = document.toObject() as JournalData;
-        const childDocuments = new Map<string, FoundryJournalWorldDocument>();
-        for (const reference of discoverJournalDependencies(source)) {
+        const source = document.toObject() as GraphData;
+        const childDocuments = new Map<string, GraphSourceDocument>();
+        const references = isJournalDocument(document)
+          ? discoverJournalDependencies(source as JournalData)
+          : discoverObjectDependencies(source);
+        for (const reference of references) {
           let resolved: FoundryUuidDocument | null = null;
           try {
             resolved = await fromUuid(reference.sourceUuid, { relative: document });
@@ -240,7 +318,7 @@ export class JournalTranslationService {
             continue;
           }
           const root = rootDocument(resolved);
-          if (!isJournalDocument(root)) {
+          if (!isSupportedSourceDocument(root)) {
             addWarning({
               kind: "unsupported",
               sourceUuid: reference.sourceUuid,
@@ -249,7 +327,7 @@ export class JournalTranslationService {
             });
             continue;
           }
-          if (readJournalTranslationFlag(root.flags)) continue;
+          if (isTranslatedDocument(root)) continue;
           node.dependencies.push({ reference, resolved, root });
           childDocuments.set(root.uuid, root);
           nodeFor(root);
@@ -273,7 +351,7 @@ export class JournalTranslationService {
         kind: "failed",
         sourceUuid: failure.node.uuid,
         parentUuid: sourceDocument.uuid,
-        message: `Závislý deník ${failure.node.name} se nepodařilo přeložit; jeho odkazy zůstaly v originále.`,
+        message: `Závislý dokument ${failure.node.name} se nepodařilo přeložit; jeho odkazy zůstaly v originále.`,
       });
     }
 
@@ -295,21 +373,34 @@ export class JournalTranslationService {
       }
       if (!replacements.length) continue;
 
-      const rewritten = rewriteJournalDocumentReferences(node.result.data, replacements);
+      const rewritten = rewriteDocumentReferences(node.result.data, replacements);
       if (JSON.stringify(rewritten) === JSON.stringify(node.result.data)) continue;
-      const flag = readJournalTranslationFlag(rewritten.flags);
-      if (flag) await assertJournalSourceUnchanged(document, flag.sourceHash);
-      node.result.data = rewritten;
-      node.result.document = await runtime.translations.save(rewritten);
+      if (isJournalDocument(document)) {
+        const journalData = rewritten as JournalData;
+        const flag = readJournalTranslationFlag(journalData.flags);
+        if (flag) await assertJournalSourceUnchanged(document, flag.sourceHash);
+        node.result.data = journalData;
+        node.result.document = await runtime.translations.save(journalData);
+      } else {
+        const actorData = rewritten as ActorData;
+        const flag = readActorTranslationFlag(actorData.flags);
+        if (flag) await assertActorSourceUnchanged(document, flag.sourceHash);
+        node.result.data = actorData;
+        node.result.document = await runtime.actorTranslations.save(actorData);
+      }
     }
 
     const rootResult = nodes.get(sourceDocument.uuid)?.result;
     if (!rootResult) throw new Error("Kořenový deník se nepodařilo přeložit.");
     const completedResults = graph.completed
       .map((document) => nodes.get(document.uuid)?.result)
-      .filter((result): result is JournalTranslationResult => Boolean(result));
+      .filter((result): result is GraphTranslationResult => Boolean(result));
     return {
-      ...rootResult,
+      ...(rootResult as JournalTranslationResult),
+      fallbackTextSegments: completedResults.reduce(
+        (total, result) => total + result.fallbackTextSegments,
+        0,
+      ),
       processedDocuments: completedResults.length,
       reusedDocuments: completedResults.filter(({ reused }) => reused).length,
       dependencyWarnings: warnings,
@@ -317,6 +408,14 @@ export class JournalTranslationService {
   }
 
   async #translateOne(
+    sourceDocument: GraphSourceDocument,
+    runtime: TranslationRuntime,
+  ): Promise<GraphTranslationResult> {
+    if (isActorDocument(sourceDocument)) return this.#translateActorOne(sourceDocument, runtime);
+    return this.#translateJournalOne(sourceDocument, runtime);
+  }
+
+  async #translateJournalOne(
     sourceDocument: FoundryJournalWorldDocument,
     runtime: TranslationRuntime,
   ): Promise<JournalTranslationResult> {
@@ -373,5 +472,60 @@ export class JournalTranslationService {
       reusedDocuments: 0,
       dependencyWarnings: [],
     };
+  }
+
+  async #translateActorOne(
+    sourceDocument: FoundryActorWorldDocument,
+    runtime: TranslationRuntime,
+  ): Promise<GraphTranslationResult> {
+    const source = sourceDocument.toObject() as ActorData;
+    const sourceHash = await actorSourceHash(source);
+    const existing = await runtime.actorTranslations.find(
+      sourceDocument.uuid,
+      runtime.settings.targetLanguage,
+    );
+    const existingFlag = existing ? readActorTranslationFlag(existing.flags) : null;
+    if (existing && existingFlag && canReuseActorTranslation(existingFlag, sourceHash)) {
+      return {
+        data: existing.toObject() as ActorData,
+        document: existing,
+        reused: true,
+        fallbackTextSegments: existingFlag.fallbackTextSegments,
+      };
+    }
+
+    const paths = actorHtmlFieldPaths(sourceDocument, source);
+    const translated = await translateActorData({
+      source,
+      sourceUuid: sourceDocument.uuid,
+      glossary: runtime.glossary,
+      provider: runtime.provider,
+      settings: {
+        providerId: runtime.settings.provider,
+        sourceLanguage: runtime.settings.sourceLanguage,
+        targetLanguage: runtime.settings.targetLanguage,
+      },
+      systemHtmlFieldPaths: paths.system,
+      itemHtmlFieldPaths: paths.items,
+      cache: runtime.cache,
+      onQualityFallback: (fallback) => {
+        logger.warn("Actor translation quality fallback kept the original fragment.", fallback);
+      },
+      ...(this.#onProgress ? {
+        onProgress: (progress) => this.#onProgress?.({
+          kind: "actor-field",
+          completedPages: progress.completedFields,
+          totalPages: progress.totalFields,
+          pageIndex: progress.completedFields - 1,
+          pageName: progress.itemName ?? progress.fieldPath.join("."),
+          translatedText: true,
+          skippedText: false,
+          documentName: sourceDocument.name,
+        }),
+      } : {}),
+    });
+    await assertActorSourceUnchanged(sourceDocument, sourceHash);
+    const document = await runtime.actorTranslations.save(translated.data);
+    return { ...translated, document, reused: false };
   }
 }

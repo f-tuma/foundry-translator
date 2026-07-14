@@ -1,13 +1,82 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-14
-- Repository state: `main`, release `v0.9.0`
+- Repository state: `main`, release `v0.10.0`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
 another device or with another agent. The README remains the user-facing
 documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
+
+## Current work log
+
+- 2026-07-14: The user confirmed that recursive Journal translation in `v0.9.0`
+  works in their Foundry instance.
+- 2026-07-14: Work started on the next milestone: schema-aware Actor translation,
+  a dedicated translated-Actor compendium, Actor nodes in the dependency graph,
+  and rewriting Journal `@Embed` references to translated Actor UUIDs.
+- 2026-07-14: Actor copies must preserve the complete Actor and stable embedded
+  Item IDs. Only fields identified as `HTMLField` by the live Actor/Item system
+  schemas will be translated; mechanical values, model identifiers, actions,
+  UUIDs, and non-HTML strings must remain byte-for-byte source data.
+- 2026-07-14: In the symlinked local development install, rebuilding to a new
+  module version removes the previous versioned bundle from `dist/`, while an
+  already-running Foundry server keeps the old manifest in memory. Restart
+  Foundry after a version/bundle-name change or the client requests the old file
+  and receives a 404.
+- 2026-07-14: Actor milestone was paused due to a session usage limit and
+  resumed in a later session on the same day.
+- 2026-07-14: The interrupted `/tmp/test-foundry-actor-recursion.mjs` E2E was
+  re-run against a freshly restarted Foundry and **passed**: the synthetic
+  Actor biography was stored translated in `world.foundry-translate-actors`,
+  the Journal `@Embed` was rewritten to the translated Actor UUID, the source
+  Actor remained byte-for-byte unchanged, and zero fallback segments occurred.
+  The only console errors were the known unrelated Crucible `prepareGrimoire`
+  failures. Temporary test data was cleaned up by the script.
+- 2026-07-14: A fresh Foundry start redirects to the `/join` screen; the E2E
+  script now selects the Gamemaster user and joins before waiting for
+  `game.ready`.
+- 2026-07-14: Released as `v0.10.0`.
+
+### Actor milestone state (released in v0.10.0)
+
+Implemented:
+
+- `src/translation/actor.ts`:
+  - immutable Actor snapshot and source hash;
+  - versioned Actor translation metadata;
+  - translation of only live-schema-confirmed Actor and embedded Item
+    `HTMLField` paths;
+  - complete Actor copy with stable embedded Item IDs;
+  - cache, token integrity, quality fallback counts, and field progress;
+  - proper Actor names are preserved and receive only the target-language suffix.
+- `src/translation/compendium-actor-translation-repository.ts`:
+  - dedicated `world.foundry-translate-actors` Actor compendium;
+  - source UUID + target language identity;
+  - update-in-place instead of duplicate creation;
+  - placement in the shared `Foundry Translate` compendium folder.
+- The Journal dependency graph now accepts both Journal and Actor nodes:
+  - Journal `@Embed[Actor...]` targets can be translated as Actor dependencies;
+  - Actor HTML may recursively reference Journals or other Actors;
+  - reference rewriting is generic across translated Journal and Actor data;
+  - standalone Item roots remain unsupported for now;
+  - Actor quality fallbacks are included in the graph completion total.
+- UI progress distinguishes Journal pages from Actor HTML fields.
+- New unit coverage for Actor source immutability, schema-selected HTML fields,
+  mechanical-data preservation, embedded Item ID preservation, Actor hashing,
+  and Actor compendium update-in-place behavior.
+
+Verified:
+
+- `npm run check` passed: typecheck, **91 tests across 20 test files**, and a
+  production bundle of approximately 92.7 kB.
+- The real-Foundry E2E `/tmp/test-foundry-actor-recursion.mjs` passed (see the
+  work log above). Journal-to-Actor recursion is confirmed working against
+  Foundry `14.364`, Crucible `0.10.1`, and Chrome Local Translator.
+- No interrupted Node/Chromium process remained from the previous session; the
+  E2E was run with the single `/tmp/foundry-chromium-148-profile` profile and
+  the browser was closed afterwards.
 
 ## Project goal
 
@@ -46,6 +115,10 @@ The user's main priorities are:
 - Translation of human-readable `@Embed` parts, including `readaloud`, without
   changing the UUID.
 - Recursive Journal-to-Journal translation with dependency-first traversal.
+- Recursive Actor translation: complete Actor copies with stable embedded Item
+  IDs in the `world.foundry-translate-actors` compendium, translation limited to
+  live-schema-confirmed `HTMLField` paths, and Journal `@Embed[Actor...]`
+  references rewritten to the translated Actor UUID.
 - Deduplication of shared dependencies and safe cycle handling.
 - Rewriting to translated compendium UUIDs after every graph node is stored.
 - Stable JournalEntryPage IDs across rewritten page references.
@@ -63,7 +136,7 @@ The user's main priorities are:
 - The translation-engine revision invalidates stored results after logic changes.
 - The translation cache uses a versioned key schema; the current schema is `3`.
 - Module compendia are grouped in the shared grey `Foundry Translate` folder.
-- 88 automated tests across 18 test files.
+- 91 automated tests across 20 test files.
 
 ## Verified real-world cases
 
@@ -139,13 +212,14 @@ in the Crucible system and are unrelated to this module.
 - `world.foundry-translate-glossary` — proper names and locations.
 - `world.foundry-translate-cache` — translated-unit cache.
 - `world.foundry-translate-translations` — JournalEntry translations.
+- `world.foundry-translate-actors` — translated Actor copies.
 
 The translation flag contains the source UUID and hash, provider, language pair,
 timestamp, translated/skipped page counts, fallback-fragment count, and engine
 revision. A legacy flag without an engine revision remains readable but must not
 be reused as a current translation.
 
-## Main remaining work: Actor and Item recursion
+## Main remaining work: Item recursion (Actor recursion released in v0.10.0)
 
 ### Required user outcome
 
@@ -211,8 +285,8 @@ interface DocumentTranslationAdapter<TSource, TData> {
 
 Recommended adapter order:
 
-1. `JournalEntry` with stable `JournalEntryPage` IDs.
-2. `Actor`, especially Ember biography/readaloud/system HTML.
+1. `JournalEntry` with stable `JournalEntryPage` IDs — completed.
+2. `Actor`, especially Ember biography/readaloud/system HTML — completed.
 3. `Item` and other types discovered during real Ember traversal.
 4. Additional types only when supported by evidence from actual content.
 
@@ -261,10 +335,9 @@ language to translated UUID mapping must remain consistent across packs.
 
 ## Known remaining limitations
 
-- Recursive translation and reference rewriting currently support Journal
-  targets. Actor and Item targets remain pointed at their source UUID and produce
-  a warning.
-- Dynamically rendered content from a source Actor therefore remains in English.
+- Recursive translation and reference rewriting support Journal and Actor
+  targets. Standalone Item targets remain pointed at their source UUID and
+  produce a warning.
 - Markdown source pages are intentionally not translated yet.
 - Portable translation-bundle export/import is not implemented yet.
 - Helium does not support Chrome Local Translator; the tested Chromium profile
@@ -331,10 +404,9 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
 
 1. Read this document and the README.
 2. Run `git status -sb` and `npm run check`.
-3. Add an Actor translation repository and adapter without changing source Actors.
-4. Translate schema-confirmed Actor HTML fields, starting with
-   `system.details.biography.*`; preserve all mechanical data and embedded IDs.
-5. Extend graph nodes to Actor dependencies and rewrite Journal `@Embed` UUIDs.
-6. Add Item handling only after Actor fields and embedded Item ownership are
-   covered by tests.
-7. Then add **Translate this page** and run the full `Gamemaster's Guide` smoke test.
+3. Add standalone Item handling; embedded Actor Items are already covered by
+   the Actor copy with stable IDs.
+4. Add **Translate this page** for the active page and its recursive
+   dependencies.
+5. Run the full `Gamemaster's Guide` smoke test in Ember (44 distinct Actor
+   references) and record findings here.

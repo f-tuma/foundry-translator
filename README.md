@@ -3,11 +3,12 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.9.0` processes
+> The module is currently an early development build. Version `0.10.0` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
 > safely keeps an isolated failed fragment in the original, translates human text
-> inside Foundry embeds, recursively translates linked Journals, rewrites links to
-> their stored translations, resumes from the server cache, and reports live progress.
+> inside Foundry embeds, recursively translates linked Journals and Actors,
+> rewrites links and Actor embeds to their stored translations, resumes from the
+> server cache, and reports live progress.
 
 ## Installation
 
@@ -106,13 +107,19 @@ action. Its source UUID and hash allow an unchanged translation to be reused and
 a changed source to update the same stored document instead of creating a
 duplicate.
 
-Linked Journal Entries are translated recursively. Shared dependencies are
-processed only once, cycles are handled without deadlocks, and links in the
-translated copy are rewritten to stable translated compendium UUIDs. Links to a
-specific Journal page preserve that page's original ID. Missing references and
-document types that are not supported recursively yet remain pointed at the
+Linked Journal Entries and Actors are translated recursively. Shared
+dependencies are processed only once, cycles are handled without deadlocks, and
+links in the translated copy are rewritten to stable translated compendium
+UUIDs. Links to a specific Journal page preserve that page's original ID.
+Referenced Actors are copied completely into the
+`Foundry Translate — Translated Actors` world compendium with stable embedded Item IDs; only HTML fields confirmed by
+the live system schema — such as Ember biography text — are translated, while
+all mechanical values, identifiers, and actions stay byte-for-byte source data.
+Journal `@Embed[Actor...]` references are rewritten to the translated Actor so
+dynamically rendered Actor text loads in the target language. Missing references
+and document types that are not supported recursively yet remain pointed at the
 source and are reported as warnings instead of failing the whole translation.
-Actor and Item dependency copies are the next implementation stage.
+Standalone Item dependency copies are the next implementation stage.
 
 ## Development
 

@@ -53,8 +53,11 @@ export class JournalTranslationApplication extends foundry.applications.api.Appl
       const service = new JournalTranslationService({
         onChromeStatus: (status) => this.#setChromeStatus(status),
         onProgress: (progress) => {
+          const key = progress.kind === "actor-field"
+            ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress"
+            : "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress";
           const message = game.i18n
-            .localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress")
+            .localize(key)
             .replace("{current}", String(progress.completedPages))
             .replace("{total}", String(progress.totalPages))
             .replace("{page}", progress.pageName)

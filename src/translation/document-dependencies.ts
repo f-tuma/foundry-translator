@@ -77,6 +77,19 @@ export function discoverJournalDependencies(source: JournalData): DocumentDepend
   return [...unique.values()];
 }
 
+export function discoverObjectDependencies(source: unknown): DocumentDependency[] {
+  const dependencies: DocumentDependency[] = [];
+  walkStrings(source, [], (text, fieldPath) => {
+    dependencies.push(...discoverDocumentDependencies(text, fieldPath));
+  });
+  const unique = new Map<string, DocumentDependency>();
+  for (const dependency of dependencies) {
+    const key = `${dependency.kind}\u0000${dependency.sourceUuid}\u0000${dependency.fieldPath.join(".")}`;
+    if (!unique.has(key)) unique.set(key, dependency);
+  }
+  return [...unique.values()];
+}
+
 function rewriteText(
   text: string,
   replacements: ReadonlyMap<string, string>,
@@ -116,4 +129,14 @@ export function rewriteJournalDocumentReferences(
     replacements.map(({ sourceUuid, translatedUuid }) => [sourceUuid, translatedUuid]),
   );
   return rewriteStrings(source, replacementMap) as JournalData;
+}
+
+export function rewriteDocumentReferences<T>(
+  source: T,
+  replacements: readonly DocumentReferenceReplacement[],
+): T {
+  const replacementMap = new Map(
+    replacements.map(({ sourceUuid, translatedUuid }) => [sourceUuid, translatedUuid]),
+  );
+  return rewriteStrings(source, replacementMap) as T;
 }

@@ -93,6 +93,36 @@ interface FoundryJournalWorldDocument extends FoundryJournalDocument {
   sheet?: { render(options?: boolean | Record<string, unknown>): unknown };
 }
 
+interface FoundryRuntimeSystem {
+  constructor?: {
+    schema?: { fields?: Record<string, unknown> };
+  };
+}
+
+interface FoundryActorDocument extends FoundryUuidDocument {
+  id: string | null;
+  uuid: string;
+  documentName?: "Actor";
+  name?: string;
+  type?: string;
+  system?: FoundryRuntimeSystem;
+  items?: { contents?: FoundryItemDocument[] };
+  flags?: Record<string, Record<string, unknown>>;
+  toObject(): Record<string, unknown>;
+  sheet?: { render(options?: boolean | Record<string, unknown>): unknown };
+}
+
+interface FoundryActorWorldDocument extends FoundryActorDocument {
+  name: string;
+  type: string;
+}
+
+interface FoundryItemDocument extends FoundryUuidDocument {
+  id: string | null;
+  name?: string;
+  system?: FoundryRuntimeSystem;
+}
+
 interface FoundrySettingConfig {
   name: string;
   hint: string;
@@ -146,6 +176,18 @@ declare const foundry: {
         ): Promise<FoundryJournalDocument[]>;
         updateDocuments(
           data: FoundryJournalEntryData[],
+          operation: { pack: string },
+        ): Promise<unknown[]>;
+      };
+    };
+    Actor: {
+      implementation: {
+        createDocuments(
+          data: Record<string, unknown>[],
+          operation: { pack: string; keepId?: boolean },
+        ): Promise<FoundryActorDocument[]>;
+        updateDocuments(
+          data: Record<string, unknown>[],
           operation: { pack: string },
         ): Promise<unknown[]>;
       };

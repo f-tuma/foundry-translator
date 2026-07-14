@@ -45,7 +45,10 @@ function formatDoneMessage(
 }
 
 function formatProgress(progress: JournalTranslationProgress): string {
-  return localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress")
+  const key = progress.kind === "actor-field"
+    ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress"
+    : "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress";
+  return localized(key)
     .replace("{current}", String(progress.completedPages))
     .replace("{total}", String(progress.totalPages))
     .replace("{page}", progress.pageName)
