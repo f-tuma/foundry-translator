@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { TranslationProvider } from "../src/providers/types";
 import { MemoryTranslationCache } from "../src/translation/cache";
 import {
+  canReuseJournalTranslation,
   readJournalTranslationFlag,
+  TRANSLATION_ENGINE_REVISION,
   translateJournalData,
   type JournalData,
 } from "../src/translation/journal";
@@ -28,7 +30,7 @@ const translationProvider: TranslationProvider = {
 
 describe("Journal translation", () => {
   it("reads older translation flags as having no quality fallbacks", () => {
-    expect(readJournalTranslationFlag({
+    const flag = readJournalTranslationFlag({
       "foundry-translate": {
         translation: {
           schemaVersion: 1,
@@ -42,7 +44,10 @@ describe("Journal translation", () => {
           skippedTextPages: 0,
         },
       },
-    })?.fallbackTextSegments).toBe(0);
+    });
+    expect(flag?.fallbackTextSegments).toBe(0);
+    expect(flag?.engineRevision).toBe(0);
+    expect(flag && canReuseJournalTranslation(flag, "hash")).toBe(false);
   });
 
   it("creates translated copy data while preserving HTML, Foundry syntax, and source", async () => {
@@ -148,12 +153,15 @@ describe("Journal translation", () => {
     expect(translated.data.flags?.existing).toEqual({ keep: true });
     expect(translated.data.flags?.["foundry-translate"]?.translation).toMatchObject({
       schemaVersion: 1,
+      engineRevision: TRANSLATION_ENGINE_REVISION,
       sourceUuid: "JournalEntry.journal-id",
       providerId: "chrome-local",
       sourceLanguage: "en",
       targetLanguage: "cs",
       fallbackTextSegments: 0,
     });
+    const currentFlag = readJournalTranslationFlag(translated.data.flags);
+    expect(currentFlag && canReuseJournalTranslation(currentFlag, currentFlag.sourceHash)).toBe(true);
   });
 
   it("finishes the journal and reports a fragment kept in the original", async () => {

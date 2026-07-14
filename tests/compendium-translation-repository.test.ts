@@ -6,6 +6,7 @@ import {
   TRANSLATIONS_PACK_ID,
 } from "../src/translation/compendium-translation-repository";
 import type { JournalData } from "../src/translation/journal";
+import { TRANSLATION_ENGINE_REVISION } from "../src/translation/journal";
 
 function translatedData(): JournalData {
   return {
@@ -15,6 +16,7 @@ function translatedData(): JournalData {
       [MODULE_ID]: {
         translation: {
           schemaVersion: 1,
+          engineRevision: TRANSLATION_ENGINE_REVISION,
           sourceUuid: "JournalEntry.source",
           sourceHash: "hash",
           providerId: "chrome-local",
@@ -72,6 +74,56 @@ describe("compendium Journal translation repository", () => {
     expect(updateDocuments).toHaveBeenCalledTimes(1);
     expect(updateDocuments).toHaveBeenCalledWith(
       [{ ...data, _id: "translation-id" }],
+      { pack: TRANSLATIONS_PACK_ID },
+    );
+  });
+
+  it("updates the same compendium document when a legacy translation is rebuilt", async () => {
+    const data = translatedData();
+    const legacyData = structuredClone(data);
+    const legacyFlag = legacyData.flags?.[MODULE_ID]?.translation as
+      | Record<string, unknown>
+      | undefined;
+    if (legacyFlag) delete legacyFlag.engineRevision;
+    const legacyIndexEntry = {
+      _id: "legacy-translation-id",
+      flags: legacyData.flags,
+    };
+    const storedDocument = {
+      id: legacyIndexEntry._id,
+      name: data.name,
+      uuid: `Compendium.${TRANSLATIONS_PACK_ID}.JournalEntry.${legacyIndexEntry._id}`,
+      flags: data.flags,
+      toObject: () => data,
+    };
+    const createDocuments = vi.fn();
+    const updateDocuments = vi.fn().mockResolvedValue([storedDocument]);
+    const getDocument = vi.fn().mockResolvedValue(storedDocument);
+    const pack = {
+      collection: TRANSLATIONS_PACK_ID,
+      locked: false,
+      folder: { id: "folder", name: "Foundry Translate", type: "Compendium" },
+      getIndex: vi.fn().mockResolvedValue(new Map([[legacyIndexEntry._id, legacyIndexEntry]])),
+      getDocument,
+      setFolder: vi.fn(),
+    };
+    vi.stubGlobal("game", {
+      user: { isGM: true },
+      packs: new Map([[TRANSLATIONS_PACK_ID, pack]]),
+      folders: { contents: [pack.folder] },
+    });
+    vi.stubGlobal("foundry", {
+      documents: {
+        JournalEntry: { implementation: { createDocuments, updateDocuments } },
+      },
+    });
+
+    const repository = new CompendiumJournalTranslationRepository();
+    await expect(repository.save(data)).resolves.toBe(storedDocument);
+
+    expect(createDocuments).not.toHaveBeenCalled();
+    expect(updateDocuments).toHaveBeenCalledWith(
+      [{ ...data, _id: legacyIndexEntry._id }],
       { pack: TRANSLATIONS_PACK_ID },
     );
   });

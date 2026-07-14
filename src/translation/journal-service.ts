@@ -6,6 +6,7 @@ import { getTranslatorSettings } from "../settings/settings";
 import { CompendiumTranslationCache } from "./compendium-cache";
 import { CompendiumJournalTranslationRepository } from "./compendium-translation-repository";
 import {
+  canReuseJournalTranslation,
   journalSourceHash,
   readJournalTranslationFlag,
   translateJournalData,
@@ -120,7 +121,7 @@ export class JournalTranslationService {
     const existingFlag = existing
       ? readJournalTranslationFlag(existing.flags)
       : null;
-    if (existing && existingFlag?.sourceHash === sourceHash) {
+    if (existing && existingFlag && canReuseJournalTranslation(existingFlag, sourceHash)) {
       return {
         data: existing.toObject() as JournalData,
         translatedTextPages: existingFlag.translatedTextPages,

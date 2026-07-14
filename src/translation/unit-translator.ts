@@ -108,7 +108,7 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       segments,
       glossaryFingerprint,
       ...settings,

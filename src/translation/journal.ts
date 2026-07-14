@@ -12,6 +12,7 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
+export const TRANSLATION_ENGINE_REVISION = 2;
 const HTML_FORMAT = 1;
 
 export interface JournalPageData extends Record<string, unknown> {
@@ -81,6 +82,7 @@ export interface TranslatedJournal {
 
 export interface JournalTranslationFlag {
   schemaVersion: typeof TRANSLATION_SCHEMA_VERSION;
+  engineRevision: number;
   sourceUuid: string;
   sourceHash: string;
   providerId: ProviderId;
@@ -113,9 +115,19 @@ export function readJournalTranslationFlag(
   }
   return {
     ...flag,
+    engineRevision:
+      typeof flag.engineRevision === "number" ? flag.engineRevision : 0,
     fallbackTextSegments:
       typeof flag.fallbackTextSegments === "number" ? flag.fallbackTextSegments : 0,
   } as JournalTranslationFlag;
+}
+
+export function canReuseJournalTranslation(
+  flag: JournalTranslationFlag,
+  sourceHash: string,
+): boolean {
+  return flag.sourceHash === sourceHash &&
+    flag.engineRevision === TRANSLATION_ENGINE_REVISION;
 }
 
 interface TranslationTarget {
@@ -305,6 +317,7 @@ export async function translateJournalData(
       ...copy.flags?.[MODULE_ID],
       translation: {
         schemaVersion: TRANSLATION_SCHEMA_VERSION,
+        engineRevision: TRANSLATION_ENGINE_REVISION,
         sourceUuid: options.sourceUuid,
         sourceHash,
         providerId: options.settings.providerId,
