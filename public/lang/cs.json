@@ -85,6 +85,7 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress": "Stránka {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Missing": "Vybraný deník už ve světě neexistuje.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done": "Překlad je hotový: {pages} HTML stránek přeloženo, {skipped} nepodporovaných přeskočeno.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback": "Překlad je hotový s upozorněním: {pages} HTML stránek přeloženo, {skipped} nepodporovaných přeskočeno, {fallback} fragmentů po kontrole kvality ponecháno v originále.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Error": "Deník se nepodařilo přeložit.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Action": "Přeložit tento deník",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Zobrazit originál",

@@ -1,4 +1,5 @@
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
+import { logger } from "../logger";
 import { createTranslationProvider } from "../providers/factory";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
 import { getTranslatorSettings } from "../settings/settings";
@@ -124,6 +125,7 @@ export class JournalTranslationService {
         data: existing.toObject() as JournalData,
         translatedTextPages: existingFlag.translatedTextPages,
         skippedTextPages: existingFlag.skippedTextPages,
+        fallbackTextSegments: existingFlag.fallbackTextSegments,
         document: existing,
         reused: true,
       };
@@ -141,6 +143,9 @@ export class JournalTranslationService {
       },
       cache: new CompendiumTranslationCache(),
       systemHtmlFieldPaths: htmlFieldPaths,
+      onQualityFallback: (fallback) => {
+        logger.warn("Translation quality fallback kept the original fragment.", fallback);
+      },
       ...(this.#onProgress ? { onProgress: this.#onProgress } : {}),
     });
     await assertJournalSourceUnchanged(sourceDocument, sourceHash);

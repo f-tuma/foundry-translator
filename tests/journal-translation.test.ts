@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { TranslationProvider } from "../src/providers/types";
 import { MemoryTranslationCache } from "../src/translation/cache";
-import { translateJournalData, type JournalData } from "../src/translation/journal";
+import {
+  readJournalTranslationFlag,
+  translateJournalData,
+  type JournalData,
+} from "../src/translation/journal";
 
 const translationProvider: TranslationProvider = {
   async translate(request) {
@@ -23,6 +27,24 @@ const translationProvider: TranslationProvider = {
 };
 
 describe("Journal translation", () => {
+  it("reads older translation flags as having no quality fallbacks", () => {
+    expect(readJournalTranslationFlag({
+      "foundry-translate": {
+        translation: {
+          schemaVersion: 1,
+          sourceUuid: "JournalEntry.old",
+          sourceHash: "hash",
+          providerId: "chrome-local",
+          sourceLanguage: "en",
+          targetLanguage: "cs",
+          translatedAt: "2026-07-14T00:00:00.000Z",
+          translatedTextPages: 1,
+          skippedTextPages: 0,
+        },
+      },
+    })?.fallbackTextSegments).toBe(0);
+  });
+
   it("creates translated copy data while preserving HTML, Foundry syntax, and source", async () => {
     const { document } = parseHTML("<html><body></body></html>");
     const source: JournalData = {
@@ -122,6 +144,7 @@ describe("Journal translation", () => {
     expect(translated.data.pages[1]?.text?.markdown).toBe("# Raw markdown");
     expect(translated.translatedTextPages).toBe(1);
     expect(translated.skippedTextPages).toBe(1);
+    expect(translated.fallbackTextSegments).toBe(0);
     expect(translated.data.flags?.existing).toEqual({ keep: true });
     expect(translated.data.flags?.["foundry-translate"]?.translation).toMatchObject({
       schemaVersion: 1,
@@ -129,6 +152,63 @@ describe("Journal translation", () => {
       providerId: "chrome-local",
       sourceLanguage: "en",
       targetLanguage: "cs",
+      fallbackTextSegments: 0,
+    });
+  });
+
+  it("finishes the journal and reports a fragment kept in the original", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const source: JournalData = {
+      name: "Guide",
+      pages: [{
+        name: "Overview",
+        type: "text",
+        text: {
+          format: 1,
+          content: "<p>The heroes enter the castle.</p><p>Welcome home.</p>",
+        },
+      }],
+    };
+    const qualityFallback = vi.fn();
+    const provider: TranslationProvider = {
+      async translate({ texts }) {
+        return texts.map((text) => ({
+          translatedText: text
+            .replace("Guide", "Průvodce")
+            .replace("Overview", "Přehled")
+            .replace("Welcome home", "Vítejte doma"),
+        }));
+      },
+      async testConnection() {},
+    };
+
+    const translated = await translateJournalData({
+      source,
+      sourceUuid: "JournalEntry.guide",
+      glossary: [],
+      provider,
+      settings: {
+        providerId: "chrome-local",
+        sourceLanguage: "en",
+        targetLanguage: "cs",
+      },
+      ownerDocument: document,
+      nonceFactory: () => "GRACEFUL",
+      onQualityFallback: qualityFallback,
+    });
+
+    expect(translated.data.name).toBe("Průvodce [CS]");
+    expect(translated.data.pages[0]?.name).toBe("Přehled");
+    expect(translated.data.pages[0]?.text?.content).toBe(
+      "<p>The heroes enter the castle.</p><p>Vítejte doma.</p>",
+    );
+    expect(translated.fallbackTextSegments).toBe(1);
+    expect(qualityFallback).toHaveBeenCalledWith(expect.objectContaining({
+      reason: "unchanged",
+      attempts: 3,
+    }));
+    expect(translated.data.flags?.["foundry-translate"]?.translation).toMatchObject({
+      fallbackTextSegments: 1,
     });
   });
 

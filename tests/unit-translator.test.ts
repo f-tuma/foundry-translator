@@ -295,19 +295,74 @@ describe("translation units", () => {
     expect(calls).toBe(2);
   });
 
-  it("fails closed after three suspicious unchanged translations", async () => {
+  it("keeps the original fragment after three suspicious unchanged translations", async () => {
     let calls = 0;
-    await expect(translateUnits({
-      units: [["The heroes enter the castle."]],
+    const fallbacks: Array<{ reason: string; attempts: number; occurrences: number }> = [];
+    const cache = new MemoryTranslationCache();
+    const options = {
+      units: [
+        ["The heroes enter the castle."],
+        ["The heroes enter the castle."],
+      ],
       glossary: [],
       provider: provider((text) => {
         calls += 1;
         return text;
       }),
       settings,
+      cache,
       nonceFactory: () => "UNCHANGED",
-    })).rejects.toThrow(/původním jazyce.*3 pokusech/u);
+      onQualityFallback: (fallback: {
+        reason: string;
+        attempts: number;
+        occurrences: number;
+      }) => {
+        fallbacks.push({
+          reason: fallback.reason,
+          attempts: fallback.attempts,
+          occurrences: fallback.occurrences,
+        });
+      },
+    } as const;
+
+    await expect(translateUnits(options)).resolves.toEqual([
+      ["The heroes enter the castle."],
+      ["The heroes enter the castle."],
+    ]);
     expect(calls).toBe(3);
+    expect(fallbacks).toEqual([{ reason: "unchanged", attempts: 3, occurrences: 2 }]);
+
+    await expect(translateUnits(options)).resolves.toEqual([
+      ["The heroes enter the castle."],
+      ["The heroes enter the castle."],
+    ]);
+    expect(calls).toBe(6);
+  });
+
+  it("keeps the original when a fragment-only retry request fails", async () => {
+    let calls = 0;
+    const fallbacks: Array<{ reason: string; attempts: number }> = [];
+    const source = "The heroes enter the castle.";
+    const translationProvider: TranslationProvider = {
+      async translate({ texts }) {
+        calls += 1;
+        if (calls > 1) throw new Error("Temporary retry failure");
+        return texts.map((text) => ({ translatedText: text }));
+      },
+      async testConnection() {},
+    };
+
+    await expect(translateUnits({
+      units: [[source]],
+      glossary: [],
+      provider: translationProvider,
+      settings,
+      nonceFactory: () => "RETRYFAILURE",
+      onQualityFallback: ({ reason, attempts }) => fallbacks.push({ reason, attempts }),
+    })).resolves.toEqual([[source]]);
+
+    expect(calls).toBe(2);
+    expect(fallbacks).toEqual([{ reason: "provider", attempts: 2 }]);
   });
 
   it("retries a damaged Foundry syntax token before restoring the document", async () => {
@@ -367,18 +422,39 @@ describe("translation units", () => {
     expect(calls).toBe(1);
   });
 
-  it("still rejects a sentence that only starts with a capital letter", async () => {
+  it("preserves a URL-like reference without sending it to the provider", async () => {
     let calls = 0;
     await expect(translateUnits({
-      units: [["The heroes enter the castle."]],
+      units: [["https foundryvtt com releases 14 358"]],
       glossary: [],
       provider: provider((text) => {
         calls += 1;
         return text;
       }),
       settings,
-      nonceFactory: () => "NOTATITLE",
-    })).rejects.toThrow(/původním jazyce.*3 pokusech/u);
+      nonceFactory: () => "URLREFERENCE",
+    })).resolves.toEqual([["https foundryvtt com releases 14 358"]]);
+    expect(calls).toBe(0);
+  });
+
+  it("restores the source after three damaged protection-token translations", async () => {
+    let calls = 0;
+    const fallbacks: string[] = [];
+    const source = "Open @UUID[JournalEntry.abc]{the journal}.";
+    const result = await translateUnits({
+      units: [[source]],
+      glossary: [],
+      provider: provider((text) => {
+        calls += 1;
+        return text.replace(/__FTS_[A-Z0-9_]+__/u, "");
+      }),
+      settings,
+      nonceFactory: () => "DAMAGEDFALLBACK",
+      onQualityFallback: ({ reason }) => fallbacks.push(reason),
+    });
+
+    expect(result).toEqual([[source]]);
     expect(calls).toBe(3);
+    expect(fallbacks).toEqual(["integrity"]);
   });
 });

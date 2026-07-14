@@ -253,6 +253,14 @@
   background: var(--ft-color-success);
 }
 
+.ft-connection-status[data-state="warning"] {
+  color: var(--ft-color-warning);
+}
+
+.ft-connection-status[data-state="warning"] .ft-connection-status__dot {
+  background: var(--ft-color-warning);
+}
+
 .ft-connection-status[data-state="error"] {
   color: var(--ft-color-danger);
 }

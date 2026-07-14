@@ -6,7 +6,10 @@ import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
-import { translateUnits } from "./unit-translator";
+import {
+  translateUnits,
+  type TranslationQualityFallback,
+} from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
 const HTML_FORMAT = 1;
@@ -57,6 +60,7 @@ export interface TranslateJournalOptions {
   nonceFactory?: () => string;
   systemHtmlFieldPaths?: readonly (readonly HtmlFieldPath[])[];
   onProgress?: (progress: JournalTranslationProgress) => void;
+  onQualityFallback?: (fallback: TranslationQualityFallback) => void;
 }
 
 export interface JournalTranslationProgress {
@@ -72,6 +76,7 @@ export interface TranslatedJournal {
   data: JournalData;
   translatedTextPages: number;
   skippedTextPages: number;
+  fallbackTextSegments: number;
 }
 
 export interface JournalTranslationFlag {
@@ -84,6 +89,7 @@ export interface JournalTranslationFlag {
   translatedAt: string;
   translatedTextPages: number;
   skippedTextPages: number;
+  fallbackTextSegments: number;
 }
 
 export function readJournalTranslationFlag(
@@ -105,7 +111,11 @@ export function readJournalTranslationFlag(
   ) {
     return null;
   }
-  return flag as JournalTranslationFlag;
+  return {
+    ...flag,
+    fallbackTextSegments:
+      typeof flag.fallbackTextSegments === "number" ? flag.fallbackTextSegments : 0,
+  } as JournalTranslationFlag;
 }
 
 interface TranslationTarget {
@@ -124,6 +134,7 @@ async function translateTargets(
   options: TranslateJournalOptions,
   targets: TranslationTarget[],
   htmlTargets: readonly HtmlTranslationTarget[],
+  onQualityFallback: (fallback: TranslationQualityFallback) => void,
 ): Promise<void> {
   const translatedUnits = await translateUnits({
     units: targets.map(({ segments }) => segments),
@@ -132,6 +143,7 @@ async function translateTargets(
     settings: options.settings,
     ...(options.cache ? { cache: options.cache } : {}),
     ...(options.nonceFactory ? { nonceFactory: options.nonceFactory } : {}),
+    onQualityFallback,
   });
 
   targets.forEach((target, index) => {
@@ -178,13 +190,18 @@ export async function translateJournalData(
 
   let translatedTextPages = 0;
   let skippedTextPages = 0;
+  let fallbackTextSegments = 0;
+  const recordQualityFallback = (fallback: TranslationQualityFallback): void => {
+    fallbackTextSegments += fallback.occurrences;
+    options.onQualityFallback?.(fallback);
+  };
 
   await translateTargets(options, [{
     segments: [copy.name],
     apply: ([translatedName]) => {
       copy.name = `${translatedName ?? copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
     },
-  }], []);
+  }], [], recordQualityFallback);
 
   if (copy.categories?.length) {
     const categoryTargets = copy.categories.map<TranslationTarget>((category) => ({
@@ -194,7 +211,7 @@ export async function translateJournalData(
       },
     }));
     try {
-      await translateTargets(options, categoryTargets, []);
+      await translateTargets(options, categoryTargets, [], recordQualityFallback);
     } catch (error) {
       const detail = error instanceof Error ? ` ${error.message}` : "";
       throw new Error(
@@ -260,7 +277,7 @@ export async function translateJournalData(
     }
 
     try {
-      await translateTargets(options, targets, htmlTargets);
+      await translateTargets(options, targets, htmlTargets, recordQualityFallback);
     } catch (error) {
       const detail = error instanceof Error ? ` ${error.message}` : "";
       throw new Error(
@@ -296,9 +313,10 @@ export async function translateJournalData(
         translatedAt: new Date().toISOString(),
         translatedTextPages,
         skippedTextPages,
+        fallbackTextSegments,
       },
     },
   };
 
-  return { data: copy, translatedTextPages, skippedTextPages };
+  return { data: copy, translatedTextPages, skippedTextPages, fallbackTextSegments };
 }

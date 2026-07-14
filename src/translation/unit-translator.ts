@@ -19,6 +19,7 @@ const MAX_CHROME_UNITS_PER_REQUEST = 16;
 const QUALITY_ATTEMPTS = 3;
 export const MAX_REQUEST_CHARACTERS = 4_500;
 const PROTECTION_TOKEN = /__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__/giu;
+const URL_TLDS = new Set(["com", "org", "net", "io", "cz", "dev"]);
 const SOURCE_LANGUAGE_HINTS: Readonly<Record<string, ReadonlySet<string>>> = {
   en: new Set([
     "a", "an", "and", "are", "as", "at", "be", "for", "from", "in", "is", "of",
@@ -51,6 +52,15 @@ export interface TranslateUnitsOptions {
   settings: TranslationUnitSettings;
   cache?: TranslationCache;
   nonceFactory?: () => string;
+  onQualityFallback?: (fallback: TranslationQualityFallback) => void;
+}
+
+export interface TranslationQualityFallback {
+  sourcePreview: string;
+  reason: "empty" | "integrity" | "provider" | "unchanged";
+  detail: string;
+  attempts: number;
+  occurrences: number;
 }
 
 interface PreparedUnit {
@@ -66,6 +76,16 @@ interface PreparedSegment {
   protection: ReturnType<typeof protectGlossaryTerms>;
   leading: string;
   trailing: string;
+}
+
+interface TranslationProblem {
+  reason: TranslationQualityFallback["reason"];
+  detail: string;
+}
+
+interface CheckedSegments {
+  segments: readonly string[];
+  usedFallback: boolean;
 }
 
 function glossarySnapshot(entries: readonly GlossaryEntry[]): string {
@@ -132,6 +152,12 @@ function looksLikeProperTitle(
   return namedWords >= 2;
 }
 
+function looksLikeUrlReference(source: string): boolean {
+  const words = visibleSourceWords(source).map((word) => word.toLocaleLowerCase());
+  if (words[0] !== "http" && words[0] !== "https" && words[0] !== "www") return false;
+  return words.some((word) => URL_TLDS.has(word));
+}
+
 function suspiciouslyUnchanged(
   source: string,
   translated: string,
@@ -145,6 +171,7 @@ function suspiciouslyUnchanged(
   const words = sourceText.match(/[\p{L}\p{N}]+/gu) ?? [];
   const letters = (sourceText.match(/\p{L}/gu) ?? []).length;
   if (letters < 8 || words.length < 2) return false;
+  if (looksLikeUrlReference(source)) return false;
   if (looksLikeProperTitle(source, settings)) return false;
   if (words.length >= 5 && letters >= 20) return true;
 
@@ -157,19 +184,25 @@ function translationProblem(
   prepared: PreparedSegment,
   translated: string,
   settings: TranslationUnitSettings,
-): string | null {
+): TranslationProblem | null {
   if (!translated.trim() && comparableText(prepared.protection.text)) {
-    return "Překladač vrátil prázdný text.";
+    return { reason: "empty", detail: "Překladač vrátil prázdný text." };
   }
   try {
     const glossaryRestored = restoreGlossaryTerms(translated, prepared.protection);
     restoreFoundrySyntax(glossaryRestored, prepared.syntax);
   } catch (error) {
-    return error instanceof Error ? error.message : "Překladač poškodil ochranné tokeny.";
+    return {
+      reason: "integrity",
+      detail: error instanceof Error ? error.message : "Překladač poškodil ochranné tokeny.",
+    };
   }
   if (suspiciouslyUnchanged(prepared.protection.text, translated, settings)) {
     const preview = comparableText(prepared.protection.text).slice(0, 100);
-    return `Překladač ponechal text v původním jazyce: „${preview}“.`;
+    return {
+      reason: "unchanged",
+      detail: `Překladač ponechal text v původním jazyce: „${preview}“.`,
+    };
   }
   return null;
 }
@@ -179,8 +212,10 @@ async function retrySuspiciousSegments(
   protectedSegments: readonly string[],
   provider: TranslationProvider,
   settings: TranslationUnitSettings,
-): Promise<readonly string[]> {
+  onQualityFallback?: (fallback: TranslationQualityFallback) => void,
+): Promise<CheckedSegments> {
   const checked: string[] = [];
+  let usedFallback = false;
   for (const [index, initial] of protectedSegments.entries()) {
     const preparedSegment = prepared.segments[index];
     if (!preparedSegment) throw new Error("Chybí metadata kontrolovaného překladu.");
@@ -189,27 +224,40 @@ async function retrySuspiciousSegments(
     let attempt = 1;
     let problem = translationProblem(preparedSegment, candidate, settings);
     while (attempt < QUALITY_ATTEMPTS && problem) {
-      const [retry] = await provider.translate({
-        texts: [source],
-        sourceLanguage: settings.sourceLanguage,
-        targetLanguage: settings.targetLanguage,
-        format: "text",
-      });
-      if (!retry || typeof retry.translatedText !== "string" || !retry.translatedText.trim()) {
-        throw new Error("Překladač vrátil při kontrole kvality prázdný výsledek.");
-      }
-      candidate = retry.translatedText;
       attempt += 1;
-      problem = translationProblem(preparedSegment, candidate, settings);
+      try {
+        const [retry] = await provider.translate({
+          texts: [source],
+          sourceLanguage: settings.sourceLanguage,
+          targetLanguage: settings.targetLanguage,
+          format: "text",
+        });
+        candidate = typeof retry?.translatedText === "string" ? retry.translatedText : "";
+        problem = translationProblem(preparedSegment, candidate, settings);
+      } catch (error) {
+        problem = {
+          reason: "provider",
+          detail: error instanceof Error
+            ? error.message
+            : "Opravný překlad fragmentu selhal.",
+        };
+        break;
+      }
     }
     if (problem) {
-      throw new Error(
-        `${problem} Kontrola selhala i po ${QUALITY_ATTEMPTS} pokusech.`,
-      );
+      usedFallback = true;
+      onQualityFallback?.({
+        sourcePreview: comparableText(source).slice(0, 100),
+        reason: problem.reason,
+        detail: problem.detail,
+        attempts: attempt,
+        occurrences: prepared.indices.length,
+      });
+      candidate = source;
     }
     checked.push(candidate);
   }
-  return checked;
+  return { segments: checked, usedFallback };
 }
 
 function createBoundaryTokens(segmentCount: number, nonce: string): string[] {
@@ -367,6 +415,10 @@ export async function translateUnits(
   }
 
   for (const { index, segments, key } of keyedUnits) {
+    if (segments.length > 0 && segments.every((segment) => looksLikeUrlReference(segment))) {
+      translated[index] = segments;
+      continue;
+    }
     const cached = cachedValues.get(key);
     if (cached && cached.length === segments.length) {
       translated[index] = cached;
@@ -429,19 +481,25 @@ export async function translateUnits(
           );
         } catch (error) {
           if (!(error instanceof GlossaryIntegrityError)) throw error;
-          protectedSegments = await translateSegmentsSeparately(
-            prepared,
-            options.provider,
-            options.settings,
-          );
+          try {
+            protectedSegments = await translateSegmentsSeparately(
+              prepared,
+              options.provider,
+              options.settings,
+            );
+          } catch {
+            protectedSegments = prepared.segments.map(({ protection }) => protection.text);
+          }
         }
       }
-      protectedSegments = await retrySuspiciousSegments(
+      const checked = await retrySuspiciousSegments(
         prepared,
         protectedSegments,
         options.provider,
         options.settings,
+        options.onQualityFallback,
       );
+      protectedSegments = checked.segments;
       const segments = protectedSegments.map((segment, index) => {
         const preparedSegment = prepared.segments[index];
         if (!preparedSegment) throw new Error("Chybí ochrana přeloženého HTML segmentu.");
@@ -450,7 +508,9 @@ export async function translateUnits(
         return `${preparedSegment.leading}${restored}${preparedSegment.trailing}`;
       });
       for (const index of prepared.indices) translated[index] = segments;
-      cacheWrites.push({ key: prepared.key, translatedSegments: segments });
+      if (!checked.usedFallback) {
+        cacheWrites.push({ key: prepared.key, translatedSegments: segments });
+      }
     }
 
     if (options.cache?.setMany) {

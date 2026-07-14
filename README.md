@@ -3,10 +3,10 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.8.1` processes
+> The module is currently an early development build. Version `0.8.2` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
-> safely translates human text inside Foundry embeds, resumes from the server
-> cache after failures, and reports live page progress.
+> safely keeps an isolated failed fragment in the original, translates human text
+> inside Foundry embeds, resumes from the server cache, and reports live progress.
 
 ## Installation
 
@@ -126,7 +126,7 @@ component updater and can produce a false TranslateKit failure. `FOUNDRY_URL`,
 `CHROMIUM_PATH`, `CHROMIUM_PROFILE`, `SOURCE_LANGUAGE`, and `TARGET_LANGUAGE` can
 be overridden through environment variables.
 
-The production module is generated in `dist/`. A release tag such as `v0.8.1`
+The production module is generated in `dist/`. A release tag such as `v0.8.2`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 

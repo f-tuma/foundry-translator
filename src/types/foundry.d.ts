@@ -154,6 +154,7 @@ declare const ui: {
   notifications: {
     info(message: string, options?: { localize?: boolean; permanent?: boolean }): unknown;
     success(message: string, options?: { localize?: boolean }): unknown;
+    warn(message: string, options?: { localize?: boolean; permanent?: boolean }): unknown;
     error(message: string, options?: { localize?: boolean; permanent?: boolean }): unknown;
   };
 };

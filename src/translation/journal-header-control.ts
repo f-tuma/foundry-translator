@@ -26,10 +26,14 @@ function localized(key: string): string {
   return game.i18n.localize(key);
 }
 
-function formatDoneMessage(pages: number, skipped: number): string {
-  return localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.Done")
+function formatDoneMessage(pages: number, skipped: number, fallback: number): string {
+  const key = fallback > 0
+    ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback"
+    : "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done";
+  return localized(key)
     .replace("{pages}", String(pages))
-    .replace("{skipped}", String(skipped));
+    .replace("{skipped}", String(skipped))
+    .replace("{fallback}", String(fallback));
 }
 
 function formatProgress(progress: JournalTranslationProgress): string {
@@ -98,8 +102,13 @@ async function translateFromHeader(
       },
     });
     const result = await service.translate(journal);
-    const message = formatDoneMessage(result.translatedTextPages, result.skippedTextPages);
-    ui.notifications.success(message);
+    const message = formatDoneMessage(
+      result.translatedTextPages,
+      result.skippedTextPages,
+      result.fallbackTextSegments,
+    );
+    if (result.fallbackTextSegments > 0) ui.notifications.warn(message, { permanent: true });
+    else ui.notifications.success(message);
     await showDocument(application, result.document);
   } catch (error) {
     logger.error("Journal translation from its header failed.", error);

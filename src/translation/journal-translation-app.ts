@@ -4,7 +4,7 @@ import { getTranslatorSettings } from "../settings/settings";
 import { JournalTranslationService } from "./journal-service";
 import { renderJournalTranslationView } from "./journal-translation-view";
 
-type TranslationState = "idle" | "testing" | "success" | "error";
+type TranslationState = "idle" | "testing" | "success" | "warning" | "error";
 
 export class JournalTranslationApplication extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -62,12 +62,21 @@ export class JournalTranslationApplication extends foundry.applications.api.Appl
         },
       });
       const result = await service.translate(journal);
-      const template = game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.Done");
+      const doneKey = result.fallbackTextSegments > 0
+        ? "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback"
+        : "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done";
+      const template = game.i18n.localize(doneKey);
       const message = template
         .replace("{pages}", String(result.translatedTextPages))
-        .replace("{skipped}", String(result.skippedTextPages));
-      this.#setStatus("success", message, false);
-      ui.notifications.success(message);
+        .replace("{skipped}", String(result.skippedTextPages))
+        .replace("{fallback}", String(result.fallbackTextSegments));
+      if (result.fallbackTextSegments > 0) {
+        this.#setStatus("warning", message, false);
+        ui.notifications.warn(message, { permanent: true });
+      } else {
+        this.#setStatus("success", message, false);
+        ui.notifications.success(message);
+      }
       result.document.sheet?.render(true);
     } catch (error) {
       logger.error("Journal translation failed.", error);

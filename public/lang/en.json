@@ -85,6 +85,7 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress": "Page {current}/{total}: {page}",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Missing": "The selected journal no longer exists in the world.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Done": "Translation ready: {pages} HTML pages translated, {skipped} unsupported pages skipped.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.DoneWithFallback": "Translation ready with warnings: {pages} HTML pages translated, {skipped} unsupported pages skipped, {fallback} fragments kept in the original after quality checks.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.Error": "The journal could not be translated.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Action": "Translate this journal",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Show original",
