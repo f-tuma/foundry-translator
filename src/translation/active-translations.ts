@@ -8,6 +8,7 @@ export type ActiveTranslationState = "scanning" | "translating" | "done" | "erro
 export interface TranslationRunIssue {
   type: "fallback" | "unresolved" | "unsupported" | "failed";
   documentName?: string;
+  documentType?: string;
   sourceUuid?: string;
   parentUuid?: string;
   reason?: string;
@@ -31,6 +32,8 @@ export interface ActiveTranslationRun {
   currentUnit?: string;
   error?: string;
   issues: TranslationRunIssue[];
+  /** Issues beyond the per-run cap are counted instead of stored. */
+  droppedIssues?: number;
 }
 
 const FINISHED_RUN_RETENTION_MS = 10 * 60 * 1000;
@@ -70,7 +73,11 @@ export class ActiveTranslationRegistry {
 
   addIssue(id: number, issue: TranslationRunIssue): void {
     const run = this.#runs.get(id);
-    if (!run || run.issues.length >= MAX_ISSUES_PER_RUN) return;
+    if (!run) return;
+    if (run.issues.length >= MAX_ISSUES_PER_RUN) {
+      run.droppedIssues = (run.droppedIssues ?? 0) + 1;
+      return;
+    }
     run.issues.push(issue);
     this.#notify();
   }
@@ -112,6 +119,19 @@ export class ActiveTranslationRegistry {
   }
 }
 
+function issueDescription(issue: TranslationRunIssue): string | null {
+  switch (issue.type) {
+    case "unresolved":
+      return "The reference could not be resolved; it stays pointing at the source.";
+    case "unsupported":
+      return `Recursive translation of ${issue.documentType ?? "this"} documents is not supported yet; the reference stays at the source.`;
+    case "failed":
+      return "The dependent document failed to translate; its references stay at the source.";
+    default:
+      return issue.detail ?? null;
+  }
+}
+
 /** Builds a plain-text, copy-friendly debug log for a translation run. */
 export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): string {
   const lines: string[] = [
@@ -123,11 +143,12 @@ export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): 
     ...(run.plan
       ? [`Scope: ${run.plan.totalDocuments} documents, ${run.plan.totalUnits} units; completed ${run.completedUnits} units in ${run.completedDocuments} documents`]
       : []),
-    `Issues: ${run.issues.length}`,
+    `Issues: ${run.issues.length}${run.droppedIssues ? ` (+${run.droppedIssues} more were not recorded)` : ""}`,
   ];
   run.issues.forEach((issue, index) => {
+    const type = issue.documentType ? `${issue.type}:${issue.documentType}` : issue.type;
     const parts = [
-      `${index + 1}. [${issue.type}]`,
+      `${index + 1}. [${type}]`,
       issue.documentName ?? issue.sourceUuid ?? "",
       issue.reason ? `reason=${issue.reason}` : "",
       issue.attempts !== undefined ? `attempts=${issue.attempts}` : "",
@@ -136,7 +157,8 @@ export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): 
     ].filter(Boolean);
     lines.push(parts.join(" "));
     if (issue.sourcePreview) lines.push(`   source: ${issue.sourcePreview}`);
-    if (issue.detail) lines.push(`   detail: ${issue.detail}`);
+    const description = issueDescription(issue);
+    if (description) lines.push(`   detail: ${description}`);
   });
   return lines.join("\n");
 }

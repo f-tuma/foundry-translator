@@ -73,17 +73,36 @@ describe("Active translation registry", () => {
       type: "unresolved",
       sourceUuid: "Actor.missing",
       parentUuid: "JournalEntry.guide",
-      detail: "Odkaz Actor.missing se nepodařilo najít.",
+    });
+    registry.addIssue(id, {
+      type: "unsupported",
+      sourceUuid: "Scene.somewhere",
+      parentUuid: "JournalEntry.guide",
+      documentType: "Scene",
     });
     registry.finish(id);
 
     const log = formatRunLog(registry.get(id)!, "0.11.0");
     expect(log).toContain("Foundry Translate 0.11.0");
     expect(log).toContain("Document: Guide -> cs");
-    expect(log).toContain("Issues: 2");
+    expect(log).toContain("Issues: 3");
     expect(log).toContain("1. [fallback] Guide reason=unchanged attempts=3 occurrences=2");
     expect(log).toContain("   source: Shard of Fear");
     expect(log).toContain("2. [unresolved] Actor.missing in=JournalEntry.guide");
+    expect(log).toContain("   detail: The reference could not be resolved");
+    expect(log).toContain("3. [unsupported:Scene] Scene.somewhere in=JournalEntry.guide");
+    expect(log).toContain("Recursive translation of Scene documents is not supported yet");
+  });
+
+  it("counts issues beyond the cap instead of storing them", () => {
+    const registry = new ActiveTranslationRegistry(() => 0);
+    const id = registry.start("Guide", "cs");
+    for (let index = 0; index < 505; index += 1) {
+      registry.addIssue(id, { type: "unresolved", sourceUuid: `Actor.${index}` });
+    }
+    expect(registry.get(id)?.issues).toHaveLength(500);
+    expect(registry.get(id)?.droppedIssues).toBe(5);
+    expect(formatRunLog(registry.get(id)!, "x")).toContain("Issues: 500 (+5 more were not recorded)");
   });
 
   it("estimates the remaining time from completed units", () => {

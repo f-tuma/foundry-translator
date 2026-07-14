@@ -1,6 +1,11 @@
 import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
+import { getTranslatorSettings } from "../settings/settings";
 import { openActiveTranslationsOverview } from "./active-translations-app";
+import {
+  TRANSLATION_FLAG_PATH,
+  TRANSLATIONS_PACK_ID,
+} from "./compendium-translation-repository";
 import { readJournalTranslationFlag, type JournalTranslationProgress } from "./journal";
 import { JournalTranslationService } from "./journal-service";
 
@@ -173,6 +178,51 @@ async function translateFromHeader(
   }
 }
 
+/**
+ * Adds a small icon button that switches to an already stored translation
+ * without starting a new translation run. Async because the stored
+ * translation is looked up in the compendium index; the pack is never
+ * created by this lookup.
+ */
+export async function addShowTranslationHeaderButton(
+  application: JournalEntrySheetApplication,
+): Promise<void> {
+  if (!game.user?.isGM) return;
+  const journal = worldJournal(application.entry);
+  const frame = application.window;
+  if (!journal || sourceJournal(application.entry) || !frame) return;
+  if (frame.header.querySelector(".ft-journal-show-translation")) return;
+
+  const pack = game.packs.get(TRANSLATIONS_PACK_ID);
+  if (!pack) return;
+  const targetLanguage = getTranslatorSettings().targetLanguage;
+  const index = await pack.getIndex({ fields: [TRANSLATION_FLAG_PATH] });
+  const entry = [...index.values()].find((candidate) => {
+    const flag = readJournalTranslationFlag(candidate.flags);
+    return flag?.sourceUuid === journal.uuid && flag.targetLanguage === targetLanguage;
+  });
+  if (!entry) return;
+  if (!frame.header.isConnected || frame.header.querySelector(".ft-journal-show-translation")) {
+    return;
+  }
+
+  const label = localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.ShowTranslation");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "header-control icon fa-solid fa-book-open ft-journal-show-translation";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", () => {
+    void pack.getDocument(entry._id).then((translated) => {
+      if (translated) return showDocument(application, translated as FoundryJournalDocument);
+      return undefined;
+    });
+  });
+  const translateButton = frame.header.querySelector(".ft-journal-translate-header");
+  if (translateButton) translateButton.before(button);
+  else frame.controls.before(button);
+}
+
 export function addJournalTranslationHeaderButton(
   application: JournalEntrySheetApplication,
 ): void {
@@ -252,4 +302,9 @@ export function addJournalTranslationHeaderControl(
 export function registerJournalTranslationHeaderControl(): void {
   Hooks.on("getHeaderControlsJournalEntrySheet", addJournalTranslationHeaderControl);
   Hooks.on("renderJournalEntrySheet", addJournalTranslationHeaderButton);
+  Hooks.on("renderJournalEntrySheet", (application: JournalEntrySheetApplication) => {
+    addShowTranslationHeaderButton(application).catch((error) => {
+      logger.warn("Stored-translation header button could not be added.", error);
+    });
+  });
 }

@@ -69,6 +69,7 @@ export interface JournalDependencyWarning {
   sourceUuid: string;
   parentUuid: string;
   message: string;
+  documentType?: string;
 }
 
 type GraphSourceDocument =
@@ -393,7 +394,7 @@ export class JournalTranslationService {
         type: warning.kind,
         sourceUuid: warning.sourceUuid,
         parentUuid: warning.parentUuid,
-        detail: warning.message,
+        ...(warning.documentType ? { documentType: warning.documentType } : {}),
       });
     };
     const nodeFor = (document: GraphSourceDocument): JournalGraphNode => {
@@ -430,11 +431,30 @@ export class JournalTranslationService {
             fieldPath[0] === "pages" && selectedIndexes.has(fieldPath[1] as number));
         }
         for (const reference of references) {
+          // Relative references (`.pageId`, `.pageId#anchor`) inside a page are
+          // written relative to that page, so the page must be the anchor;
+          // the whole entry only works for explicit two-part relative UUIDs.
+          const anchors: FoundryUuidDocument[] = [];
+          if (
+            reference.sourceUuid.startsWith(".") &&
+            isJournalDocument(document) &&
+            reference.fieldPath[0] === "pages"
+          ) {
+            const page = (document as FoundryJournalWorldDocument & {
+              pages?: { contents?: FoundryUuidDocument[] };
+            }).pages?.contents?.[reference.fieldPath[1] as number];
+            if (page) anchors.push(page);
+          }
+          anchors.push(document);
+
           let resolved: FoundryUuidDocument | null = null;
-          try {
-            resolved = await fromUuid(reference.sourceUuid, { relative: document });
-          } catch (error) {
-            logger.warn("Foundry UUID resolution failed.", { reference, error });
+          for (const anchor of anchors) {
+            try {
+              resolved = await fromUuid(reference.sourceUuid, { relative: anchor });
+            } catch (error) {
+              logger.warn("Foundry UUID resolution failed.", { reference, error });
+            }
+            if (resolved) break;
           }
           if (!resolved) {
             addWarning({
@@ -452,6 +472,7 @@ export class JournalTranslationService {
               sourceUuid: reference.sourceUuid,
               parentUuid: document.uuid,
               message: `Rekurzivní překlad typu ${root.documentName} zatím není podporovaný; odkaz zůstal v originále.`,
+              ...(root.documentName ? { documentType: root.documentName } : {}),
             });
             continue;
           }

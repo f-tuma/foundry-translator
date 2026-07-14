@@ -49,7 +49,7 @@
   font-size: 12px;
 }
 
-:is(.minimizing, .minimized) .ft-journal-translate-header {
+:is(.minimizing, .minimized) :is(.ft-journal-translate-header, .ft-journal-show-translation) {
   display: none;
 }
 

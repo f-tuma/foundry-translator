@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addJournalTranslationHeaderButton,
   addJournalTranslationHeaderControl,
+  addShowTranslationHeaderButton,
 } from "../src/translation/journal-header-control";
 
 function journal(id = "journal-id"): FoundryJournalWorldDocument {
@@ -51,6 +52,62 @@ describe("Journal header translation action", () => {
     });
     expect(header.querySelectorAll(".ft-journal-translate-header")).toHaveLength(1);
     expect(header.firstElementChild?.textContent).toContain("Přeložit tento deník");
+  });
+
+  it("adds a switch-to-translation button only when a stored translation exists", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const source = journal();
+    const header = document.createElement("header");
+    document.body.append(header);
+    const controlsButton = document.createElement("button");
+    header.append(controlsButton);
+    vi.stubGlobal("document", document);
+    const translationFlag = {
+      schemaVersion: 1,
+      engineRevision: 3,
+      sourceUuid: source.uuid,
+      sourceHash: "hash",
+      providerId: "chrome-local",
+      sourceLanguage: "en",
+      targetLanguage: "cs",
+      translatedAt: "2026-07-14T00:00:00.000Z",
+      translatedTextPages: 1,
+      skippedTextPages: 0,
+      fallbackTextSegments: 0,
+      partial: false,
+    };
+    const pack = {
+      getIndex: vi.fn().mockResolvedValue(new Map([[
+        "translated-id",
+        { _id: "translated-id", flags: { "foundry-translate": { translation: translationFlag } } },
+      ]])),
+      getDocument: vi.fn(),
+    };
+    vi.stubGlobal("game", {
+      user: { isGM: true },
+      journal: { contents: [source] },
+      i18n: { localize: (key: string) => key },
+      packs: new Map([["world.foundry-translate-translations", pack]]),
+      settings: { get: (_m: string, key: string) => (key === "targetLanguage" ? "cs" : "") },
+    });
+
+    const application = { entry: source, window: { header, controls: controlsButton } };
+    await addShowTranslationHeaderButton(application);
+    await addShowTranslationHeaderButton(application);
+    expect(header.querySelectorAll(".ft-journal-show-translation")).toHaveLength(1);
+
+    // A journal without a stored translation gets no button.
+    const other = journal("other");
+    const otherHeader = document.createElement("header");
+    document.body.append(otherHeader);
+    const otherControls = document.createElement("button");
+    otherHeader.append(otherControls);
+    (game.journal.contents as FoundryJournalWorldDocument[]).push(other);
+    await addShowTranslationHeaderButton({
+      entry: other,
+      window: { header: otherHeader, controls: otherControls },
+    });
+    expect(otherHeader.querySelector(".ft-journal-show-translation")).toBeNull();
   });
 
   it("does not add translation actions for a player or a non-world journal", () => {

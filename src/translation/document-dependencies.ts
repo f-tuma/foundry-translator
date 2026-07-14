@@ -17,7 +17,10 @@ const FOUNDRY_REFERENCE = /@(?<kind>UUID|Embed)\[(?<body>[^\]\r\n]*)\]/giu;
 const DATA_UUID = /(?<prefix>\bdata-uuid\s*=\s*)(?<quote>["'])(?<uuid>[^"']+)\k<quote>/giu;
 
 function referenceUuid(body: string): string | null {
-  const uuid = body.trim().split(/\s+/u, 1)[0] ?? "";
+  const token = body.trim().split(/\s+/u, 1)[0] ?? "";
+  // Anchors such as `JournalEntry.X.JournalEntryPage.Y#section` are not part
+  // of the UUID; strip them so the reference resolves and rewriting keeps them.
+  const uuid = token.split("#", 1)[0] ?? "";
   return uuid && !uuid.includes("=") ? uuid : null;
 }
 

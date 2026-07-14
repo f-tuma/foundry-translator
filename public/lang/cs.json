@@ -99,6 +99,7 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage": "Přeložit tuto stránku",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.NoActivePage": "Nepodařilo se určit aktivní stránku deníku.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Zobrazit originál",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.ShowTranslation": "Přepnout na uložený překlad",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting": "Foundry Translate připravuje tento deník…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading": "Chrome stahuje lokální překladový model. Překlad bude automaticky pokračovat…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "Tento deník se už překládá.",

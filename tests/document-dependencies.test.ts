@@ -43,6 +43,35 @@ describe("document dependency discovery", () => {
     ]);
   });
 
+  it("strips anchors when discovering and keeps them when rewriting", () => {
+    const dependencies = discoverDocumentDependencies(
+      "<p>@UUID[JournalEntry.guide.JournalEntryPage.intro#resurrection]{Rules}</p>" +
+      "<p>@UUID[.pageId#section]{Local}</p>",
+    );
+    expect(dependencies).toMatchObject([
+      { sourceUuid: "JournalEntry.guide.JournalEntryPage.intro" },
+      { sourceUuid: ".pageId" },
+    ]);
+
+    const source: JournalData = {
+      name: "Guide",
+      pages: [{
+        name: "Page",
+        type: "text",
+        text: { content: "@UUID[JournalEntry.guide.JournalEntryPage.intro#resurrection]{Rules}" },
+      }],
+    };
+    const rewritten = rewriteJournalDocumentReferences(source, [
+      {
+        sourceUuid: "JournalEntry.guide.JournalEntryPage.intro",
+        translatedUuid: "Compendium.world.translations.JournalEntry.cs.JournalEntryPage.intro",
+      },
+    ]);
+    expect(rewritten.pages[0]?.text?.content).toBe(
+      "@UUID[Compendium.world.translations.JournalEntry.cs.JournalEntryPage.intro#resurrection]{Rules}",
+    );
+  });
+
   it("rewrites only UUID-bearing syntax and preserves page IDs and options", () => {
     const source: JournalData = {
       name: "Guide",

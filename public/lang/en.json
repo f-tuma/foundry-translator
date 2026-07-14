@@ -99,6 +99,7 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage": "Translate this page",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.NoActivePage": "The active journal page could not be determined.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Show original",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.ShowTranslation": "Switch to the stored translation",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting": "Foundry Translate is preparing this journal…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading": "Chrome is downloading the local translation model. Translation will continue automatically…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "This journal is already being translated.",

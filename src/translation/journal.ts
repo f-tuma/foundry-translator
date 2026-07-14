@@ -13,7 +13,7 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
-export const TRANSLATION_ENGINE_REVISION = 3;
+export const TRANSLATION_ENGINE_REVISION = 4;
 const HTML_FORMAT = 1;
 
 export interface JournalPageData extends Record<string, unknown> {

@@ -106,6 +106,27 @@ and the recommended implementation order.
   the user while the next features were still in progress, so page
   translation, the copyable run log, and glossary custom translations ship as
   `v0.12.0`.
+- 2026-07-14: The user's real Ember `Gamemaster's Guide` run log (768
+  documents, 7 739 units) exposed two genuine resolution bugs, both fixed:
+  anchored references (`...JournalEntryPage.X#section`) failed because the
+  anchor was treated as part of the UUID — discovery now strips `#anchor` and
+  rewriting keeps it after the translated UUID; and page-relative references
+  (`.pageId`, `.pageId#anchor`) failed because Foundry resolves them relative
+  to the containing PAGE (the entry alone lacks the embedded type), so
+  resolution now anchors to the page first. Verified by a real-Foundry E2E.
+  All three engine revisions were bumped (journal 4, actor 2, item 2) so the
+  improved rewriting re-applies to stored translations.
+- 2026-07-14: Debug logs are now English end-to-end: quality-fallback details
+  in the unit translator, and dependency issues rendered from structured data
+  (type, `documentType` for unsupported references) instead of the Czech UI
+  message. Issues beyond the 500-per-run cap are counted and reported as
+  `(+N more were not recorded)`.
+- 2026-07-14: Remaining known causes of unresolved references in real Ember
+  data: genuinely missing world documents, and `Compendium.dnd5e.*` links
+  pointing to packs that are not present in the user's world. Unsupported
+  types observed in real data: Scene, Playlist, Macro, RollTable,
+  ActiveEffect, Folder — candidates for future adapters (RollTable text
+  likely first by value).
 
 ### Actor milestone state (released in v0.10.0)
 

@@ -186,7 +186,7 @@ function translationProblem(
   settings: TranslationUnitSettings,
 ): TranslationProblem | null {
   if (!translated.trim() && comparableText(prepared.protection.text)) {
-    return { reason: "empty", detail: "Překladač vrátil prázdný text." };
+    return { reason: "empty", detail: "The provider returned empty text." };
   }
   try {
     const glossaryRestored = restoreGlossaryTerms(translated, prepared.protection);
@@ -194,14 +194,14 @@ function translationProblem(
   } catch (error) {
     return {
       reason: "integrity",
-      detail: error instanceof Error ? error.message : "Překladač poškodil ochranné tokeny.",
+      detail: error instanceof Error ? error.message : "The provider corrupted protection tokens.",
     };
   }
   if (suspiciouslyUnchanged(prepared.protection.text, translated, settings)) {
     const preview = comparableText(prepared.protection.text).slice(0, 100);
     return {
       reason: "unchanged",
-      detail: `Překladač ponechal text v původním jazyce: „${preview}“.`,
+      detail: `The provider left the text in the source language: "${preview}".`,
     };
   }
   return null;
@@ -239,7 +239,7 @@ async function retrySuspiciousSegments(
           reason: "provider",
           detail: error instanceof Error
             ? error.message
-            : "Opravný překlad fragmentu selhal.",
+            : "The retry translation of the fragment failed.",
         };
         break;
       }
