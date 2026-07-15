@@ -208,7 +208,10 @@ describe("Active translation registry", () => {
       detail: "Překlad stránky 9/33 „Magic and Spellcraft“ selhal. Provider timed out.",
     });
 
-    expect(formatRunLog(registry.get(id)!, "test")).toContain(
+    registry.finish(id);
+    const log = formatRunLog(registry.get(id)!, "test");
+    expect(log).toContain("State: done-with-issues");
+    expect(log).toContain(
       "detail: Překlad stránky 9/33 „Magic and Spellcraft“ selhal. Provider timed out.",
     );
   });

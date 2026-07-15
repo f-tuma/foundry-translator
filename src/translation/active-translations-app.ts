@@ -35,12 +35,17 @@ function formatTokenSpeed(run: ActiveTranslationRun): string {
 }
 
 function renderRun(run: ActiveTranslationRun, now: number): string {
+  const displayState = run.state === "done" && run.issues.length
+    ? "done-with-issues"
+    : run.state;
   const stateKey = run.cancelRequested && run.finishedAt === undefined
     ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling"
     : {
         scanning: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning",
         translating: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating",
-        done: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done",
+        done: run.issues.length
+          ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.DoneWithIssues"
+          : "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done",
         error: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error",
         cancelled: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled",
       }[run.state];
@@ -118,7 +123,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
       </button>`
     : "";
   return `
-    <li class="ft-active-translations__run" data-state="${run.state}">
+    <li class="ft-active-translations__run" data-state="${displayState}">
       <div class="ft-active-translations__title">
         <strong>${escapeHtml(run.rootName)}</strong>
         <span class="ft-active-translations__state">${localize(stateKey)} · ${run.targetLanguage.toUpperCase()}</span>

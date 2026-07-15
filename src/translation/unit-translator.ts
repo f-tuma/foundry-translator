@@ -216,7 +216,18 @@ function translationProblem(
   }
   try {
     const glossaryRestored = restoreGlossaryTerms(translated, prepared.protection);
-    restoreFoundrySyntax(glossaryRestored, prepared.syntax);
+    const restored = restoreFoundrySyntax(glossaryRestored, prepared.syntax);
+    // A batched model can move a valid token from a neighbouring text into
+    // this one. The token has a different nonce, so the per-protection
+    // restorers correctly leave it untouched. Treat any such foreign token as
+    // an integrity problem here, where only this segment can be retried or
+    // restored to its source, instead of failing the entire Journal page batch.
+    PROTECTION_TOKEN.lastIndex = 0;
+    if (PROTECTION_TOKEN.test(restored)) {
+      throw new GlossaryIntegrityError(
+        "Translation contains a protection token from another segment.",
+      );
+    }
   } catch (error) {
     return {
       reason: "integrity",

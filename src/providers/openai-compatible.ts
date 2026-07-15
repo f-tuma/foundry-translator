@@ -13,6 +13,11 @@ const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
 
 type FetchImplementation = (input: string, init?: RequestInit) => Promise<Response>;
 
+interface PendingTranslation {
+  text: string;
+  index: number;
+}
+
 interface ChatCompletionPayload {
   choices?: Array<{
     message?: { content?: unknown };
@@ -231,6 +236,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
   readonly #fetch: FetchImplementation;
   readonly #onMetrics: ((metrics: ProviderRequestMetrics) => void) | undefined;
   #lmStudioNativeAvailable: boolean | undefined;
+  #adaptiveBatchSize = MAX_TEXTS_PER_REQUEST;
   readonly cacheIdentity: string;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
@@ -251,47 +257,78 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       .map((text, index) => ({ text, index }))
       .filter(({ text }) => Boolean(text));
 
-    if (pending.length > 1) {
-      const boundaryTokens = createBatchTokens(pending.length);
-      let useSequentialFallback = false;
-      try {
-        const translatedBatch = await this.#translateOne(
-          combineBatch(pending.map(({ text }) => text), boundaryTokens),
-          request,
-        );
-        const translated = splitBatch(translatedBatch, boundaryTokens);
-        if (translated) {
-          pending.forEach(({ index }, resultIndex) => {
-            results[index] = { translatedText: translated[resultIndex] ?? "" };
-          });
-          return results;
-        }
-        useSequentialFallback = true;
-      } catch (error) {
-        // A model may not support stable batch delimiters. Provider/network
-        // errors still propagate; only a completed but unusable generation
-        // falls back to the proven single-text path.
-        if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
-          throw error;
-        }
-        useSequentialFallback = true;
-      }
-      if (useSequentialFallback) {
+    const batchSize = Math.max(1, Math.min(this.#adaptiveBatchSize, pending.length));
+    if (pending.length > 1 && batchSize === 1) {
+      this.#onMetrics?.({
+        phase: "diagnostic",
+        model: this.#model,
+        sequentialFallbackTexts: pending.length,
+      });
+    }
+    for (let start = 0; start < pending.length; start += batchSize) {
+      await this.#translateGroup(
+        pending.slice(start, start + batchSize),
+        request,
+        results,
+        false,
+      );
+    }
+    return results;
+  }
+
+  async #translateGroup(
+    pending: readonly PendingTranslation[],
+    request: TranslateRequest,
+    results: TranslationResult[],
+    sequentialFallback: boolean,
+  ): Promise<void> {
+    const only = pending[0];
+    if (pending.length === 1 && only) {
+      if (sequentialFallback) {
         this.#onMetrics?.({
           phase: "diagnostic",
           model: this.#model,
-          batchFallbacks: 1,
-          sequentialFallbackTexts: pending.length,
+          sequentialFallbackTexts: 1,
         });
+      }
+      results[only.index] = { translatedText: await this.#translateOne(only.text, request) };
+      return;
+    }
+    if (!pending.length) return;
+
+    const boundaryTokens = createBatchTokens(pending.length);
+    try {
+      const translatedBatch = await this.#translateOne(
+        combineBatch(pending.map(({ text }) => text), boundaryTokens),
+        request,
+      );
+      const translated = splitBatch(translatedBatch, boundaryTokens);
+      if (translated) {
+        pending.forEach(({ index }, resultIndex) => {
+          results[index] = { translatedText: translated[resultIndex] ?? "" };
+        });
+        return;
+      }
+    } catch (error) {
+      // Provider/network errors still propagate. Only a completed but unusable
+      // generation is safe to retry as smaller independent batches.
+      if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
+        throw error;
       }
     }
 
-    // Local servers generally serialize generation internally. Keeping the
-    // fallback sequential avoids filling their queue after a malformed batch.
-    for (const { text, index } of pending) {
-      results[index] = { translatedText: await this.#translateOne(text, request) };
-    }
-    return results;
+    this.#onMetrics?.({
+      phase: "diagnostic",
+      model: this.#model,
+      batchFallbacks: 1,
+    });
+    const smallerBatchSize = Math.max(1, Math.ceil(pending.length / 2));
+    this.#adaptiveBatchSize = Math.min(this.#adaptiveBatchSize, smallerBatchSize);
+    const midpoint = Math.ceil(pending.length / 2);
+    // LM Studio serializes generation internally; recurse sequentially rather
+    // than filling its queue. Successful halves avoid N one-text requests.
+    await this.#translateGroup(pending.slice(0, midpoint), request, results, true);
+    await this.#translateGroup(pending.slice(midpoint), request, results, true);
   }
 
   async testConnection(targetLanguage: string): Promise<void> {

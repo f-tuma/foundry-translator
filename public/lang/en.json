@@ -167,6 +167,7 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning": "Scanning",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Translating",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Done",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.DoneWithIssues": "Done with issues",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error": "Error",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled": "Cancelled",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling": "Cancelling after the current part…",

@@ -288,11 +288,55 @@ describe("OpenAiCompatibleProvider", () => {
     await expect(provider.translate({ texts: ["First.", "Second."], targetLanguage: "cs" }))
       .resolves.toEqual([{ translatedText: "První." }, { translatedText: "Druhý." }]);
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
-      phase: "diagnostic",
-      batchFallbacks: 1,
-      sequentialFallbackTexts: 2,
+    const diagnostics = metrics.mock.calls
+      .map(([metric]) => metric)
+      .filter(({ phase }) => phase === "diagnostic");
+    expect(diagnostics.reduce((sum, metric) => sum + (metric.batchFallbacks ?? 0), 0)).toBe(1);
+    expect(diagnostics.reduce(
+      (sum, metric) => sum + (metric.sequentialFallbackTexts ?? 0),
+      0,
+    )).toBe(2);
+  });
+
+  it("splits a malformed batch and remembers the smaller working size", async () => {
+    let request = 0;
+    const metrics = vi.fn();
+    const batchSizes: number[] = [];
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      request += 1;
+      const body = JSON.parse(String(init?.body));
+      const content = String(body.messages[0].content);
+      const boundaries = [...content.matchAll(/__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu)]
+        .map(([token]) => token);
+      batchSizes.push(Math.max(1, boundaries.length - 1));
+      if (request === 1) {
+        return jsonResponse({
+          choices: [{ message: { content: "Broken combined answer" }, finish_reason: "stop" }],
+        });
+      }
+      const translated = boundaries.slice(0, -1)
+        .map((token, index) => `${token}Překlad ${index + 1}.`)
+        .join("") + (boundaries.at(-1) ?? "");
+      return jsonResponse({
+        choices: [{ message: { content: translated }, finish_reason: "stop" }],
+      });
+    });
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234",
+      model: "gemma-batch",
+      fetchImplementation: fetchMock,
+      onMetrics: metrics,
+    });
+
+    await provider.translate({ texts: ["One", "Two", "Three", "Four"], targetLanguage: "cs" });
+    expect(batchSizes).toEqual([4, 2, 2]);
+    expect(metrics).not.toHaveBeenCalledWith(expect.objectContaining({
+      sequentialFallbackTexts: expect.any(Number),
     }));
+
+    batchSizes.length = 0;
+    await provider.translate({ texts: ["Five", "Six", "Seven", "Eight"], targetLanguage: "cs" });
+    expect(batchSizes).toEqual([2, 2]);
   });
 
   it("reports a native API fallback before using Chat Completions", async () => {

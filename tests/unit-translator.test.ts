@@ -452,6 +452,25 @@ describe("translation units", () => {
     expect(calls).toBe(2);
   });
 
+  it("retries a protection token leaked from another batched segment", async () => {
+    let calls = 0;
+    const result = await translateUnits({
+      units: [["The guardians watch the valley."]],
+      glossary: [],
+      provider: provider(() => {
+        calls += 1;
+        return calls === 1
+          ? "Strážci sledují údolí. __FTS_FOREIGN_0000__"
+          : "Strážci sledují údolí.";
+      }),
+      settings,
+      nonceFactory: () => "LEAKED",
+    });
+
+    expect(result).toEqual([["Strážci sledují údolí."]]);
+    expect(calls).toBe(2);
+  });
+
   it("allows an unchanged phrase when the glossary intentionally protects it", async () => {
     let calls = 0;
     const result = await translateUnits({

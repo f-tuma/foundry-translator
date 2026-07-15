@@ -167,6 +167,7 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning": "Analyzuji",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Překládám",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Hotovo",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.DoneWithIssues": "Hotovo s problémy",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error": "Chyba",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled": "Zrušeno",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling": "Ruším po dokončení aktuální části…",

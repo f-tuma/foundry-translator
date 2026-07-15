@@ -792,6 +792,10 @@
   color: var(--ft-color-success);
 }
 
+.ft-active-translations__run[data-state="done-with-issues"] .ft-active-translations__state {
+  color: var(--ft-color-warning);
+}
+
 .ft-active-translations__run[data-state="error"] .ft-active-translations__state {
   color: var(--ft-color-danger);
 }
@@ -811,6 +815,10 @@
 
 .ft-active-translations__run[data-state="done"] .ft-progress__fill {
   background: var(--ft-color-success);
+}
+
+.ft-active-translations__run[data-state="done-with-issues"] .ft-progress__fill {
+  background: var(--ft-color-warning);
 }
 
 .ft-active-translations__run[data-state="error"] .ft-progress__fill {

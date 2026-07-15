@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-15
-- Repository state: `main`; progress UI patch `v0.14.5` prepared locally from `v0.14.4`
+- Repository state: `main`; adaptive LLM recovery patch `v0.14.6` prepared locally from `v0.14.5`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,14 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-07-15: A real `v0.14.5` run exposed seven malformed Gemma batches,
+  95 texts sent through sequential fallback, and a foreign protection token
+  that failed a four-page dependency window. Patch `v0.14.6` recursively
+  bisects malformed LLM batches, remembers the smaller successful batch size
+  for the rest of the provider session, and validates foreign FT tokens at the
+  individual segment boundary so only that segment is retried or restored.
+  Completed runs with dependency issues are now labelled `done-with-issues`
+  instead of plain `done` in the overview and copied log.
 - 2026-07-15: Patch `v0.14.3` batches up to four Actor/embedded
   Item or standalone Item HTML fields per OpenAI-compatible request and folds
   Journal metadata into the first multi-page LLM window. A fresh three-page

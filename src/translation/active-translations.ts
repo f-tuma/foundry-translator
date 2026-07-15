@@ -220,10 +220,13 @@ function issueDescription(issue: TranslationRunIssue): string | null {
 
 /** Builds a plain-text, copy-friendly debug log for a translation run. */
 export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): string {
+  const loggedState = run.state === "done" && run.issues.length
+    ? "done-with-issues"
+    : run.state;
   const lines: string[] = [
     `Foundry Translate ${moduleVersion} — translation log`,
     `Document: ${run.rootName} -> ${run.targetLanguage}`,
-    `State: ${run.state}${run.error ? ` (${run.error})` : ""}`,
+    `State: ${loggedState}${run.error ? ` (${run.error})` : ""}`,
     `Started: ${new Date(run.startedAt).toISOString()}`,
     ...(run.finishedAt ? [`Finished: ${new Date(run.finishedAt).toISOString()}`] : []),
     ...(run.plan
