@@ -14,6 +14,17 @@ export interface TranslationResult {
   detectedSourceLanguage?: string;
 }
 
+export interface ProviderRequestMetrics {
+  phase: "started" | "completed" | "failed";
+  model: string;
+  durationMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  tokensPerSecond?: number;
+  finishReason?: string;
+}
+
 export interface TranslationProvider {
   /** Distinguishes model/configuration-specific cache entries without including secrets. */
   readonly cacheIdentity?: string;

@@ -1,21 +1,44 @@
-import type { TranslateRequest, TranslationProvider, TranslationResult } from "./types";
+import type {
+  ProviderRequestMetrics,
+  TranslateRequest,
+  TranslationProvider,
+  TranslationResult,
+} from "./types";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 2;
+const PROMPT_REVISION = 3;
+const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 
 type FetchImplementation = (input: string, init?: RequestInit) => Promise<Response>;
 
 interface ChatCompletionPayload {
   choices?: Array<{
     message?: { content?: unknown };
+    finish_reason?: unknown;
   }>;
   error?: { message?: unknown };
+  usage?: {
+    prompt_tokens?: unknown;
+    completion_tokens?: unknown;
+    completion_tokens_details?: { reasoning_tokens?: unknown };
+  };
 }
 
 interface ModelsPayload {
   data?: Array<{ id?: unknown }>;
   error?: { message?: unknown };
+}
+
+interface LmStudioChatPayload {
+  output?: Array<{ type?: unknown; content?: unknown }>;
+  stats?: {
+    input_tokens?: unknown;
+    total_output_tokens?: unknown;
+    reasoning_output_tokens?: unknown;
+    tokens_per_second?: unknown;
+  };
+  error?: unknown;
 }
 
 function textFingerprint(value: string): string {
@@ -33,6 +56,7 @@ export interface OpenAiCompatibleProviderOptions {
   apiKey?: string;
   worldContext?: string;
   fetchImplementation?: FetchImplementation;
+  onMetrics?: (metrics: ProviderRequestMetrics) => void;
 }
 
 export class OpenAiCompatibleTranslationError extends Error {
@@ -91,6 +115,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
   readonly #apiKey: string;
   readonly #worldContext: string;
   readonly #fetch: FetchImplementation;
+  readonly #onMetrics: ((metrics: ProviderRequestMetrics) => void) | undefined;
+  #lmStudioNativeAvailable: boolean | undefined;
   readonly cacheIdentity: string;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
@@ -100,6 +126,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     this.#worldContext = options.worldContext?.trim().slice(0, 6_000) ?? "";
     this.#fetch = options.fetchImplementation ?? ((input, init) =>
       foundry.utils.fetchWithTimeout(input, init, { timeoutMs: REQUEST_TIMEOUT_MS }));
+    this.#onMetrics = options.onMetrics;
     this.cacheIdentity = `openai-compatible:${this.#baseUrl}:${this.#model}:context-${textFingerprint(this.#worldContext)}:prompt-${PROMPT_REVISION}`;
   }
 
@@ -184,6 +211,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       `Translate from ${source} to ${target}.`,
       "Return only the translated text, without commentary, labels, or Markdown fences.",
       "Do not include the text_to_translate wrapper in the response.",
+      "Translate directly; do not explain, analyze, or reason about the translation in the response.",
       "Preserve every token beginning with __FTN_, __FTG_, or __FTS_ byte-for-byte, exactly once, and in the original order.",
       "Preserve the meaning, tone, paragraph structure, and surrounding whitespace.",
       ...(this.#worldContext
@@ -193,31 +221,153 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
         ? [`Approved glossary (source => fixed target):\n${glossaryPrompt(request.glossary)}`]
         : []),
     ].join(" ");
-    const response = await this.#request(`${this.#baseUrl}/chat/completions`, {
-      method: "POST",
-      body: JSON.stringify({
-        model: this.#model,
-        // TranslateGemma's stock LM Studio template requires the first message
-        // to use the user role, so instructions and input share one message.
-        messages: [{
-          role: "user",
-          content: `${system}\n\n<text_to_translate>\n${text}\n</text_to_translate>`,
-        }],
-        temperature: 0,
-        max_tokens: 2_048,
-        stream: false,
-      }),
-    });
-    const payload = await this.#readJson<ChatCompletionPayload>(response);
-    if (!response.ok) throw this.#httpError(response.status, payload.error?.message);
-    const translated = payload.choices?.[0]?.message?.content;
-    if (typeof translated !== "string" || !translated.trim()) {
-      throw new OpenAiCompatibleTranslationError(
-        "OpenAI-compatible server vrátil prázdnou nebo neočekávanou odpověď.",
-        response.status,
-      );
+    if (/\bgemma-4\b/iu.test(this.#model) && this.#lmStudioNativeAvailable !== false) {
+      const native = await this.#translateWithLmStudioNative(text, system);
+      if (native !== null) return native;
     }
-    return translated;
+    let lastDetail = "";
+    for (const maxTokens of OUTPUT_TOKEN_LIMITS) {
+      const startedAt = Date.now();
+      this.#onMetrics?.({ phase: "started", model: this.#model });
+      let response: Response;
+      let payload: ChatCompletionPayload;
+      try {
+        response = await this.#request(`${this.#baseUrl}/chat/completions`, {
+          method: "POST",
+          body: JSON.stringify({
+            model: this.#model,
+            // TranslateGemma's stock LM Studio template requires the first message
+            // to use the user role, so instructions and input share one message.
+            messages: [{
+              role: "user",
+              content: `${system}\n\n<text_to_translate>\n${text}\n</text_to_translate>`,
+            }],
+            temperature: 0,
+            max_tokens: maxTokens,
+            stream: false,
+          }),
+        });
+        payload = await this.#readJson<ChatCompletionPayload>(response);
+      } catch (error) {
+        this.#onMetrics?.({
+          phase: "failed",
+          model: this.#model,
+          durationMs: Date.now() - startedAt,
+        });
+        throw error;
+      }
+
+      const metrics = this.#completionMetrics(payload, Date.now() - startedAt);
+      if (!response.ok) {
+        this.#onMetrics?.({ phase: "failed", model: this.#model, ...metrics });
+        throw this.#httpError(response.status, payload.error?.message);
+      }
+      this.#onMetrics?.({ phase: "completed", model: this.#model, ...metrics });
+
+      const translated = payload.choices?.[0]?.message?.content;
+      const finishReason = metrics.finishReason ?? "unknown";
+      if (typeof translated === "string" && translated.trim() && finishReason !== "length") {
+        return translated;
+      }
+      const reasoning = metrics.reasoningTokens ?? 0;
+      lastDetail = finishReason === "length"
+        ? `výstup narazil na limit ${maxTokens} tokenů`
+        : reasoning > 0
+          ? `model spotřeboval ${reasoning} tokenů na reasoning, ale nevrátil překlad`
+          : "odpověď neobsahovala text překladu";
+    }
+    throw new OpenAiCompatibleTranslationError(
+      `OpenAI-compatible server dvakrát nevrátil úplný překlad (${lastDetail}). Zkuste model bez reasoningu nebo kratší kontext světa.`,
+      200,
+    );
+  }
+
+  async #translateWithLmStudioNative(text: string, system: string): Promise<string | null> {
+    const url = new URL(this.#baseUrl);
+    const startedAt = Date.now();
+    this.#onMetrics?.({ phase: "started", model: this.#model });
+    let response: Response;
+    try {
+      response = await this.#request(`${url.origin}/api/v1/chat`, {
+        method: "POST",
+        body: JSON.stringify({
+          model: this.#model,
+          input: `${system}\n\n<text_to_translate>\n${text}\n</text_to_translate>`,
+          temperature: 0,
+          max_output_tokens: 4_096,
+          reasoning: "off",
+          stream: false,
+        }),
+      });
+    } catch (error) {
+      this.#onMetrics?.({
+        phase: "failed",
+        model: this.#model,
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
+    if (response.status === 404 || response.status === 405) {
+      this.#lmStudioNativeAvailable = false;
+      this.#onMetrics?.({
+        phase: "failed",
+        model: this.#model,
+        durationMs: Date.now() - startedAt,
+      });
+      return null;
+    }
+
+    const payload = await this.#readJson<LmStudioChatPayload>(response);
+    const numeric = (value: unknown): number | undefined =>
+      typeof value === "number" && Number.isFinite(value) ? value : undefined;
+    const inputTokens = numeric(payload.stats?.input_tokens);
+    const outputTokens = numeric(payload.stats?.total_output_tokens);
+    const reasoningTokens = numeric(payload.stats?.reasoning_output_tokens);
+    const tokensPerSecond = numeric(payload.stats?.tokens_per_second);
+    const durationMs = Date.now() - startedAt;
+    const telemetry = {
+      durationMs,
+      ...(inputTokens !== undefined ? { inputTokens } : {}),
+      ...(outputTokens !== undefined ? { outputTokens } : {}),
+      ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+      ...(tokensPerSecond !== undefined ? { tokensPerSecond } : {}),
+    };
+    if (!response.ok) {
+      this.#onMetrics?.({ phase: "failed", model: this.#model, ...telemetry });
+      throw this.#httpError(response.status, payload.error);
+    }
+    this.#lmStudioNativeAvailable = true;
+    const translated = payload.output?.find(({ type }) => type === "message")?.content;
+    if (typeof translated === "string" && translated.trim()) {
+      this.#onMetrics?.({
+        phase: "completed",
+        model: this.#model,
+        finishReason: "stop",
+        ...telemetry,
+      });
+      return translated;
+    }
+    this.#onMetrics?.({ phase: "failed", model: this.#model, ...telemetry });
+    return null;
+  }
+
+  #completionMetrics(
+    payload: ChatCompletionPayload,
+    durationMs: number,
+  ): Omit<ProviderRequestMetrics, "phase" | "model"> {
+    const number = (value: unknown): number | undefined =>
+      typeof value === "number" && Number.isFinite(value) ? value : undefined;
+    const finishReason = payload.choices?.[0]?.finish_reason;
+    const inputTokens = number(payload.usage?.prompt_tokens);
+    const outputTokens = number(payload.usage?.completion_tokens);
+    const reasoningTokens = number(payload.usage?.completion_tokens_details?.reasoning_tokens);
+    return {
+      durationMs,
+      ...(inputTokens !== undefined ? { inputTokens } : {}),
+      ...(outputTokens !== undefined ? { outputTokens } : {}),
+      ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+      ...(typeof finishReason === "string" ? { finishReason } : {}),
+    };
   }
 
   #validateConfiguration(): void {

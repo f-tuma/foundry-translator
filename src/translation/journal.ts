@@ -67,6 +67,8 @@ export interface TranslateJournalOptions {
   /** Translate only these pages; the rest stay source copies and the flag records a partial translation. */
   pageIds?: readonly string[];
   onProgress?: (progress: JournalTranslationProgress) => void;
+  /** Reports the page currently being prepared before its first provider request. */
+  onPageStart?: (pageName: string) => void;
   onQualityFallback?: (fallback: TranslationQualityFallback) => void;
 }
 
@@ -427,6 +429,7 @@ export async function translateJournalData(
       });
     }
 
+    options.onPageStart?.(sourcePageName);
     try {
       await translateTargets(options, targets, structuredTargets, recordQualityFallback);
     } catch (error) {

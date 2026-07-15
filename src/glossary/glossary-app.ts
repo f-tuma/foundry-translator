@@ -2,7 +2,7 @@ import { logger } from "../logger";
 import { GlossaryCompendiumRepository } from "./compendium-repository";
 import { discoverGlossaryEntries } from "./discovery";
 import { planManualTerm } from "./sync";
-import { renderGlossaryView } from "./glossary-view";
+import { renderGlossaryView, updateGlossaryFilter } from "./glossary-view";
 import type { GlossaryEntry } from "./types";
 import { loadGlossaryCandidates, saveGlossaryCandidates } from "./candidate-store";
 import type { GlossaryCandidate } from "./candidates";
@@ -49,6 +49,12 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
   }
 
   protected async _onRender(): Promise<void> {
+    const manualTerm = this.element.querySelector<HTMLInputElement>("[name='manualTerm']");
+    manualTerm?.addEventListener("input", () => {
+      updateGlossaryFilter(this.element, manualTerm.value);
+    });
+    if (manualTerm) updateGlossaryFilter(this.element, manualTerm.value);
+
     this.element
       .querySelector<HTMLElement>("[data-action='sync']")
       ?.addEventListener("click", () => void this.#sync());

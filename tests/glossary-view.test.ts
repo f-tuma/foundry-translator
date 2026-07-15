@@ -1,7 +1,7 @@
 import { parseHTML } from "linkedom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { renderGlossaryView } from "../src/glossary/glossary-view";
+import { renderGlossaryView, updateGlossaryFilter } from "../src/glossary/glossary-view";
 
 describe("Glossary view", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -54,5 +54,39 @@ describe("Glossary view", () => {
       .toBe("Hrad Ravenloft");
     expect(view.querySelector("[data-action='accept-candidate']")).not.toBeNull();
     expect(view.querySelector("[data-action='reject-candidate']")).not.toBeNull();
+  });
+
+  it("filters stored terms from the source field by source, translation, and aliases", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document", document);
+    vi.stubGlobal("game", {
+      i18n: {
+        localize: (key: string) => ({
+          "FOUNDRY_TRANSLATE.Glossary.Search.Results": "Matching entries: {count} of {total}.",
+          "FOUNDRY_TRANSLATE.Glossary.Search.Empty": "No similar entry was found.",
+        })[key] ?? key,
+      },
+    });
+    const view = renderGlossaryView({
+      discovered: [],
+      stored: [
+        { source: "Castle Ravenloft", replacement: "Hrad Ravenloft", category: "location", aliases: ["Ravenloft Keep"] },
+        { source: "Silver Dragon", replacement: "Stříbrný drak", category: "term", aliases: [] },
+        { source: "Ember Order", replacement: "Řád uhlíků", category: "term", aliases: ["Ashen Circle"] },
+      ],
+    });
+
+    expect(updateGlossaryFilter(view, "stribrny")).toEqual({ matches: 1, total: 3 });
+    expect(Array.from(view.querySelectorAll<HTMLElement>("[data-glossary-row]:not([hidden])")))
+      .toHaveLength(1);
+    expect(updateGlossaryFilter(view, "ashen circle").matches).toBe(1);
+    expect(updateGlossaryFilter(view, "missing").matches).toBe(0);
+    expect(view.querySelector("[data-glossary-filter-text]")?.textContent)
+      .toBe("No similar entry was found.");
+
+    expect(updateGlossaryFilter(view, "")).toEqual({ matches: 3, total: 3 });
+    expect(view.querySelector<HTMLElement>("[data-glossary-filter-status]")?.hidden).toBe(true);
+    expect(Array.from(view.querySelectorAll<HTMLElement>("[data-glossary-row]"))
+      .every((row) => !row.hidden)).toBe(true);
   });
 });

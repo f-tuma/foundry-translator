@@ -109,4 +109,66 @@ describe("OpenAiCompatibleProvider", () => {
     expect(payload.messages).toHaveLength(1);
     expect(payload.messages[0].content).toContain("Journal: Barovia");
   });
+
+  it("retries an empty reasoning-only response with a larger output limit and reports metrics", async () => {
+    const metrics = vi.fn();
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "", reasoning_content: "Thinking" }, finish_reason: "length" }],
+        usage: { prompt_tokens: 100, completion_tokens: 4096, completion_tokens_details: { reasoning_tokens: 4096 } },
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "Přeloženo." }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 12, completion_tokens_details: { reasoning_tokens: 2 } },
+      }));
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234",
+      model: "gemma-reasoning",
+      fetchImplementation: fetchMock,
+      onMetrics: metrics,
+    });
+
+    await expect(provider.translate({ texts: ["Translated."], targetLanguage: "cs" }))
+      .resolves.toEqual([{ translatedText: "Přeloženo." }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).max_tokens).toBe(4096);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)).max_tokens).toBe(8192);
+    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "completed",
+      outputTokens: 4096,
+      reasoningTokens: 4096,
+      finishReason: "length",
+    }));
+  });
+
+  it("uses LM Studio native chat with reasoning disabled for Gemma 4", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+      output: [{ type: "message", content: "Vítejte v Emberu." }],
+      stats: {
+        input_tokens: 80,
+        total_output_tokens: 12,
+        reasoning_output_tokens: 0,
+        tokens_per_second: 90,
+      },
+    }));
+    const metrics = vi.fn();
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234/v1",
+      model: "google/gemma-4-12b-qat",
+      fetchImplementation: fetchMock,
+      onMetrics: metrics,
+    });
+
+    await expect(provider.translate({ texts: ["Welcome to Ember."], targetLanguage: "cs" }))
+      .resolves.toEqual([{ translatedText: "Vítejte v Emberu." }]);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:1234/api/v1/chat");
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({ reasoning: "off", max_output_tokens: 4096 });
+    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "completed",
+      inputTokens: 80,
+      outputTokens: 12,
+      reasoningTokens: 0,
+    }));
+  });
 });

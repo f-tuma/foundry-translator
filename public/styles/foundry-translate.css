@@ -427,6 +427,20 @@
   border-bottom: 1px solid var(--ft-color-border);
 }
 
+.ft-glossary__filter-status {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: var(--ft-space-2);
+  align-items: center;
+  min-height: 20px;
+  color: var(--ft-color-text-muted);
+  font-size: 12px;
+}
+
+.ft-glossary__filter-status[data-empty="true"] {
+  color: var(--ft-color-warning);
+}
+
 .ft-glossary__manual input,
 .ft-glossary__row input {
   min-width: 0;
@@ -813,6 +827,43 @@
 
 .ft-active-translations__error {
   color: var(--ft-color-danger);
+}
+
+.ft-active-translations__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--ft-color-border);
+  border-radius: var(--ft-radius-sm);
+  background: var(--ft-color-border);
+}
+
+.ft-active-translations__metrics span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 7px 8px;
+  color: var(--ft-color-text-muted);
+  background: var(--ft-color-surface);
+  font-size: 10px;
+}
+
+.ft-active-translations__metrics strong {
+  overflow: hidden;
+  color: var(--ft-color-text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ft-active-translations__model {
+  overflow: hidden;
+  font-family: monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ft-active-translations__empty {

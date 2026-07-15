@@ -138,4 +138,33 @@ describe("Active translation registry", () => {
     expect(estimateRemainingMs({ ...run, completedUnits: 0 }, 50_000)).toBeNull();
     expect(estimateRemainingMs({ ...run, finishedAt: 1 }, 50_000)).toBeNull();
   });
+
+  it("aggregates LLM request telemetry and includes it in the copied log", () => {
+    let now = 1_000;
+    const registry = new ActiveTranslationRegistry(() => now);
+    const id = registry.start("Guide", "cs");
+    registry.recordProviderMetrics(id, { phase: "started", model: "gemma" });
+    now = 2_500;
+    registry.recordProviderMetrics(id, {
+      phase: "completed",
+      model: "gemma",
+      durationMs: 1_500,
+      inputTokens: 120,
+      outputTokens: 60,
+      reasoningTokens: 10,
+      finishReason: "stop",
+    });
+
+    expect(registry.get(id)).toMatchObject({
+      providerModel: "gemma",
+      providerRequestCount: 1,
+      providerRequestActive: false,
+      providerInputTokens: 120,
+      providerOutputTokens: 60,
+      providerReasoningTokens: 10,
+      providerGenerationMs: 1_500,
+    });
+    expect(formatRunLog(registry.get(id)!, "test"))
+      .toContain("Provider: gemma; 1 requests; 120 input tokens; 60 output tokens; 10 reasoning tokens; 1500 ms");
+  });
 });

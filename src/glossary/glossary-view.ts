@@ -21,6 +21,52 @@ function escapeHtml(value: string): string {
   );
 }
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase()
+    .trim();
+}
+
+export interface GlossaryFilterResult {
+  matches: number;
+  total: number;
+}
+
+export function updateGlossaryFilter(root: ParentNode, query: string): GlossaryFilterResult {
+  const terms = normalizeSearchText(query).split(/\s+/).filter(Boolean);
+  const rows = Array.from(root.querySelectorAll<HTMLElement>("[data-glossary-row]"));
+  let matches = 0;
+
+  for (const row of rows) {
+    const source = row.querySelector<HTMLElement>(".ft-glossary__source")?.textContent ?? "";
+    const replacement = row.querySelector<HTMLInputElement>("[data-glossary-replacement]")?.value ?? "";
+    const aliases = row.dataset.glossaryAliases ?? "";
+    const searchable = normalizeSearchText(`${source} ${replacement} ${aliases}`);
+    const isMatch = terms.every((term) => searchable.includes(term));
+    row.hidden = !isMatch;
+    if (isMatch) matches += 1;
+  }
+
+  const status = root.querySelector<HTMLElement>("[data-glossary-filter-status]");
+  const statusText = status?.querySelector<HTMLElement>("[data-glossary-filter-text]");
+  if (status) {
+    status.hidden = terms.length === 0;
+    status.dataset.empty = String(terms.length > 0 && matches === 0);
+  }
+  if (statusText) {
+    const template = matches === 0
+      ? status?.dataset.emptyTemplate ?? ""
+      : status?.dataset.resultsTemplate ?? "";
+    statusText.textContent = terms.length === 0
+      ? ""
+      : template.replace("{count}", String(matches)).replace("{total}", String(rows.length));
+  }
+
+  return { matches, total: rows.length };
+}
+
 export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
   const actorCount = data.discovered.filter(({ category }) => category === "character").length;
   const sceneCount = data.discovered.filter(({ category }) => category === "location").length;
@@ -29,7 +75,7 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
   const storedRows = [...data.stored]
     .sort((left, right) => left.source.localeCompare(right.source))
     .map((entry) => `
-      <label class="ft-glossary__row">
+      <label class="ft-glossary__row" data-glossary-row data-glossary-aliases="${escapeHtml(entry.aliases.join(" "))}">
         <span class="ft-glossary__source" title="${escapeHtml(entry.source)}">${escapeHtml(entry.source)}</span>
         <input type="text" maxlength="240" value="${escapeHtml(entry.replacement)}" data-glossary-replacement data-source="${escapeHtml(entry.source)}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}: ${escapeHtml(entry.source)}">
       </label>
@@ -119,6 +165,10 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             <span>${localize("FOUNDRY_TRANSLATE.Glossary.Add")}</span>
           </button>
+          <div class="ft-glossary__filter-status" data-glossary-filter-status data-results-template="${escapeHtml(localize("FOUNDRY_TRANSLATE.Glossary.Search.Results"))}" data-empty-template="${escapeHtml(localize("FOUNDRY_TRANSLATE.Glossary.Search.Empty"))}" role="status" aria-live="polite" hidden>
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <span data-glossary-filter-text></span>
+          </div>
         </div>
         <div class="ft-glossary__rows">
           ${storedRows || `<p class="ft-glossary__empty">${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Empty")}</p>`}

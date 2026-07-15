@@ -26,6 +26,14 @@ function formatDuration(milliseconds: number): string {
   return `${Math.round(seconds / 60)} min`;
 }
 
+function formatTokenSpeed(run: ActiveTranslationRun): string {
+  if (run.providerTokensPerSecond !== undefined) {
+    return `${run.providerTokensPerSecond.toFixed(1)} tok/s`;
+  }
+  if (!run.providerOutputTokens || !run.providerGenerationMs) return "—";
+  return `${((run.providerOutputTokens * 1000) / run.providerGenerationMs).toFixed(1)} tok/s`;
+}
+
 function renderRun(run: ActiveTranslationRun, now: number): string {
   const stateKey = run.cancelRequested && run.finishedAt === undefined
     ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling"
@@ -54,6 +62,22 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
   const current = run.finishedAt === undefined && run.currentDocument
     ? `${escapeHtml(run.currentDocument)}${run.currentUnit ? ` — ${escapeHtml(run.currentUnit)}` : ""}`
     : "";
+  const providerElapsed = run.providerRequestActive && run.providerRequestStartedAt !== undefined
+    ? now - run.providerRequestStartedAt
+    : run.providerGenerationMs ?? 0;
+  const providerMetrics = run.providerRequestCount
+    ? `<div class="ft-active-translations__metrics">
+        <span><strong>${formatTokenSpeed(run)}</strong>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Speed")}</span>
+        <span><strong>${run.providerOutputTokens ?? 0}</strong>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Output")}</span>
+        <span><strong>${run.providerInputTokens ?? 0}</strong>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Input")}</span>
+        <span><strong>${run.providerReasoningTokens ?? 0}</strong>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Reasoning")}</span>
+        <span><strong>${run.providerRequestCount}</strong>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Requests")}</span>
+        <span><strong>${formatDuration(providerElapsed)}</strong>${run.providerRequestActive
+          ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.CurrentRequest")
+          : localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.GenerationTime")}</span>
+      </div>
+      <span class="ft-active-translations__model">${escapeHtml(run.providerModel ?? "")}</span>`
+    : "";
   const issues = run.issues.length
     ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Issues").replace("{count}", String(run.issues.length))
     : "";
@@ -80,6 +104,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
       </div>
       <div class="ft-active-translations__detail">
         <span>${counts}${eta ? ` · ${eta}` : ""}${issues ? ` · ${issues}` : ""}</span>
+        ${providerMetrics}
         ${run.error ? `<span class="ft-active-translations__error">${escapeHtml(run.error)}</span>` : ""}
         ${current ? `<span class="ft-active-translations__current">${current}</span>` : ""}
         <div class="ft-active-translations__actions">${cancel}${copyLog}</div>
@@ -109,6 +134,7 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
   };
 
   #unsubscribe: (() => void) | undefined;
+  #ticker: ReturnType<typeof setInterval> | undefined;
 
   protected async _renderHTML(): Promise<HTMLElement> {
     const runs = activeTranslations.list();
@@ -128,6 +154,11 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
 
   protected _onRender(): void {
     this.#unsubscribe ??= activeTranslations.subscribe(() => void this.render());
+    this.#ticker ??= setInterval(() => {
+      if (activeTranslations.list().some(({ providerRequestActive }) => providerRequestActive)) {
+        void this.render();
+      }
+    }, 1_000);
     for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-log]")) {
       button.addEventListener("click", () => {
         const run = activeTranslations.get(Number(button.dataset.runLog));
@@ -147,6 +178,8 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
   override async close(options?: Record<string, unknown>): Promise<FoundryApplicationV2> {
     this.#unsubscribe?.();
     this.#unsubscribe = undefined;
+    if (this.#ticker !== undefined) clearInterval(this.#ticker);
+    this.#ticker = undefined;
     return super.close(options);
   }
 }

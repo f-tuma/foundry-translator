@@ -359,8 +359,12 @@ export class JournalTranslationService {
     const settings = getTranslatorSettings();
     const source = sourceDocument.toObject() as JournalData;
     const htmlFieldPaths = systemHtmlFieldPaths(sourceDocument, source);
+    let runId: number | undefined;
     const provider = createTranslationProvider(settings, {
       ...(this.#onChromeStatus ? { onChromeStatus: this.#onChromeStatus } : {}),
+      onProviderMetrics: (metrics) => {
+        if (runId !== undefined) activeTranslations.recordProviderMetrics(runId, metrics);
+      },
     });
 
     // Calling prepare before the first await preserves Chrome's user activation.
@@ -375,7 +379,7 @@ export class JournalTranslationService {
       new GlossaryCompendiumRepository().load(),
       preparation ?? Promise.resolve(),
     ]);
-    const runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
+    runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
     const runtime: TranslationRuntime = {
       runId,
       glossaryHash: await glossaryFingerprint(glossary),
@@ -660,6 +664,10 @@ export class JournalTranslationService {
     onProgress: (progress: JournalTranslationProgress) => void,
     pageIds?: readonly string[],
   ): Promise<GraphTranslationResult> {
+    activeTranslations.update(runtime.runId, {
+      currentDocument: sourceDocument.name,
+      currentUnit: "",
+    });
     if (isActorDocument(sourceDocument)) {
       return this.#translateActorOne(sourceDocument, runtime, onProgress);
     }
@@ -718,6 +726,10 @@ export class JournalTranslationService {
       cache: runtime.cache,
       systemHtmlFieldPaths: systemHtmlFieldPaths(sourceDocument, source),
       ...(pageIds ? { pageIds } : {}),
+      onPageStart: (pageName) => activeTranslations.update(runtime.runId, {
+        currentDocument: sourceDocument.name,
+        currentUnit: pageName,
+      }),
       onQualityFallback: (fallback) => {
         logger.warn("Translation quality fallback kept the original fragment.", fallback);
         activeTranslations.addIssue(runtime.runId, {

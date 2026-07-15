@@ -1,11 +1,12 @@
 import { ChromeLocalProvider, type ChromeLocalProviderStatus } from "./chrome-local";
 import { GoogleCloudBasicProvider } from "./google-cloud-basic";
-import type { TranslationProvider } from "./types";
+import type { ProviderRequestMetrics, TranslationProvider } from "./types";
 import type { TranslatorSettings } from "../settings/settings";
 import { OpenAiCompatibleProvider } from "./openai-compatible";
 
 export interface ProviderFactoryOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
+  onProviderMetrics?: (metrics: ProviderRequestMetrics) => void;
 }
 
 export function createTranslationProvider(
@@ -23,6 +24,7 @@ export function createTranslationProvider(
       model: settings.openAiModel,
       apiKey: settings.openAiApiKey,
       worldContext: settings.worldContext,
+      ...(options.onProviderMetrics ? { onMetrics: options.onProviderMetrics } : {}),
     });
   }
   return new GoogleCloudBasicProvider(settings.apiKey);

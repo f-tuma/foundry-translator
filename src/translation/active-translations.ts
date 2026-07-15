@@ -41,6 +41,16 @@ export interface ActiveTranslationRun {
   droppedIssues?: number;
   /** Set by the UI; the service stops at the next safe point. */
   cancelRequested?: boolean;
+  providerModel?: string;
+  providerRequestCount?: number;
+  providerRequestActive?: boolean;
+  providerRequestStartedAt?: number;
+  providerInputTokens?: number;
+  providerOutputTokens?: number;
+  providerReasoningTokens?: number;
+  providerGenerationMs?: number;
+  providerTokensPerSecond?: number;
+  providerFinishReason?: string;
 }
 
 const FINISHED_RUN_RETENTION_MS = 10 * 60 * 1000;
@@ -86,6 +96,32 @@ export class ActiveTranslationRegistry {
       return;
     }
     run.issues.push(issue);
+    this.#notify();
+  }
+
+  recordProviderMetrics(
+    id: number,
+    metrics: import("../providers/types").ProviderRequestMetrics,
+  ): void {
+    const run = this.#runs.get(id);
+    if (!run || run.finishedAt !== undefined) return;
+    run.providerModel = metrics.model;
+    if (metrics.phase === "started") {
+      run.providerRequestCount = (run.providerRequestCount ?? 0) + 1;
+      run.providerRequestActive = true;
+      run.providerRequestStartedAt = this.#now();
+    } else {
+      run.providerRequestActive = false;
+      delete run.providerRequestStartedAt;
+      run.providerInputTokens = (run.providerInputTokens ?? 0) + (metrics.inputTokens ?? 0);
+      run.providerOutputTokens = (run.providerOutputTokens ?? 0) + (metrics.outputTokens ?? 0);
+      run.providerReasoningTokens = (run.providerReasoningTokens ?? 0) + (metrics.reasoningTokens ?? 0);
+      run.providerGenerationMs = (run.providerGenerationMs ?? 0) + (metrics.durationMs ?? 0);
+      if (metrics.tokensPerSecond !== undefined) {
+        run.providerTokensPerSecond = metrics.tokensPerSecond;
+      }
+      if (metrics.finishReason) run.providerFinishReason = metrics.finishReason;
+    }
     this.#notify();
   }
 
@@ -168,6 +204,9 @@ export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): 
     ...(run.finishedAt ? [`Finished: ${new Date(run.finishedAt).toISOString()}`] : []),
     ...(run.plan
       ? [`Scope: ${run.plan.totalDocuments} documents, ${run.plan.totalUnits} units; completed ${run.completedUnits} units in ${run.completedDocuments} documents`]
+      : []),
+    ...(run.providerRequestCount
+      ? [`Provider: ${run.providerModel ?? "unknown"}; ${run.providerRequestCount} requests; ${run.providerInputTokens ?? 0} input tokens; ${run.providerOutputTokens ?? 0} output tokens; ${run.providerReasoningTokens ?? 0} reasoning tokens; ${run.providerGenerationMs ?? 0} ms`]
       : []),
     `Issues: ${run.issues.length}${run.droppedIssues ? ` (+${run.droppedIssues} more were not recorded)` : ""}`,
   ];
