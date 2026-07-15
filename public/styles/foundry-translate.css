@@ -871,26 +871,13 @@
   font-size: 10px;
 }
 
-.ft-active-translations__preview {
-  padding: 7px 8px;
-  border-left: 2px solid var(--ft-color-accent);
-  border-radius: var(--ft-radius-sm);
-  background: var(--ft-color-surface);
-}
-
-.ft-active-translations__preview span {
+.ft-active-translations__stream-status {
+  display: flex;
+  align-items: center;
+  gap: var(--ft-space-1);
   color: var(--ft-color-text-muted);
   font-size: 10px;
-}
-
-.ft-active-translations__preview p {
-  display: -webkit-box;
-  margin: 2px 0 0;
-  overflow: hidden;
-  color: var(--ft-color-text);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
 }
 
 .ft-active-translations__empty {

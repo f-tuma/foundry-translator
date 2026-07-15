@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-15
-- Repository state: `main`; diagnostic patch `v0.14.4` prepared locally from `v0.14.3`
+- Repository state: `main`; progress UI patch `v0.14.5` prepared locally from `v0.14.4`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -32,6 +32,16 @@ and the recommended implementation order.
   retries, and native LM Studio API fallbacks. These counters are visible in
   the overview and copied log, so another attempt can distinguish delimiter
   damage from empty/truncated generation without relying on request count alone.
+- 2026-07-15: The `v0.14.5` LLM progress UI no longer renders the rapidly
+  changing tail of the streamed model response. SSE still supplies progress
+  and final usage metrics, but the overview now shows a stable generation
+  status with the received character count and refreshes on its one-second
+  ticker instead of re-rendering for every stream chunk.
+- 2026-07-15: Stored partial Journal translations now expose the same
+  `Translate this page` header action as their source Journal. Because partial
+  copies preserve source page IDs, the action resolves the source document
+  from the translation flag and merges the selected page back into the stored
+  translation without requiring the GM to switch to the original first.
 
 - 2026-07-15: Patch `v0.14.2` fixes smart-glossary candidate suffix duplication
   and avoids repeated failed whole-block attempts in Chrome Local Translator.

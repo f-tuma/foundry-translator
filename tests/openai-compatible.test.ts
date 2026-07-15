@@ -224,7 +224,6 @@ describe("OpenAiCompatibleProvider", () => {
     }]);
     expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
       phase: "progress",
-      outputPreview: "Vítejte",
       streamedCharacters: 27,
     }));
     expect(metrics).toHaveBeenCalledWith(expect.objectContaining({

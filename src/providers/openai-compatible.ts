@@ -77,14 +77,6 @@ export class OpenAiCompatibleTranslationError extends Error {
   }
 }
 
-function translationPreview(value: string): string {
-  return value
-    .replace(/__FT(?:N|G|S|B)_[A-Z0-9_]+__/giu, " ")
-    .replace(/\s+/gu, " ")
-    .trim()
-    .slice(-280);
-}
-
 async function readLmStudioEventStream(
   response: Response,
   onMessage: (content: string) => void,
@@ -508,7 +500,6 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
               model: this.#model,
               durationMs: now - startedAt,
               streamedCharacters: content.length,
-              outputPreview: translationPreview(content),
             });
           })
         : await this.#readJson<LmStudioChatPayload>(response);

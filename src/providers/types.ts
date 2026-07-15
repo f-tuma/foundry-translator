@@ -23,7 +23,6 @@ export interface ProviderRequestMetrics {
   reasoningTokens?: number;
   tokensPerSecond?: number;
   finishReason?: string;
-  outputPreview?: string;
   streamedCharacters?: number;
   batchFallbacks?: number;
   sequentialFallbackTexts?: number;

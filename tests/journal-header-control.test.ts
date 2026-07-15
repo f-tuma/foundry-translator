@@ -130,7 +130,7 @@ describe("Journal header translation action", () => {
     expect(controls).toHaveLength(0);
   });
 
-  it("offers a return to the source from a stored translation", () => {
+  it("offers page translation and a return to the source from a stored translation", () => {
     const source = journal();
     const translated: FoundryJournalDocument = {
       id: "translated-id",
@@ -166,6 +166,11 @@ describe("Journal header translation action", () => {
       action: "foundry-translate-show-original-journal",
       label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original",
       icon: "fa-solid fa-arrow-left",
+    });
+    expect(controls[1]).toMatchObject({
+      action: "foundry-translate-translate-page",
+      label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage",
+      icon: "fa-solid fa-file-lines",
     });
   });
 

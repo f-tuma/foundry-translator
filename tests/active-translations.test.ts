@@ -143,14 +143,17 @@ describe("Active translation registry", () => {
     let now = 1_000;
     const registry = new ActiveTranslationRegistry(() => now);
     const id = registry.start("Guide", "cs");
+    let notifications = 0;
+    registry.subscribe(() => notifications += 1);
     registry.recordProviderMetrics(id, { phase: "started", model: "gemma" });
+    expect(notifications).toBe(1);
     registry.recordProviderMetrics(id, {
       phase: "progress",
       model: "gemma",
       durationMs: 500,
       streamedCharacters: 24,
-      outputPreview: "Průběžný překlad",
     });
+    expect(notifications).toBe(1);
     registry.recordProviderMetrics(id, {
       phase: "diagnostic",
       model: "gemma",
@@ -163,7 +166,6 @@ describe("Active translation registry", () => {
       providerRequestActive: true,
       providerRequestCount: 1,
       providerStreamedCharacters: 24,
-      providerOutputPreview: "Průběžný překlad",
       providerBatchFallbacks: 1,
       providerSequentialFallbackTexts: 16,
       providerResponseRetries: 2,

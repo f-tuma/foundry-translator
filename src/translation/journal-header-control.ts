@@ -269,7 +269,8 @@ export function addJournalTranslationHeaderControl(
   const original = sourceJournal(application.entry);
   if (!journal && !original) return;
 
-  if (journal && !original) {
+  const translationSource = journal ?? original;
+  if (translationSource) {
     controls.unshift({
       action: "foundry-translate-translate-page",
       label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage",
@@ -283,7 +284,7 @@ export function addJournalTranslationHeaderControl(
           );
           return;
         }
-        void translateFromHeader(journal, application, pageId);
+        void translateFromHeader(translationSource, application, pageId);
       },
     });
   }

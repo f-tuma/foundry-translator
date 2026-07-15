@@ -94,10 +94,11 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
       ${providerFallbacks
         ? `<span class="ft-active-translations__fallbacks">${escapeHtml(providerFallbacks)}</span>`
         : ""}
-      ${run.providerRequestActive && run.providerOutputPreview
-        ? `<div class="ft-active-translations__preview">
-            <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.StreamPreview")}</span>
-            <p>${escapeHtml(run.providerOutputPreview)}</p>
+      ${run.providerRequestActive
+        ? `<div class="ft-active-translations__stream-status">
+            <i class="fa-solid fa-wave-square" aria-hidden="true"></i>
+            <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.StreamStatus")
+              .replace("{characters}", (run.providerStreamedCharacters ?? 0).toLocaleString())}</span>
           </div>`
         : ""}`
     : "";

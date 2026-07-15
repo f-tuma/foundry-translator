@@ -51,7 +51,6 @@ export interface ActiveTranslationRun {
   providerGenerationMs?: number;
   providerTokensPerSecond?: number;
   providerFinishReason?: string;
-  providerOutputPreview?: string;
   providerStreamedCharacters?: number;
   providerBatchFallbacks?: number;
   providerSequentialFallbackTexts?: number;
@@ -116,16 +115,15 @@ export class ActiveTranslationRegistry {
       run.providerRequestCount = (run.providerRequestCount ?? 0) + 1;
       run.providerRequestActive = true;
       run.providerRequestStartedAt = this.#now();
-      delete run.providerOutputPreview;
       delete run.providerStreamedCharacters;
     } else if (metrics.phase === "progress") {
       run.providerRequestActive = true;
-      if (metrics.outputPreview !== undefined) {
-        run.providerOutputPreview = metrics.outputPreview;
-      }
       if (metrics.streamedCharacters !== undefined) {
         run.providerStreamedCharacters = metrics.streamedCharacters;
       }
+      // The overview has its own one-second ticker. Avoid re-rendering the
+      // entire Foundry window for every SSE chunk, which made the UI flicker.
+      return;
     } else if (metrics.phase === "diagnostic") {
       run.providerBatchFallbacks = (run.providerBatchFallbacks ?? 0) +
         (metrics.batchFallbacks ?? 0);

@@ -159,7 +159,7 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Requests": "LLM requests",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.CurrentRequest": "current request",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.GenerationTime": "generation time",
-  "FOUNDRY_TRANSLATE.ActiveTranslations.StreamPreview": "Live model output",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.StreamStatus": "Model is generating · {characters} characters received",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Batches": "malformed batches",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Sequential": "sequential fallback texts",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Retries": "response retries",

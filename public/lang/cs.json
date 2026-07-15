@@ -159,7 +159,7 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Requests": "LLM požadavky",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.CurrentRequest": "aktuální požadavek",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.GenerationTime": "čas generování",
-  "FOUNDRY_TRANSLATE.ActiveTranslations.StreamPreview": "Živý výstup modelu",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.StreamStatus": "Model generuje odpověď · přijato {characters} znaků",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Batches": "poškozené batche",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Sequential": "sekvenční fallback texty",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Retries": "opakované odpovědi",

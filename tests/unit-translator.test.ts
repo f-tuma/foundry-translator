@@ -239,6 +239,10 @@ describe("translation units", () => {
       glossary: [],
       provider: translationProvider,
       settings,
+      // Production translation runs always provide the server cache. Keeping
+      // it here also makes the assertion deterministic if the first run
+      // finishes while the second is still computing its WebCrypto cache key.
+      cache: new MemoryTranslationCache(),
       nonceFactory: () => "CONCURRENT",
     } as const;
 
