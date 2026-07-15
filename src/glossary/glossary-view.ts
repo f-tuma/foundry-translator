@@ -1,8 +1,10 @@
 import type { GlossaryEntry } from "./types";
+import type { GlossaryCandidate } from "./candidates";
 
 export interface GlossaryViewData {
   discovered: GlossaryEntry[];
   stored: GlossaryEntry[];
+  candidates?: GlossaryCandidate[];
   error?: string;
 }
 function localize(key: string): string {
@@ -24,6 +26,39 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
   const sceneCount = data.discovered.filter(({ category }) => category === "location").length;
   const section = document.createElement("section");
   section.className = "ft-settings ft-glossary";
+  const storedRows = [...data.stored]
+    .sort((left, right) => left.source.localeCompare(right.source))
+    .map((entry) => `
+      <label class="ft-glossary__row">
+        <span class="ft-glossary__source" title="${escapeHtml(entry.source)}">${escapeHtml(entry.source)}</span>
+        <input type="text" maxlength="240" value="${escapeHtml(entry.replacement)}" data-glossary-replacement data-source="${escapeHtml(entry.source)}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}: ${escapeHtml(entry.source)}">
+      </label>
+    `)
+    .join("");
+  const candidates = data.candidates ?? [];
+  const candidateRows = candidates.map((candidate) => `
+    <article class="ft-glossary__candidate" data-candidate-id="${escapeHtml(candidate.id)}">
+      <div class="ft-glossary__candidate-context">
+        <strong>${escapeHtml(candidate.documentName)}</strong>
+        <span>${escapeHtml(candidate.fieldName)}</span>
+        <span>${localize("FOUNDRY_TRANSLATE.Glossary.Candidates.Previous")}: ${escapeHtml(candidate.previousTranslation)}</span>
+      </div>
+      <div class="ft-glossary__candidate-fields">
+        <input type="text" maxlength="240" value="${escapeHtml(candidate.source)}" data-candidate-source placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.Candidates.SourcePlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Source")}">
+        <input type="text" maxlength="240" value="${escapeHtml(candidate.replacement)}" data-candidate-replacement aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}">
+      </div>
+      <div class="ft-glossary__candidate-actions">
+        <button type="button" class="ft-button ft-button--secondary" data-action="reject-candidate">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          <span>${localize("FOUNDRY_TRANSLATE.Glossary.Candidates.Reject")}</span>
+        </button>
+        <button type="button" class="ft-button ft-button--primary" data-action="accept-candidate">
+          <i class="fa-solid fa-check" aria-hidden="true"></i>
+          <span>${localize("FOUNDRY_TRANSLATE.Glossary.Candidates.Accept")}</span>
+        </button>
+      </div>
+    </article>
+  `).join("");
   section.innerHTML = `
     <header class="ft-settings__intro">
       <span class="ft-settings__brand-icon" aria-hidden="true">
@@ -52,6 +87,19 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
         : ""
     }
 
+    <section class="ft-glossary__section ft-glossary__candidates">
+      <div class="ft-glossary__section-heading">
+        <div>
+          <h3>${localize("FOUNDRY_TRANSLATE.Glossary.Candidates.Heading")}</h3>
+          <p>${localize("FOUNDRY_TRANSLATE.Glossary.Candidates.Hint")}</p>
+        </div>
+        <span>${candidates.length}</span>
+      </div>
+      <div class="ft-glossary__candidate-list">
+        ${candidateRows || `<p class="ft-glossary__empty">${localize("FOUNDRY_TRANSLATE.Glossary.Candidates.Empty")}</p>`}
+      </div>
+    </section>
+
     <section class="ft-glossary__section">
       <div class="ft-glossary__section-heading">
         <div>
@@ -59,13 +107,28 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
           <p>${localize("FOUNDRY_TRANSLATE.Glossary.ManualHint")}</p>
         </div>
       </div>
-      <div class="ft-glossary__manual">
-        <input type="text" name="manualTerm" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.ManualHeading")}">
-        <input type="text" name="manualReplacement" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualReplacementPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.ManualReplacementPlaceholder")}">
-        <button type="button" class="ft-button ft-button--secondary" data-action="add-term">
-          <i class="fa-solid fa-plus" aria-hidden="true"></i>
-          <span>${localize("FOUNDRY_TRANSLATE.Glossary.Add")}</span>
-        </button>
+      <div class="ft-glossary__editor">
+        <div class="ft-glossary__columns" aria-hidden="true">
+          <strong>${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Source")}</strong>
+          <strong>${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}</strong>
+        </div>
+        <div class="ft-glossary__manual">
+          <input type="text" name="manualTerm" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Source")}">
+          <input type="text" name="manualReplacement" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualReplacementPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}">
+          <button type="button" class="ft-button ft-button--secondary" data-action="add-term">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            <span>${localize("FOUNDRY_TRANSLATE.Glossary.Add")}</span>
+          </button>
+        </div>
+        <div class="ft-glossary__rows">
+          ${storedRows || `<p class="ft-glossary__empty">${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Empty")}</p>`}
+        </div>
+        <div class="ft-glossary__editor-actions">
+          <button type="button" class="ft-button ft-button--secondary" data-action="save-edits" ${data.stored.length ? "" : "disabled"}>
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+            <span>${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Save")}</span>
+          </button>
+        </div>
       </div>
     </section>
 

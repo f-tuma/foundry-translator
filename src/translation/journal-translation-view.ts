@@ -27,7 +27,9 @@ export function renderJournalTranslationView(
   const providerName = localize(
     data.settings.provider === "chrome-local"
       ? "FOUNDRY_TRANSLATE.Settings.Provider.Chrome"
-      : "FOUNDRY_TRANSLATE.JournalTranslation.GoogleProvider",
+      : data.settings.provider === "openai-compatible"
+        ? "FOUNDRY_TRANSLATE.JournalTranslation.OpenAIProvider"
+        : "FOUNDRY_TRANSLATE.JournalTranslation.GoogleProvider",
   );
   const sourceLanguage =
     data.settings.sourceLanguage === "auto"

@@ -24,6 +24,42 @@ export function registerSettings(): void {
     default: "",
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.OPENAI_BASE_URL, {
+    name: "FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrl",
+    hint: "FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrlHint",
+    scope: "client",
+    config: false,
+    type: String,
+    default: "http://localhost:1234/v1",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.OPENAI_MODEL, {
+    name: "FOUNDRY_TRANSLATE.Settings.OpenAI.Model",
+    hint: "FOUNDRY_TRANSLATE.Settings.OpenAI.ModelHint",
+    scope: "client",
+    config: false,
+    type: String,
+    default: "",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.OPENAI_API_KEY, {
+    name: "FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKey",
+    hint: "FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKeyHint",
+    scope: "client",
+    config: false,
+    type: String,
+    default: "",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.WORLD_CONTEXT, {
+    name: "FOUNDRY_TRANSLATE.Settings.WorldContext.Name",
+    hint: "FOUNDRY_TRANSLATE.Settings.WorldContext.Hint",
+    scope: "world",
+    config: false,
+    type: String,
+    default: "",
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.SOURCE_LANGUAGE, {
     name: "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Name",
     hint: "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Hint",
@@ -40,6 +76,15 @@ export function registerSettings(): void {
     config: false,
     type: String,
     default: "cs",
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.GLOSSARY_CANDIDATES, {
+    name: "FOUNDRY_TRANSLATE.Glossary.Candidates.SettingName",
+    hint: "FOUNDRY_TRANSLATE.Glossary.Candidates.SettingHint",
+    scope: "world",
+    config: false,
+    type: Object,
+    default: [],
   });
 
   game.settings.registerMenu(MODULE_ID, "googleProvider", {

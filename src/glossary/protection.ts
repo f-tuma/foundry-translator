@@ -90,6 +90,23 @@ function asciiTokenPattern(token: string): RegExp {
   return new RegExp(escapeRegExp(token), "giu");
 }
 
+function restoreTokenWithWordBoundaries(
+  text: string,
+  token: string,
+  replacement: string,
+): string {
+  const pattern = asciiTokenPattern(token);
+  return text.replace(pattern, (matched, offset: number, whole: string) => {
+    const before = offset > 0 ? whole[offset - 1] ?? "" : "";
+    const after = whole[offset + matched.length] ?? "";
+    const needsLeadingSpace = WORD_CHARACTER.test(before) &&
+      WORD_CHARACTER.test(replacement[0] ?? "");
+    const needsTrailingSpace = WORD_CHARACTER.test(replacement.at(-1) ?? "") &&
+      WORD_CHARACTER.test(after);
+    return `${needsLeadingSpace ? " " : ""}${replacement}${needsTrailingSpace ? " " : ""}`;
+  });
+}
+
 export function protectGlossaryTerms(
   text: string,
   entries: Iterable<GlossaryEntry>,
@@ -162,7 +179,11 @@ export function restoreGlossaryTerms(
         `Translation must contain glossary token ${token} exactly once; found ${count}.`,
       );
     }
-    restored = restored.replace(asciiTokenPattern(token), () => replacement);
+    // Providers occasionally trim whitespace immediately next to a protected
+    // token (for example `To__FTG...__dorazilo`). Restore a word boundary
+    // around the fixed glossary replacement without adding spaces before
+    // punctuation.
+    restored = restoreTokenWithWordBoundaries(restored, token, replacement);
   }
 
   return restored;

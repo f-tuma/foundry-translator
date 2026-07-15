@@ -7,6 +7,7 @@ import {
   actorSourceHash,
   canReuseActorTranslation,
   readActorTranslationFlag,
+  stampActorOutputHash,
   translateActorData,
   type ActorData,
 } from "./actor";
@@ -15,6 +16,7 @@ import {
   canReuseItemTranslation,
   itemSourceHash,
   readItemTranslationFlag,
+  stampItemOutputHash,
   translateItemData,
   type ItemData,
 } from "./item";
@@ -36,11 +38,13 @@ import {
   journalSourceHash,
   mergePartialJournalTranslation,
   readJournalTranslationFlag,
+  stampJournalOutputHash,
   translateJournalData,
   type JournalData,
   type JournalTranslationProgress,
   type TranslatedJournal,
 } from "./journal";
+import { hasManualOutputEdits } from "./output-hash";
 import {
   discoverSystemHtmlFieldPaths,
   readPath,
@@ -66,6 +70,15 @@ export class TranslationCancelledError extends Error {
   constructor() {
     super("Překlad byl zrušen. Hotové části zůstávají uložené a další spuštění na ně naváže.");
     this.name = "TranslationCancelledError";
+  }
+}
+
+export class ManualTranslationEditsError extends Error {
+  constructor(documentName: string) {
+    super(
+      `Překlad „${documentName}“ obsahuje ruční úpravy. Zůstal beze změny, aby je nový překlad nepřepsal.`,
+    );
+    this.name = "ManualTranslationEditsError";
   }
 }
 
@@ -604,18 +617,21 @@ export class JournalTranslationService {
         const journalData = rewritten as JournalData;
         const flag = readJournalTranslationFlag(journalData.flags);
         if (flag) await assertJournalSourceUnchanged(document, flag.sourceHash);
+        await stampJournalOutputHash(journalData);
         node.result.data = journalData;
         node.result.document = await runtime.translations.save(journalData);
       } else if (isActorDocument(document)) {
         const actorData = rewritten as ActorData;
         const flag = readActorTranslationFlag(actorData.flags);
         if (flag) await assertActorSourceUnchanged(document, flag.sourceHash);
+        await stampActorOutputHash(actorData);
         node.result.data = actorData;
         node.result.document = await runtime.actorTranslations.save(actorData);
       } else {
         const itemData = rewritten as ItemData;
         const flag = readItemTranslationFlag(itemData.flags);
         if (flag) await assertItemSourceUnchanged(document, flag.sourceHash);
+        await stampItemOutputHash(itemData);
         node.result.data = itemData;
         node.result.document = await runtime.itemTranslations.save(itemData);
       }
@@ -666,6 +682,10 @@ export class JournalTranslationService {
       runtime.settings.targetLanguage,
     );
     const existingFlag = existing ? readJournalTranslationFlag(existing.flags) : null;
+    const existingData = existing?.toObject() as JournalData | undefined;
+    const manuallyEdited = existingData && existingFlag
+      ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
+      : false;
     const reusable = existing && existingFlag && (pageIds
       ? pageIds.every((pageId) =>
           canReuseJournalPageTranslation(existingFlag, sourceHash, pageId, runtime.glossaryHash))
@@ -683,6 +703,7 @@ export class JournalTranslationService {
         dependencyWarnings: [],
       };
     }
+    if (existing && manuallyEdited) throw new ManualTranslationEditsError(existing.name ?? source.name);
 
     const translated = await translateJournalData({
       source,
@@ -721,6 +742,7 @@ export class JournalTranslationService {
         translated.data,
       );
     }
+    await stampJournalOutputHash(translated.data);
     const document = await runtime.translations.save(translated.data);
     return {
       ...translated,
@@ -744,6 +766,10 @@ export class JournalTranslationService {
       runtime.settings.targetLanguage,
     );
     const existingFlag = existing ? readActorTranslationFlag(existing.flags) : null;
+    const existingData = existing?.toObject() as ActorData | undefined;
+    const manuallyEdited = existingData && existingFlag
+      ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
+      : false;
     if (existing && existingFlag &&
       canReuseActorTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
       return {
@@ -753,6 +779,7 @@ export class JournalTranslationService {
         fallbackTextSegments: existingFlag.fallbackTextSegments,
       };
     }
+    if (existing && manuallyEdited) throw new ManualTranslationEditsError(existing.name ?? source.name);
 
     const paths = actorHtmlFieldPaths(sourceDocument, source);
     const translated = await translateActorData({
@@ -792,6 +819,7 @@ export class JournalTranslationService {
       }),
     });
     await assertActorSourceUnchanged(sourceDocument, sourceHash);
+    await stampActorOutputHash(translated.data);
     const document = await runtime.actorTranslations.save(translated.data);
     return { ...translated, document, reused: false };
   }
@@ -808,6 +836,10 @@ export class JournalTranslationService {
       runtime.settings.targetLanguage,
     );
     const existingFlag = existing ? readItemTranslationFlag(existing.flags) : null;
+    const existingData = existing?.toObject() as ItemData | undefined;
+    const manuallyEdited = existingData && existingFlag
+      ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
+      : false;
     if (existing && existingFlag &&
       canReuseItemTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
       return {
@@ -817,6 +849,7 @@ export class JournalTranslationService {
         fallbackTextSegments: existingFlag.fallbackTextSegments,
       };
     }
+    if (existing && manuallyEdited) throw new ManualTranslationEditsError(existing.name ?? source.name);
 
     const translated = await translateItemData({
       source,
@@ -854,6 +887,7 @@ export class JournalTranslationService {
       }),
     });
     await assertItemSourceUnchanged(sourceDocument, sourceHash);
+    await stampItemOutputHash(translated.data);
     const document = await runtime.itemTranslations.save(translated.data);
     return { ...translated, document, reused: false };
   }

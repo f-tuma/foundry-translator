@@ -1,10 +1,11 @@
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
-import type { ProviderId } from "../settings/settings";
+import { isProviderId, type ProviderId } from "../settings/settings";
 import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
+import { translatedOutputHash } from "./output-hash";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
@@ -13,7 +14,7 @@ import {
 } from "./unit-translator";
 
 export const ITEM_TRANSLATION_SCHEMA_VERSION = 1;
-export const ITEM_TRANSLATION_ENGINE_REVISION = 2;
+export const ITEM_TRANSLATION_ENGINE_REVISION = 3;
 
 export interface ItemData extends Record<string, unknown> {
   _id?: string;
@@ -37,6 +38,8 @@ export interface ItemTranslationFlag {
   fallbackTextSegments: number;
   /** Glossary hash at translation time; a changed glossary invalidates reuse. */
   glossaryFingerprint?: string;
+  /** Fingerprint of the generated copy, used to detect later manual edits. */
+  outputHash?: string;
 }
 
 export interface ItemTranslationProgress {
@@ -79,7 +82,7 @@ export function readItemTranslationFlag(
     flag.schemaVersion !== ITEM_TRANSLATION_SCHEMA_VERSION ||
     typeof flag.sourceUuid !== "string" ||
     typeof flag.sourceHash !== "string" ||
-    (flag.providerId !== "chrome-local" && flag.providerId !== "google-cloud-basic") ||
+    !isProviderId(flag.providerId) ||
     typeof flag.sourceLanguage !== "string" ||
     typeof flag.targetLanguage !== "string" ||
     typeof flag.translatedAt !== "string" ||
@@ -113,6 +116,18 @@ function sourceSnapshot(source: ItemData): string {
 
 export async function itemSourceHash(source: ItemData): Promise<string> {
   return sha256(sourceSnapshot(source));
+}
+
+export async function stampItemOutputHash(data: ItemData): Promise<string> {
+  const flag = readItemTranslationFlag(data.flags);
+  if (!flag) throw new Error("Přeložený Item nemá platná metadata pro otisk výstupu.");
+  const outputHash = await translatedOutputHash(data);
+  flag.outputHash = outputHash;
+  data.flags = {
+    ...data.flags,
+    [MODULE_ID]: { ...data.flags?.[MODULE_ID], itemTranslation: flag },
+  };
+  return outputHash;
 }
 
 export async function translateItemData(options: TranslateItemOptions): Promise<TranslatedItem> {

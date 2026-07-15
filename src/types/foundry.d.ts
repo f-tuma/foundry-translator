@@ -16,6 +16,7 @@ interface FoundryGame {
     set(namespace: string, key: string, value: unknown): Promise<unknown>;
   };
   actors: { contents: FoundryNamedDocument[] };
+  items: { contents: FoundryNamedDocument[] };
   scenes: { contents: FoundryNamedDocument[] };
   journal: { contents: FoundryJournalWorldDocument[] };
   folders: { contents: FoundryFolder[] };

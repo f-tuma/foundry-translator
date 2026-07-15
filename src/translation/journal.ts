@@ -1,10 +1,12 @@
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
-import type { ProviderId } from "../settings/settings";
+import { isProviderId, type ProviderId } from "../settings/settings";
 import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
+import { planMarkdownTranslation } from "./markdown";
+import { translatedOutputHash } from "./output-hash";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
@@ -13,8 +15,9 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
-export const TRANSLATION_ENGINE_REVISION = 4;
+export const TRANSLATION_ENGINE_REVISION = 6;
 const HTML_FORMAT = 1;
+const MARKDOWN_FORMAT = 2;
 
 export interface JournalPageData extends Record<string, unknown> {
   _id?: string;
@@ -111,6 +114,8 @@ export interface JournalTranslationFlag {
   processedPageIds?: string[];
   /** Glossary hash at translation time; a changed glossary invalidates reuse. */
   glossaryFingerprint?: string;
+  /** Fingerprint of the generated copy, used to detect later manual edits. */
+  outputHash?: string;
 }
 
 export function readJournalTranslationFlag(
@@ -123,7 +128,7 @@ export function readJournalTranslationFlag(
     flag.schemaVersion !== TRANSLATION_SCHEMA_VERSION ||
     typeof flag.sourceUuid !== "string" ||
     typeof flag.sourceHash !== "string" ||
-    (flag.providerId !== "chrome-local" && flag.providerId !== "google-cloud-basic") ||
+    !isProviderId(flag.providerId) ||
     typeof flag.sourceLanguage !== "string" ||
     typeof flag.targetLanguage !== "string" ||
     typeof flag.translatedAt !== "string" ||
@@ -216,7 +221,7 @@ interface TranslationTarget {
   apply(segments: readonly string[]): void;
 }
 
-interface HtmlTranslationTarget {
+interface StructuredTranslationTarget {
   start: number;
   length: number;
   apply(units: readonly (readonly string[])[]): void;
@@ -225,7 +230,7 @@ interface HtmlTranslationTarget {
 async function translateTargets(
   options: TranslateJournalOptions,
   targets: TranslationTarget[],
-  htmlTargets: readonly HtmlTranslationTarget[],
+  structuredTargets: readonly StructuredTranslationTarget[],
   onQualityFallback: (fallback: TranslationQualityFallback) => void,
 ): Promise<void> {
   const translatedUnits = await translateUnits({
@@ -246,7 +251,7 @@ async function translateTargets(
     target.translatedSegments = translatedSegments;
     target.apply(translatedSegments);
   });
-  for (const target of htmlTargets) {
+  for (const target of structuredTargets) {
     target.apply(
       targets
         .slice(target.start, target.start + target.length)
@@ -271,6 +276,18 @@ function sourceSnapshot(source: JournalData): string {
 
 export async function journalSourceHash(source: JournalData): Promise<string> {
   return sha256(sourceSnapshot(source));
+}
+
+export async function stampJournalOutputHash(data: JournalData): Promise<string> {
+  const flag = readJournalTranslationFlag(data.flags);
+  if (!flag) throw new Error("Přeložený deník nemá platná metadata pro otisk výstupu.");
+  const outputHash = await translatedOutputHash(data);
+  flag.outputHash = outputHash;
+  data.flags = {
+    ...data.flags,
+    [MODULE_ID]: { ...data.flags?.[MODULE_ID], translation: flag },
+  };
+  return outputHash;
 }
 
 export async function translateJournalData(
@@ -327,7 +344,7 @@ export async function translateJournalData(
     if (selectedPageIds && (!page._id || !selectedPageIds.has(page._id))) continue;
     const sourcePageName = page.name;
     const targets: TranslationTarget[] = [];
-    const htmlTargets: HtmlTranslationTarget[] = [];
+    const structuredTargets: StructuredTranslationTarget[] = [];
     targets.push({
       segments: [page.name],
       apply: ([translatedName]) => {
@@ -344,7 +361,22 @@ export async function translateJournalData(
       for (const segments of plan.units) {
         targets.push({ segments, apply: () => undefined });
       }
-      htmlTargets.push({
+      structuredTargets.push({
+        start,
+        length: plan.units.length,
+        apply: (translated) => apply(plan.apply(translated)),
+      });
+      translatedPage = true;
+    };
+
+    const queueMarkdown = (markdown: string, apply: (translated: string) => void): void => {
+      const plan = planMarkdownTranslation(markdown);
+      if (!plan.units.length) return;
+      const start = targets.length;
+      for (const segments of plan.units) {
+        targets.push({ segments, apply: () => undefined });
+      }
+      structuredTargets.push({
         start,
         length: plan.units.length,
         apply: (translated) => apply(plan.apply(translated)),
@@ -354,11 +386,28 @@ export async function translateJournalData(
 
     const text = page.text;
     const content = text?.content;
+    const isMarkdownTextPage =
+      text?.format === MARKDOWN_FORMAT &&
+      (typeof text.markdown === "string" || typeof content === "string");
     const isHtmlTextPage =
       typeof content === "string" &&
       (text?.format === undefined || text.format === HTML_FORMAT) &&
       !text?.markdown;
-    if (!isHtmlTextPage) {
+    if (isMarkdownTextPage) {
+      if (typeof text.markdown === "string") {
+        queueMarkdown(text.markdown, (translated) => {
+          if (page.text) page.text.markdown = translated;
+        });
+      }
+      // Foundry stores the rendered HTML alongside the original Markdown.
+      // Translate it too so the compendium copy renders correctly without
+      // relying on an internal Markdown converter during document creation.
+      if (typeof content === "string") {
+        queueHtml(content, (translated) => {
+          if (page.text) page.text.content = translated;
+        });
+      }
+    } else if (!isHtmlTextPage) {
       if (typeof content === "string" && content.trim()) {
         skippedPage = true;
       }
@@ -379,7 +428,7 @@ export async function translateJournalData(
     }
 
     try {
-      await translateTargets(options, targets, htmlTargets, recordQualityFallback);
+      await translateTargets(options, targets, structuredTargets, recordQualityFallback);
     } catch (error) {
       const detail = error instanceof Error ? ` ${error.message}` : "";
       throw new Error(

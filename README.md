@@ -3,7 +3,7 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.13.0` processes
+> The module is currently an early development build. Version `0.14.0` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
 > safely keeps an isolated failed fragment in the original, translates human text
 > inside Foundry embeds, recursively translates linked Journals, Actors, and
@@ -52,8 +52,32 @@ the browser.
 Its API key is a client-scoped setting: it stays in the current browser and is not
 stored in the world or shared with players.
 
-The provider test performs one short English-to-Czech translation. Google Cloud
-requires a project with billing and the Cloud Translation API enabled.
+**OpenAI-compatible / LM Studio** connects directly from the GM browser to a
+local server. Enter either the server root (for example
+`http://localhost:1234`) or its `/v1` URL, the exact model ID returned by
+`GET /v1/models`, and an optional Bearer token. LM Studio must allow CORS and,
+for another machine on the LAN, serve on the local network. The address, model,
+and token are client-scoped.
+
+LLM translation can use an editable world profile containing setting, genre,
+tone, lore, and translation preferences. **Suggest profile from world** sends a
+bounded sample of Journal text plus Actor, Item, and Scene names to the selected
+local model and fills the editor; the GM must review it and explicitly save the
+settings. Each LLM request also receives the approved glossary as terminology
+reference, while glossary and Foundry tokens remain integrity-protected. Cache
+entries are separated by server, model, prompt revision, world profile, and
+glossary contents.
+
+Google's stock TranslateGemma chat template uses a specialized structured
+message format which LM Studio currently does not preserve through the standard
+OpenAI-compatible Chat Completions endpoint. For this provider, use a normal
+instruction model such as Gemma Instruct or Qwen, or install a
+TranslateGemma-compatible LM Studio prompt template. The world-profile generator
+requires a general instruction model.
+
+The provider test performs one short English-to-Czech translation. For an LLM it
+first verifies the exact configured model ID. Google Cloud requires a project
+with billing and the Cloud Translation API enabled.
 
 ## Protected name glossary
 
@@ -76,6 +100,15 @@ instead of returning a corrupted name. Translations remember the glossary they
 were made with, so after a glossary change a re-run updates the stored copy
 instead of reusing it.
 
+The glossary window also contains a review queue for suggestions learned from
+manual corrections to translated Journal pages. A suggestion shows editable
+source and replacement columns and must be explicitly accepted or rejected;
+the module never adds it to the glossary automatically. If the source phrase
+cannot be inferred safely, it is left blank and must be supplied before the
+suggestion can be accepted. Newly generated Journal, Actor, and Item copies also
+carry an output fingerprint, so a later retranslation cannot silently overwrite
+detected manual edits.
+
 ## Translate a Journal Entry
 
 As Game Master open **Configure Settings → Module Settings → Journal
@@ -93,14 +126,23 @@ complete translation. Clicking the translate action of a journal that is
 already being translated opens the global overview instead.
 
 The current development build translates the journal name, page-category names,
-page names, and HTML-backed pages, including custom page types used by adventure modules.
+page names, HTML-backed pages, and Markdown source pages, including custom page
+types used by adventure modules.
 Inline markup and mechanical attributes remain local, while visible attributes
 such as `alt`, `title`, and `aria-label` are translated. Foundry references such
 as `@UUID[...]` and inline rolls such as `[[/r 1d20]]` are integrity-protected.
 Human labels and supported `@Embed[...]` options such as `readaloud` are
 translated without exposing UUIDs or configuration to the model. Markdown
-source pages are deliberately left unchanged for now and reported in the
-completion summary.
+structure, link destinations, fenced and inline code, frontmatter, and reference
+definitions stay byte-for-byte unchanged; both the editable Markdown source and
+its stored rendered HTML are translated.
+
+Chrome Local Translator first receives each protected logical block as a whole,
+so it can use paragraph-level context across inline markup and fixed glossary
+terms. The contextual result is accepted only when every structural, glossary,
+and Foundry-syntax token survives byte-for-byte and in its original order. If
+Chrome changes any token, the module automatically falls back to translating
+isolated text fragments instead of risking damaged content.
 
 Before the first request, the module scans the complete dependency graph
 without writing anything and reports the total number of documents and

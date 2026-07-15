@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ChromeLocalProvider,
   ChromeLocalTranslationError,
+  preservesProtectionTokens,
   type ChromeDownloadProgressEvent,
   type ChromeLanguageDetectorFactory,
   type ChromeTranslatorFactory,
@@ -166,7 +167,7 @@ describe("ChromeLocalProvider", () => {
     expect(calls).toBe(3);
   });
 
-  it("keeps HTML, glossary, and Foundry syntax protection tokens out of Chrome", async () => {
+  it("translates a protected logical block with full context when every token survives", async () => {
     const translatedInputs: string[] = [];
     const Translator = createTranslatorFactory((text) => {
       translatedInputs.push(text);
@@ -186,8 +187,49 @@ describe("ChromeLocalProvider", () => {
     })).resolves.toEqual([{
       translatedText: `${first}Ahoj ${glossary} ${syntax} ${second}světe${third}`,
     }]);
-    expect(translatedInputs).toEqual(["Hello ", "world"]);
-    expect(translatedInputs.join(" ")).not.toMatch(/__FT[NGS]_/u);
+    expect(translatedInputs).toEqual([
+      `${first}Hello ${glossary} ${syntax} ${second}world${third}`,
+    ]);
+  });
+
+  it("falls back to isolated fragments when Chrome corrupts a protection token", async () => {
+    const translatedInputs: string[] = [];
+    const token = "__FTG_GLOSSARY0_0000__";
+    const Translator = createTranslatorFactory((text) => {
+      translatedInputs.push(text);
+      if (text.includes(token)) return text.replace(token, "BROKEN");
+      return text.replace("The", "Ten").replace("stands.", "stojí.");
+    });
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+
+    await expect(provider.translate({
+      texts: [`The ${token} stands.`],
+      sourceLanguage: "en",
+      targetLanguage: "cs",
+    })).resolves.toEqual([{ translatedText: `Ten ${token} stojí.` }]);
+    expect(translatedInputs.slice(0, 3)).toEqual(Array(3).fill(`The ${token} stands.`));
+    expect(translatedInputs.slice(3)).toEqual(["The", "stands."]);
+  });
+
+  it("preserves whitespace around protection tokens when Chrome trims it", async () => {
+    const Translator = createTranslatorFactory((text) =>
+      text.replace("The", "To").replace("stands.", "stojí."));
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+    const token = "__FTG_SPACING_0000__";
+
+    await expect(provider.translate({
+      texts: [`The ${token} stands.`],
+      sourceLanguage: "en",
+      targetLanguage: "cs",
+    })).resolves.toEqual([{ translatedText: `To ${token} stojí.` }]);
+  });
+
+  it("requires protection tokens to remain byte-exact and ordered", () => {
+    const a = "__FTN_TEST_0000__";
+    const b = "__FTN_TEST_0001__";
+    expect(preservesProtectionTokens(`${a}Hello${b}`, `${a}Ahoj${b}`)).toBe(true);
+    expect(preservesProtectionTokens(`${a}Hello${b}`, `${b}Ahoj${a}`)).toBe(false);
+    expect(preservesProtectionTokens(`${a}Hello${b}`, `${a}Ahoj`)).toBe(false);
   });
 
   it("prepares the selected language pair immediately from a user action", async () => {

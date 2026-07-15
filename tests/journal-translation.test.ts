@@ -22,7 +22,9 @@ const translationProvider: TranslationProvider = {
         .replace("welcomes", "vítá")
         .replace("the heroes", "hrdiny")
         .replace("Player overview", "Přehled pro hráče")
-        .replace("Hidden history", "Skrytá historie"),
+        .replace("Hidden history", "Skrytá historie")
+        .replace("Raw markdown", "Zdrojový Markdown")
+        .replace("Rendered", "Vykresleno"),
     }));
   },
   async testConnection() {},
@@ -146,9 +148,10 @@ describe("Journal translation", () => {
       },
     });
     expect(translated.data.pages[1]?.name).toBe("Dodatek");
-    expect(translated.data.pages[1]?.text?.markdown).toBe("# Raw markdown");
-    expect(translated.translatedTextPages).toBe(1);
-    expect(translated.skippedTextPages).toBe(1);
+    expect(translated.data.pages[1]?.text?.markdown).toBe("# Zdrojový Markdown");
+    expect(translated.data.pages[1]?.text?.content).toBe("Vykresleno");
+    expect(translated.translatedTextPages).toBe(2);
+    expect(translated.skippedTextPages).toBe(0);
     expect(translated.fallbackTextSegments).toBe(0);
     expect(translated.data.flags?.existing).toEqual({ keep: true });
     expect(translated.data.flags?.["foundry-translate"]?.translation).toMatchObject({

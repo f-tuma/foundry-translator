@@ -23,6 +23,10 @@ describe("Journal translation view", () => {
       settings: {
         provider: "chrome-local",
         apiKey: "",
+        openAiBaseUrl: "http://localhost:1234/v1",
+        openAiModel: "",
+        openAiApiKey: "",
+        worldContext: "",
         sourceLanguage: "en",
         targetLanguage: "cs",
       },
@@ -43,6 +47,10 @@ describe("Journal translation view", () => {
       settings: {
         provider: "chrome-local",
         apiKey: "",
+        openAiBaseUrl: "http://localhost:1234/v1",
+        openAiModel: "",
+        openAiApiKey: "",
+        worldContext: "",
         sourceLanguage: "auto",
         targetLanguage: "cs",
       },

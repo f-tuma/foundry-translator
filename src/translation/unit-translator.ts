@@ -16,6 +16,7 @@ import {
 
 const MAX_UNITS_PER_REQUEST = 128;
 const MAX_CHROME_UNITS_PER_REQUEST = 16;
+const MAX_OPENAI_UNITS_PER_REQUEST = 16;
 const QUALITY_ATTEMPTS = 3;
 export const MAX_REQUEST_CHARACTERS = 4_500;
 const PROTECTION_TOKEN = /__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__/giu;
@@ -105,12 +106,14 @@ async function cacheKey(
   segments: readonly string[],
   glossaryFingerprint: string,
   settings: TranslationUnitSettings,
+  providerIdentity?: string,
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 3,
+      schemaVersion: 4,
       segments,
       glossaryFingerprint,
+      ...(providerIdentity ? { providerIdentity } : {}),
       ...settings,
     }),
   );
@@ -212,6 +215,7 @@ async function retrySuspiciousSegments(
   protectedSegments: readonly string[],
   provider: TranslationProvider,
   settings: TranslationUnitSettings,
+  glossary: readonly GlossaryEntry[],
   onQualityFallback?: (fallback: TranslationQualityFallback) => void,
 ): Promise<CheckedSegments> {
   const checked: string[] = [];
@@ -231,6 +235,7 @@ async function retrySuspiciousSegments(
           sourceLanguage: settings.sourceLanguage,
           targetLanguage: settings.targetLanguage,
           format: "text",
+          glossary,
         });
         candidate = typeof retry?.translatedText === "string" ? retry.translatedText : "";
         problem = translationProblem(preparedSegment, candidate, settings);
@@ -317,6 +322,7 @@ async function translateSegmentsSeparately(
   prepared: PreparedUnit,
   provider: TranslationProvider,
   settings: TranslationUnitSettings,
+  glossary: readonly GlossaryEntry[],
 ): Promise<string[]> {
   const translatable = prepared.segments
     .map(({ protection }, index) => ({ text: protection.text, index }))
@@ -326,6 +332,7 @@ async function translateSegmentsSeparately(
     sourceLanguage: settings.sourceLanguage,
     targetLanguage: settings.targetLanguage,
     format: "text",
+    glossary,
   });
   if (results.length !== translatable.length) {
     throw new Error("Překladač vrátil jiný počet HTML segmentů, než kolik dostal.");
@@ -369,7 +376,9 @@ function requestBatches(
   let characters = 0;
   const maxUnits = providerId === "chrome-local"
     ? MAX_CHROME_UNITS_PER_REQUEST
-    : MAX_UNITS_PER_REQUEST;
+    : providerId === "openai-compatible"
+      ? MAX_OPENAI_UNITS_PER_REQUEST
+      : MAX_UNITS_PER_REQUEST;
   for (const prepared of misses) {
     const size = prepared.protectedText.length;
     if (
@@ -404,7 +413,12 @@ export async function translateUnits(
   const keyedUnits = await Promise.all(options.units.map(async (segments, index) => ({
     index,
     segments,
-    key: await cacheKey(segments, glossaryFingerprint, options.settings),
+    key: await cacheKey(
+      segments,
+      glossaryFingerprint,
+      options.settings,
+      options.provider.cacheIdentity,
+    ),
   })));
   let cachedValues = new Map<string, readonly string[]>();
   if (options.cache?.getMany) {
@@ -465,6 +479,7 @@ export async function translateUnits(
       sourceLanguage: options.settings.sourceLanguage,
       targetLanguage: options.settings.targetLanguage,
       format: "text",
+      glossary: options.glossary,
     });
 
     if (results.length !== batch.length) {
@@ -491,6 +506,7 @@ export async function translateUnits(
               prepared,
               options.provider,
               options.settings,
+              options.glossary,
             );
           } catch {
             protectedSegments = prepared.segments.map(({ protection }) => protection.text);
@@ -502,6 +518,7 @@ export async function translateUnits(
         protectedSegments,
         options.provider,
         options.settings,
+        options.glossary,
         options.onQualityFallback,
       );
       protectedSegments = checked.segments;

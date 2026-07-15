@@ -4,6 +4,7 @@ import {
   type ChromeLocalProviderStatus,
 } from "../providers/chrome-local";
 import { GoogleCloudBasicProvider } from "../providers/google-cloud-basic";
+import { OpenAiCompatibleProvider } from "../providers/openai-compatible";
 import type { TranslationProvider } from "../providers/types";
 import {
   getTranslatorSettings,
@@ -16,6 +17,7 @@ import {
   renderTranslatorSettingsForm,
   updateProviderFields,
 } from "./translator-settings-view";
+import { collectWorldContextSource } from "./world-context";
 
 type ConnectionState = "idle" | "testing" | "success" | "error";
 
@@ -25,12 +27,12 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     classes: ["foundry-translate", "foundry-translate-settings-window"],
     position: {
       width: 620,
-      height: "auto",
+      height: 760,
     },
     window: {
       icon: "fa-solid fa-language",
       title: "FOUNDRY_TRANSLATE.Settings.WindowTitle",
-      resizable: false,
+      resizable: true,
     },
   };
 
@@ -53,6 +55,12 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     form
       .querySelector<HTMLElement>("[data-action='toggle-key']")
       ?.addEventListener("click", (event) => this.#toggleKey(event, form));
+    form
+      .querySelector<HTMLElement>("[data-action='toggle-openai-key']")
+      ?.addEventListener("click", (event) => this.#toggleKey(event, form));
+    form
+      .querySelector<HTMLElement>("[data-action='generate-world-context']")
+      ?.addEventListener("click", () => void this.#generateWorldContext(form));
     const providerSelect = form.elements.namedItem("provider");
     if (providerSelect instanceof HTMLSelectElement) {
       providerSelect.addEventListener("change", () => this.#providerChanged(form));
@@ -87,7 +95,9 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
       "testing",
       settings.provider === "chrome-local"
         ? "FOUNDRY_TRANSLATE.Settings.Status.TestingChrome"
-        : "FOUNDRY_TRANSLATE.Settings.Status.TestingGoogle",
+        : settings.provider === "openai-compatible"
+          ? "FOUNDRY_TRANSLATE.Settings.Status.TestingOpenAI"
+          : "FOUNDRY_TRANSLATE.Settings.Status.TestingGoogle",
     );
 
     try {
@@ -100,7 +110,9 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
         "success",
         settings.provider === "chrome-local"
           ? "FOUNDRY_TRANSLATE.Settings.Status.ConnectedChrome"
-          : "FOUNDRY_TRANSLATE.Settings.Status.ConnectedGoogle",
+          : settings.provider === "openai-compatible"
+            ? "FOUNDRY_TRANSLATE.Settings.Status.ConnectedOpenAI"
+            : "FOUNDRY_TRANSLATE.Settings.Status.ConnectedGoogle",
       );
     } catch (error) {
       logger.error("Translation provider test failed.", error);
@@ -114,12 +126,51 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     }
   }
 
+  async #generateWorldContext(form: HTMLFormElement): Promise<void> {
+    const settings = this.#readForm(form);
+    const button = form.querySelector<HTMLButtonElement>("[data-action='generate-world-context']");
+    const input = form.elements.namedItem("worldContext");
+    if (!(input instanceof HTMLTextAreaElement)) return;
+    button?.setAttribute("disabled", "");
+    this.#setStatus(form, "testing", "FOUNDRY_TRANSLATE.Settings.Status.GeneratingContext");
+    try {
+      const provider = new OpenAiCompatibleProvider({
+        baseUrl: settings.openAiBaseUrl,
+        model: settings.openAiModel,
+        apiKey: settings.openAiApiKey,
+        worldContext: settings.worldContext,
+      });
+      input.value = await provider.generateWorldContext(
+        collectWorldContextSource(),
+        settings.targetLanguage,
+      );
+      this.#setStatus(form, "success", "FOUNDRY_TRANSLATE.Settings.Status.ContextGenerated");
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : game.i18n.localize("FOUNDRY_TRANSLATE.Settings.Status.UnknownError");
+      logger.error("World context generation failed.", error);
+      this.#setStatus(form, "error", message, false);
+    } finally {
+      button?.removeAttribute("disabled");
+    }
+  }
+
   #createProvider(
     settings: TranslatorSettings,
     onStatus: (status: ChromeLocalProviderStatus) => void,
   ): TranslationProvider {
     if (settings.provider === "chrome-local") {
       return new ChromeLocalProvider({ onStatus });
+    }
+
+    if (settings.provider === "openai-compatible") {
+      return new OpenAiCompatibleProvider({
+        baseUrl: settings.openAiBaseUrl,
+        model: settings.openAiModel,
+        apiKey: settings.openAiApiKey,
+        worldContext: settings.worldContext,
+      });
     }
 
     return new GoogleCloudBasicProvider(settings.apiKey);
@@ -171,7 +222,10 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
 
   #toggleKey(event: Event, form: HTMLFormElement): void {
     const button = event.currentTarget;
-    const input = form.elements.namedItem("apiKey");
+    const inputName = button instanceof HTMLElement
+      ? button.dataset.secretTarget ?? "apiKey"
+      : "apiKey";
+    const input = form.elements.namedItem(inputName);
     if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLInputElement)) return;
 
     const showing = input.type === "text";
@@ -199,6 +253,10 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     return {
       provider: this.#readProvider(form),
       apiKey: String(data.get("apiKey") ?? "").trim(),
+      openAiBaseUrl: String(data.get("openAiBaseUrl") ?? "").trim(),
+      openAiModel: String(data.get("openAiModel") ?? "").trim(),
+      openAiApiKey: String(data.get("openAiApiKey") ?? "").trim(),
+      worldContext: String(data.get("worldContext") ?? "").trim(),
       sourceLanguage: String(data.get("sourceLanguage") ?? "auto"),
       targetLanguage: String(data.get("targetLanguage") ?? "cs"),
     };

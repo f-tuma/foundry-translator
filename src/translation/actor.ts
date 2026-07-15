@@ -1,10 +1,11 @@
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
-import type { ProviderId } from "../settings/settings";
+import { isProviderId, type ProviderId } from "../settings/settings";
 import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { planHtmlTranslation } from "./html";
+import { translatedOutputHash } from "./output-hash";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
@@ -13,7 +14,7 @@ import {
 } from "./unit-translator";
 
 export const ACTOR_TRANSLATION_SCHEMA_VERSION = 1;
-export const ACTOR_TRANSLATION_ENGINE_REVISION = 2;
+export const ACTOR_TRANSLATION_ENGINE_REVISION = 3;
 
 export interface ActorItemData extends Record<string, unknown> {
   _id?: string;
@@ -45,6 +46,8 @@ export interface ActorTranslationFlag {
   fallbackTextSegments: number;
   /** Glossary hash at translation time; a changed glossary invalidates reuse. */
   glossaryFingerprint?: string;
+  /** Fingerprint of the generated copy, used to detect later manual edits. */
+  outputHash?: string;
 }
 
 export interface ActorTranslationProgress {
@@ -89,7 +92,7 @@ export function readActorTranslationFlag(
     flag.schemaVersion !== ACTOR_TRANSLATION_SCHEMA_VERSION ||
     typeof flag.sourceUuid !== "string" ||
     typeof flag.sourceHash !== "string" ||
-    (flag.providerId !== "chrome-local" && flag.providerId !== "google-cloud-basic") ||
+    !isProviderId(flag.providerId) ||
     typeof flag.sourceLanguage !== "string" ||
     typeof flag.targetLanguage !== "string" ||
     typeof flag.translatedAt !== "string" ||
@@ -124,6 +127,18 @@ function sourceSnapshot(source: ActorData): string {
 
 export async function actorSourceHash(source: ActorData): Promise<string> {
   return sha256(sourceSnapshot(source));
+}
+
+export async function stampActorOutputHash(data: ActorData): Promise<string> {
+  const flag = readActorTranslationFlag(data.flags);
+  if (!flag) throw new Error("Přeložený Actor nemá platná metadata pro otisk výstupu.");
+  const outputHash = await translatedOutputHash(data);
+  flag.outputHash = outputHash;
+  data.flags = {
+    ...data.flags,
+    [MODULE_ID]: { ...data.flags?.[MODULE_ID], actorTranslation: flag },
+  };
+  return outputHash;
 }
 
 interface HtmlTarget {

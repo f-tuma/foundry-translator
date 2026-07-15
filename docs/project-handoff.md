@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-07-14
-- Repository state: `main`, release `v0.12.1`; `v0.13.0` prepared locally
+- Updated: 2026-07-15
+- Repository state: `main`; `v0.14.0` prepared locally from `v0.13.0`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,74 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-07-15: The repository was verified clean at `v0.13.0`; the older handoff
+  header and Item-recursion roadmap text were stale. Development after the
+  release started with Markdown pages, glossary editing, and glossary-token
+  spacing reliability.
+- 2026-07-15: Markdown-backed Journal pages are now translated conservatively.
+  Visible Markdown text is planned separately from syntax; frontmatter, fenced
+  and inline code, URL/link destinations, reference definitions, table
+  delimiters, escapes, and structural markers remain byte-for-byte source data.
+  Foundry expressions still go through the existing integrity protection. Both
+  `text.markdown` and stored rendered `text.content` are translated because
+  Foundry v14 stores both and does not expose a supported public converter for
+  use during compendium creation. Journal engine revision is now 6.
+- 2026-07-15: Glossary management gained a two-column editor showing source
+  terms and editable fixed translations, including bulk saving. Token restoration
+  now repairs missing word boundaries when a provider glues a word to a glossary
+  token; Chrome Local Translator additionally preserves source whitespace around
+  all protection tokens before and after each local translation call.
+- 2026-07-15: The first **smart glossary** slice is implemented. Newly generated
+  Journal, Actor, and standalone Item copies store a normalized output hash.
+  When a later translation trigger would overwrite a detected manual change,
+  the run stops with an explicit preservation error; compatible translations
+  continue to reuse the manually edited copy.
+- 2026-07-15: Manual edits to translated Journal pages are compared with the
+  previous stored text and the corresponding source page. A conservative
+  single-span extractor creates review candidates, using an exact source match
+  or an existing glossary replacement when possible and otherwise leaving the
+  source field blank. Candidates are stored in a hidden world setting and shown
+  in the glossary's editable review queue. The GM must explicitly accept or
+  reject each one; incomplete candidates cannot be accepted and nothing is ever
+  inserted automatically. Actor/Item candidate capture remains future work.
+- 2026-07-15: `npm run check` passed after these changes: typecheck, **123 tests
+  across 28 test files**, and a production bundle of approximately 137.3 kB.
+- 2026-07-15: Real-Foundry QA passed in `ember-test` on Foundry `14.364` and
+  Crucible `0.10.1`: a manual edit to a temporary translated Journal page
+  produced the expected `Castle` → `Hradu` review candidate while adding no
+  glossary entry automatically; Accept stored an explicitly reviewed test
+  entry, Reject discarded a second one, and all temporary documents, entries,
+  and candidates were removed. The module UI produced no console errors.
+- 2026-07-15: Chrome Local Translator gained conservative paragraph-context
+  translation. A complete protected logical block is attempted first and used
+  only if every protection token survives byte-exactly and in order; otherwise
+  the provider falls back to the previous isolated-fragment path. Cache schema
+  is now 4 and engine revisions are Journal 6, Actor 3, and Item 3 so old
+  fragment-context output is not reused.
+- 2026-07-15: Added an `openai-compatible` provider for LM Studio and similar
+  local servers. Its client-scoped settings are Base URL, exact model ID, and
+  optional Bearer token; a root server URL automatically gains `/v1`. The
+  connection test lists models first and then performs a real Chat Completions
+  translation. Calls are sequential, bounded, timeout-aware, and cache identity
+  includes server, model, prompt revision, and world-context fingerprint without
+  including secrets.
+- 2026-07-15: LLM calls now receive the approved glossary as terminology
+  reference and an editable world profile. The settings UI can have the selected
+  local model suggest that profile from a 12,000-character maximum sample of
+  Journal text and Actor/Item/Scene names. Generation only fills the textarea;
+  the GM must review and explicitly save it. The final check passed with **129
+  tests across 30 files** and a 153.02 kB production bundle.
+- 2026-07-15: Real Foundry-to-LM-Studio QA passed after CORS was enabled on the
+  user's LAN server. The settings UI successfully listed and tested
+  `google/gemma-4-12b-qat`, saved the OpenAI-compatible provider, server URL,
+  model, and manual Ember profile, and loaded those values back. The first
+  30,000-character world-profile sample exhausted this model's 8,192-token
+  context during reasoning and produced no final content; reducing the bounded
+  sample to 12,000 characters fixed it. A subsequent real-Foundry generation
+  produced a 1,165-character editable profile and left the previously saved
+  profile unchanged until explicit Save. The suggestion included at least one
+  questionable inference (D&D 5e), confirming that mandatory human review is
+  necessary.
 - 2026-07-14: The user confirmed that recursive Journal translation in `v0.9.0`
   works in their Foundry instance.
 - 2026-07-14: Work started on the next milestone: schema-aware Actor translation,
@@ -255,7 +323,10 @@ The user's main priorities are:
   and a copyable plain-text debug log.
 - Glossary entries may carry a fixed custom translation; changing the glossary
   invalidates translation reuse via a stored glossary fingerprint.
-- 104 automated tests across 24 test files.
+- Markdown Journal pages translate visible source text while preserving Markdown
+  mechanics, and their stored rendered HTML is translated for immediate display.
+- Glossary entries are editable in a two-column source/fixed-translation view.
+- 114 automated tests across 26 test files.
 
 ## Verified real-world cases
 
@@ -339,7 +410,7 @@ timestamp, translated/skipped page counts, fallback-fragment count, and engine
 revision. A legacy flag without an engine revision remains readable but must not
 be reused as a current translation.
 
-## Main remaining work: Item recursion (Actor recursion released in v0.10.0)
+## Completed recursion milestone (Actor in v0.10.0, Item in v0.11.0)
 
 ### Required user outcome
 
@@ -460,12 +531,42 @@ language to translated UUID mapping must remain consistent across packs.
 - Recursive translation and reference rewriting support Journal, Actor, and
   standalone Item targets. Other document types remain pointed at their source
   UUID and produce a warning.
-- Markdown source pages are intentionally not translated yet.
 - Portable translation-bundle export/import is not implemented yet.
+- Output-hash protection covers newly generated Journal, Actor, and Item copies;
+  older stored translations gain it only after they are generated again.
+- Smart-glossary candidate extraction currently observes manual edits to
+  translated Journal pages. Actor and Item field corrections are protected from
+  overwrite but do not yet create review candidates.
 - Helium does not support Chrome Local Translator; the tested Chromium profile
   does.
+- The stock TranslateGemma LM Studio chat template requires custom structured
+  message fields which are discarded by LM Studio's standard OpenAI-compatible
+  Chat Completions normalization. A general Gemma/Qwen instruction model works;
+  TranslateGemma needs a compatible custom prompt template before it can be used
+  through this provider. Its official template also does not support the freeform
+  context prompt used by the world-profile feature.
 
 ## Local development environment on the original machine
+
+Current machine update (2026-07-15):
+
+- Foundry `14.364` binary is available at
+  `/home/flamendrin/Games/FoundryVTT-Linux-14.364/foundryvtt`.
+- The `fvtt` CLI is configured with that install and the isolated data path
+  `/home/flamendrin/.local/share/FoundryVTT-foundry-translator-test`.
+- The disposable `ember-test` world is installed in that profile. It uses
+  Crucible `0.10.1`, requires the Ember module, and is the preferred target for
+  Ember-specific real-Foundry E2E testing.
+- The development module is linked from
+  `Data/modules/foundry-translate` to this repository's `dist` directory.
+- Start the setup server with
+  `fvtt launch --noupnp --noupdate --port 30000`; add `--world ember-test` for
+  direct world launch after the Foundry license has been activated.
+- A test LM Studio server was available at `http://192.168.10.183:1234`.
+  `GET /v1/models` exposed `translategemma-4b-it`, two general Gemma models,
+  Qwen, and an embedding model. A real protected-token translation succeeded
+  with `google/gemma-4-12b-qat`; the stock `translategemma-4b-it` template
+  rejected standard OpenAI chat message shapes as described above.
 
 These paths are machine-specific and must be replaced with equivalents elsewhere.
 
@@ -529,8 +630,9 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
 3. If the local `ember-test` world still contains `CZ `-prefixed stub
    artifacts from the crashed smoke test, run `/tmp/cleanup-guide-smoke.mjs`
    (see the work log) with the user's approval.
-4. Remaining roadmap in order: Markdown source pages, then portable
-   translation-bundle export/import (the user explicitly wants export last).
+4. Remaining roadmap in order: safe manual edits and user-approved smart
+   glossary suggestions, then portable translation-bundle export/import (the
+   user explicitly wants export last).
 5. If the user reports specific failed parts from their real `Gamemaster's
    Guide` run, ask for the copyable log from the Active translations window
    and address the reported fallbacks.

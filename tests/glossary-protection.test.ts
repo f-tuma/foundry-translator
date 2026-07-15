@@ -85,6 +85,21 @@ describe("glossary protection", () => {
     ).toBe("Potkejte Strahd na Castle Ravenloft.");
   });
 
+  it("restores missing word boundaries around a glossary token", () => {
+    const protection = protectGlossaryTerms(
+      "The Castle Ravenloft stands.",
+      [entry("Castle Ravenloft")],
+      { nonce: "SPACING" },
+    );
+
+    expect(
+      restoreGlossaryTerms("To__FTG_SPACING_0000__stojí.", protection),
+    ).toBe("To Castle Ravenloft stojí.");
+    expect(
+      restoreGlossaryTerms("Navštivte __FTG_SPACING_0000__.", protection),
+    ).toBe("Navštivte Castle Ravenloft.");
+  });
+
   it("refuses missing, duplicated, and unknown tokens", () => {
     const protection = protectGlossaryTerms("Strahd waits.", [entry("Strahd")], {
       nonce: "SAFE",

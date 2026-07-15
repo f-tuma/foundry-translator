@@ -101,6 +101,19 @@ function protectedTextParts(text: string): string[] {
   return text.split(/(__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__)/giu);
 }
 
+function protectionTokens(text: string): string[] {
+  PROTECTION_TOKEN.lastIndex = 0;
+  return [...text.matchAll(PROTECTION_TOKEN)].map(([token]) => token);
+}
+
+/** Whole-block translation is safe only when every protection token survives in order. */
+export function preservesProtectionTokens(source: string, translated: string): boolean {
+  const sourceTokens = protectionTokens(source);
+  const translatedTokens = protectionTokens(translated);
+  return sourceTokens.length === translatedTokens.length &&
+    sourceTokens.every((token, index) => token === translatedTokens[index]);
+}
+
 const getBrowserApis = (): ChromeLocalApis =>
   globalThis as unknown as ChromeLocalApis;
 
@@ -170,17 +183,34 @@ export class ChromeLocalProvider implements TranslationProvider {
     text: string,
   ): Promise<string> {
     const parts = protectedTextParts(text);
+    if (parts.length > 1) {
+      // Let Chrome see the complete paragraph first. If it preserves all
+      // glossary, Foundry-syntax, and structural boundary tokens byte-for-byte,
+      // the caller's stricter integrity checks can safely accept the contextual
+      // result. Otherwise fall back to translating isolated text fragments.
+      for (let attempt = 0; attempt < EMPTY_TRANSLATION_ATTEMPTS; attempt += 1) {
+        const candidate = await translator.translate(text);
+        if (typeof candidate === "string" && candidate.trim() &&
+          preservesProtectionTokens(text, candidate)) {
+          return candidate;
+        }
+      }
+    }
     const translated: string[] = [];
     for (const part of parts) {
       if (!part || isProtectionToken(part) || !TRANSLATABLE_CONTENT.test(part)) {
         translated.push(part);
         continue;
       }
+      const leading = part.match(/^\s*/u)?.[0] ?? "";
+      const withoutLeading = part.slice(leading.length);
+      const trailing = withoutLeading.match(/\s*$/u)?.[0] ?? "";
+      const core = withoutLeading.slice(0, withoutLeading.length - trailing.length);
       let translatedPart = "";
       for (let attempt = 0; attempt < EMPTY_TRANSLATION_ATTEMPTS; attempt += 1) {
-        const candidate = await translator.translate(part);
+        const candidate = await translator.translate(core);
         if (typeof candidate === "string" && candidate.trim()) {
-          translatedPart = candidate;
+          translatedPart = `${leading}${candidate.trim()}${trailing}`;
           break;
         }
       }
