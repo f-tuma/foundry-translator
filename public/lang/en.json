@@ -29,7 +29,7 @@
   "FOUNDRY_TRANSLATE.Settings.WorldContext.Hint": "Theme, tone, lore, and translation preferences. The LLM receives this context together with the approved glossary for every translation.",
   "FOUNDRY_TRANSLATE.Settings.WorldContext.Placeholder": "For example: dark Gothic fantasy; preserve faction names…",
   "FOUNDRY_TRANSLATE.Settings.WorldContext.Generate": "Suggest profile from world",
-  "FOUNDRY_TRANSLATE.Settings.WorldContext.GenerateHint": "Sends a bounded sample of Journals and Actor, Item, and Scene names to the local model. Review the suggestion first; it is stored only after Save settings.",
+  "FOUNDRY_TRANSLATE.Settings.WorldContext.GenerateHint": "Selects overview and lore passages by keyword, then adds random excerpts and Journal, Actor, Item, and Scene names. This is an incomplete sample: review the suggestion first; it is stored only after Save settings.",
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Name": "Source language",
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Hint": "Keep automatic detection when an adventure combines multiple languages.",
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Auto": "Detect automatically",

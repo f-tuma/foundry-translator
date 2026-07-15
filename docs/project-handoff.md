@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-15
-- Repository state: `main`; `v0.14.0` prepared locally from `v0.13.0`
+- Repository state: `main`; `v0.14.1` prepared locally from `v0.14.0`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -79,6 +79,27 @@ and the recommended implementation order.
   profile unchanged until explicit Save. The suggestion included at least one
   questionable inference (D&D 5e), confirming that mandatory human review is
   necessary.
+- 2026-07-15: Root cause of the misleading Ember profile was identified after
+  release `v0.14.0`: the 12,000-character prefix contained only five text pages
+  from the first `Chamber of Agaseros` Journal out of 75 Journals and no Actor,
+  Item, or Scene names. The sampler was replaced with a stratified selection:
+  keyword-ranked overview/lore/guide/history/faction pages from distinct
+  Journals, random excerpts from additional Journals, a keyword-first Journal
+  name index, random Actor/Item/Scene name samples, and world/system metadata.
+  Both the English model prompt and Czech/English UI now state that this is an
+  incomplete keyword-selected and random sample and instruct the model not to
+  overfit one adventure or guess the rules system from generic RPG terms.
+- 2026-07-15: Real Ember QA of the replacement sampler passed against LM Studio
+  with `google/gemma-4-12b-qat`. The request included the official Ember world
+  description, active `Crucible 0.10.1` metadata, all 75 Journal names,
+  randomized samples from 265 Actors, 443 Items, and 97 Scenes, five
+  keyword-selected excerpts from distinct broad-profile Journals, and three
+  random excerpts from other Journals. Empty `Under Construction` and
+  Foundry-reference-only pages are filtered before selection. The resulting
+  profile covered the Ember Cosmos, Eiru, the Weave, Shard Gods, Elder Gods,
+  major organizations and locations instead of one dungeon. The existing saved
+  profile remained unchanged. Final validation passed with **132 tests across
+  31 files** and a 157.18 kB production bundle; patch release `v0.14.1`.
 - 2026-07-14: The user confirmed that recursive Journal translation in `v0.9.0`
   works in their Foundry instance.
 - 2026-07-14: Work started on the next milestone: schema-aware Actor translation,

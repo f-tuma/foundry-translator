@@ -29,7 +29,7 @@
   "FOUNDRY_TRANSLATE.Settings.WorldContext.Hint": "Téma, tón, reálie a překladatelské preference. LLM tento kontext dostane spolu se schváleným glosářem u každého překladu.",
   "FOUNDRY_TRANSLATE.Settings.WorldContext.Placeholder": "Např. temné gotické fantasy; názvy frakcí zachovávat…",
   "FOUNDRY_TRANSLATE.Settings.WorldContext.Generate": "Navrhnout profil ze světa",
-  "FOUNDRY_TRANSLATE.Settings.WorldContext.GenerateHint": "Do lokálního modelu odešle omezený vzorek Journalů a názvů Actorů, Itemů a scén. Návrh nejprve zkontrolujete a uloží se až tlačítkem Uložit nastavení.",
+  "FOUNDRY_TRANSLATE.Settings.WorldContext.GenerateHint": "Vybere přehledové a lore pasáže podle klíčových slov a doplní je náhodnými úryvky a názvy Journalů, Actorů, Itemů a scén. Jde o neúplný vzorek: návrh nejprve zkontrolujete a uloží se až tlačítkem Uložit nastavení.",
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Name": "Zdrojový jazyk",
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Hint": "Ponechte automatickou detekci, pokud dobrodružství kombinuje více jazyků.",
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Auto": "Rozpoznat automaticky",

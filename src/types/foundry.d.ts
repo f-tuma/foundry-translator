@@ -22,6 +22,8 @@ interface FoundryGame {
   folders: { contents: FoundryFolder[] };
   packs: Map<string, FoundryCompendiumCollection>;
   user?: { isGM: boolean };
+  world?: { title?: string; description?: string };
+  system?: { id?: string; title?: string; version?: string };
 }
 
 interface FoundryNamedDocument {

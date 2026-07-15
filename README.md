@@ -3,7 +3,7 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.14.0` processes
+> The module is currently an early development build. Version `0.14.1` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
 > safely keeps an isolated failed fragment in the original, translates human text
 > inside Foundry embeds, recursively translates linked Journals, Actors, and
@@ -60,10 +60,14 @@ for another machine on the LAN, serve on the local network. The address, model,
 and token are client-scoped.
 
 LLM translation can use an editable world profile containing setting, genre,
-tone, lore, and translation preferences. **Suggest profile from world** sends a
-bounded sample of Journal text plus Actor, Item, and Scene names to the selected
-local model and fills the editor; the GM must review it and explicitly save the
-settings. Each LLM request also receives the approved glossary as terminology
+tone, lore, and translation preferences. **Suggest profile from world** builds a
+bounded stratified sample: it prioritizes Journal and page names associated with
+setting, lore, guides, history, factions, and similar overview material, then
+fills the remaining budget with random excerpts from different Journals and
+random Actor, Item, and Scene names. The prompt explicitly tells the model this
+is an incomplete sample and asks it to infer broad repeated patterns without
+overfitting to one adventure. The GM must review the result and explicitly save
+the settings. Each LLM request also receives the approved glossary as terminology
 reference, while glossary and Foundry tokens remain integrity-protected. Cache
 entries are separated by server, model, prompt revision, world profile, and
 glossary contents.
