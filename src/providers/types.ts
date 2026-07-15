@@ -15,7 +15,7 @@ export interface TranslationResult {
 }
 
 export interface ProviderRequestMetrics {
-  phase: "started" | "completed" | "failed";
+  phase: "started" | "progress" | "completed" | "failed";
   model: string;
   durationMs?: number;
   inputTokens?: number;
@@ -23,6 +23,8 @@ export interface ProviderRequestMetrics {
   reasoningTokens?: number;
   tokensPerSecond?: number;
   finishReason?: string;
+  outputPreview?: string;
+  streamedCharacters?: number;
 }
 
 export interface TranslationProvider {

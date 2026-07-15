@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-15
-- Repository state: `main`; `v0.14.2` prepared locally from `v0.14.1`
+- Repository state: `main`; `v0.14.3` prepared locally from `v0.14.2`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,19 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-07-15: Patch `v0.14.3` batches up to four Actor/embedded
+  Item or standalone Item HTML fields per OpenAI-compatible request and folds
+  Journal metadata into the first multi-page LLM window. A fresh three-page
+  Foundry QA Journal required one LM Studio request for 500 input and 359 output
+  tokens, down from two requests after the first page-batching pass. LM Studio's
+  native `/api/v1/chat` path now consumes official SSE streaming events, exposes
+  a sanitized live model-output preview while a request is active, and retains
+  the authoritative final usage and token-speed statistics from `chat.end`.
+  JSON responses remain supported as a compatibility fallback. Validation
+  passes with **147 tests across 31 files**; real LM Studio responses confirmed
+  `text/event-stream`, one-request multi-page translation, and intact final
+  metrics. Temporary QA documents were removed.
 
 - 2026-07-15: Patch `v0.14.2` fixes smart-glossary candidate suffix duplication
   and avoids repeated failed whole-block attempts in Chrome Local Translator.

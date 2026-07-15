@@ -322,20 +322,26 @@ export async function translateJournalData(
     options.onQualityFallback?.(fallback);
   };
 
-  await translateTargets(options, [{
+  const nameTarget: TranslationTarget = {
     segments: [copy.name],
     apply: ([translatedName]) => {
       copy.name = `${translatedName ?? copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
     },
-  }], [], recordQualityFallback);
+  };
 
-  if (copy.categories?.length) {
-    const categoryTargets = copy.categories.map<TranslationTarget>((category) => ({
-      segments: [category.name],
-      apply: ([translatedName]) => {
-        category.name = translatedName ?? category.name;
-      },
-    }));
+  const categoryTargets = copy.categories?.map<TranslationTarget>((category) => ({
+    segments: [category.name],
+    apply: ([translatedName]) => {
+      category.name = translatedName ?? category.name;
+    },
+  })) ?? [];
+  const metadataTargets = [nameTarget, ...categoryTargets];
+  const deferMetadata = options.settings.providerId !== "chrome-local";
+  if (!deferMetadata) {
+    await translateTargets(options, [nameTarget], [], recordQualityFallback);
+  }
+
+  if (!deferMetadata && categoryTargets.length) {
     try {
       await translateTargets(options, categoryTargets, [], recordQualityFallback);
     } catch (error) {
@@ -456,9 +462,18 @@ export async function translateJournalData(
   }
 
   const pageBatchSize = journalPageBatchSize(options.settings.providerId);
+  if (!pageWork.length && deferMetadata) {
+    try {
+      await translateTargets(options, metadataTargets, [], recordQualityFallback);
+    } catch (error) {
+      const detail = error instanceof Error ? ` ${error.message}` : "";
+      throw new Error(`Překlad metadat deníku selhal.${detail}`, { cause: error });
+    }
+  }
   for (let start = 0; start < pageWork.length; start += pageBatchSize) {
     const batch = pageWork.slice(start, start + pageBatchSize);
-    const targets: TranslationTarget[] = [];
+    const includesMetadata = deferMetadata && start === 0;
+    const targets: TranslationTarget[] = includesMetadata ? [...metadataTargets] : [];
     const structuredTargets: StructuredTranslationTarget[] = [];
     for (const work of batch) {
       options.onPageStart?.(work.sourcePageName);
@@ -479,7 +494,7 @@ export async function translateJournalData(
         ? `stránky ${(first?.pageIndex ?? 0) + 1}/${copy.pages.length} „${first?.sourcePageName ?? ""}“`
         : `stránek ${(first?.pageIndex ?? 0) + 1}–${(last?.pageIndex ?? 0) + 1}/${copy.pages.length} „${first?.sourcePageName ?? ""}“ až „${last?.sourcePageName ?? ""}“`;
       throw new Error(
-        `Překlad ${pageDescription} selhal.${detail} Hotové stránky zůstávají v cache pro další pokus.`,
+        `Překlad ${includesMetadata ? "metadat a " : ""}${pageDescription} selhal.${detail} Hotové stránky zůstávají v cache pro další pokus.`,
         { cause: error },
       );
     }

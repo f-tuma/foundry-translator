@@ -51,6 +51,8 @@ export interface ActiveTranslationRun {
   providerGenerationMs?: number;
   providerTokensPerSecond?: number;
   providerFinishReason?: string;
+  providerOutputPreview?: string;
+  providerStreamedCharacters?: number;
 }
 
 const FINISHED_RUN_RETENTION_MS = 10 * 60 * 1000;
@@ -110,6 +112,16 @@ export class ActiveTranslationRegistry {
       run.providerRequestCount = (run.providerRequestCount ?? 0) + 1;
       run.providerRequestActive = true;
       run.providerRequestStartedAt = this.#now();
+      delete run.providerOutputPreview;
+      delete run.providerStreamedCharacters;
+    } else if (metrics.phase === "progress") {
+      run.providerRequestActive = true;
+      if (metrics.outputPreview !== undefined) {
+        run.providerOutputPreview = metrics.outputPreview;
+      }
+      if (metrics.streamedCharacters !== undefined) {
+        run.providerStreamedCharacters = metrics.streamedCharacters;
+      }
     } else {
       run.providerRequestActive = false;
       delete run.providerRequestStartedAt;

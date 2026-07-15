@@ -42,6 +42,13 @@ interface LmStudioChatPayload {
   error?: unknown;
 }
 
+interface LmStudioStreamEvent {
+  type?: unknown;
+  content?: unknown;
+  result?: unknown;
+  error?: { message?: unknown };
+}
+
 function textFingerprint(value: string): string {
   let hash = 2_166_136_261;
   for (let index = 0; index < value.length; index += 1) {
@@ -68,6 +75,76 @@ export class OpenAiCompatibleTranslationError extends Error {
     this.name = "OpenAiCompatibleTranslationError";
     this.status = status;
   }
+}
+
+function translationPreview(value: string): string {
+  return value
+    .replace(/__FT(?:N|G|S|B)_[A-Z0-9_]+__/giu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(-280);
+}
+
+async function readLmStudioEventStream(
+  response: Response,
+  onMessage: (content: string) => void,
+): Promise<LmStudioChatPayload> {
+  if (!response.body) {
+    throw new OpenAiCompatibleTranslationError(
+      "LM Studio vrátil stream bez čitelného těla.",
+      response.status,
+    );
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let message = "";
+  let result: LmStudioChatPayload | undefined;
+  let streamError = "";
+
+  const consume = (finished = false): void => {
+    if (finished) buffer += "\n\n";
+    while (true) {
+      const boundary = buffer.match(/\r?\n\r?\n/u);
+      if (boundary?.index === undefined) break;
+      const block = buffer.slice(0, boundary.index);
+      buffer = buffer.slice(boundary.index + boundary[0].length);
+      const data = block
+        .split(/\r?\n/u)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!data) continue;
+      let event: LmStudioStreamEvent;
+      try {
+        event = JSON.parse(data) as LmStudioStreamEvent;
+      } catch {
+        continue;
+      }
+      if (event.type === "message.delta" && typeof event.content === "string") {
+        message += event.content;
+        onMessage(message);
+      } else if (event.type === "chat.end" && event.result && typeof event.result === "object") {
+        result = event.result as LmStudioChatPayload;
+      } else if (event.type === "error" && typeof event.error?.message === "string") {
+        streamError = event.error.message;
+      }
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    consume();
+  }
+  buffer += decoder.decode();
+  consume(true);
+  if (result) return result;
+  throw new OpenAiCompatibleTranslationError(
+    streamError || "LM Studio stream skončil bez závěrečné odpovědi chat.end.",
+    response.status,
+  );
 }
 
 function normalizedBaseUrl(value: string): string {
@@ -366,7 +443,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
           temperature: 0,
           max_output_tokens: 4_096,
           reasoning: "off",
-          stream: false,
+          stream: true,
+          store: false,
         }),
       });
     } catch (error) {
@@ -387,7 +465,38 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       return null;
     }
 
-    const payload = await this.#readJson<LmStudioChatPayload>(response);
+    let lastProgressAt = 0;
+    let lastProgressCharacters = 0;
+    const contentType = response.headers.get("Content-Type") ?? "";
+    let payload: LmStudioChatPayload;
+    try {
+      payload = contentType.includes("text/event-stream")
+        ? await readLmStudioEventStream(response, (content) => {
+            const now = Date.now();
+            if (
+              lastProgressCharacters > 0 &&
+              now - lastProgressAt < 150 &&
+              content.length - lastProgressCharacters < 100
+            ) return;
+            lastProgressAt = now;
+            lastProgressCharacters = content.length;
+            this.#onMetrics?.({
+              phase: "progress",
+              model: this.#model,
+              durationMs: now - startedAt,
+              streamedCharacters: content.length,
+              outputPreview: translationPreview(content),
+            });
+          })
+        : await this.#readJson<LmStudioChatPayload>(response);
+    } catch (error) {
+      this.#onMetrics?.({
+        phase: "failed",
+        model: this.#model,
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
     const numeric = (value: unknown): number | undefined =>
       typeof value === "number" && Number.isFinite(value) ? value : undefined;
     const inputTokens = numeric(payload.stats?.input_tokens);

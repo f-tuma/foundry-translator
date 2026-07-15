@@ -82,4 +82,43 @@ describe("Item translation", () => {
     changed.system.damage = "2d6";
     await expect(itemSourceHash(source)).resolves.not.toBe(await itemSourceHash(changed));
   });
+
+  it("uses bounded multi-field batches for an LLM provider", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const requestSizes: number[] = [];
+    const progress: number[] = [];
+    const fields = ["one", "two", "three", "four", "five"];
+    const source: ItemData = {
+      name: "Field Test",
+      type: "feature",
+      system: Object.fromEntries(fields.map((field) => [field, `<p>${field} field.</p>`])),
+    };
+
+    const result = await translateItemData({
+      source,
+      sourceUuid: "Item.fields",
+      glossary: [],
+      provider: {
+        async translate({ texts }) {
+          requestSizes.push(texts.length);
+          return texts.map((text) => ({ translatedText: `Přeloženo: ${text}` }));
+        },
+        async testConnection() {},
+      },
+      settings: {
+        providerId: "openai-compatible",
+        sourceLanguage: "en",
+        targetLanguage: "cs",
+      },
+      systemHtmlFieldPaths: fields.map((field) => [field]),
+      ownerDocument: document,
+      nonceFactory: () => "ITEMBATCH",
+      onProgress: ({ completedFields }) => progress.push(completedFields),
+    });
+
+    expect(requestSizes).toEqual([4, 1]);
+    expect(progress).toEqual([1, 2, 3, 4, 5]);
+    expect(result.translatedHtmlFields).toBe(5);
+    expect(result.data.system.five).toBe("<p>Přeloženo: five field.</p>");
+  });
 });

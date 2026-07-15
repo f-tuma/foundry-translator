@@ -13,6 +13,13 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   });
 }
 
+function eventStreamResponse(events: readonly unknown[]): Response {
+  return new Response(
+    events.map((event) => `event: ${(event as { type?: string }).type ?? "message"}\ndata: ${JSON.stringify(event)}\n\n`).join(""),
+    { status: 200, headers: { "Content-Type": "text/event-stream; charset=utf-8" } },
+  );
+}
+
 describe("OpenAiCompatibleProvider", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -163,12 +170,64 @@ describe("OpenAiCompatibleProvider", () => {
       .resolves.toEqual([{ translatedText: "Vítejte v Emberu." }]);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:1234/api/v1/chat");
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-    expect(body).toMatchObject({ reasoning: "off", max_output_tokens: 4096 });
+    expect(body).toMatchObject({
+      reasoning: "off",
+      max_output_tokens: 4096,
+      stream: true,
+      store: false,
+    });
     expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
       phase: "completed",
       inputTokens: 80,
       outputTokens: 12,
       reasoningTokens: 0,
+    }));
+  });
+
+  it("streams LM Studio native output previews and uses chat.end as the final result", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(eventStreamResponse([
+      { type: "chat.start", model_instance_id: "google/gemma-4-12b-qat" },
+      { type: "message.start" },
+      { type: "message.delta", content: "__FTB_STREAM_0000__Vítejte " },
+      { type: "message.delta", content: "v Emberu." },
+      { type: "message.end" },
+      {
+        type: "chat.end",
+        result: {
+          output: [{ type: "message", content: "__FTB_STREAM_0000__Vítejte v Emberu." }],
+          stats: {
+            input_tokens: 90,
+            total_output_tokens: 15,
+            reasoning_output_tokens: 0,
+            tokens_per_second: 75,
+          },
+        },
+      },
+    ]));
+    const metrics = vi.fn();
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234",
+      model: "google/gemma-4-12b-qat",
+      fetchImplementation: fetchMock,
+      onMetrics: metrics,
+    });
+
+    await expect(provider.translate({
+      texts: ["__FTB_STREAM_0000__Welcome to Ember."],
+      targetLanguage: "cs",
+    })).resolves.toEqual([{
+      translatedText: "__FTB_STREAM_0000__Vítejte v Emberu.",
+    }]);
+    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "progress",
+      outputPreview: "Vítejte",
+      streamedCharacters: 27,
+    }));
+    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "completed",
+      inputTokens: 90,
+      outputTokens: 15,
+      tokensPerSecond: 75,
     }));
   });
 

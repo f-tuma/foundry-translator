@@ -144,6 +144,20 @@ describe("Active translation registry", () => {
     const registry = new ActiveTranslationRegistry(() => now);
     const id = registry.start("Guide", "cs");
     registry.recordProviderMetrics(id, { phase: "started", model: "gemma" });
+    registry.recordProviderMetrics(id, {
+      phase: "progress",
+      model: "gemma",
+      durationMs: 500,
+      streamedCharacters: 24,
+      outputPreview: "Průběžný překlad",
+    });
+    expect(registry.get(id)).toMatchObject({
+      providerRequestActive: true,
+      providerRequestCount: 1,
+      providerStreamedCharacters: 24,
+      providerOutputPreview: "Průběžný překlad",
+    });
+    expect(registry.get(id)?.providerOutputTokens).toBeUndefined();
     now = 2_500;
     registry.recordProviderMetrics(id, {
       phase: "completed",

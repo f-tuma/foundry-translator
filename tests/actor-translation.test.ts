@@ -110,4 +110,55 @@ describe("Actor translation", () => {
     if (changed.items?.[0]?.system) changed.items[0].system.description = "After";
     await expect(actorSourceHash(source)).resolves.not.toBe(await actorSourceHash(changed));
   });
+
+  it("batches Actor and embedded Item HTML fields for an LLM provider", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const requestSizes: number[] = [];
+    const progress: number[] = [];
+    const source: ActorData = {
+      name: "Scholar",
+      type: "adversary",
+      system: {
+        public: "<p>Public biography.</p>",
+        private: "<p>Private biography.</p>",
+      },
+      items: [{
+        name: "Precise Strike",
+        system: { description: "<p>Precise attack.</p>" },
+      }],
+    };
+
+    const result = await translateActorData({
+      source,
+      sourceUuid: "Actor.scholar",
+      glossary: [],
+      provider: {
+        async translate({ texts }) {
+          requestSizes.push(texts.length);
+          return texts.map((text) => ({ translatedText: `Přeloženo: ${text}` }));
+        },
+        async testConnection() {},
+      },
+      settings: {
+        providerId: "openai-compatible",
+        sourceLanguage: "en",
+        targetLanguage: "cs",
+      },
+      systemHtmlFieldPaths: [["public"], ["private"]],
+      itemHtmlFieldPaths: [[ ["description"] ]],
+      ownerDocument: document,
+      nonceFactory: () => "ACTORBATCH",
+      onProgress: ({ completedFields }) => progress.push(completedFields),
+    });
+
+    expect(requestSizes).toEqual([3]);
+    expect(progress).toEqual([1, 2, 3]);
+    expect(result.data.system).toMatchObject({
+      public: "<p>Přeloženo: Public biography.</p>",
+      private: "<p>Přeloženo: Private biography.</p>",
+    });
+    expect(result.data.items?.[0]?.system).toMatchObject({
+      description: "<p>Přeloženo: Precise attack.</p>",
+    });
+  });
 });

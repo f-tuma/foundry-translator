@@ -159,6 +159,7 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Requests": "LLM požadavky",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.CurrentRequest": "aktuální požadavek",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.GenerationTime": "čas generování",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.StreamPreview": "Živý výstup modelu",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning": "Analyzuji",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Překládám",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Hotovo",

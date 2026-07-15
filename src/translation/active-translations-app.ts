@@ -76,7 +76,13 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
           ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.CurrentRequest")
           : localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.GenerationTime")}</span>
       </div>
-      <span class="ft-active-translations__model">${escapeHtml(run.providerModel ?? "")}</span>`
+      <span class="ft-active-translations__model">${escapeHtml(run.providerModel ?? "")}</span>
+      ${run.providerRequestActive && run.providerOutputPreview
+        ? `<div class="ft-active-translations__preview">
+            <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.StreamPreview")}</span>
+            <p>${escapeHtml(run.providerOutputPreview)}</p>
+          </div>`
+        : ""}`
     : "";
   const issues = run.issues.length
     ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Issues").replace("{count}", String(run.issues.length))

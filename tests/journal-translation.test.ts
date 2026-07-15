@@ -323,7 +323,7 @@ describe("Journal translation", () => {
       nonceFactory: () => "PAGEBATCH",
     });
 
-    expect(requestSizes).toEqual([1, 6]);
+    expect(requestSizes).toEqual([7]);
     expect(translated.translatedTextPages).toBe(3);
     expect(translated.data.pages.map((page) => page.name)).toEqual(["První", "Druhá", "Třetí"]);
   });

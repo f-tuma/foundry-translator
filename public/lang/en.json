@@ -159,6 +159,7 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Requests": "LLM requests",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.CurrentRequest": "current request",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.GenerationTime": "generation time",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.StreamPreview": "Live model output",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning": "Scanning",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating": "Translating",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Done": "Done",

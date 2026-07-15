@@ -4,12 +4,11 @@ import type { TranslationProvider } from "../providers/types";
 import { isProviderId, type ProviderId } from "../settings/settings";
 import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
-import { planHtmlTranslation } from "./html";
+import { translateHtmlFields } from "./html-field-translation";
 import { translatedOutputHash } from "./output-hash";
-import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
+import type { HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
-  translateUnits,
   type TranslationQualityFallback,
 } from "./unit-translator";
 
@@ -137,39 +136,24 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
   delete copy.folder;
   copy.name = `${copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
 
-  let translatedHtmlFields = 0;
-  let fallbackTextSegments = 0;
-  for (const [pathIndex, path] of options.systemHtmlFieldPaths.entries()) {
-    const content = readPath(copy.system, path);
-    if (typeof content !== "string" || !content.trim()) continue;
-    const plan = planHtmlTranslation(content, options.ownerDocument);
-    if (!plan.units.length) continue;
-    const translated = await translateUnits({
-      units: plan.units,
-      glossary: options.glossary,
-      provider: options.provider,
-      settings: options.settings,
-      ...(options.cache ? { cache: options.cache } : {}),
-      ...(options.nonceFactory ? { nonceFactory: options.nonceFactory } : {}),
-      onQualityFallback: (fallback) => {
-        fallbackTextSegments += fallback.occurrences;
-        options.onQualityFallback?.(fallback);
-      },
-    });
-    const output = plan.apply(translated);
-    if (/__FT[NGS]_/iu.test(output)) {
-      throw new Error("Překlad Itemu obsahuje neobnovený ochranný token.");
-    }
-    if (!writePath(copy.system, path, output)) {
-      throw new Error(`Nepodařilo se zapsat HTML pole Itemu: ${path.join(".")}`);
-    }
-    translatedHtmlFields += 1;
-    options.onProgress?.({
-      completedFields: pathIndex + 1,
-      totalFields: options.systemHtmlFieldPaths.length,
-      fieldPath: path,
-    });
-  }
+  const { translatedHtmlFields, fallbackTextSegments } = await translateHtmlFields({
+    targets: options.systemHtmlFieldPaths.map((path) => ({ owner: copy.system, path })),
+    glossary: options.glossary,
+    provider: options.provider,
+    settings: options.settings,
+    documentLabel: "Itemu",
+    ...(options.cache ? { cache: options.cache } : {}),
+    ...(options.ownerDocument ? { ownerDocument: options.ownerDocument } : {}),
+    ...(options.nonceFactory ? { nonceFactory: options.nonceFactory } : {}),
+    ...(options.onQualityFallback
+      ? { onQualityFallback: options.onQualityFallback }
+      : {}),
+    onProgress: (target, completedFields, totalFields) => options.onProgress?.({
+      completedFields,
+      totalFields,
+      fieldPath: target.path,
+    }),
+  });
 
   const sourceHash = await itemSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);

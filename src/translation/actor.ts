@@ -4,12 +4,14 @@ import type { TranslationProvider } from "../providers/types";
 import { isProviderId, type ProviderId } from "../settings/settings";
 import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
-import { planHtmlTranslation } from "./html";
+import {
+  translateHtmlFields,
+  type HtmlFieldTranslationTarget,
+} from "./html-field-translation";
 import { translatedOutputHash } from "./output-hash";
-import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
+import type { HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
-  translateUnits,
   type TranslationQualityFallback,
 } from "./unit-translator";
 
@@ -141,12 +143,6 @@ export async function stampActorOutputHash(data: ActorData): Promise<string> {
   return outputHash;
 }
 
-interface HtmlTarget {
-  owner: unknown;
-  path: HtmlFieldPath;
-  itemName?: string;
-}
-
 export async function translateActorData(options: TranslateActorOptions): Promise<TranslatedActor> {
   const copy = structuredClone(options.source);
   delete copy._id;
@@ -155,7 +151,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
   copy.name = `${copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
   for (const item of copy.items ?? []) delete item._stats;
 
-  const targets: HtmlTarget[] = options.systemHtmlFieldPaths.map((path) => ({
+  const targets: HtmlFieldTranslationTarget[] = options.systemHtmlFieldPaths.map((path) => ({
     owner: copy.system,
     path,
   }));
@@ -169,40 +165,25 @@ export async function translateActorData(options: TranslateActorOptions): Promis
     }));
   });
 
-  let translatedHtmlFields = 0;
-  let fallbackTextSegments = 0;
-  for (const [targetIndex, target] of targets.entries()) {
-    const content = readPath(target.owner, target.path);
-    if (typeof content !== "string" || !content.trim()) continue;
-    const plan = planHtmlTranslation(content, options.ownerDocument);
-    if (!plan.units.length) continue;
-    const translated = await translateUnits({
-      units: plan.units,
-      glossary: options.glossary,
-      provider: options.provider,
-      settings: options.settings,
-      ...(options.cache ? { cache: options.cache } : {}),
-      ...(options.nonceFactory ? { nonceFactory: options.nonceFactory } : {}),
-      onQualityFallback: (fallback) => {
-        fallbackTextSegments += fallback.occurrences;
-        options.onQualityFallback?.(fallback);
-      },
-    });
-    const output = plan.apply(translated);
-    if (/__FT[NGS]_/iu.test(output)) {
-      throw new Error("Překlad Actoru obsahuje neobnovený ochranný token.");
-    }
-    if (!writePath(target.owner, target.path, output)) {
-      throw new Error(`Nepodařilo se zapsat HTML pole Actoru: ${target.path.join(".")}`);
-    }
-    translatedHtmlFields += 1;
-    options.onProgress?.({
-      completedFields: targetIndex + 1,
-      totalFields: targets.length,
+  const { translatedHtmlFields, fallbackTextSegments } = await translateHtmlFields({
+    targets,
+    glossary: options.glossary,
+    provider: options.provider,
+    settings: options.settings,
+    documentLabel: "Actoru",
+    ...(options.cache ? { cache: options.cache } : {}),
+    ...(options.ownerDocument ? { ownerDocument: options.ownerDocument } : {}),
+    ...(options.nonceFactory ? { nonceFactory: options.nonceFactory } : {}),
+    ...(options.onQualityFallback
+      ? { onQualityFallback: options.onQualityFallback }
+      : {}),
+    onProgress: (target, completedFields, totalFields) => options.onProgress?.({
+      completedFields,
+      totalFields,
       fieldPath: target.path,
       ...(target.itemName ? { itemName: target.itemName } : {}),
-    });
-  }
+    }),
+  });
 
   const sourceHash = await actorSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);
