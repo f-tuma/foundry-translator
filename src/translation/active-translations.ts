@@ -53,6 +53,10 @@ export interface ActiveTranslationRun {
   providerFinishReason?: string;
   providerOutputPreview?: string;
   providerStreamedCharacters?: number;
+  providerBatchFallbacks?: number;
+  providerSequentialFallbackTexts?: number;
+  providerResponseRetries?: number;
+  providerNativeFallbacks?: number;
 }
 
 const FINISHED_RUN_RETENTION_MS = 10 * 60 * 1000;
@@ -122,6 +126,15 @@ export class ActiveTranslationRegistry {
       if (metrics.streamedCharacters !== undefined) {
         run.providerStreamedCharacters = metrics.streamedCharacters;
       }
+    } else if (metrics.phase === "diagnostic") {
+      run.providerBatchFallbacks = (run.providerBatchFallbacks ?? 0) +
+        (metrics.batchFallbacks ?? 0);
+      run.providerSequentialFallbackTexts = (run.providerSequentialFallbackTexts ?? 0) +
+        (metrics.sequentialFallbackTexts ?? 0);
+      run.providerResponseRetries = (run.providerResponseRetries ?? 0) +
+        (metrics.responseRetries ?? 0);
+      run.providerNativeFallbacks = (run.providerNativeFallbacks ?? 0) +
+        (metrics.nativeFallbacks ?? 0);
     } else {
       run.providerRequestActive = false;
       delete run.providerRequestStartedAt;
@@ -200,7 +213,8 @@ function issueDescription(issue: TranslationRunIssue): string | null {
     case "unsupported":
       return `Recursive translation of ${issue.documentType ?? "this"} documents is not supported yet; the reference stays at the source.`;
     case "failed":
-      return "The dependent document failed to translate; its references stay at the source.";
+      return issue.detail ??
+        "The dependent document failed to translate; its references stay at the source.";
     default:
       return issue.detail ?? null;
   }
@@ -219,6 +233,9 @@ export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): 
       : []),
     ...(run.providerRequestCount
       ? [`Provider: ${run.providerModel ?? "unknown"}; ${run.providerRequestCount} requests; ${run.providerInputTokens ?? 0} input tokens; ${run.providerOutputTokens ?? 0} output tokens; ${run.providerReasoningTokens ?? 0} reasoning tokens; ${run.providerGenerationMs ?? 0} ms`]
+      : []),
+    ...(run.providerBatchFallbacks || run.providerResponseRetries || run.providerNativeFallbacks
+      ? [`Provider fallbacks: ${run.providerBatchFallbacks ?? 0} malformed batches; ${run.providerSequentialFallbackTexts ?? 0} texts sent sequentially; ${run.providerResponseRetries ?? 0} response retries; ${run.providerNativeFallbacks ?? 0} native API fallbacks`]
       : []),
     `Issues: ${run.issues.length}${run.droppedIssues ? ` (+${run.droppedIssues} more were not recorded)` : ""}`,
   ];

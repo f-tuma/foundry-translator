@@ -94,6 +94,7 @@ export interface JournalDependencyWarning {
   parentUuid: string;
   message: string;
   documentType?: string;
+  detail?: string;
 }
 
 type GraphSourceDocument =
@@ -427,6 +428,7 @@ export class JournalTranslationService {
         sourceUuid: warning.sourceUuid,
         parentUuid: warning.parentUuid,
         ...(warning.documentType ? { documentType: warning.documentType } : {}),
+        ...(warning.detail ? { detail: warning.detail } : {}),
       });
     };
     const nodeFor = (document: GraphSourceDocument): JournalGraphNode => {
@@ -589,11 +591,15 @@ export class JournalTranslationService {
     });
 
     for (const failure of graph.failures) {
+      const detail = failure.error instanceof Error
+        ? failure.error.message
+        : String(failure.error);
       addWarning({
         kind: "failed",
         sourceUuid: failure.node.uuid,
         parentUuid: sourceDocument.uuid,
         message: `Závislý dokument ${failure.node.name} se nepodařilo přeložit; jeho odkazy zůstaly v originále.`,
+        detail,
       });
     }
 

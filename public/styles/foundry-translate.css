@@ -866,6 +866,11 @@
   white-space: nowrap;
 }
 
+.ft-active-translations__fallbacks {
+  color: var(--ft-color-warning);
+  font-size: 10px;
+}
+
 .ft-active-translations__preview {
   padding: 7px 8px;
   border-left: 2px solid var(--ft-color-accent);

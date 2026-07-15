@@ -146,6 +146,10 @@ describe("OpenAiCompatibleProvider", () => {
       reasoningTokens: 4096,
       finishReason: "length",
     }));
+    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "diagnostic",
+      responseRetries: 1,
+    }));
   });
 
   it("uses LM Studio native chat with reasoning disabled for Gemma 4", async () => {
@@ -264,6 +268,7 @@ describe("OpenAiCompatibleProvider", () => {
   });
 
   it("falls back to sequential translations when batch delimiters are corrupted", async () => {
+    const metrics = vi.fn();
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse({
         choices: [{ message: { content: "Broken combined answer" }, finish_reason: "stop" }],
@@ -278,10 +283,42 @@ describe("OpenAiCompatibleProvider", () => {
       baseUrl: "http://localhost:1234",
       model: "gemma-batch",
       fetchImplementation: fetchMock,
+      onMetrics: metrics,
     });
 
     await expect(provider.translate({ texts: ["First.", "Second."], targetLanguage: "cs" }))
       .resolves.toEqual([{ translatedText: "První." }, { translatedText: "Druhý." }]);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "diagnostic",
+      batchFallbacks: 1,
+      sequentialFallbackTexts: 2,
+    }));
+  });
+
+  it("reports a native API fallback before using Chat Completions", async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ output: [], stats: {} }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "Přeloženo." }, finish_reason: "stop" }],
+      }));
+    const metrics = vi.fn();
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234",
+      model: "google/gemma-4-12b-qat",
+      fetchImplementation: fetchMock,
+      onMetrics: metrics,
+    });
+
+    await expect(provider.translate({ texts: ["Translated."], targetLanguage: "cs" }))
+      .resolves.toEqual([{ translatedText: "Přeloženo." }]);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "http://localhost:1234/api/v1/chat",
+      "http://localhost:1234/v1/chat/completions",
+    ]);
+    expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "diagnostic",
+      nativeFallbacks: 1,
+    }));
   });
 });

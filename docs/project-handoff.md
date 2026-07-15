@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-15
-- Repository state: `main`; `v0.14.3` prepared locally from `v0.14.2`
+- Repository state: `main`; diagnostic patch `v0.14.4` prepared locally from `v0.14.3`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -23,6 +23,15 @@ and the recommended implementation order.
   passes with **147 tests across 31 files**; real LM Studio responses confirmed
   `text/event-stream`, one-request multi-page translation, and intact final
   metrics. Temporary QA documents were removed.
+- 2026-07-15: A real `v0.14.2` partial translation log for the selected
+  Gamemaster's Guide page exposed a failed 33-page `Players' Guide` dependency:
+  76 provider requests consumed 229,336 input and 47,482 output tokens, but the
+  copied issue discarded the original nested error. `v0.14.4` now carries the
+  exact dependency exception into the active-translations issue/log and records
+  malformed LLM batches, texts sent through sequential fallback, response
+  retries, and native LM Studio API fallbacks. These counters are visible in
+  the overview and copied log, so another attempt can distinguish delimiter
+  damage from empty/truncated generation without relying on request count alone.
 
 - 2026-07-15: Patch `v0.14.2` fixes smart-glossary candidate suffix duplication
   and avoids repeated failed whole-block attempts in Chrome Local Translator.

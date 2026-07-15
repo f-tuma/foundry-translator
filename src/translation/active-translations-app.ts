@@ -65,6 +65,20 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
   const providerElapsed = run.providerRequestActive && run.providerRequestStartedAt !== undefined
     ? now - run.providerRequestStartedAt
     : run.providerGenerationMs ?? 0;
+  const providerFallbacks = [
+    run.providerBatchFallbacks
+      ? `${run.providerBatchFallbacks} ${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Batches")}`
+      : "",
+    run.providerSequentialFallbackTexts
+      ? `${run.providerSequentialFallbackTexts} ${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Sequential")}`
+      : "",
+    run.providerResponseRetries
+      ? `${run.providerResponseRetries} ${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Retries")}`
+      : "",
+    run.providerNativeFallbacks
+      ? `${run.providerNativeFallbacks} ${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Fallbacks.Native")}`
+      : "",
+  ].filter(Boolean).join(" · ");
   const providerMetrics = run.providerRequestCount
     ? `<div class="ft-active-translations__metrics">
         <span><strong>${formatTokenSpeed(run)}</strong>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.Speed")}</span>
@@ -77,6 +91,9 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
           : localize("FOUNDRY_TRANSLATE.ActiveTranslations.Metrics.GenerationTime")}</span>
       </div>
       <span class="ft-active-translations__model">${escapeHtml(run.providerModel ?? "")}</span>
+      ${providerFallbacks
+        ? `<span class="ft-active-translations__fallbacks">${escapeHtml(providerFallbacks)}</span>`
+        : ""}
       ${run.providerRequestActive && run.providerOutputPreview
         ? `<div class="ft-active-translations__preview">
             <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.StreamPreview")}</span>

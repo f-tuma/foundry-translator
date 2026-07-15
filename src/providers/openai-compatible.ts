@@ -261,6 +261,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
 
     if (pending.length > 1) {
       const boundaryTokens = createBatchTokens(pending.length);
+      let useSequentialFallback = false;
       try {
         const translatedBatch = await this.#translateOne(
           combineBatch(pending.map(({ text }) => text), boundaryTokens),
@@ -273,6 +274,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
           });
           return results;
         }
+        useSequentialFallback = true;
       } catch (error) {
         // A model may not support stable batch delimiters. Provider/network
         // errors still propagate; only a completed but unusable generation
@@ -280,6 +282,15 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
         if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
           throw error;
         }
+        useSequentialFallback = true;
+      }
+      if (useSequentialFallback) {
+        this.#onMetrics?.({
+          phase: "diagnostic",
+          model: this.#model,
+          batchFallbacks: 1,
+          sequentialFallbackTexts: pending.length,
+        });
       }
     }
 
@@ -373,7 +384,14 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       if (native !== null) return native;
     }
     let lastDetail = "";
-    for (const maxTokens of OUTPUT_TOKEN_LIMITS) {
+    for (const [attemptIndex, maxTokens] of OUTPUT_TOKEN_LIMITS.entries()) {
+      if (attemptIndex > 0) {
+        this.#onMetrics?.({
+          phase: "diagnostic",
+          model: this.#model,
+          responseRetries: 1,
+        });
+      }
       const startedAt = Date.now();
       this.#onMetrics?.({ phase: "started", model: this.#model });
       let response: Response;
@@ -462,6 +480,11 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
         model: this.#model,
         durationMs: Date.now() - startedAt,
       });
+      this.#onMetrics?.({
+        phase: "diagnostic",
+        model: this.#model,
+        nativeFallbacks: 1,
+      });
       return null;
     }
 
@@ -527,6 +550,11 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       return translated;
     }
     this.#onMetrics?.({ phase: "failed", model: this.#model, ...telemetry });
+    this.#onMetrics?.({
+      phase: "diagnostic",
+      model: this.#model,
+      nativeFallbacks: 1,
+    });
     return null;
   }
 

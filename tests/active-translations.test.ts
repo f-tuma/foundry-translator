@@ -151,11 +151,23 @@ describe("Active translation registry", () => {
       streamedCharacters: 24,
       outputPreview: "Průběžný překlad",
     });
+    registry.recordProviderMetrics(id, {
+      phase: "diagnostic",
+      model: "gemma",
+      batchFallbacks: 1,
+      sequentialFallbackTexts: 16,
+      responseRetries: 2,
+      nativeFallbacks: 1,
+    });
     expect(registry.get(id)).toMatchObject({
       providerRequestActive: true,
       providerRequestCount: 1,
       providerStreamedCharacters: 24,
       providerOutputPreview: "Průběžný překlad",
+      providerBatchFallbacks: 1,
+      providerSequentialFallbackTexts: 16,
+      providerResponseRetries: 2,
+      providerNativeFallbacks: 1,
     });
     expect(registry.get(id)?.providerOutputTokens).toBeUndefined();
     now = 2_500;
@@ -180,5 +192,22 @@ describe("Active translation registry", () => {
     });
     expect(formatRunLog(registry.get(id)!, "test"))
       .toContain("Provider: gemma; 1 requests; 120 input tokens; 60 output tokens; 10 reasoning tokens; 1500 ms");
+    expect(formatRunLog(registry.get(id)!, "test"))
+      .toContain("Provider fallbacks: 1 malformed batches; 16 texts sent sequentially; 2 response retries; 1 native API fallbacks");
+  });
+
+  it("keeps the original dependency failure detail in the copied log", () => {
+    const registry = new ActiveTranslationRegistry(() => 0);
+    const id = registry.start("Guide", "cs");
+    registry.addIssue(id, {
+      type: "failed",
+      sourceUuid: "JournalEntry.players",
+      parentUuid: "JournalEntry.gm",
+      detail: "Překlad stránky 9/33 „Magic and Spellcraft“ selhal. Provider timed out.",
+    });
+
+    expect(formatRunLog(registry.get(id)!, "test")).toContain(
+      "detail: Překlad stránky 9/33 „Magic and Spellcraft“ selhal. Provider timed out.",
+    );
   });
 });
