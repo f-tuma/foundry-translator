@@ -122,6 +122,12 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Cancel")}</span>
       </button>`
     : "";
+  const openTranslation = run.translatedDocumentUuid
+    ? `<button type="button" class="ft-button ft-button--secondary ft-active-translations__open" data-run-open="${run.id}">
+        <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+        <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslation")}</span>
+      </button>`
+    : "";
   return `
     <li class="ft-active-translations__run" data-state="${displayState}">
       <div class="ft-active-translations__title">
@@ -136,7 +142,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         ${providerMetrics}
         ${run.error ? `<span class="ft-active-translations__error">${escapeHtml(run.error)}</span>` : ""}
         ${current ? `<span class="ft-active-translations__current">${current}</span>` : ""}
-        <div class="ft-active-translations__actions">${cancel}${copyLog}</div>
+        <div class="ft-active-translations__actions">${openTranslation}${cancel}${copyLog}</div>
       </div>
     </li>
   `;
@@ -200,6 +206,23 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
     for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-cancel]")) {
       button.addEventListener("click", () => {
         activeTranslations.requestCancel(Number(button.dataset.runCancel));
+      });
+    }
+    for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-open]")) {
+      button.addEventListener("click", () => {
+        const run = activeTranslations.get(Number(button.dataset.runOpen));
+        if (!run?.translatedDocumentUuid) return;
+        void fromUuid(run.translatedDocumentUuid).then((document) => {
+          const journal = document as FoundryJournalDocument | null;
+          if (journal?.sheet) journal.sheet.render(true);
+          else ui.notifications.warn(
+            localize("FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslationFailed"),
+          );
+        }).catch(() => {
+          ui.notifications.warn(
+            localize("FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslationFailed"),
+          );
+        });
       });
     }
   }

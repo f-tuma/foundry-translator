@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-07-15
-- Repository state: `main`; adaptive LLM recovery patch `v0.14.6` prepared locally from `v0.14.5`
+- Updated: 2026-07-16
+- Repository state: `main`; live Journal checkpoint patch `v0.14.7` prepared locally from `v0.14.6`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,13 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-07-16: Patch `v0.14.7` persists a valid partial Journal translation
+  after every completed page batch. Stored checkpoints merge with pages from
+  earlier partial runs, preserve processed page IDs and counters, verify that
+  the source is unchanged, and stop before overwriting edits made to the live
+  translation between checkpoints. The active-translations overview exposes
+  the root checkpoint through an `Open live translation` action, allowing a GM
+  to read the translated pages while the remaining Journal continues.
 - 2026-07-15: A real `v0.14.5` run exposed seven malformed Gemma batches,
   95 texts sent through sequential fallback, and a foreign protection token
   that failed a four-page dependency window. Patch `v0.14.6` recursively

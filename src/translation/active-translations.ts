@@ -56,6 +56,8 @@ export interface ActiveTranslationRun {
   providerSequentialFallbackTexts?: number;
   providerResponseRetries?: number;
   providerNativeFallbacks?: number;
+  /** Stored root Journal checkpoint available for live reading. */
+  translatedDocumentUuid?: string;
 }
 
 const FINISHED_RUN_RETENTION_MS = 10 * 60 * 1000;

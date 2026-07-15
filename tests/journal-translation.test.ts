@@ -327,4 +327,69 @@ describe("Journal translation", () => {
     expect(translated.translatedTextPages).toBe(3);
     expect(translated.data.pages.map((page) => page.name)).toEqual(["První", "Druhá", "Třetí"]);
   });
+
+  it("emits persistable partial checkpoints after each LLM page batch", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const checkpoints: Array<{
+      names: string[];
+      partial: boolean;
+      processed: string[];
+    }> = [];
+    const source: JournalData = {
+      name: "Live Guide",
+      pages: Array.from({ length: 5 }, (_, index) => ({
+        _id: `page-${index + 1}`,
+        name: `Page ${index + 1}`,
+        type: "text",
+        text: { format: 1, content: `<p>Page ${index + 1} content.</p>` },
+      })),
+    };
+    const provider: TranslationProvider = {
+      async translate({ texts }) {
+        return texts.map((text) => ({
+          translatedText: text
+            .replace("Live Guide", "Živý průvodce")
+            .replaceAll("Page", "Stránka")
+            .replaceAll("content", "obsah"),
+        }));
+      },
+      async testConnection() {},
+    };
+
+    const translated = await translateJournalData({
+      source,
+      sourceUuid: "JournalEntry.live-guide",
+      glossary: [],
+      provider,
+      settings: {
+        providerId: "openai-compatible",
+        sourceLanguage: "en",
+        targetLanguage: "cs",
+      },
+      ownerDocument: document,
+      nonceFactory: () => "CHECKPOINT",
+      onCheckpoint: async ({ data }) => {
+        const flag = readJournalTranslationFlag(data.flags);
+        checkpoints.push({
+          names: data.pages.map(({ name }) => name),
+          partial: flag?.partial ?? false,
+          processed: flag?.processedPageIds ?? [],
+        });
+      },
+    });
+
+    expect(checkpoints).toEqual([
+      {
+        names: ["Stránka 1", "Stránka 2", "Stránka 3", "Stránka 4", "Page 5"],
+        partial: true,
+        processed: ["page-1", "page-2", "page-3", "page-4"],
+      },
+      {
+        names: ["Stránka 1", "Stránka 2", "Stránka 3", "Stránka 4", "Stránka 5"],
+        partial: false,
+        processed: ["page-1", "page-2", "page-3", "page-4", "page-5"],
+      },
+    ]);
+    expect(readJournalTranslationFlag(translated.data.flags)?.partial).toBe(false);
+  });
 });

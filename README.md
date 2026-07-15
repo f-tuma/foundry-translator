@@ -3,7 +3,7 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.14.6` processes
+> The module is currently an early development build. Version `0.14.7` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
 > safely keeps an isolated failed fragment in the original, translates human text
 > inside Foundry embeds, recursively translates linked Journals, Actors, and

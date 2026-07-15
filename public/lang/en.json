@@ -172,6 +172,8 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled": "Cancelled",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling": "Cancelling after the current part…",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Cancel": "Cancel",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslation": "Open live translation",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslationFailed": "The stored translation could not be opened.",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Issues": "{count} issues",
   "FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog": "Copy log",
   "FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied": "The translation log was copied to the clipboard."

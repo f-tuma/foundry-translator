@@ -901,6 +901,7 @@
 
 .ft-active-translations__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ft-space-2);
   margin-top: var(--ft-space-1);
 }

@@ -67,6 +67,8 @@ export interface TranslateJournalOptions {
   /** Translate only these pages; the rest stay source copies and the flag records a partial translation. */
   pageIds?: readonly string[];
   onProgress?: (progress: JournalTranslationProgress) => void;
+  /** Persistable partial snapshot emitted after each completed page batch. */
+  onCheckpoint?: (checkpoint: TranslatedJournal) => void | Promise<void>;
   /** Reports the page currently being prepared before its first provider request. */
   onPageStart?: (pageName: string) => void;
   onQualityFallback?: (fallback: TranslationQualityFallback) => void;
@@ -313,6 +315,9 @@ export async function translateJournalData(
   const copy = structuredClone(options.source);
   delete copy._id;
   delete copy._stats;
+  const sourceHash = await journalSourceHash(options.source);
+  const glossaryHash = await glossaryFingerprint(options.glossary);
+  const translatedAt = new Date().toISOString();
 
   let translatedTextPages = 0;
   let skippedTextPages = 0;
@@ -361,7 +366,35 @@ export async function translateJournalData(
     throw new Error("Vybraná stránka deníku už ve zdrojovém dokumentu neexistuje.");
   }
   let completedSelectedPages = 0;
+  const processedPageIds = new Set<string>();
   const pageWork: PageTranslationWork[] = [];
+
+  const snapshot = (partial: boolean): TranslatedJournal => {
+    const data = structuredClone(copy);
+    data.flags = {
+      ...data.flags,
+      [MODULE_ID]: {
+        ...data.flags?.[MODULE_ID],
+        translation: {
+          schemaVersion: TRANSLATION_SCHEMA_VERSION,
+          engineRevision: TRANSLATION_ENGINE_REVISION,
+          sourceUuid: options.sourceUuid,
+          sourceHash,
+          providerId: options.settings.providerId,
+          sourceLanguage: options.settings.sourceLanguage,
+          targetLanguage: options.settings.targetLanguage,
+          translatedAt,
+          translatedTextPages,
+          skippedTextPages,
+          fallbackTextSegments,
+          partial,
+          processedPageIds: [...processedPageIds],
+          glossaryFingerprint: glossaryHash,
+        },
+      },
+    };
+    return { data, translatedTextPages, skippedTextPages, fallbackTextSegments };
+  };
 
   for (const [pageIndex, page] of copy.pages.entries()) {
     delete page._stats;
@@ -503,6 +536,15 @@ export async function translateJournalData(
       if (work.translatedPage) translatedTextPages += 1;
       else if (work.skippedPage) skippedTextPages += 1;
       completedSelectedPages += 1;
+      const pageId = copy.pages[work.pageIndex]?._id;
+      if (pageId) processedPageIds.add(pageId);
+    }
+    if (options.onCheckpoint) {
+      const partial = completedSelectedPages < selectedPages.length ||
+        selectedPages.length < copy.pages.length;
+      await options.onCheckpoint(snapshot(partial));
+    }
+    for (const work of batch) {
       options.onProgress?.({
         completedPages: completedSelectedPages,
         totalPages: selectedPages.length,
@@ -513,33 +555,5 @@ export async function translateJournalData(
       });
     }
   }
-
-  const sourceHash = await journalSourceHash(options.source);
-  const glossaryHash = await glossaryFingerprint(options.glossary);
-  copy.flags = {
-    ...copy.flags,
-    [MODULE_ID]: {
-      ...copy.flags?.[MODULE_ID],
-      translation: {
-        schemaVersion: TRANSLATION_SCHEMA_VERSION,
-        engineRevision: TRANSLATION_ENGINE_REVISION,
-        sourceUuid: options.sourceUuid,
-        sourceHash,
-        providerId: options.settings.providerId,
-        sourceLanguage: options.settings.sourceLanguage,
-        targetLanguage: options.settings.targetLanguage,
-        translatedAt: new Date().toISOString(),
-        translatedTextPages,
-        skippedTextPages,
-        fallbackTextSegments,
-        partial: Boolean(selectedPageIds) && selectedPages.length < copy.pages.length,
-        processedPageIds: selectedPages
-          .map((page) => page._id)
-          .filter((id): id is string => Boolean(id)),
-        glossaryFingerprint: glossaryHash,
-      },
-    },
-  };
-
-  return { data: copy, translatedTextPages, skippedTextPages, fallbackTextSegments };
+  return snapshot(Boolean(selectedPageIds) && selectedPages.length < copy.pages.length);
 }

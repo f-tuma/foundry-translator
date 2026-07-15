@@ -136,6 +136,7 @@ interface TranslationScope {
 
 interface TranslationRuntime {
   runId: number;
+  rootUuid: string;
   glossaryHash: string;
   settings: ReturnType<typeof getTranslatorSettings>;
   provider: ReturnType<typeof createTranslationProvider>;
@@ -383,6 +384,7 @@ export class JournalTranslationService {
     runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
     const runtime: TranslationRuntime = {
       runId,
+      rootUuid: sourceDocument.uuid,
       glossaryHash: await glossaryFingerprint(glossary),
       settings,
       provider,
@@ -719,6 +721,35 @@ export class JournalTranslationService {
     }
     if (existing && manuallyEdited) throw new ManualTranslationEditsError(existing.name ?? source.name);
 
+    const saveTranslatedData = async (
+      data: JournalData,
+      mergeInitialPartial: boolean,
+    ): Promise<{ data: JournalData; document: FoundryJournalDocument }> => {
+      await assertJournalSourceUnchanged(sourceDocument, sourceHash);
+      const latest = await runtime.translations.find(
+        sourceDocument.uuid,
+        runtime.settings.targetLanguage,
+      );
+      const latestData = latest?.toObject() as JournalData | undefined;
+      const latestFlag = latestData ? readJournalTranslationFlag(latestData.flags) : null;
+      if (latestData && latestFlag &&
+        await hasManualOutputEdits(latestData, latestFlag.outputHash)) {
+        throw new ManualTranslationEditsError(latest?.name ?? source.name);
+      }
+
+      const savedData = mergeInitialPartial && existingData && existingFlag
+        ? mergePartialJournalTranslation(existingData, data)
+        : data;
+      await stampJournalOutputHash(savedData);
+      const document = await runtime.translations.save(savedData);
+      if (sourceDocument.uuid === runtime.rootUuid && document.uuid) {
+        activeTranslations.update(runtime.runId, {
+          translatedDocumentUuid: document.uuid,
+        });
+      }
+      return { data: savedData, document };
+    };
+
     const translated = await translateJournalData({
       source,
       sourceUuid: sourceDocument.uuid,
@@ -748,23 +779,25 @@ export class JournalTranslationService {
           occurrences: fallback.occurrences,
         });
       },
+      onCheckpoint: async (checkpoint) => {
+        await saveTranslatedData(checkpoint.data, true);
+      },
       onProgress: (progress: JournalTranslationProgress) => onProgress({
         ...progress,
         documentName: sourceDocument.name,
       }),
     });
-    await assertJournalSourceUnchanged(sourceDocument, sourceHash);
     if (pageIds && existing && existingFlag) {
       translated.data = mergePartialJournalTranslation(
         existing.toObject() as JournalData,
         translated.data,
       );
     }
-    await stampJournalOutputHash(translated.data);
-    const document = await runtime.translations.save(translated.data);
+    const saved = await saveTranslatedData(translated.data, false);
+    translated.data = saved.data;
     return {
       ...translated,
-      document,
+      document: saved.document,
       reused: false,
       processedDocuments: 1,
       reusedDocuments: 0,

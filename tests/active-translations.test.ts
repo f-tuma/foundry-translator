@@ -139,6 +139,19 @@ describe("Active translation registry", () => {
     expect(estimateRemainingMs({ ...run, finishedAt: 1 }, 50_000)).toBeNull();
   });
 
+  it("tracks the live root translation document once a checkpoint is stored", () => {
+    const registry = new ActiveTranslationRegistry(() => 1_000);
+    const id = registry.start("Guide", "cs");
+    registry.update(id, {
+      translatedDocumentUuid:
+        "Compendium.world.foundry-translate-translations.JournalEntry.translated",
+    });
+
+    expect(registry.get(id)?.translatedDocumentUuid).toBe(
+      "Compendium.world.foundry-translate-translations.JournalEntry.translated",
+    );
+  });
+
   it("aggregates LLM request telemetry and includes it in the copied log", () => {
     let now = 1_000;
     const registry = new ActiveTranslationRegistry(() => now);
