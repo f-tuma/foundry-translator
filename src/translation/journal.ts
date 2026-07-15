@@ -229,6 +229,21 @@ interface StructuredTranslationTarget {
   apply(units: readonly (readonly string[])[]): void;
 }
 
+interface PageTranslationWork {
+  pageIndex: number;
+  sourcePageName: string;
+  targets: TranslationTarget[];
+  structuredTargets: StructuredTranslationTarget[];
+  translatedPage: boolean;
+  skippedPage: boolean;
+}
+
+function journalPageBatchSize(providerId: ProviderId): number {
+  if (providerId === "chrome-local") return 1;
+  if (providerId === "openai-compatible") return 4;
+  return 8;
+}
+
 async function translateTargets(
   options: TranslateJournalOptions,
   targets: TranslationTarget[],
@@ -340,6 +355,7 @@ export async function translateJournalData(
     throw new Error("Vybraná stránka deníku už ve zdrojovém dokumentu neexistuje.");
   }
   let completedSelectedPages = 0;
+  const pageWork: PageTranslationWork[] = [];
 
   for (const [pageIndex, page] of copy.pages.entries()) {
     delete page._stats;
@@ -429,28 +445,58 @@ export async function translateJournalData(
       });
     }
 
-    options.onPageStart?.(sourcePageName);
+    pageWork.push({
+      pageIndex,
+      sourcePageName,
+      targets,
+      structuredTargets,
+      translatedPage,
+      skippedPage,
+    });
+  }
+
+  const pageBatchSize = journalPageBatchSize(options.settings.providerId);
+  for (let start = 0; start < pageWork.length; start += pageBatchSize) {
+    const batch = pageWork.slice(start, start + pageBatchSize);
+    const targets: TranslationTarget[] = [];
+    const structuredTargets: StructuredTranslationTarget[] = [];
+    for (const work of batch) {
+      options.onPageStart?.(work.sourcePageName);
+      const offset = targets.length;
+      targets.push(...work.targets);
+      structuredTargets.push(...work.structuredTargets.map((target) => ({
+        ...target,
+        start: target.start + offset,
+      })));
+    }
     try {
       await translateTargets(options, targets, structuredTargets, recordQualityFallback);
     } catch (error) {
       const detail = error instanceof Error ? ` ${error.message}` : "";
+      const first = batch[0];
+      const last = batch.at(-1);
+      const pageDescription = batch.length === 1
+        ? `stránky ${(first?.pageIndex ?? 0) + 1}/${copy.pages.length} „${first?.sourcePageName ?? ""}“`
+        : `stránek ${(first?.pageIndex ?? 0) + 1}–${(last?.pageIndex ?? 0) + 1}/${copy.pages.length} „${first?.sourcePageName ?? ""}“ až „${last?.sourcePageName ?? ""}“`;
       throw new Error(
-        `Překlad stránky ${pageIndex + 1}/${copy.pages.length} „${sourcePageName}“ selhal.${detail} Hotové stránky zůstávají v cache pro další pokus.`,
+        `Překlad ${pageDescription} selhal.${detail} Hotové stránky zůstávají v cache pro další pokus.`,
         { cause: error },
       );
     }
 
-    if (translatedPage) translatedTextPages += 1;
-    else if (skippedPage) skippedTextPages += 1;
-    completedSelectedPages += 1;
-    options.onProgress?.({
-      completedPages: completedSelectedPages,
-      totalPages: selectedPages.length,
-      pageIndex,
-      pageName: sourcePageName,
-      translatedText: translatedPage,
-      skippedText: skippedPage && !translatedPage,
-    });
+    for (const work of batch) {
+      if (work.translatedPage) translatedTextPages += 1;
+      else if (work.skippedPage) skippedTextPages += 1;
+      completedSelectedPages += 1;
+      options.onProgress?.({
+        completedPages: completedSelectedPages,
+        totalPages: selectedPages.length,
+        pageIndex: work.pageIndex,
+        pageName: work.sourcePageName,
+        translatedText: work.translatedPage,
+        skippedText: work.skippedPage && !work.translatedPage,
+      });
+    }
   }
 
   const sourceHash = await journalSourceHash(options.source);

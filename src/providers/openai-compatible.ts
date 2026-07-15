@@ -7,8 +7,9 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 3;
+const PROMPT_REVISION = 4;
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
+const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
 
 type FetchImplementation = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -109,6 +110,50 @@ function glossaryPrompt(
     .slice(0, 6_000);
 }
 
+function createBatchTokens(count: number): string[] {
+  const nonce = crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
+  return Array.from(
+    { length: count + 1 },
+    (_, index) => `__FTB_${nonce}_${index.toString(36).toUpperCase().padStart(4, "0")}__`,
+  );
+}
+
+function combineBatch(texts: readonly string[], boundaryTokens: readonly string[]): string {
+  return texts.map((text, index) => `${boundaryTokens[index]}${text}`).join("") +
+    boundaryTokens.at(-1);
+}
+
+function splitBatch(text: string, boundaryTokens: readonly string[]): string[] | null {
+  BATCH_TOKEN_PATTERN.lastIndex = 0;
+  const found = [...text.matchAll(BATCH_TOKEN_PATTERN)].map(([token]) => token);
+  if (
+    found.length !== boundaryTokens.length ||
+    !boundaryTokens.every((token, index) => token === found[index])
+  ) {
+    return null;
+  }
+
+  const starts: number[] = [];
+  let cursor = 0;
+  for (const token of boundaryTokens) {
+    const position = text.indexOf(token, cursor);
+    if (position < 0) return null;
+    starts.push(position);
+    cursor = position + token.length;
+  }
+  const firstStart = starts[0] ?? 0;
+  const lastStart = starts.at(-1) ?? text.length;
+  if (text.slice(0, firstStart).trim() ||
+    text.slice(lastStart + (boundaryTokens.at(-1)?.length ?? 0)).trim()) {
+    return null;
+  }
+  return boundaryTokens.slice(0, -1).map((token, index) => {
+    const start = (starts[index] ?? 0) + token.length;
+    const end = starts[index + 1] ?? text.length;
+    return text.slice(start, end);
+  });
+}
+
 export class OpenAiCompatibleProvider implements TranslationProvider {
   readonly #baseUrl: string;
   readonly #model: string;
@@ -132,15 +177,39 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
 
   async translate(request: TranslateRequest): Promise<TranslationResult[]> {
     this.#validateRequest(request);
-    const results: TranslationResult[] = [];
-    // Local servers generally serialize generation internally. Keeping this
-    // loop sequential avoids filling their queue with a large Foundry page.
-    for (const text of request.texts) {
-      if (!text) {
-        results.push({ translatedText: text });
-        continue;
+    const results: TranslationResult[] = request.texts.map((text) => ({ translatedText: text }));
+    const pending = request.texts
+      .map((text, index) => ({ text, index }))
+      .filter(({ text }) => Boolean(text));
+
+    if (pending.length > 1) {
+      const boundaryTokens = createBatchTokens(pending.length);
+      try {
+        const translatedBatch = await this.#translateOne(
+          combineBatch(pending.map(({ text }) => text), boundaryTokens),
+          request,
+        );
+        const translated = splitBatch(translatedBatch, boundaryTokens);
+        if (translated) {
+          pending.forEach(({ index }, resultIndex) => {
+            results[index] = { translatedText: translated[resultIndex] ?? "" };
+          });
+          return results;
+        }
+      } catch (error) {
+        // A model may not support stable batch delimiters. Provider/network
+        // errors still propagate; only a completed but unusable generation
+        // falls back to the proven single-text path.
+        if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
+          throw error;
+        }
       }
-      results.push({ translatedText: await this.#translateOne(text, request) });
+    }
+
+    // Local servers generally serialize generation internally. Keeping the
+    // fallback sequential avoids filling their queue after a malformed batch.
+    for (const { text, index } of pending) {
+      results[index] = { translatedText: await this.#translateOne(text, request) };
     }
     return results;
   }
@@ -212,7 +281,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       "Return only the translated text, without commentary, labels, or Markdown fences.",
       "Do not include the text_to_translate wrapper in the response.",
       "Translate directly; do not explain, analyze, or reason about the translation in the response.",
-      "Preserve every token beginning with __FTN_, __FTG_, or __FTS_ byte-for-byte, exactly once, and in the original order.",
+      "Preserve every token beginning with __FTN_, __FTG_, __FTS_, or __FTB_ byte-for-byte, exactly once, and in the original order.",
+      "FTB tokens delimit independent translation items. Translate every item independently and never move words across an FTB boundary.",
       "Preserve the meaning, tone, paragraph structure, and surrounding whitespace.",
       ...(this.#worldContext
         ? [`World and translation context:\n${this.#worldContext}`]

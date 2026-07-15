@@ -65,6 +65,38 @@ describe("smart glossary candidates", () => {
     expect(candidate?.replacement).toBe("Zvláštní bytost");
   });
 
+  it("does not include a duplicated unchanged ending in the suggested replacement", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document", document);
+    const candidate = extractCorrectionCandidate({
+      sourceText: "Welcome to Ember. The adventure begins.",
+      generatedText: "Vítejte v Emberu. Dobrodružství začíná.",
+      correctedText: "Vítejte ve světě Ember. Dobrodružství začíná. Dobrodružství začíná.",
+      glossary: [],
+      documentName: "Guide",
+      fieldName: "Welcome",
+    });
+
+    expect(candidate?.previousTranslation).toBe("v Emberu");
+    expect(candidate?.replacement).toBe("ve světě Ember");
+  });
+
+  it("ignores HTML block and whitespace normalization around a focused correction", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document", document);
+    const candidate = extractCorrectionCandidate({
+      sourceText: "<p>The Silver Dragon waits.</p><p>The gate is shut.</p>",
+      generatedText: "<p>Stříbrný drak\u00a0čeká.</p><p>Brána je zavřená.</p>",
+      correctedText: "<div>Stříbrný drak vyčkává.</div><div>Brána je zavřená.</div>",
+      glossary: [],
+      documentName: "Guide",
+      fieldName: "Dragon",
+    });
+
+    expect(candidate?.previousTranslation).toBe("čeká");
+    expect(candidate?.replacement).toBe("vyčkává");
+  });
+
   it("rejects malformed persisted candidates", () => {
     expect(readGlossaryCandidates([{ id: "bad" }, null])).toEqual([]);
   });

@@ -277,4 +277,54 @@ describe("Journal translation", () => {
     expect(translatedInputs.filter((text) => text.includes("First"))).toHaveLength(2);
     expect(translatedInputs.filter((text) => text.includes("Second"))).toHaveLength(4);
   });
+
+  it("batches several journal pages into one request for network LLM providers", async () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const requestSizes: number[] = [];
+    const provider: TranslationProvider = {
+      async translate({ texts }) {
+        requestSizes.push(texts.length);
+        return texts.map((text) => ({
+          translatedText: text
+            .replace("Batch Journal", "Dávkový deník")
+            .replace("First", "První")
+            .replace("Second", "Druhá")
+            .replace("Third", "Třetí")
+            .replace("Welcome to the first place", "Vítejte na prvním místě")
+            .replace("Welcome to the second place", "Vítejte na druhém místě")
+            .replace("Welcome to the third place", "Vítejte na třetím místě"),
+        }));
+      },
+      async testConnection() {},
+    };
+    const source: JournalData = {
+      name: "Batch Journal",
+      pages: ["First", "Second", "Third"].map((name) => ({
+        name,
+        type: "text",
+        text: {
+          format: 1,
+          content: `<p>Welcome to the ${name.toLocaleLowerCase()} place.</p>`,
+        },
+      })),
+    };
+
+    const translated = await translateJournalData({
+      source,
+      sourceUuid: "JournalEntry.batch",
+      glossary: [],
+      provider,
+      settings: {
+        providerId: "openai-compatible",
+        sourceLanguage: "en",
+        targetLanguage: "cs",
+      },
+      ownerDocument: document,
+      nonceFactory: () => "PAGEBATCH",
+    });
+
+    expect(requestSizes).toEqual([1, 6]);
+    expect(translated.translatedTextPages).toBe(3);
+    expect(translated.data.pages.map((page) => page.name)).toEqual(["První", "Druhá", "Třetí"]);
+  });
 });

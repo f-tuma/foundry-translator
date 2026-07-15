@@ -213,6 +213,71 @@ describe("translation units", () => {
     expect(result).toEqual([["Opakovaný text"], ["Opakovaný text"], ["Opakovaný text"]]);
   });
 
+  it("shares identical units between concurrent translation runs", async () => {
+    let calls = 0;
+    let releaseProvider!: () => void;
+    let markProviderStarted!: () => void;
+    const providerStarted = new Promise<void>((resolve) => {
+      markProviderStarted = resolve;
+    });
+    const providerRelease = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    const translationProvider: TranslationProvider = {
+      async translate({ texts }) {
+        calls += 1;
+        markProviderStarted();
+        await providerRelease;
+        return texts.map((text) => ({
+          translatedText: text.replace("Shared text", "Sdílený text"),
+        }));
+      },
+      async testConnection() {},
+    };
+    const options = {
+      units: [["Shared text"]],
+      glossary: [],
+      provider: translationProvider,
+      settings,
+      nonceFactory: () => "CONCURRENT",
+    } as const;
+
+    const first = translateUnits(options);
+    await providerStarted;
+    const second = translateUnits(options);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    releaseProvider();
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      [["Sdílený text"]],
+      [["Sdílený text"]],
+    ]);
+    expect(calls).toBe(1);
+  });
+
+  it("clears an in-flight unit after a provider failure", async () => {
+    let calls = 0;
+    const translationProvider: TranslationProvider = {
+      async translate({ texts }) {
+        calls += 1;
+        if (calls === 1) throw new Error("Temporary provider failure");
+        return texts.map(() => ({ translatedText: "Obnovený překlad" }));
+      },
+      async testConnection() {},
+    };
+    const options = {
+      units: [["Recovered translation"]],
+      glossary: [],
+      provider: translationProvider,
+      settings,
+      nonceFactory: () => "FAILURE",
+    } as const;
+
+    await expect(translateUnits(options)).rejects.toThrow("Temporary provider failure");
+    await expect(translateUnits(options)).resolves.toEqual([["Obnovený překlad"]]);
+    expect(calls).toBe(2);
+  });
+
   it("reattaches exact outer whitespace even when the provider trims it", async () => {
     const result = await translateUnits({
       units: [["  Welcome.\n"]],

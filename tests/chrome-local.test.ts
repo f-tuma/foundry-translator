@@ -207,8 +207,36 @@ describe("ChromeLocalProvider", () => {
       sourceLanguage: "en",
       targetLanguage: "cs",
     })).resolves.toEqual([{ translatedText: `Ten ${token} stojí.` }]);
-    expect(translatedInputs.slice(0, 3)).toEqual(Array(3).fill(`The ${token} stands.`));
-    expect(translatedInputs.slice(3)).toEqual(["The", "stands."]);
+    expect(translatedInputs).toEqual([
+      `The ${token} stands.`,
+      "The",
+      "stands.",
+    ]);
+  });
+
+  it("remembers a token-corrupting session and skips later whole-block probes", async () => {
+    const translatedInputs: string[] = [];
+    const token = "__FTG_GLOSSARY0_0000__";
+    const Translator = createTranslatorFactory((text) => {
+      translatedInputs.push(text);
+      if (text.includes(token)) return text.replace(token, "BROKEN");
+      return `cs:${text}`;
+    });
+    const provider = new ChromeLocalProvider({ apis: { Translator } });
+
+    await provider.translate({
+      texts: [`First ${token} text.`, `Second ${token} text.`],
+      sourceLanguage: "en",
+      targetLanguage: "cs",
+    });
+
+    expect(translatedInputs).toEqual([
+      `First ${token} text.`,
+      "First",
+      "text.",
+      "Second",
+      "text.",
+    ]);
   });
 
   it("preserves whitespace around protection tokens when Chrome trims it", async () => {

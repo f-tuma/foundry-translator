@@ -130,6 +130,7 @@ export class ChromeLocalProvider implements TranslationProvider {
   readonly #onStatus: ((status: ChromeLocalProviderStatus) => void) | undefined;
   readonly #modelTimeoutMs: number;
   readonly #translators = new Map<string, Promise<ChromeTranslatorSession>>();
+  readonly #fragmentOnlyTranslators = new WeakSet<ChromeTranslatorSession>();
   #detector?: Promise<ChromeLanguageDetectorSession>;
 
   constructor(options: ChromeLocalProviderOptions = {}) {
@@ -183,18 +184,19 @@ export class ChromeLocalProvider implements TranslationProvider {
     text: string,
   ): Promise<string> {
     const parts = protectedTextParts(text);
-    if (parts.length > 1) {
+    if (parts.length > 1 && !this.#fragmentOnlyTranslators.has(translator)) {
       // Let Chrome see the complete paragraph first. If it preserves all
       // glossary, Foundry-syntax, and structural boundary tokens byte-for-byte,
       // the caller's stricter integrity checks can safely accept the contextual
-      // result. Otherwise fall back to translating isolated text fragments.
-      for (let attempt = 0; attempt < EMPTY_TRANSLATION_ATTEMPTS; attempt += 1) {
-        const candidate = await translator.translate(text);
-        if (typeof candidate === "string" && candidate.trim() &&
-          preservesProtectionTokens(text, candidate)) {
-          return candidate;
-        }
+      // result. A session that corrupts tokens once goes straight to isolated
+      // fragments afterwards; repeating the same unsafe probe adds latency but
+      // cannot improve integrity.
+      const candidate = await translator.translate(text);
+      if (typeof candidate === "string" && candidate.trim() &&
+        preservesProtectionTokens(text, candidate)) {
+        return candidate;
       }
+      this.#fragmentOnlyTranslators.add(translator);
     }
     const translated: string[] = [];
     for (const part of parts) {

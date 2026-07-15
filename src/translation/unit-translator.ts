@@ -67,9 +67,16 @@ export interface TranslationQualityFallback {
 interface PreparedUnit {
   indices: number[];
   key: string;
+  inFlight: InFlightTranslation;
   protectedText: string;
   segments: PreparedSegment[];
   boundaryTokens: string[];
+}
+
+interface InFlightTranslation {
+  promise: Promise<readonly string[]>;
+  resolve: (segments: readonly string[]) => void;
+  reject: (reason: unknown) => void;
 }
 
 interface PreparedSegment {
@@ -87,6 +94,22 @@ interface TranslationProblem {
 interface CheckedSegments {
   segments: readonly string[];
   usedFallback: boolean;
+}
+
+const inFlightTranslations = new Map<string, InFlightTranslation>();
+
+function createInFlightTranslation(): InFlightTranslation {
+  let resolve!: (segments: readonly string[]) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<readonly string[]>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  // Owners complete through the normal return path and do not await their own
+  // promise. Register a rejection handler so a provider failure cannot become
+  // an unhandled rejection when there are no concurrent waiters.
+  void promise.catch(() => undefined);
+  return { promise, resolve, reject };
 }
 
 function glossarySnapshot(entries: readonly GlossaryEntry[]): string {
@@ -410,6 +433,7 @@ export async function translateUnits(
   const translated: (readonly string[] | undefined)[] = Array(options.units.length);
   const misses: PreparedUnit[] = [];
   const missesByKey = new Map<string, PreparedUnit>();
+  const waiting: Array<{ index: number; promise: Promise<readonly string[]> }> = [];
   const keyedUnits = await Promise.all(options.units.map(async (segments, index) => ({
     index,
     segments,
@@ -448,6 +472,11 @@ export async function translateUnits(
       duplicate.indices.push(index);
       continue;
     }
+    const existingInFlight = inFlightTranslations.get(key);
+    if (existingInFlight) {
+      waiting.push({ index, promise: existingInFlight.promise });
+      continue;
+    }
 
     const nonce = options.nonceFactory?.() ?? randomNonce();
     const boundaryTokens = segments.length > 1
@@ -460,9 +489,11 @@ export async function translateUnits(
         `${nonce}${segmentIndex.toString(36)}`,
       ),
     );
+    const inFlight = createInFlightTranslation();
     const prepared: PreparedUnit = {
       indices: [index],
       key,
+      inFlight,
       boundaryTokens,
       protectedText: boundaryTokens.length
         ? combineSegments(preparedSegments.map(({ protection }) => protection.text), boundaryTokens)
@@ -471,79 +502,102 @@ export async function translateUnits(
     };
     misses.push(prepared);
     missesByKey.set(key, prepared);
+    inFlightTranslations.set(key, inFlight);
   }
 
-  for (const batch of requestBatches(misses, options.settings.providerId)) {
-    const results = await options.provider.translate({
-      texts: batch.map(({ protectedText }) => protectedText),
-      sourceLanguage: options.settings.sourceLanguage,
-      targetLanguage: options.settings.targetLanguage,
-      format: "text",
-      glossary: options.glossary,
-    });
+  try {
+    for (const batch of requestBatches(misses, options.settings.providerId)) {
+      const results = await options.provider.translate({
+        texts: batch.map(({ protectedText }) => protectedText),
+        sourceLanguage: options.settings.sourceLanguage,
+        targetLanguage: options.settings.targetLanguage,
+        format: "text",
+        glossary: options.glossary,
+      });
 
-    if (results.length !== batch.length) {
-      throw new Error("Překladač vrátil jiný počet výsledků, než kolik dostal bloků.");
-    }
+      if (results.length !== batch.length) {
+        throw new Error("Překladač vrátil jiný počet výsledků, než kolik dostal bloků.");
+      }
 
-    const cacheWrites: TranslationCacheEntry[] = [];
-    for (const [resultIndex, result] of results.entries()) {
-      const prepared = batch[resultIndex];
-      if (!prepared) throw new Error("Chybí metadata přeloženého bloku.");
-      let protectedSegments: readonly string[];
-      if (!prepared.boundaryTokens.length) {
-        protectedSegments = [result.translatedText];
-      } else {
-        try {
-          protectedSegments = splitTranslatedSegments(
-            result.translatedText,
-            prepared.boundaryTokens,
-          );
-        } catch (error) {
-          if (!(error instanceof GlossaryIntegrityError)) throw error;
+      const cacheWrites: TranslationCacheEntry[] = [];
+      const completed: Array<{ prepared: PreparedUnit; segments: readonly string[] }> = [];
+      for (const [resultIndex, result] of results.entries()) {
+        const prepared = batch[resultIndex];
+        if (!prepared) throw new Error("Chybí metadata přeloženého bloku.");
+        let protectedSegments: readonly string[];
+        if (!prepared.boundaryTokens.length) {
+          protectedSegments = [result.translatedText];
+        } else {
           try {
-            protectedSegments = await translateSegmentsSeparately(
-              prepared,
-              options.provider,
-              options.settings,
-              options.glossary,
+            protectedSegments = splitTranslatedSegments(
+              result.translatedText,
+              prepared.boundaryTokens,
             );
-          } catch {
-            protectedSegments = prepared.segments.map(({ protection }) => protection.text);
+          } catch (error) {
+            if (!(error instanceof GlossaryIntegrityError)) throw error;
+            try {
+              protectedSegments = await translateSegmentsSeparately(
+                prepared,
+                options.provider,
+                options.settings,
+                options.glossary,
+              );
+            } catch {
+              protectedSegments = prepared.segments.map(({ protection }) => protection.text);
+            }
           }
         }
+        const checked = await retrySuspiciousSegments(
+          prepared,
+          protectedSegments,
+          options.provider,
+          options.settings,
+          options.glossary,
+          options.onQualityFallback,
+        );
+        protectedSegments = checked.segments;
+        const segments = protectedSegments.map((segment, index) => {
+          const preparedSegment = prepared.segments[index];
+          if (!preparedSegment) throw new Error("Chybí ochrana přeloženého HTML segmentu.");
+          const glossaryRestored = restoreGlossaryTerms(segment, preparedSegment.protection);
+          const restored = restoreFoundrySyntax(glossaryRestored, preparedSegment.syntax);
+          return `${preparedSegment.leading}${restored}${preparedSegment.trailing}`;
+        });
+        for (const index of prepared.indices) translated[index] = segments;
+        completed.push({ prepared, segments });
+        if (!checked.usedFallback) {
+          cacheWrites.push({ key: prepared.key, translatedSegments: segments });
+        }
       }
-      const checked = await retrySuspiciousSegments(
-        prepared,
-        protectedSegments,
-        options.provider,
-        options.settings,
-        options.glossary,
-        options.onQualityFallback,
-      );
-      protectedSegments = checked.segments;
-      const segments = protectedSegments.map((segment, index) => {
-        const preparedSegment = prepared.segments[index];
-        if (!preparedSegment) throw new Error("Chybí ochrana přeloženého HTML segmentu.");
-        const glossaryRestored = restoreGlossaryTerms(segment, preparedSegment.protection);
-        const restored = restoreFoundrySyntax(glossaryRestored, preparedSegment.syntax);
-        return `${preparedSegment.leading}${restored}${preparedSegment.trailing}`;
-      });
-      for (const index of prepared.indices) translated[index] = segments;
-      if (!checked.usedFallback) {
-        cacheWrites.push({ key: prepared.key, translatedSegments: segments });
-      }
-    }
 
-    if (options.cache?.setMany) {
-      await options.cache.setMany(cacheWrites);
-    } else if (options.cache) {
-      await Promise.all(
-        cacheWrites.map(({ key, translatedSegments }) =>
-          options.cache?.set(key, translatedSegments),
-        ),
-      );
+      if (options.cache?.setMany) {
+        await options.cache.setMany(cacheWrites);
+      } else if (options.cache) {
+        await Promise.all(
+          cacheWrites.map(({ key, translatedSegments }) =>
+            options.cache?.set(key, translatedSegments)
+          ),
+        );
+      }
+
+      for (const { prepared, segments } of completed) {
+        if (inFlightTranslations.get(prepared.key) === prepared.inFlight) {
+          inFlightTranslations.delete(prepared.key);
+        }
+        prepared.inFlight.resolve(segments);
+      }
     }
+  } catch (error) {
+    for (const prepared of misses) {
+      if (inFlightTranslations.get(prepared.key) !== prepared.inFlight) continue;
+      inFlightTranslations.delete(prepared.key);
+      prepared.inFlight.reject(error);
+    }
+    throw error;
+  }
+
+  for (const { index, promise } of waiting) {
+    translated[index] = await promise;
   }
 
   if (translated.some((segments) => !segments)) {

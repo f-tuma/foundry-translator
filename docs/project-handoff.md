@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-15
-- Repository state: `main`; `v0.14.1` prepared locally from `v0.14.0`
+- Repository state: `main`; `v0.14.2` prepared locally from `v0.14.1`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,15 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-07-15: Patch `v0.14.2` fixes smart-glossary candidate suffix duplication
+  and avoids repeated failed whole-block attempts in Chrome Local Translator.
+  OpenAI-compatible translation now sends true protected multi-item batches,
+  falls back safely when a model damages batch delimiters, shares identical
+  in-flight units between concurrent runs, and groups up to four Journal pages
+  into one LLM request window. Real Foundry QA against LM Studio with
+  `google/gemma-4-12b-qat` translated a three-page Journal in two LLM requests;
+  final validation passed with **144 tests across 31 files**.
 
 - 2026-07-15: The repository was verified clean at `v0.13.0`; the older handoff
   header and Item-recursion roadmap text were stale. Development after the

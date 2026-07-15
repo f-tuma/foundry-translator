@@ -171,4 +171,58 @@ describe("OpenAiCompatibleProvider", () => {
       reasoningTokens: 0,
     }));
   });
+
+  it("translates multiple texts in one delimited LLM request", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      const content = String(body.messages[0].content);
+      const boundaries = [...content.matchAll(/__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu)]
+        .map(([token]) => token);
+      return jsonResponse({
+        choices: [{
+          message: {
+            content: `${boundaries[0]}Vítejte v Emberu.${boundaries[1]}Stříbrný drak.${boundaries[2]}`,
+          },
+          finish_reason: "stop",
+        }],
+      });
+    });
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234",
+      model: "gemma-batch",
+      fetchImplementation: fetchMock,
+    });
+
+    await expect(provider.translate({
+      texts: ["Welcome to Ember.", "Silver Dragon."],
+      sourceLanguage: "en",
+      targetLanguage: "cs",
+    })).resolves.toEqual([
+      { translatedText: "Vítejte v Emberu." },
+      { translatedText: "Stříbrný drak." },
+    ]);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to sequential translations when batch delimiters are corrupted", async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "Broken combined answer" }, finish_reason: "stop" }],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "První." }, finish_reason: "stop" }],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "Druhý." }, finish_reason: "stop" }],
+      }));
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234",
+      model: "gemma-batch",
+      fetchImplementation: fetchMock,
+    });
+
+    await expect(provider.translate({ texts: ["First.", "Second."], targetLanguage: "cs" }))
+      .resolves.toEqual([{ translatedText: "První." }, { translatedText: "Druhý." }]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });
