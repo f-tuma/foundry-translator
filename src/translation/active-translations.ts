@@ -11,7 +11,7 @@ export type ActiveTranslationState =
   | "cancelled";
 
 export interface TranslationRunIssue {
-  type: "fallback" | "unresolved" | "unsupported" | "failed";
+  type: "fallback" | "unresolved" | "unsupported" | "failed" | "preserved";
   documentName?: string;
   documentType?: string;
   sourceUuid?: string;
@@ -62,6 +62,7 @@ export interface ActiveTranslationRun {
 
 const FINISHED_RUN_RETENTION_MS = 10 * 60 * 1000;
 const MAX_ISSUES_PER_RUN = 500;
+const MAX_LOGGED_ISSUE_DETAILS = 50;
 
 export class ActiveTranslationRegistry {
   #runs = new Map<number, ActiveTranslationRun>();
@@ -215,6 +216,9 @@ function issueDescription(issue: TranslationRunIssue): string | null {
     case "failed":
       return issue.detail ??
         "The dependent document failed to translate; its references stay at the source.";
+    case "preserved":
+      return issue.detail ??
+        "Manual edits were preserved; automatic refresh of this document was skipped.";
     default:
       return issue.detail ?? null;
   }
@@ -242,7 +246,24 @@ export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): 
       : []),
     `Issues: ${run.issues.length}${run.droppedIssues ? ` (+${run.droppedIssues} more were not recorded)` : ""}`,
   ];
-  run.issues.forEach((issue, index) => {
+  if (run.issues.length) {
+    const summary = new Map<string, number>();
+    for (const issue of run.issues) {
+      const key = issue.documentType ? `${issue.type}:${issue.documentType}` : issue.type;
+      summary.set(key, (summary.get(key) ?? 0) + (issue.occurrences ?? 1));
+    }
+    lines.push(
+      `Issue summary (recorded): ${[...summary.entries()]
+        .map(([type, count]) => `${type}=${count}`)
+        .join("; ")}`,
+    );
+    if (run.issues.length > MAX_LOGGED_ISSUE_DETAILS) {
+      lines.push(
+        `Issue details: first ${MAX_LOGGED_ISSUE_DETAILS} of ${run.issues.length} recorded issues`,
+      );
+    }
+  }
+  run.issues.slice(0, MAX_LOGGED_ISSUE_DETAILS).forEach((issue, index) => {
     const type = issue.documentType ? `${issue.type}:${issue.documentType}` : issue.type;
     const parts = [
       `${index + 1}. [${type}]`,

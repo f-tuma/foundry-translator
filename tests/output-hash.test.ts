@@ -30,4 +30,29 @@ describe("translated output fingerprints", () => {
     )).toBe(true);
     expect(await hasManualOutputEdits(generated, undefined)).toBe(false);
   });
+
+  it("is stable when Foundry reorders hydrated document fields", async () => {
+    const generated = {
+      name: "Guide [CS]",
+      pages: [{
+        _id: "page",
+        name: "Úvod",
+        type: "text",
+        text: { format: 1, content: "<p>Vítejte.</p>" },
+      }],
+    };
+    const hydrated = {
+      pages: [{
+        text: { content: "<p>Vítejte.</p>", format: 1 },
+        type: "text",
+        name: "Úvod",
+        _id: "page",
+      }],
+      name: "Guide [CS]",
+    };
+
+    await expect(translatedOutputHash(hydrated)).resolves.toBe(
+      await translatedOutputHash(generated),
+    );
+  });
 });

@@ -61,6 +61,8 @@ export interface JournalTranslationServiceOptions {
 export interface JournalTranslationResult extends TranslatedJournal {
   document: FoundryJournalDocument;
   reused: boolean;
+  /** True when an existing manually edited document was deliberately preserved. */
+  protectedManualEdits?: boolean;
   processedDocuments: number;
   reusedDocuments: number;
   dependencyWarnings: readonly JournalDependencyWarning[];
@@ -111,6 +113,8 @@ interface GraphTranslationResult {
   data: GraphData;
   document: GraphTranslatedDocument;
   reused: boolean;
+  /** Do not rewrite references or save this manually edited translation. */
+  protectedManualEdits?: boolean;
   fallbackTextSegments: number;
 }
 
@@ -145,6 +149,22 @@ interface TranslationRuntime {
   translations: CompendiumJournalTranslationRepository;
   actorTranslations: CompendiumActorTranslationRepository;
   itemTranslations: CompendiumItemTranslationRepository;
+}
+
+function recordPreservedManualEdits(
+  runtime: TranslationRuntime,
+  documentName: string,
+  sourceUuid: string,
+): void {
+  logger.info("Existing translation with manual edits was preserved.", {
+    documentName,
+    sourceUuid,
+  });
+  activeTranslations.addIssue(runtime.runId, {
+    type: "preserved",
+    documentName,
+    sourceUuid,
+  });
 }
 
 interface RuntimePageSystem {
@@ -608,6 +628,7 @@ export class JournalTranslationService {
     for (const document of graph.completed) {
       const node = nodes.get(document.uuid);
       if (!node?.result) continue;
+      if (node.result.protectedManualEdits) continue;
       const replacements: DocumentReferenceReplacement[] = [];
       for (const dependency of node.dependencies) {
         const translatedDependency = nodes.get(dependency.root.uuid)?.result?.document;
@@ -719,7 +740,21 @@ export class JournalTranslationService {
         dependencyWarnings: [],
       };
     }
-    if (existing && manuallyEdited) throw new ManualTranslationEditsError(existing.name ?? source.name);
+    if (existing && existingFlag && existingData && manuallyEdited) {
+      recordPreservedManualEdits(runtime, existing.name ?? source.name, sourceDocument.uuid);
+      return {
+        data: existingData,
+        translatedTextPages: existingFlag.translatedTextPages,
+        skippedTextPages: existingFlag.skippedTextPages,
+        fallbackTextSegments: existingFlag.fallbackTextSegments,
+        document: existing,
+        reused: true,
+        protectedManualEdits: true,
+        processedDocuments: 1,
+        reusedDocuments: 1,
+        dependencyWarnings: [],
+      };
+    }
 
     const saveTranslatedData = async (
       data: JournalData,
@@ -830,7 +865,16 @@ export class JournalTranslationService {
         fallbackTextSegments: existingFlag.fallbackTextSegments,
       };
     }
-    if (existing && manuallyEdited) throw new ManualTranslationEditsError(existing.name ?? source.name);
+    if (existing && existingFlag && existingData && manuallyEdited) {
+      recordPreservedManualEdits(runtime, existing.name ?? source.name, sourceDocument.uuid);
+      return {
+        data: existingData,
+        document: existing,
+        reused: true,
+        protectedManualEdits: true,
+        fallbackTextSegments: existingFlag.fallbackTextSegments,
+      };
+    }
 
     const paths = actorHtmlFieldPaths(sourceDocument, source);
     const translated = await translateActorData({
@@ -900,7 +944,16 @@ export class JournalTranslationService {
         fallbackTextSegments: existingFlag.fallbackTextSegments,
       };
     }
-    if (existing && manuallyEdited) throw new ManualTranslationEditsError(existing.name ?? source.name);
+    if (existing && existingFlag && existingData && manuallyEdited) {
+      recordPreservedManualEdits(runtime, existing.name ?? source.name, sourceDocument.uuid);
+      return {
+        data: existingData,
+        document: existing,
+        reused: true,
+        protectedManualEdits: true,
+        fallbackTextSegments: existingFlag.fallbackTextSegments,
+      };
+    }
 
     const translated = await translateItemData({
       source,

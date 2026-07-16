@@ -118,7 +118,12 @@ describe("Active translation registry", () => {
     }
     expect(registry.get(id)?.issues).toHaveLength(500);
     expect(registry.get(id)?.droppedIssues).toBe(5);
-    expect(formatRunLog(registry.get(id)!, "x")).toContain("Issues: 500 (+5 more were not recorded)");
+    const log = formatRunLog(registry.get(id)!, "x");
+    expect(log).toContain("Issues: 500 (+5 more were not recorded)");
+    expect(log).toContain("Issue summary (recorded): unresolved=500");
+    expect(log).toContain("Issue details: first 50 of 500 recorded issues");
+    expect(log).toContain("50. [unresolved] Actor.49");
+    expect(log).not.toContain("51. [unresolved]");
   });
 
   it("estimates the remaining time from completed units", () => {
@@ -227,5 +232,21 @@ describe("Active translation registry", () => {
     expect(log).toContain(
       "detail: Překlad stránky 9/33 „Magic and Spellcraft“ selhal. Provider timed out.",
     );
+  });
+
+  it("reports a preserved manually edited translation as a non-fatal issue", () => {
+    const registry = new ActiveTranslationRegistry(() => 0);
+    const id = registry.start("Guide", "cs");
+    registry.addIssue(id, {
+      type: "preserved",
+      documentName: "Průvodce [CS]",
+      sourceUuid: "JournalEntry.guide",
+    });
+    registry.finish(id);
+
+    const log = formatRunLog(registry.get(id)!, "test");
+    expect(log).toContain("State: done-with-issues");
+    expect(log).toContain("[preserved] Průvodce [CS]");
+    expect(log).toContain("Manual edits were preserved");
   });
 });

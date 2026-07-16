@@ -14,7 +14,12 @@ function normalize(value: unknown, root = false): unknown {
   if (!value || typeof value !== "object") return value;
 
   const output: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+  // Foundry may hydrate a persisted document with the same fields in a
+  // different insertion order. Sort keys recursively so semantically equal
+  // documents keep the same fingerprint across a save/load round trip.
+  const entries = Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right));
+  for (const [key, entry] of entries) {
     if (key === "_stats") continue;
     if (root && ["_id", "folder", "ownership", "sort", "flags"].includes(key)) continue;
     output[key] = normalize(entry);

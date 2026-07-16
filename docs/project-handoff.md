@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-16
-- Repository state: `main`; live Journal checkpoint patch `v0.14.7` prepared locally from `v0.14.6`
+- Repository state: `main`; manual-edit preservation patch `v0.14.8` prepared locally from `v0.14.7`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,12 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-07-16: Patch `v0.14.8` makes translated-output fingerprints stable
+  across Foundry save/load field ordering. Existing manually edited Journals,
+  Actors, and Items are now preserved as non-fatal reused documents instead of
+  failing a long recursive run; active edits made between live checkpoints
+  still stop that document before it can be overwritten. Copied run logs add
+  an issue-type summary and cap verbose details at the first 50 entries.
 - 2026-07-16: Patch `v0.14.7` persists a valid partial Journal translation
   after every completed page batch. Stored checkpoints merge with pages from
   earlier partial runs, preserve processed page IDs and counters, verify that
