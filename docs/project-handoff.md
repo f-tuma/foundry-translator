@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-17
-- Repository state: `main`; translated-link reliability patch `v0.14.9` prepared locally from `v0.14.8`
+- Repository state: `main`; folder-navigation hotfix `v0.14.10` prepared locally from `v0.14.9`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,10 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-07-17: Patch `v0.14.10` limits automatic translated-link interception
+  to Journal, Actor, and Item UUIDs. Folder and other unsupported sidebar UUIDs
+  remain entirely under Foundry's native click handling, so a folder click
+  expands or collapses it instead of opening the folder configuration sheet.
 - 2026-07-16: Patch `v0.14.9` makes reliable translated Journal navigation the
   primary behavior. Manual edits no longer block a refresh: they still feed
   glossary candidates, but a rerun regenerates edited output. Journal engine

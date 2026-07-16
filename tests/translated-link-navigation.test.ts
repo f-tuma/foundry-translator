@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  isTranslatableDocumentReference,
   openTranslatedReference,
   translatedEmbeddedUuid,
 } from "../src/translation/translated-link-navigation";
@@ -31,6 +32,25 @@ function journalFlag() {
 }
 
 describe("translated link navigation", () => {
+  it("intercepts only document types supported by translated navigation", () => {
+    expect(isTranslatableDocumentReference("JournalEntry.guide")).toBe(true);
+    expect(isTranslatableDocumentReference(
+      "JournalEntry.guide.JournalEntryPage.intro",
+    )).toBe(true);
+    expect(isTranslatableDocumentReference("Actor.hero")).toBe(true);
+    expect(isTranslatableDocumentReference("Item.sword")).toBe(true);
+    expect(isTranslatableDocumentReference(
+      "Compendium.ember.character.Item.sword",
+    )).toBe(true);
+
+    expect(isTranslatableDocumentReference("Folder.journals")).toBe(false);
+    expect(isTranslatableDocumentReference("Scene.map")).toBe(false);
+    expect(isTranslatableDocumentReference("Playlist.ambience")).toBe(false);
+    expect(isTranslatableDocumentReference(
+      "Compendium.world.foundry-translate-translations.JournalEntry.csGuide",
+    )).toBe(false);
+  });
+
   it("maps a source Journal and its embedded page to the translated root", () => {
     const translated = "Compendium.world.foundry-translate-translations.JournalEntry.csGuide";
 

@@ -63,6 +63,15 @@ function isStoredTranslationUuid(uuid: string): boolean {
   return PACKS.some(({ packId }) => uuid.startsWith(`Compendium.${packId}.`));
 }
 
+/** Whether a Foundry UUID belongs to a document type translated by this module. */
+export function isTranslatableDocumentReference(uuid: string): boolean {
+  const rootUuid = rootDocumentReferenceUuid(cleanUuid(uuid));
+  if (!rootUuid || isStoredTranslationUuid(rootUuid)) return false;
+  const parts = rootUuid.split(".");
+  const documentType = parts[0] === "Compendium" ? parts[3] : parts[0];
+  return documentType === "JournalEntry" || documentType === "Actor" || documentType === "Item";
+}
+
 export function translatedEmbeddedUuid(
   sourceUuid: string,
   translatedRootUuid: string,
@@ -110,8 +119,9 @@ async function openOriginal(uuid: string): Promise<void> {
 /** Opens a stored translation when available and returns whether it did so. */
 export async function openTranslatedReference(uuid: string): Promise<boolean> {
   const sourceUuid = cleanUuid(uuid);
+  if (!isTranslatableDocumentReference(sourceUuid)) return false;
   const rootUuid = rootDocumentReferenceUuid(sourceUuid);
-  if (!rootUuid || isStoredTranslationUuid(rootUuid)) return false;
+  if (!rootUuid) return false;
 
   const translatedRoot = await storedTranslation(rootUuid, targetLanguage());
   if (!translatedRoot?.uuid) return false;
@@ -140,7 +150,7 @@ function onDocumentClick(event: MouseEvent): void {
     return;
   }
   const uuid = linkedUuid(event);
-  if (!uuid || isStoredTranslationUuid(cleanUuid(uuid))) return;
+  if (!uuid || !isTranslatableDocumentReference(uuid)) return;
 
   // Foundry's core content-link listener would otherwise open the source while
   // the compendium index lookup is in flight.
