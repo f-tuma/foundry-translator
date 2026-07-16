@@ -234,19 +234,4 @@ describe("Active translation registry", () => {
     );
   });
 
-  it("reports a preserved manually edited translation as a non-fatal issue", () => {
-    const registry = new ActiveTranslationRegistry(() => 0);
-    const id = registry.start("Guide", "cs");
-    registry.addIssue(id, {
-      type: "preserved",
-      documentName: "Průvodce [CS]",
-      sourceUuid: "JournalEntry.guide",
-    });
-    registry.finish(id);
-
-    const log = formatRunLog(registry.get(id)!, "test");
-    expect(log).toContain("State: done-with-issues");
-    expect(log).toContain("[preserved] Průvodce [CS]");
-    expect(log).toContain("Manual edits were preserved");
-  });
 });

@@ -35,6 +35,8 @@
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Auto": "Rozpoznat automaticky",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Name": "Cílový jazyk",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Hint": "Jazyk výsledného dobrodružství.",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Name": "Automaticky otevírat dostupné překlady",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Hint": "Pokud má odkazovaný dokument uložený překlad do cílového jazyka, otevře se překlad místo zdroje. Vypnutím obnovíte původní chování odkazů ve Foundry.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyChrome": "Překlad probíhá lokálně v GM prohlížeči. Text ani názvy se neodesílají Googlu ani jiné překladové službě.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyGoogle": "Požadavky odesílá přímo váš GM prohlížeč do Google Cloud. API klíč se neukládá do světa, compendia ani exportu.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyOpenAI": "Text se odesílá přímo z GM prohlížeče na zadaný server. Adresa, model a případný token se ukládají jen v tomto prohlížeči.",

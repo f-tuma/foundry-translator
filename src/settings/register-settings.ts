@@ -78,6 +78,15 @@ export function registerSettings(): void {
     default: "cs",
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.AUTO_OPEN_TRANSLATIONS, {
+    name: "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Name",
+    hint: "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.GLOSSARY_CANDIDATES, {
     name: "FOUNDRY_TRANSLATE.Glossary.Candidates.SettingName",
     hint: "FOUNDRY_TRANSLATE.Glossary.Candidates.SettingHint",

@@ -71,7 +71,7 @@ export class CompendiumJournalTranslationRepository {
     if (existingId) {
       await foundry.documents.JournalEntry.implementation.updateDocuments(
         [{ ...data, _id: existingId }],
-        { pack: pack.collection },
+        { pack: pack.collection, foundryTranslateGenerated: true },
       );
       const updated = await pack.getDocument(existingId);
       if (!updated) throw new Error("Aktualizovaný překlad se nepodařilo načíst.");

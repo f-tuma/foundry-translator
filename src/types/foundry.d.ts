@@ -190,7 +190,7 @@ declare const foundry: {
         ): Promise<FoundryJournalDocument[]>;
         updateDocuments(
           data: FoundryJournalEntryData[],
-          operation: { pack: string },
+          operation: { pack: string; foundryTranslateGenerated?: boolean },
         ): Promise<unknown[]>;
       };
     };

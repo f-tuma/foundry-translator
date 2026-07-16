@@ -15,7 +15,7 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
-export const TRANSLATION_ENGINE_REVISION = 6;
+export const TRANSLATION_ENGINE_REVISION = 7;
 const HTML_FORMAT = 1;
 const MARKDOWN_FORMAT = 2;
 

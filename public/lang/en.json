@@ -35,6 +35,8 @@
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Auto": "Detect automatically",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Name": "Target language",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Hint": "Language of the translated adventure.",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Name": "Open available translations automatically",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Hint": "When a document link has a stored translation in the target language, open that translation instead of the source document. Disable this to keep Foundry's original link behavior.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyChrome": "Translation runs locally in the GM browser. Text and names are not sent to Google or another translation service.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyGoogle": "Requests are sent directly from the GM browser to Google Cloud. The API key is never stored in the world, compendium, or an export.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyOpenAI": "Text is sent directly from the GM browser to the configured server. The address, model, and optional token are stored only in this browser.",

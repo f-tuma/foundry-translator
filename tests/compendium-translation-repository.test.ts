@@ -74,7 +74,7 @@ describe("compendium Journal translation repository", () => {
     expect(updateDocuments).toHaveBeenCalledTimes(1);
     expect(updateDocuments).toHaveBeenCalledWith(
       [{ ...data, _id: "translation-id" }],
-      { pack: TRANSLATIONS_PACK_ID },
+      { pack: TRANSLATIONS_PACK_ID, foundryTranslateGenerated: true },
     );
   });
 
@@ -124,7 +124,7 @@ describe("compendium Journal translation repository", () => {
     expect(createDocuments).not.toHaveBeenCalled();
     expect(updateDocuments).toHaveBeenCalledWith(
       [{ ...data, _id: legacyIndexEntry._id }],
-      { pack: TRANSLATIONS_PACK_ID },
+      { pack: TRANSLATIONS_PACK_ID, foundryTranslateGenerated: true },
     );
   });
 });

@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-07-16
-- Repository state: `main`; manual-edit preservation patch `v0.14.8` prepared locally from `v0.14.7`
+- Updated: 2026-07-17
+- Repository state: `main`; translated-link reliability patch `v0.14.9` prepared locally from `v0.14.8`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,16 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-07-16: Patch `v0.14.9` makes reliable translated Journal navigation the
+  primary behavior. Manual edits no longer block a refresh: they still feed
+  glossary candidates, but a rerun regenerates edited output. Journal engine
+  revision 7 invalidates the incorrectly preserved `v0.14.8` root documents
+  while retaining segment cache reuse. Embedded UUID resolution falls back to
+  a valid root document and preserves the page/item suffix during rewriting.
+  A world-level `Open available translations automatically` setting (enabled
+  by default) intercepts Foundry document links and opens the stored target-
+  language Journal, Actor, or Item; stale embedded-page links fall back to the
+  translated root instead of the English document.
 - 2026-07-16: Patch `v0.14.8` makes translated-output fingerprints stable
   across Foundry save/load field ordering. Existing manually edited Journals,
   Actors, and Items are now preserved as non-fatal reused documents instead of
@@ -615,11 +625,9 @@ language to translated UUID mapping must remain consistent across packs.
   standalone Item targets. Other document types remain pointed at their source
   UUID and produce a warning.
 - Portable translation-bundle export/import is not implemented yet.
-- Output-hash protection covers newly generated Journal, Actor, and Item copies;
-  older stored translations gain it only after they are generated again.
 - Smart-glossary candidate extraction currently observes manual edits to
-  translated Journal pages. Actor and Item field corrections are protected from
-  overwrite but do not yet create review candidates.
+  translated Journal pages. Corrections intentionally do not block a later
+  regeneration; Actor and Item corrections do not yet create review candidates.
 - Helium does not support Chrome Local Translator; the tested Chromium profile
   does.
 - The stock TranslateGemma LM Studio chat template requires custom structured
@@ -713,9 +721,9 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
 3. If the local `ember-test` world still contains `CZ `-prefixed stub
    artifacts from the crashed smoke test, run `/tmp/cleanup-guide-smoke.mjs`
    (see the work log) with the user's approval.
-4. Remaining roadmap in order: safe manual edits and user-approved smart
-   glossary suggestions, then portable translation-bundle export/import (the
-   user explicitly wants export last).
+4. Remaining roadmap in order: user-approved smart-glossary improvements, then
+   portable translation-bundle export/import (the user explicitly wants export
+   last). Manual corrections are candidate input, not protected output.
 5. If the user reports specific failed parts from their real `Gamemaster's
    Guide` run, ask for the copyable log from the Active translations window
    and address the reported fallbacks.

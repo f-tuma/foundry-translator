@@ -61,8 +61,6 @@ export interface JournalTranslationServiceOptions {
 export interface JournalTranslationResult extends TranslatedJournal {
   document: FoundryJournalDocument;
   reused: boolean;
-  /** True when an existing manually edited document was deliberately preserved. */
-  protectedManualEdits?: boolean;
   processedDocuments: number;
   reusedDocuments: number;
   dependencyWarnings: readonly JournalDependencyWarning[];
@@ -72,15 +70,6 @@ export class TranslationCancelledError extends Error {
   constructor() {
     super("Překlad byl zrušen. Hotové části zůstávají uložené a další spuštění na ně naváže.");
     this.name = "TranslationCancelledError";
-  }
-}
-
-export class ManualTranslationEditsError extends Error {
-  constructor(documentName: string) {
-    super(
-      `Překlad „${documentName}“ obsahuje ruční úpravy. Zůstal beze změny, aby je nový překlad nepřepsal.`,
-    );
-    this.name = "ManualTranslationEditsError";
   }
 }
 
@@ -113,8 +102,6 @@ interface GraphTranslationResult {
   data: GraphData;
   document: GraphTranslatedDocument;
   reused: boolean;
-  /** Do not rewrite references or save this manually edited translation. */
-  protectedManualEdits?: boolean;
   fallbackTextSegments: number;
 }
 
@@ -149,22 +136,6 @@ interface TranslationRuntime {
   translations: CompendiumJournalTranslationRepository;
   actorTranslations: CompendiumActorTranslationRepository;
   itemTranslations: CompendiumItemTranslationRepository;
-}
-
-function recordPreservedManualEdits(
-  runtime: TranslationRuntime,
-  documentName: string,
-  sourceUuid: string,
-): void {
-  logger.info("Existing translation with manual edits was preserved.", {
-    documentName,
-    sourceUuid,
-  });
-  activeTranslations.addIssue(runtime.runId, {
-    type: "preserved",
-    documentName,
-    sourceUuid,
-  });
 }
 
 interface RuntimePageSystem {
@@ -247,9 +218,18 @@ export function translatedDocumentReferenceUuid(
   resolved: FoundryUuidDocument,
   sourceRoot: FoundryUuidDocument,
   translatedRoot: FoundryUuidDocument | FoundryJournalDocument,
+  sourceReferenceUuid?: string,
 ): string | null {
   if (!translatedRoot.uuid) return null;
-  if (resolved.uuid === sourceRoot.uuid) return translatedRoot.uuid;
+  if (resolved.uuid === sourceRoot.uuid) {
+    const referenceRoot = sourceReferenceUuid
+      ? rootDocumentReferenceUuid(sourceReferenceUuid)
+      : null;
+    if (referenceRoot === sourceRoot.uuid && sourceReferenceUuid !== sourceRoot.uuid) {
+      return `${translatedRoot.uuid}${sourceReferenceUuid?.slice(referenceRoot.length) ?? ""}`;
+    }
+    return translatedRoot.uuid;
+  }
 
   const embedded: string[] = [];
   let current: FoundryUuidDocument | null | undefined = resolved;
@@ -259,6 +239,17 @@ export function translatedDocumentReferenceUuid(
     current = current.parent;
   }
   return current ? `${translatedRoot.uuid}.${embedded.join(".")}` : null;
+}
+
+/** Returns the root-document portion of an absolute Foundry UUID. */
+export function rootDocumentReferenceUuid(uuid: string): string | null {
+  if (!uuid || uuid.startsWith(".")) return null;
+  const clean = uuid.split("#", 1)[0] ?? "";
+  const parts = clean.split(".");
+  if (parts[0] === "Compendium") {
+    return parts.length >= 5 ? parts.slice(0, 5).join(".") : null;
+  }
+  return parts.length >= 2 ? parts.slice(0, 2).join(".") : null;
 }
 
 export async function assertJournalSourceUnchanged(
@@ -512,6 +503,24 @@ export class JournalTranslationService {
             }
             if (resolved) break;
           }
+          // Some v14 content packs contain valid root documents but Foundry
+          // cannot resolve their embedded page/item UUID directly. Resolve
+          // the root as a fallback so its translated counterpart can still be
+          // linked with the original embedded suffix.
+          if (!resolved) {
+            const rootUuid = rootDocumentReferenceUuid(reference.sourceUuid);
+            if (rootUuid && rootUuid !== reference.sourceUuid) {
+              try {
+                resolved = await fromUuid(rootUuid);
+              } catch (error) {
+                logger.warn("Foundry root UUID fallback resolution failed.", {
+                  reference,
+                  rootUuid,
+                  error,
+                });
+              }
+            }
+          }
           if (!resolved) {
             addWarning({
               kind: "unresolved",
@@ -628,7 +637,6 @@ export class JournalTranslationService {
     for (const document of graph.completed) {
       const node = nodes.get(document.uuid);
       if (!node?.result) continue;
-      if (node.result.protectedManualEdits) continue;
       const replacements: DocumentReferenceReplacement[] = [];
       for (const dependency of node.dependencies) {
         const translatedDependency = nodes.get(dependency.root.uuid)?.result?.document;
@@ -637,6 +645,7 @@ export class JournalTranslationService {
           dependency.resolved,
           dependency.root,
           translatedDependency,
+          dependency.reference.sourceUuid,
         );
         if (translatedUuid) {
           replacements.push({ sourceUuid: dependency.reference.sourceUuid, translatedUuid });
@@ -727,7 +736,7 @@ export class JournalTranslationService {
       ? pageIds.every((pageId) =>
           canReuseJournalPageTranslation(existingFlag, sourceHash, pageId, runtime.glossaryHash))
       : canReuseJournalTranslation(existingFlag, sourceHash, runtime.glossaryHash));
-    if (existing && existingFlag && reusable) {
+    if (existing && existingFlag && reusable && !manuallyEdited) {
       return {
         data: existing.toObject() as JournalData,
         translatedTextPages: existingFlag.translatedTextPages,
@@ -740,38 +749,11 @@ export class JournalTranslationService {
         dependencyWarnings: [],
       };
     }
-    if (existing && existingFlag && existingData && manuallyEdited) {
-      recordPreservedManualEdits(runtime, existing.name ?? source.name, sourceDocument.uuid);
-      return {
-        data: existingData,
-        translatedTextPages: existingFlag.translatedTextPages,
-        skippedTextPages: existingFlag.skippedTextPages,
-        fallbackTextSegments: existingFlag.fallbackTextSegments,
-        document: existing,
-        reused: true,
-        protectedManualEdits: true,
-        processedDocuments: 1,
-        reusedDocuments: 1,
-        dependencyWarnings: [],
-      };
-    }
-
     const saveTranslatedData = async (
       data: JournalData,
       mergeInitialPartial: boolean,
     ): Promise<{ data: JournalData; document: FoundryJournalDocument }> => {
       await assertJournalSourceUnchanged(sourceDocument, sourceHash);
-      const latest = await runtime.translations.find(
-        sourceDocument.uuid,
-        runtime.settings.targetLanguage,
-      );
-      const latestData = latest?.toObject() as JournalData | undefined;
-      const latestFlag = latestData ? readJournalTranslationFlag(latestData.flags) : null;
-      if (latestData && latestFlag &&
-        await hasManualOutputEdits(latestData, latestFlag.outputHash)) {
-        throw new ManualTranslationEditsError(latest?.name ?? source.name);
-      }
-
       const savedData = mergeInitialPartial && existingData && existingFlag
         ? mergePartialJournalTranslation(existingData, data)
         : data;
@@ -856,7 +838,7 @@ export class JournalTranslationService {
     const manuallyEdited = existingData && existingFlag
       ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
       : false;
-    if (existing && existingFlag &&
+    if (existing && existingFlag && !manuallyEdited &&
       canReuseActorTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
       return {
         data: existing.toObject() as ActorData,
@@ -865,17 +847,6 @@ export class JournalTranslationService {
         fallbackTextSegments: existingFlag.fallbackTextSegments,
       };
     }
-    if (existing && existingFlag && existingData && manuallyEdited) {
-      recordPreservedManualEdits(runtime, existing.name ?? source.name, sourceDocument.uuid);
-      return {
-        data: existingData,
-        document: existing,
-        reused: true,
-        protectedManualEdits: true,
-        fallbackTextSegments: existingFlag.fallbackTextSegments,
-      };
-    }
-
     const paths = actorHtmlFieldPaths(sourceDocument, source);
     const translated = await translateActorData({
       source,
@@ -935,7 +906,7 @@ export class JournalTranslationService {
     const manuallyEdited = existingData && existingFlag
       ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
       : false;
-    if (existing && existingFlag &&
+    if (existing && existingFlag && !manuallyEdited &&
       canReuseItemTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
       return {
         data: existing.toObject() as ItemData,
@@ -944,17 +915,6 @@ export class JournalTranslationService {
         fallbackTextSegments: existingFlag.fallbackTextSegments,
       };
     }
-    if (existing && existingFlag && existingData && manuallyEdited) {
-      recordPreservedManualEdits(runtime, existing.name ?? source.name, sourceDocument.uuid);
-      return {
-        data: existingData,
-        document: existing,
-        reused: true,
-        protectedManualEdits: true,
-        fallbackTextSegments: existingFlag.fallbackTextSegments,
-      };
-    }
-
     const translated = await translateItemData({
       source,
       sourceUuid: sourceDocument.uuid,

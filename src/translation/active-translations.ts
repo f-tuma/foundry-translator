@@ -11,7 +11,7 @@ export type ActiveTranslationState =
   | "cancelled";
 
 export interface TranslationRunIssue {
-  type: "fallback" | "unresolved" | "unsupported" | "failed" | "preserved";
+  type: "fallback" | "unresolved" | "unsupported" | "failed";
   documentName?: string;
   documentType?: string;
   sourceUuid?: string;
@@ -216,9 +216,6 @@ function issueDescription(issue: TranslationRunIssue): string | null {
     case "failed":
       return issue.detail ??
         "The dependent document failed to translate; its references stay at the source.";
-    case "preserved":
-      return issue.detail ??
-        "Manual edits were preserved; automatic refresh of this document was skipped.";
     default:
       return issue.detail ?? null;
   }

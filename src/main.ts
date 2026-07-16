@@ -4,6 +4,7 @@ import { logger } from "./logger";
 import { registerSettings } from "./settings/register-settings";
 import { registerJournalTranslationHeaderControl } from "./translation/journal-header-control";
 import { registerGlossaryCandidateHooks } from "./glossary/candidate-hooks";
+import { registerTranslatedLinkNavigation } from "./translation/translated-link-navigation";
 
 let ready = false;
 
@@ -25,6 +26,7 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", () => {
   ready = true;
+  registerTranslatedLinkNavigation();
   Hooks.callAll(MODULE_HOOKS.READY);
   logger.info(`${MODULE_TITLE} is ready.`);
 });

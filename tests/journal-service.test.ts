@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { journalSourceHash, type JournalData } from "../src/translation/journal";
 import {
   assertJournalSourceUnchanged,
+  rootDocumentReferenceUuid,
   translatedDocumentReferenceUuid,
 } from "../src/translation/journal-service";
 
@@ -30,6 +31,33 @@ describe("Journal translation service protections", () => {
     expect(translatedDocumentReferenceUuid(page, source, translated)).toBe(
       "Compendium.world.translations.JournalEntry.translated.JournalEntryPage.page-id",
     );
+  });
+
+  it("keeps an embedded suffix when only the referenced root could be resolved", () => {
+    const source = {
+      id: "source",
+      uuid: "JournalEntry.source",
+      documentName: "JournalEntry",
+      name: "Source",
+      toObject: () => ({ name: "Source", pages: [] }),
+    } satisfies FoundryJournalWorldDocument;
+    const translated = {
+      id: "translated",
+      uuid: "Compendium.world.translations.JournalEntry.translated",
+      toObject: () => ({}),
+    } satisfies FoundryJournalDocument;
+
+    expect(translatedDocumentReferenceUuid(
+      source,
+      source,
+      translated,
+      "JournalEntry.source.JournalEntryPage.intro",
+    )).toBe(
+      "Compendium.world.translations.JournalEntry.translated.JournalEntryPage.intro",
+    );
+    expect(rootDocumentReferenceUuid(
+      "Compendium.ember.character.Item.soulbound.ActiveEffect.blessed",
+    )).toBe("Compendium.ember.character.Item.soulbound");
   });
 
   it("includes page-category names in the source fingerprint", async () => {

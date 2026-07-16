@@ -3,7 +3,7 @@
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
 > [!IMPORTANT]
-> The module is currently an early development build. Version `0.14.8` processes
+> The module is currently an early development build. Version `0.14.9` processes
 > long Journals page by page, validates and retries suspicious unchanged output,
 > safely keeps an isolated failed fragment in the original, translates human text
 > inside Foundry embeds, recursively translates linked Journals, Actors, and
@@ -110,8 +110,9 @@ source and replacement columns and must be explicitly accepted or rejected;
 the module never adds it to the glossary automatically. If the source phrase
 cannot be inferred safely, it is left blank and must be supplied before the
 suggestion can be accepted. Newly generated Journal, Actor, and Item copies also
-carry an output fingerprint, so a later retranslation cannot silently overwrite
-detected manual edits.
+carry an output fingerprint. A detected correction invalidates document-level
+reuse so the next run regenerates that copy; the correction itself remains
+useful as a glossary suggestion after explicit review.
 
 ## Translate a Journal Entry
 
@@ -181,6 +182,12 @@ Linked Journal Entries, Actors, and Items are translated recursively. Shared
 dependencies are processed only once, cycles are handled without deadlocks, and
 links in the translated copy are rewritten to stable translated compendium
 UUIDs. Links to a specific Journal page preserve that page's original ID.
+The world setting **Open available translations automatically** is enabled by
+default: clicking any Foundry document link opens its stored target-language
+copy when one exists. Disable it in Module Settings to restore Foundry's source-
+document behavior. If an old link names a removed embedded page but its Journal
+translation exists, the translated Journal root opens instead of a broken or
+English target.
 Referenced Actors are copied completely into the
 `Foundry Translate — Translated Actors` world compendium with stable embedded Item IDs; only HTML fields confirmed by
 the live system schema — such as Ember biography text — are translated, while
