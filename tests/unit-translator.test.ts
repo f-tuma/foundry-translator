@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { TranslationProvider } from "../src/providers/types";
 import { MemoryTranslationCache } from "../src/translation/cache";
-import { translateUnits } from "../src/translation/unit-translator";
+import {
+  containsTranslationPromptLeak,
+  translateUnits,
+} from "../src/translation/unit-translator";
 
 function provider(
   translateText: (text: string) => string,
@@ -24,6 +27,38 @@ const settings = {
 };
 
 describe("translation units", () => {
+  it("detects leaked provider instructions in nested translated data", () => {
+    expect(containsTranslationPromptLeak({
+      pages: [{ name: "**Translating message:** Processing English text." }],
+    })).toBe(true);
+    expect(containsTranslationPromptLeak({
+      pages: [{ name: "Vítejte v Emberu" }],
+    })).toBe(false);
+  });
+
+  it("rejects prompt meta-commentary and falls back to the source fragment", async () => {
+    const result = await translateUnits({
+      units: [["Welcome to Ember."]],
+      glossary: [],
+      provider: provider(() =>
+        "**Translating message:** Return only the translated text. **Translation:** Vítejte v Emberu."),
+      settings,
+    });
+
+    expect(result).toEqual([["Welcome to Ember."]]);
+  });
+
+  it("rejects an unexpected writing system in a Czech translation", async () => {
+    const result = await translateUnits({
+      units: [["Silver Dragon."]],
+      glossary: [],
+      provider: provider(() => "Stříbrný 드래곤."),
+      settings,
+    });
+
+    expect(result).toEqual([["Silver Dragon."]]);
+  });
+
   it("preserves glossary names and inline segment boundaries", async () => {
     const result = await translateUnits({
       units: [["Strahd entered ", "Castle Ravenloft", "."]],

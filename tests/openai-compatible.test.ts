@@ -23,7 +23,7 @@ function eventStreamResponse(events: readonly unknown[]): Response {
 describe("OpenAiCompatibleProvider", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("normalizes an LM Studio root URL and sends context, glossary, model, and token", async () => {
+  it("sends context, model, and token without repeating the protected glossary", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
       choices: [{ message: { content: "Vítej v __FTG_TEST_0001__." } }],
     }));
@@ -50,7 +50,7 @@ describe("OpenAiCompatibleProvider", () => {
     expect(payload.messages).toHaveLength(1);
     expect(payload.messages[0].role).toBe("user");
     expect(payload.messages[0].content).toContain("Temné gotické fantasy");
-    expect(payload.messages[0].content).toContain("Castle Ravenloft => Hrad Ravenloft");
+    expect(payload.messages[0].content).not.toContain("Castle Ravenloft => Hrad Ravenloft");
     expect(payload.messages[0].content).toContain("__FTG_TEST_0001__");
   });
 
@@ -180,12 +180,43 @@ describe("OpenAiCompatibleProvider", () => {
       stream: true,
       store: false,
     });
+    expect(body.system_prompt).toContain("Translate from");
+    expect(body.input).toBe("<text_to_translate>\nWelcome to Ember.\n</text_to_translate>");
+    expect(body.input).not.toContain("Translate from");
     expect(metrics).toHaveBeenCalledWith(expect.objectContaining({
       phase: "completed",
       inputTokens: 80,
       outputTokens: 12,
       reasoningTokens: 0,
     }));
+  });
+
+  it("uses constrained structured output for Gemma 4 e2b", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+      choices: [{
+        message: { content: JSON.stringify({ translation: "Vítejte v Emberu." }) },
+        finish_reason: "stop",
+      }],
+      usage: { prompt_tokens: 36, completion_tokens: 15 },
+    }));
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234/v1",
+      model: "google/gemma-4-e2b",
+      fetchImplementation: fetchMock,
+    });
+
+    await expect(provider.translate({ texts: ["Welcome to Ember."], targetLanguage: "cs" }))
+      .resolves.toEqual([{ translatedText: "Vítejte v Emberu." }]);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:1234/v1/chat/completions");
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.messages).toEqual([
+      expect.objectContaining({ role: "system" }),
+      { role: "user", content: "Welcome to Ember." },
+    ]);
+    expect(body.response_format).toMatchObject({
+      type: "json_schema",
+      json_schema: { name: "translation_response", strict: true },
+    });
   });
 
   it("streams LM Studio native output previews and uses chat.end as the final result", async () => {
@@ -337,6 +368,37 @@ describe("OpenAiCompatibleProvider", () => {
     batchSizes.length = 0;
     await provider.translate({ texts: ["Five", "Six", "Seven", "Eight"], targetLanguage: "cs" });
     expect(batchSizes).toEqual([2, 2]);
+  });
+
+  it("does not let recursive batch recovery poison the session down to one text", async () => {
+    const batchSizes: number[] = [];
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      const content = String(body.messages[0].content);
+      const boundaries = [...content.matchAll(/__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu)]
+        .map(([token]) => token);
+      const size = Math.max(1, boundaries.length - 1);
+      batchSizes.push(size);
+      if (size > 1) {
+        return jsonResponse({
+          choices: [{ message: { content: "Broken combined answer" }, finish_reason: "stop" }],
+        });
+      }
+      return jsonResponse({
+        choices: [{ message: { content: "Překlad." }, finish_reason: "stop" }],
+      });
+    });
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:1234",
+      model: "gemma-batch",
+      fetchImplementation: fetchMock,
+    });
+
+    await provider.translate({ texts: Array(8).fill("Text"), targetLanguage: "cs" });
+    batchSizes.length = 0;
+    await provider.translate({ texts: Array(8).fill("Text"), targetLanguage: "cs" });
+
+    expect(batchSizes[0]).toBe(4);
   });
 
   it("reports a native API fallback before using Chat Completions", async () => {

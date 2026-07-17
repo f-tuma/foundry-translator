@@ -15,7 +15,7 @@ function journalFlag() {
     "foundry-translate": {
       translation: {
         schemaVersion: 1,
-        engineRevision: 7,
+        engineRevision: 8,
         sourceUuid: "JournalEntry.guide",
         sourceHash: "source",
         providerId: "openai-compatible",

@@ -51,6 +51,7 @@ describe("Journal header translation action", () => {
       label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage",
     });
     expect(header.querySelectorAll(".ft-journal-translate-header")).toHaveLength(1);
+    expect(header.querySelectorAll(".ft-journal-translate-page-header")).toHaveLength(1);
     expect(header.firstElementChild?.textContent).toContain("Přeložit tento deník");
   });
 

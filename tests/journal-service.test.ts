@@ -1,11 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { journalSourceHash, type JournalData } from "../src/translation/journal";
 import {
   assertJournalSourceUnchanged,
   rootDocumentReferenceUuid,
   translatedDocumentReferenceUuid,
+  usableTranslatedDocumentReferenceUuid,
 } from "../src/translation/journal-service";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("Journal translation service protections", () => {
   it("builds a translated embedded-page UUID from the real document hierarchy", () => {
@@ -58,6 +63,54 @@ describe("Journal translation service protections", () => {
     expect(rootDocumentReferenceUuid(
       "Compendium.ember.character.Item.soulbound.ActiveEffect.blessed",
     )).toBe("Compendium.ember.character.Item.soulbound");
+  });
+
+  it("falls back to a translated root when a stale embedded page is also absent there", async () => {
+    const source = {
+      id: "source",
+      uuid: "JournalEntry.source",
+      documentName: "JournalEntry",
+      name: "Source",
+      toObject: () => ({ name: "Source", pages: [] }),
+    } satisfies FoundryJournalWorldDocument;
+    const translated = {
+      id: "translated",
+      uuid: "Compendium.world.translations.JournalEntry.translated",
+      toObject: () => ({}),
+    } satisfies FoundryJournalDocument;
+    const fromUuid = vi.fn(async () => null);
+    vi.stubGlobal("fromUuid", fromUuid);
+
+    await expect(usableTranslatedDocumentReferenceUuid(
+      source,
+      source,
+      translated,
+      "JournalEntry.source.JournalEntryPage.removed",
+    )).resolves.toBe(translated.uuid);
+    expect(fromUuid).toHaveBeenCalledWith(`${translated.uuid}.JournalEntryPage.removed`);
+  });
+
+  it("keeps an embedded translated page when that page exists", async () => {
+    const source = {
+      id: "source",
+      uuid: "JournalEntry.source",
+      documentName: "JournalEntry",
+      name: "Source",
+      toObject: () => ({ name: "Source", pages: [] }),
+    } satisfies FoundryJournalWorldDocument;
+    const translated = {
+      id: "translated",
+      uuid: "Compendium.world.translations.JournalEntry.translated",
+      toObject: () => ({}),
+    } satisfies FoundryJournalDocument;
+    vi.stubGlobal("fromUuid", vi.fn(async () => ({ id: "intro" })));
+
+    await expect(usableTranslatedDocumentReferenceUuid(
+      source,
+      source,
+      translated,
+      "JournalEntry.source.JournalEntryPage.intro",
+    )).resolves.toBe(`${translated.uuid}.JournalEntryPage.intro`);
   });
 
   it("includes page-category names in the source fingerprint", async () => {
