@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-17
-- Repository state: `main`; folder-navigation hotfix `v0.14.10` prepared locally from `v0.14.9`
+- Repository state: `main`; existing-link repair preflight `v0.14.11` prepared locally from `v0.14.10`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,28 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-07-17: Patch `v0.14.11` adds a write-light repair preflight after the
+  dependency scan and before provider translation. Existing translated
+  Journals, Actors, and Items are immediately relinked to already available
+  translated dependencies. Known-stale embedded page UUIDs are validated and
+  fall back to the translated root when the page no longer exists. Generated
+  link-only repairs refresh output hashes, while documents with earlier manual
+  edits retain their old hash so the normal glossary/regeneration path still
+  detects those edits. A one-page translation now treats already translated
+  direct dependencies as complete instead of retranslating their entire
+  Journals. OpenAI-compatible requests no longer repeat the glossary because
+  matching terms are already protected and restored deterministically, and a
+  recursively malformed batch can reduce the remembered batch size only once
+  per top-level request instead of poisoning the rest of a long run down to
+  one text per request. LM Studio native requests now use the documented
+  `system_prompt` field instead of placing instructions and source in one user
+  input. Prompt-leak and expanded meta-commentary detection fails closed to the
+  original fragment, contaminated stored translations are excluded from the
+  preflight, and Journal/Actor/Item engine revisions were raised to invalidate
+  output created by the unsafe prompt layout. Journal sheets now expose a
+  separate always-visible `Translate this page` button because Ember's v14
+  sheet does not render the contributed header-controls menu; whole-Journal
+  translation has an explicit large-recursive-run confirmation.
 - 2026-07-17: Patch `v0.14.10` limits automatic translated-link interception
   to Journal, Actor, and Item UUIDs. Folder and other unsupported sidebar UUIDs
   remain entirely under Foundry's native click handling, so a folder click

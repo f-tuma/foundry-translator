@@ -7,7 +7,7 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 4;
+const PROMPT_REVISION = 5;
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
 
@@ -173,17 +173,6 @@ function languageLabel(code: string | undefined): string {
     Record<string, string>)[code] ?? code;
 }
 
-function glossaryPrompt(
-  glossary: TranslateRequest["glossary"],
-): string {
-  if (!glossary?.length) return "";
-  return glossary
-    .slice(0, 200)
-    .map(({ source, replacement }) => `${source} => ${replacement || source}`)
-    .join("\n")
-    .slice(0, 6_000);
-}
-
 function createBatchTokens(count: number): string[] {
   const nonce = crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
   return Array.from(
@@ -323,7 +312,13 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       batchFallbacks: 1,
     });
     const smallerBatchSize = Math.max(1, Math.ceil(pending.length / 2));
-    this.#adaptiveBatchSize = Math.min(this.#adaptiveBatchSize, smallerBatchSize);
+    // A recursively split sub-batch may need to reach individual texts, but
+    // that one malformed response must not poison the whole provider session
+    // into thousands of one-text requests. Degrade the remembered size only
+    // once for the original request; recursive recovery stays local to it.
+    if (!sequentialFallback) {
+      this.#adaptiveBatchSize = Math.min(this.#adaptiveBatchSize, smallerBatchSize);
+    }
     const midpoint = Math.ceil(pending.length / 2);
     // LM Studio serializes generation internally; recurse sequentially rather
     // than filling its queue. Successful halves avoid N one-text requests.
@@ -404,10 +399,14 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       ...(this.#worldContext
         ? [`World and translation context:\n${this.#worldContext}`]
         : []),
-      ...(glossaryPrompt(request.glossary)
-        ? [`Approved glossary (source => fixed target):\n${glossaryPrompt(request.glossary)}`]
-        : []),
+      // Glossary terms have already been replaced with protected FTG tokens
+      // by unit-translator and are restored deterministically afterwards.
+      // Repeating the entire glossary here only wastes input tokens.
     ].join(" ");
+    if (/\bgemma-4-e2b\b/iu.test(this.#model)) {
+      const structured = await this.#translateWithStructuredOutput(text, system);
+      if (structured !== null) return structured;
+    }
     if (/\bgemma-4\b/iu.test(this.#model) && this.#lmStudioNativeAvailable !== false) {
       const native = await this.#translateWithLmStudioNative(text, system);
       if (native !== null) return native;
@@ -476,6 +475,70 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     );
   }
 
+  async #translateWithStructuredOutput(text: string, system: string): Promise<string | null> {
+    const startedAt = Date.now();
+    this.#onMetrics?.({ phase: "started", model: this.#model });
+    let response: Response;
+    let payload: ChatCompletionPayload;
+    try {
+      response = await this.#request(`${this.#baseUrl}/chat/completions`, {
+        method: "POST",
+        body: JSON.stringify({
+          model: this.#model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: text },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "translation_response",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: { translation: { type: "string" } },
+                required: ["translation"],
+                additionalProperties: false,
+              },
+            },
+          },
+          temperature: 0,
+          max_tokens: 4_096,
+          stream: false,
+        }),
+      });
+      payload = await this.#readJson<ChatCompletionPayload>(response);
+    } catch (error) {
+      this.#onMetrics?.({
+        phase: "failed",
+        model: this.#model,
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
+    const metrics = this.#completionMetrics(payload, Date.now() - startedAt);
+    if (!response.ok) {
+      this.#onMetrics?.({ phase: "failed", model: this.#model, ...metrics });
+      if ([400, 404, 405, 422].includes(response.status)) return null;
+      throw this.#httpError(response.status, payload.error?.message);
+    }
+    const content = payload.choices?.[0]?.message?.content;
+    if (typeof content === "string") {
+      try {
+        const parsed = JSON.parse(content) as { translation?: unknown };
+        if (typeof parsed.translation === "string" && parsed.translation.trim()) {
+          this.#onMetrics?.({ phase: "completed", model: this.#model, ...metrics });
+          return parsed.translation;
+        }
+      } catch {
+        // A nominally compatible server may ignore response_format. Its plain
+        // response is handled by the established native/fallback path below.
+      }
+    }
+    this.#onMetrics?.({ phase: "failed", model: this.#model, ...metrics });
+    return null;
+  }
+
   async #translateWithLmStudioNative(text: string, system: string): Promise<string | null> {
     const url = new URL(this.#baseUrl);
     const startedAt = Date.now();
@@ -486,7 +549,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
         method: "POST",
         body: JSON.stringify({
           model: this.#model,
-          input: `${system}\n\n<text_to_translate>\n${text}\n</text_to_translate>`,
+          system_prompt: system,
+          input: `<text_to_translate>\n${text}\n</text_to_translate>`,
           temperature: 0,
           max_output_tokens: 4_096,
           reasoning: "off",

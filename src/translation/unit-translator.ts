@@ -20,6 +20,10 @@ const MAX_OPENAI_UNITS_PER_REQUEST = 16;
 const QUALITY_ATTEMPTS = 3;
 export const MAX_REQUEST_CHARACTERS = 4_500;
 const PROTECTION_TOKEN = /__(?:FTN|FTG|FTS)_[A-Z0-9]+_[A-Z0-9]+__/giu;
+const TRANSLATION_PROMPT_LEAK = /(?:<\/?text_to_translate>|\btranslating message\b|\bthe user wants me to translate\b|\bthe most natural translation\b|\btranslation should be direct\b|\bworld and translation context\b|\breturn only the translated text\b|\bdo not include the text_to_translate\b|\bpreserve every token beginning with\b|\bapproved glossary \(source)/iu;
+const LEADING_TRANSLATION_META = /^\s*(?:\*\*)?(?:translation|translated text|translating message|překlad|překládaná zpráva|kontext překladu)\s*:/iu;
+const NON_LATIN_TRANSLATION_SCRIPT = /[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Arabic}\p{Script=Cyrillic}]/u;
+const LATIN_TARGET_LANGUAGES = new Set(["cs", "de", "en", "fr", "pl"]);
 const URL_TLDS = new Set(["com", "org", "net", "io", "cz", "dev"]);
 const SOURCE_LANGUAGE_HINTS: Readonly<Record<string, ReadonlySet<string>>> = {
   en: new Set([
@@ -94,6 +98,14 @@ interface TranslationProblem {
 interface CheckedSegments {
   segments: readonly string[];
   usedFallback: boolean;
+}
+
+/** Detects provider instructions accidentally emitted into translated content. */
+export function containsTranslationPromptLeak(value: unknown): boolean {
+  if (typeof value === "string") return TRANSLATION_PROMPT_LEAK.test(value);
+  if (Array.isArray(value)) return value.some(containsTranslationPromptLeak);
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value as Record<string, unknown>).some(containsTranslationPromptLeak);
 }
 
 const inFlightTranslations = new Map<string, InFlightTranslation>();
@@ -213,6 +225,33 @@ function translationProblem(
 ): TranslationProblem | null {
   if (!translated.trim() && comparableText(prepared.protection.text)) {
     return { reason: "empty", detail: "The provider returned empty text." };
+  }
+  const sourceLength = prepared.protection.text.length;
+  const suspiciousMetaExpansion = LEADING_TRANSLATION_META.test(translated) &&
+    translated.length > Math.max(sourceLength * 2, sourceLength + 160);
+  const excessiveExpansion = translated.length > Math.max(
+    sourceLength * 4,
+    sourceLength + 160,
+  );
+  if (
+    containsTranslationPromptLeak(translated) ||
+    suspiciousMetaExpansion ||
+    excessiveExpansion
+  ) {
+    return {
+      reason: "integrity",
+      detail: "The provider returned translation instructions or meta-commentary instead of only the translated text.",
+    };
+  }
+  if (
+    LATIN_TARGET_LANGUAGES.has(settings.targetLanguage) &&
+    !NON_LATIN_TRANSLATION_SCRIPT.test(prepared.protection.text) &&
+    NON_LATIN_TRANSLATION_SCRIPT.test(translated)
+  ) {
+    return {
+      reason: "integrity",
+      detail: "The provider inserted characters from an unexpected writing system.",
+    };
   }
   try {
     const glossaryRestored = restoreGlossaryTerms(translated, prepared.protection);

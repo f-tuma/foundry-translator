@@ -117,6 +117,28 @@ async function translateFromHeader(
     return;
   }
 
+  if (!pageId) {
+    const dialogApi = foundry.applications.api as typeof foundry.applications.api & {
+      DialogV2?: {
+        confirm(options: Record<string, unknown>): Promise<boolean>;
+      };
+    };
+    const template = localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.ConfirmWholeBody");
+    const escapedName = document.createElement("span");
+    escapedName.textContent = journal.name;
+    const confirmed = dialogApi.DialogV2
+      ? await dialogApi.DialogV2.confirm({
+          window: {
+            title: localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.ConfirmWholeTitle"),
+          },
+          content: `<p>${template.replace("{journal}", escapedName.innerHTML)}</p>`,
+          modal: true,
+          rejectClose: false,
+        })
+      : true;
+    if (!confirmed) return;
+  }
+
   translationsInProgress.add(journal.uuid);
   ui.notifications.info(localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting"));
   let downloadNoticeShown = false;
@@ -236,6 +258,32 @@ export function addJournalTranslationHeaderButton(
   const frame = application.window;
   if ((!journal && !original) || !frame || frame.header.querySelector(".ft-journal-translate-header")) {
     return;
+  }
+  const translationSource = journal ?? original;
+  if (translationSource) {
+    const pageLabel = localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage");
+    const pageButton = document.createElement("button");
+    pageButton.type = "button";
+    pageButton.className = "header-control ft-journal-translate-page-header";
+    pageButton.title = pageLabel;
+    pageButton.setAttribute("aria-label", pageLabel);
+    const pageIcon = document.createElement("i");
+    pageIcon.className = "fa-solid fa-file-lines";
+    pageIcon.setAttribute("aria-hidden", "true");
+    const pageText = document.createElement("span");
+    pageText.textContent = pageLabel;
+    pageButton.append(pageIcon, pageText);
+    pageButton.addEventListener("click", () => {
+      const pageId = activePageId(application);
+      if (!pageId) {
+        ui.notifications.warn(
+          localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.NoActivePage"),
+        );
+        return;
+      }
+      void translateFromHeader(translationSource, application, pageId);
+    });
+    frame.controls.before(pageButton);
   }
   const label = localized(
     original

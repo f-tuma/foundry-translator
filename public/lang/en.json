@@ -144,6 +144,8 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Show original",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.ShowTranslation": "Switch to the stored translation",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting": "Foundry Translate is preparing this journal…",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.ConfirmWholeTitle": "Translate the entire journal?",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.ConfirmWholeBody": "Translate all of “{journal}” and recursively process its linked documents? This can be a very large run. Use “Translate this page” when you only want the open page.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading": "Chrome is downloading the local translation model. Translation will continue automatically…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "This journal is already being translated.",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Name": "Active translations",

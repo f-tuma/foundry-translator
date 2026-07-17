@@ -16,7 +16,7 @@ import {
 } from "./unit-translator";
 
 export const ACTOR_TRANSLATION_SCHEMA_VERSION = 1;
-export const ACTOR_TRANSLATION_ENGINE_REVISION = 3;
+export const ACTOR_TRANSLATION_ENGINE_REVISION = 4;
 
 export interface ActorItemData extends Record<string, unknown> {
   _id?: string;

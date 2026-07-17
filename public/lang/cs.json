@@ -144,6 +144,8 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Original": "Zobrazit originál",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.ShowTranslation": "Přepnout na uložený překlad",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Starting": "Foundry Translate připravuje tento deník…",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.ConfirmWholeTitle": "Přeložit celý deník?",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.ConfirmWholeBody": "Přeložit celý deník „{journal}“ a rekurzivně zpracovat jeho odkazované dokumenty? Může jít o velmi rozsáhlý běh. Pokud chceš jen otevřenou stránku, použij „Přeložit tuto stránku“.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.Downloading": "Chrome stahuje lokální překladový model. Překlad bude automaticky pokračovat…",
   "FOUNDRY_TRANSLATE.JournalTranslation.Header.AlreadyRunning": "Tento deník se už překládá.",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Menu.Name": "Probíhající překlady",

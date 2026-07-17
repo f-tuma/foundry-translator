@@ -50,7 +50,7 @@ import {
   readPath,
   type HtmlFieldPath,
 } from "./system-html-fields";
-import { glossaryFingerprint } from "./unit-translator";
+import { containsTranslationPromptLeak, glossaryFingerprint } from "./unit-translator";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
@@ -239,6 +239,43 @@ export function translatedDocumentReferenceUuid(
     current = current.parent;
   }
   return current ? `${translatedRoot.uuid}.${embedded.join(".")}` : null;
+}
+
+/**
+ * Builds a translated reference and avoids persisting a known-broken embedded
+ * UUID. Root fallback resolution means the original embedded target no longer
+ * exists; retain its suffix only when the translated document actually has it.
+ */
+export async function usableTranslatedDocumentReferenceUuid(
+  resolved: FoundryUuidDocument,
+  sourceRoot: FoundryUuidDocument,
+  translatedRoot: FoundryUuidDocument | FoundryJournalDocument,
+  sourceReferenceUuid?: string,
+): Promise<string | null> {
+  const translatedUuid = translatedDocumentReferenceUuid(
+    resolved,
+    sourceRoot,
+    translatedRoot,
+    sourceReferenceUuid,
+  );
+  if (!translatedUuid || !translatedRoot.uuid || translatedUuid === translatedRoot.uuid) {
+    return translatedUuid;
+  }
+  const sourceReferenceRoot = sourceReferenceUuid
+    ? rootDocumentReferenceUuid(sourceReferenceUuid)
+    : null;
+  if (resolved.uuid !== sourceRoot.uuid || sourceReferenceRoot === sourceReferenceUuid) {
+    return translatedUuid;
+  }
+  try {
+    return await fromUuid(translatedUuid) ? translatedUuid : translatedRoot.uuid;
+  } catch (error) {
+    logger.warn("Translated embedded UUID validation failed; using its translated root.", {
+      translatedUuid,
+      error,
+    });
+    return translatedRoot.uuid;
+  }
 }
 
 /** Returns the root-document portion of an absolute Foundry UUID. */
@@ -573,6 +610,13 @@ export class JournalTranslationService {
     activeTranslations.update(runId, { state: "translating", plan });
     this.#onPlan?.(plan);
 
+    const existingAtStart = await this.#repairExistingLinks(
+      scan.completed,
+      nodes,
+      runtime,
+      runId,
+    );
+
     const overall = { completedUnits: 0, completedDocuments: 0 };
     const emitProgress = (progress: JournalTranslationProgress): void => {
       // A cancel stops right after the unit that just finished; its result is
@@ -600,12 +644,29 @@ export class JournalTranslationService {
       process: async (document) => {
         throwIfCancelled(runId);
         const node = nodeFor(document);
-        node.result = await this.#translateOne(
-          document,
-          runtime,
-          emitProgress,
-          document.uuid === sourceDocument.uuid ? scope.rootPageIds : undefined,
-        );
+        const existingDependency = scope.rootPageIds && document.uuid !== sourceDocument.uuid
+          ? existingAtStart.get(document.uuid)
+          : undefined;
+        if (existingDependency) {
+          const flag = isJournalDocument(document)
+            ? readJournalTranslationFlag(existingDependency.flags)
+            : isActorDocument(document)
+              ? readActorTranslationFlag(existingDependency.flags)
+              : readItemTranslationFlag(existingDependency.flags);
+          node.result = {
+            data: existingDependency.toObject() as GraphData,
+            document: existingDependency,
+            reused: true,
+            fallbackTextSegments: flag?.fallbackTextSegments ?? 0,
+          };
+        } else {
+          node.result = await this.#translateOne(
+            document,
+            runtime,
+            emitProgress,
+            document.uuid === sourceDocument.uuid ? scope.rootPageIds : undefined,
+          );
+        }
         overall.completedUnits += node.units ?? 0;
         overall.completedDocuments += 1;
         activeTranslations.update(runId, {
@@ -641,7 +702,7 @@ export class JournalTranslationService {
       for (const dependency of node.dependencies) {
         const translatedDependency = nodes.get(dependency.root.uuid)?.result?.document;
         if (!translatedDependency) continue;
-        const translatedUuid = translatedDocumentReferenceUuid(
+        const translatedUuid = await usableTranslatedDocumentReferenceUuid(
           dependency.resolved,
           dependency.root,
           translatedDependency,
@@ -694,6 +755,115 @@ export class JournalTranslationService {
       reusedDocuments: completedResults.filter(({ reused }) => reused).length,
       dependencyWarnings: warnings,
     };
+  }
+
+  async #repairExistingLinks(
+    documents: readonly GraphSourceDocument[],
+    nodes: ReadonlyMap<string, JournalGraphNode>,
+    runtime: TranslationRuntime,
+    runId: number,
+  ): Promise<Map<string, GraphTranslatedDocument>> {
+    activeTranslations.update(runId, {
+      currentDocument: "Repairing links in existing translations",
+      currentUnit: "",
+    });
+    const existingEntries = await Promise.all(documents.map(async (document) => {
+      const sourceUuid = document.uuid;
+      let translated: GraphTranslatedDocument | null;
+      if (isJournalDocument(document)) {
+        translated = await runtime.translations.find(
+          sourceUuid,
+          runtime.settings.targetLanguage,
+        );
+      } else if (isActorDocument(document)) {
+        translated = await runtime.actorTranslations.find(
+          sourceUuid,
+          runtime.settings.targetLanguage,
+        );
+      } else {
+        translated = await runtime.itemTranslations.find(
+          sourceUuid,
+          runtime.settings.targetLanguage,
+        );
+      }
+      if (translated && containsTranslationPromptLeak(translated.toObject())) {
+        logger.warn("Existing translation contains leaked provider instructions and will be regenerated.", {
+          sourceUuid,
+          translatedUuid: translated.uuid,
+        });
+        translated = null;
+      }
+      return [sourceUuid, translated] as const;
+    }));
+    const existingBySource = new Map(
+      existingEntries.filter(
+        (entry): entry is readonly [string, GraphTranslatedDocument] => Boolean(entry[1]),
+      ),
+    );
+    let repairedDocuments = 0;
+
+    for (const sourceDocument of documents) {
+      throwIfCancelled(runId);
+      const existing = existingBySource.get(sourceDocument.uuid);
+      const node = nodes.get(sourceDocument.uuid);
+      if (!existing || !node?.dependencies.length) continue;
+      const replacements: DocumentReferenceReplacement[] = [];
+      for (const dependency of node.dependencies) {
+        const translatedDependency = existingBySource.get(dependency.root.uuid);
+        if (!translatedDependency) continue;
+        const translatedUuid = await usableTranslatedDocumentReferenceUuid(
+          dependency.resolved,
+          dependency.root,
+          translatedDependency,
+          dependency.reference.sourceUuid,
+        );
+        if (translatedUuid) {
+          replacements.push({ sourceUuid: dependency.reference.sourceUuid, translatedUuid });
+        }
+      }
+      if (!replacements.length) continue;
+
+      const existingData = existing.toObject() as GraphData;
+      const rewritten = rewriteDocumentReferences(existingData, replacements);
+      if (JSON.stringify(rewritten) === JSON.stringify(existingData)) continue;
+
+      let saved: GraphTranslatedDocument;
+      if (isJournalDocument(sourceDocument)) {
+        const journalData = rewritten as JournalData;
+        const flag = readJournalTranslationFlag(existingData.flags);
+        const manuallyEdited = flag
+          ? await hasManualOutputEdits(existingData, flag.outputHash)
+          : false;
+        if (!manuallyEdited) await stampJournalOutputHash(journalData);
+        saved = await runtime.translations.save(journalData);
+      } else if (isActorDocument(sourceDocument)) {
+        const actorData = rewritten as ActorData;
+        const flag = readActorTranslationFlag(existingData.flags);
+        const manuallyEdited = flag
+          ? await hasManualOutputEdits(existingData, flag.outputHash)
+          : false;
+        if (!manuallyEdited) await stampActorOutputHash(actorData);
+        saved = await runtime.actorTranslations.save(actorData);
+      } else {
+        const itemData = rewritten as ItemData;
+        const flag = readItemTranslationFlag(existingData.flags);
+        const manuallyEdited = flag
+          ? await hasManualOutputEdits(existingData, flag.outputHash)
+          : false;
+        if (!manuallyEdited) await stampItemOutputHash(itemData);
+        saved = await runtime.itemTranslations.save(itemData);
+      }
+      existingBySource.set(sourceDocument.uuid, saved);
+      repairedDocuments += 1;
+      if (sourceDocument.uuid === runtime.rootUuid && saved.uuid) {
+        activeTranslations.update(runId, { translatedDocumentUuid: saved.uuid });
+      }
+    }
+    logger.info("Existing translation link preflight finished.", {
+      existingDocuments: existingBySource.size,
+      repairedDocuments,
+    });
+    return existingBySource;
   }
 
   async #translateOne(
