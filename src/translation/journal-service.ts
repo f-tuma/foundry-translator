@@ -429,7 +429,11 @@ export class JournalTranslationService {
       new GlossaryCompendiumRepository().load(),
       preparation ?? Promise.resolve(),
     ]);
-    runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage);
+    runId = activeTranslations.start(
+      sourceDocument.name,
+      settings.targetLanguage,
+      sourceDocument.uuid,
+    );
     const runtime: TranslationRuntime = {
       runId,
       rootUuid: sourceDocument.uuid,

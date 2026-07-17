@@ -26,6 +26,8 @@ export interface TranslationRunIssue {
 export interface ActiveTranslationRun {
   id: number;
   rootName: string;
+  /** Stable source identity used to reconnect reopened Journal sheets. */
+  sourceUuid?: string;
   targetLanguage: string;
   startedAt: number;
   finishedAt?: number;
@@ -74,7 +76,7 @@ export class ActiveTranslationRegistry {
     this.#now = now;
   }
 
-  start(rootName: string, targetLanguage: string): number {
+  start(rootName: string, targetLanguage: string, sourceUuid?: string): number {
     const now = this.#now();
     for (const [id, run] of this.#runs) {
       if (run.finishedAt !== undefined && now - run.finishedAt > FINISHED_RUN_RETENTION_MS) {
@@ -85,6 +87,7 @@ export class ActiveTranslationRegistry {
     this.#runs.set(id, {
       id,
       rootName,
+      ...(sourceUuid ? { sourceUuid } : {}),
       targetLanguage,
       startedAt: now,
       state: "scanning",
@@ -179,6 +182,25 @@ export class ActiveTranslationRegistry {
     if (!run || run.finishedAt !== undefined || run.cancelRequested) return;
     run.cancelRequested = true;
     this.#notify();
+  }
+
+  removeFinished(id: number): boolean {
+    const run = this.#runs.get(id);
+    if (!run || run.finishedAt === undefined) return false;
+    this.#runs.delete(id);
+    this.#notify();
+    return true;
+  }
+
+  clearFinished(): number {
+    let removed = 0;
+    for (const [id, run] of this.#runs) {
+      if (run.finishedAt === undefined) continue;
+      this.#runs.delete(id);
+      removed += 1;
+    }
+    if (removed) this.#notify();
+    return removed;
   }
 
   isCancelRequested(id: number): boolean {

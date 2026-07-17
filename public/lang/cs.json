@@ -180,5 +180,8 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslationFailed": "Uložený překlad se nepodařilo otevřít.",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Issues": "{count} problémů",
   "FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog": "Kopírovat log",
-  "FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied": "Log překladu byl zkopírován do schránky."
+  "FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied": "Log překladu byl zkopírován do schránky.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Remove": "Smazat",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.ClearFinished": "Smazat dokončené",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.Active": "Zobrazit probíhající překlad"
 }

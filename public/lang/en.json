@@ -180,5 +180,8 @@
   "FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslationFailed": "The stored translation could not be opened.",
   "FOUNDRY_TRANSLATE.ActiveTranslations.Issues": "{count} issues",
   "FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog": "Copy log",
-  "FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied": "The translation log was copied to the clipboard."
+  "FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied": "The translation log was copied to the clipboard.",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Remove": "Remove",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.ClearFinished": "Clear finished",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Header.Active": "Translation in progress"
 }

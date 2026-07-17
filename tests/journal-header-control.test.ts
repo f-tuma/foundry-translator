@@ -6,6 +6,7 @@ import {
   addJournalTranslationHeaderControl,
   addShowTranslationHeaderButton,
 } from "../src/translation/journal-header-control";
+import { activeTranslations } from "../src/translation/active-translations";
 
 function journal(id = "journal-id"): FoundryJournalWorldDocument {
   return {
@@ -53,6 +54,39 @@ describe("Journal header translation action", () => {
     expect(header.querySelectorAll(".ft-journal-translate-header")).toHaveLength(1);
     expect(header.querySelectorAll(".ft-journal-translate-page-header")).toHaveLength(1);
     expect(header.firstElementChild?.textContent).toContain("Přeložit tento deník");
+  });
+
+  it("reconnects a reopened journal header to its active translation", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const source = journal("running");
+    const header = document.createElement("header");
+    const controlsButton = document.createElement("button");
+    header.append(controlsButton);
+    vi.stubGlobal("document", document);
+    vi.stubGlobal("game", {
+      user: { isGM: true },
+      journal: { contents: [source] },
+      i18n: { localize: (key: string) => key },
+    });
+    const runId = activeTranslations.start(source.name, "cs", source.uuid);
+    const controls: import("../src/translation/journal-header-control").ApplicationHeaderControl[] = [];
+
+    addJournalTranslationHeaderControl({ entry: source }, controls);
+    addJournalTranslationHeaderButton({
+      entry: source,
+      window: { header, controls: controlsButton },
+    });
+
+    expect(controls).toEqual([expect.objectContaining({
+      action: "foundry-translate-show-active-translation",
+      label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.Active",
+    })]);
+    expect(header.querySelector(".ft-journal-translate-page-header")).toBeNull();
+    expect(header.querySelector(".ft-journal-translate-header")?.textContent)
+      .toContain("FOUNDRY_TRANSLATE.JournalTranslation.Header.Active");
+
+    activeTranslations.finishCancelled(runId);
+    activeTranslations.removeFinished(runId);
   });
 
   it("adds a switch-to-translation button only when a stored translation exists", async () => {

@@ -756,13 +756,33 @@
   }
 }
 
+.ft-active-translations {
+  display: flex;
+  flex-direction: column;
+  max-height: min(72vh, 760px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ft-active-translations__toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  padding-bottom: var(--ft-space-2);
+}
+
 .ft-active-translations__list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: var(--ft-space-3);
   list-style: none;
   margin: 0;
-  padding: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--ft-space-1) 0 0;
+  scrollbar-gutter: stable;
 }
 
 .ft-active-translations__run {
@@ -908,6 +928,10 @@
 
 .ft-active-translations__cancel {
   color: var(--ft-color-danger);
+}
+
+.ft-active-translations__remove {
+  margin-left: auto;
 }
 
 .ft-active-translations__run[data-state="cancelled"] .ft-active-translations__state {

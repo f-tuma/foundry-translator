@@ -128,6 +128,12 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.OpenTranslation")}</span>
       </button>`
     : "";
+  const remove = run.finishedAt !== undefined
+    ? `<button type="button" class="ft-button ft-button--secondary ft-active-translations__remove" data-run-remove="${run.id}" title="${escapeHtml(localize("FOUNDRY_TRANSLATE.ActiveTranslations.Remove"))}" aria-label="${escapeHtml(localize("FOUNDRY_TRANSLATE.ActiveTranslations.Remove"))}">
+        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+        <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Remove")}</span>
+      </button>`
+    : "";
   return `
     <li class="ft-active-translations__run" data-state="${displayState}">
       <div class="ft-active-translations__title">
@@ -142,7 +148,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         ${providerMetrics}
         ${run.error ? `<span class="ft-active-translations__error">${escapeHtml(run.error)}</span>` : ""}
         ${current ? `<span class="ft-active-translations__current">${current}</span>` : ""}
-        <div class="ft-active-translations__actions">${openTranslation}${cancel}${copyLog}</div>
+        <div class="ft-active-translations__actions">${openTranslation}${cancel}${copyLog}${remove}</div>
       </div>
     </li>
   `;
@@ -170,13 +176,23 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
 
   #unsubscribe: (() => void) | undefined;
   #ticker: ReturnType<typeof setInterval> | undefined;
+  #scrollTop = 0;
 
   protected async _renderHTML(): Promise<HTMLElement> {
     const runs = activeTranslations.list();
+    const hasFinishedRuns = runs.some(({ finishedAt }) => finishedAt !== undefined);
     const container = document.createElement("div");
     container.className = "ft-settings ft-active-translations";
     container.innerHTML = runs.length
-      ? `<ul class="ft-active-translations__list">
+      ? `${hasFinishedRuns
+          ? `<div class="ft-active-translations__toolbar">
+              <button type="button" class="ft-button ft-button--secondary" data-runs-clear-finished>
+                <i class="fa-solid fa-broom" aria-hidden="true"></i>
+                <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.ClearFinished")}</span>
+              </button>
+            </div>`
+          : ""}
+        <ul class="ft-active-translations__list">
           ${runs.map((run) => renderRun(run, Date.now())).join("")}
         </ul>`
       : `<p class="ft-active-translations__empty">${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Empty")}</p>`;
@@ -184,7 +200,11 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
   }
 
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void {
+    this.#scrollTop = content.querySelector<HTMLElement>(".ft-active-translations__list")
+      ?.scrollTop ?? this.#scrollTop;
     content.replaceChildren(result);
+    const list = content.querySelector<HTMLElement>(".ft-active-translations__list");
+    if (list) list.scrollTop = this.#scrollTop;
   }
 
   protected _onRender(): void {
@@ -225,6 +245,15 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
         });
       });
     }
+    for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-remove]")) {
+      button.addEventListener("click", () => {
+        activeTranslations.removeFinished(Number(button.dataset.runRemove));
+      });
+    }
+    this.element.querySelector<HTMLButtonElement>("[data-runs-clear-finished]")
+      ?.addEventListener("click", () => {
+        activeTranslations.clearFinished();
+      });
   }
 
   override async close(options?: Record<string, unknown>): Promise<FoundryApplicationV2> {

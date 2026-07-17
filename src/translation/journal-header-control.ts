@@ -1,6 +1,7 @@
 import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
 import { getTranslatorSettings } from "../settings/settings";
+import { activeTranslations } from "./active-translations";
 import { openActiveTranslationsOverview } from "./active-translations-app";
 import {
   TRANSLATION_FLAG_PATH,
@@ -38,6 +39,12 @@ export interface ApplicationHeaderControl {
 }
 
 const translationsInProgress = new Set<string>();
+
+function hasActiveTranslation(sourceUuid: string): boolean {
+  return translationsInProgress.has(sourceUuid) || activeTranslations.list().some((run) =>
+    run.sourceUuid === sourceUuid && run.finishedAt === undefined
+  );
+}
 
 function localized(key: string): string {
   return game.i18n.localize(key);
@@ -111,7 +118,7 @@ async function translateFromHeader(
   application: JournalEntrySheetApplication,
   pageId?: string,
 ): Promise<void> {
-  if (translationsInProgress.has(journal.uuid)) {
+  if (hasActiveTranslation(journal.uuid)) {
     // Clicking a running translation opens the global overview instead.
     openActiveTranslationsOverview();
     return;
@@ -260,6 +267,24 @@ export function addJournalTranslationHeaderButton(
     return;
   }
   const translationSource = journal ?? original;
+  const isTranslating = translationSource ? hasActiveTranslation(translationSource.uuid) : false;
+  if (isTranslating) {
+    const activeLabel = localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.Active");
+    const activeButton = document.createElement("button");
+    activeButton.type = "button";
+    activeButton.className = "header-control ft-journal-translate-header";
+    activeButton.title = activeLabel;
+    activeButton.setAttribute("aria-label", activeLabel);
+    const activeIcon = document.createElement("i");
+    activeIcon.className = "fa-solid fa-list-check";
+    activeIcon.setAttribute("aria-hidden", "true");
+    const activeText = document.createElement("span");
+    activeText.textContent = activeLabel;
+    activeButton.append(activeIcon, activeText);
+    activeButton.addEventListener("click", openActiveTranslationsOverview);
+    frame.controls.before(activeButton);
+    return;
+  }
   if (translationSource) {
     const pageLabel = localized("FOUNDRY_TRANSLATE.JournalTranslation.Header.ActionPage");
     const pageButton = document.createElement("button");
@@ -318,6 +343,16 @@ export function addJournalTranslationHeaderControl(
   if (!journal && !original) return;
 
   const translationSource = journal ?? original;
+  if (translationSource && hasActiveTranslation(translationSource.uuid)) {
+    controls.unshift({
+      action: "foundry-translate-show-active-translation",
+      label: "FOUNDRY_TRANSLATE.JournalTranslation.Header.Active",
+      icon: "fa-solid fa-list-check",
+      visible: true,
+      onClick: openActiveTranslationsOverview,
+    });
+    return;
+  }
   if (translationSource) {
     controls.unshift({
       action: "foundry-translate-translate-page",

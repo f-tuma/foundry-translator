@@ -110,6 +110,22 @@ describe("Active translation registry", () => {
     expect(run?.state).toBe("cancelled");
   });
 
+  it("removes only finished runs and can clear their history", () => {
+    const registry = new ActiveTranslationRegistry(() => 7);
+    const running = registry.start("Running", "cs", "JournalEntry.running");
+    const done = registry.start("Done", "cs");
+    const failed = registry.start("Failed", "cs");
+    registry.finish(done);
+    registry.finish(failed, "Provider failed");
+
+    expect(registry.get(running)?.sourceUuid).toBe("JournalEntry.running");
+    expect(registry.removeFinished(running)).toBe(false);
+    expect(registry.removeFinished(done)).toBe(true);
+    expect(registry.list().map(({ rootName }) => rootName)).toEqual(["Running", "Failed"]);
+    expect(registry.clearFinished()).toBe(1);
+    expect(registry.list().map(({ rootName }) => rootName)).toEqual(["Running"]);
+  });
+
   it("counts issues beyond the cap instead of storing them", () => {
     const registry = new ActiveTranslationRegistry(() => 0);
     const id = registry.start("Guide", "cs");

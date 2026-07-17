@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-07-17
-- Repository state: `main`; existing-link repair preflight `v0.14.11` prepared locally from `v0.14.10`
+- Repository state: `main`; active-translation UI follow-up `v0.14.12` prepared from `v0.14.11`
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,13 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-07-17: Patch `v0.14.12` keeps the active-translations window within the
+  viewport using a scrollable history that preserves its position during live
+  metric refreshes. Finished runs can be removed individually or cleared in
+  bulk, while running jobs cannot be deleted. Reopened source or translated
+  Journal sheets now reconnect to the live run by source UUID and expose the
+  active overview instead of offering a duplicate translation action.
 
 - 2026-07-17: Patch `v0.14.11` adds a write-light repair preflight after the
   dependency scan and before provider translation. Existing translated
