@@ -249,11 +249,12 @@ describe("Journal header translation action", () => {
 
     addJournalTranslationHeaderButton({
       entry: translated,
+      pageId: "chapter-two",
       close,
       window: { header, controls: controlsButton },
     });
     header.querySelector<HTMLButtonElement>(".ft-journal-translate-header")?.click();
-    await vi.waitFor(() => expect(renderSource).toHaveBeenCalledWith(true));
+    await vi.waitFor(() => expect(renderSource).toHaveBeenCalledWith({ force: true, pageId: "chapter-two" }));
 
     expect(close).toHaveBeenCalledOnce();
   });

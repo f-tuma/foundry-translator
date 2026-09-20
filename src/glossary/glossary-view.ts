@@ -1,4 +1,4 @@
-import type { GlossaryEntry } from "./types";
+import { GLOSSARY_CATEGORIES, type GlossaryEntry } from "./types";
 import type { GlossaryCandidate } from "./candidates";
 
 export interface GlossaryViewData {
@@ -29,6 +29,10 @@ function normalizeSearchText(value: string): string {
     .trim();
 }
 
+function categoryOptions(selected = "term"): string {
+  return GLOSSARY_CATEGORIES.map((category) => `<option value="${category}" ${category === selected ? "selected" : ""}>${localize(`FOUNDRY_TRANSLATE.Glossary.Category.${category}`)}</option>`).join("");
+}
+
 export interface GlossaryFilterResult {
   matches: number;
   total: number;
@@ -37,14 +41,16 @@ export interface GlossaryFilterResult {
 export function updateGlossaryFilter(root: ParentNode, query: string): GlossaryFilterResult {
   const terms = normalizeSearchText(query).split(/\s+/).filter(Boolean);
   const rows = Array.from(root.querySelectorAll<HTMLElement>("[data-glossary-row]"));
+  const category = root.querySelector<HTMLSelectElement>("[name='categoryFilter']")?.value ?? "";
   let matches = 0;
 
   for (const row of rows) {
     const source = row.querySelector<HTMLElement>(".ft-glossary__source")?.textContent ?? "";
     const replacement = row.querySelector<HTMLInputElement>("[data-glossary-replacement]")?.value ?? "";
-    const aliases = row.dataset.glossaryAliases ?? "";
+    const aliases = row.querySelector<HTMLInputElement>("[data-glossary-aliases-input]")?.value ?? row.dataset.glossaryAliases ?? "";
     const searchable = normalizeSearchText(`${source} ${replacement} ${aliases}`);
-    const isMatch = terms.every((term) => searchable.includes(term));
+    const rowCategory = row.querySelector<HTMLSelectElement>("[data-glossary-category]")?.value;
+    const isMatch = (!category || rowCategory === category) && terms.every((term) => searchable.includes(term));
     row.hidden = !isMatch;
     if (isMatch) matches += 1;
   }
@@ -52,14 +58,14 @@ export function updateGlossaryFilter(root: ParentNode, query: string): GlossaryF
   const status = root.querySelector<HTMLElement>("[data-glossary-filter-status]");
   const statusText = status?.querySelector<HTMLElement>("[data-glossary-filter-text]");
   if (status) {
-    status.hidden = terms.length === 0;
+    status.hidden = terms.length === 0 && !category;
     status.dataset.empty = String(terms.length > 0 && matches === 0);
   }
   if (statusText) {
     const template = matches === 0
       ? status?.dataset.emptyTemplate ?? ""
       : status?.dataset.resultsTemplate ?? "";
-    statusText.textContent = terms.length === 0
+    statusText.textContent = terms.length === 0 && !category
       ? ""
       : template.replace("{count}", String(matches)).replace("{total}", String(rows.length));
   }
@@ -75,10 +81,18 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
   const storedRows = [...data.stored]
     .sort((left, right) => left.source.localeCompare(right.source))
     .map((entry) => `
-      <label class="ft-glossary__row" data-glossary-row data-glossary-aliases="${escapeHtml(entry.aliases.join(" "))}">
+      <div class="ft-glossary__row" data-glossary-row data-glossary-aliases="${escapeHtml(entry.aliases.join(" "))}">
         <span class="ft-glossary__source" title="${escapeHtml(entry.source)}">${escapeHtml(entry.source)}</span>
         <input type="text" maxlength="240" value="${escapeHtml(entry.replacement)}" data-glossary-replacement data-source="${escapeHtml(entry.source)}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}: ${escapeHtml(entry.source)}">
-      </label>
+        <details class="ft-glossary__details">
+          <summary>${localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${localize(entry.enabled === false ? "FOUNDRY_TRANSLATE.Glossary.Automatic" : entry.source === entry.replacement ? "FOUNDRY_TRANSLATE.Glossary.Preserve" : "FOUNDRY_TRANSLATE.Glossary.Fixed")}</summary>
+          <div class="ft-glossary__metadata">
+            <label><input type="checkbox" data-glossary-enabled ${entry.enabled === false ? "" : "checked"}> ${localize("FOUNDRY_TRANSLATE.Glossary.Enabled")}</label>
+            <label>${localize("FOUNDRY_TRANSLATE.Glossary.CategoryLabel")}<select data-glossary-category>${categoryOptions(entry.category)}</select></label>
+            <label>${localize("FOUNDRY_TRANSLATE.Glossary.Aliases")}<input type="text" data-glossary-aliases-input value="${escapeHtml(entry.aliases.join("; "))}" maxlength="2000" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.AliasesHint")}"></label>
+          </div>
+        </details>
+      </div>
     `)
     .join("");
   const candidates = data.candidates ?? [];
@@ -154,6 +168,9 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
         </div>
       </div>
       <div class="ft-glossary__editor">
+        <label class="ft-glossary__category-filter">${localize("FOUNDRY_TRANSLATE.Glossary.CategoryLabel")}
+          <select name="categoryFilter"><option value="">${localize("FOUNDRY_TRANSLATE.Glossary.AllCategories")}</option>${categoryOptions("")}</select>
+        </label>
         <div class="ft-glossary__columns" aria-hidden="true">
           <strong>${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Source")}</strong>
           <strong>${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}</strong>
@@ -161,6 +178,7 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
         <div class="ft-glossary__manual">
           <input type="text" name="manualTerm" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Source")}">
           <input type="text" name="manualReplacement" maxlength="240" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.ManualReplacementPlaceholder")}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}">
+          <select name="manualCategory" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.CategoryLabel")}">${categoryOptions()}</select>
           <button type="button" class="ft-button ft-button--secondary" data-action="add-term">
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             <span>${localize("FOUNDRY_TRANSLATE.Glossary.Add")}</span>

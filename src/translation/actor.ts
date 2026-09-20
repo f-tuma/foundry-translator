@@ -1,3 +1,4 @@
+import { providerFingerprint } from "./provider-fingerprint";
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
@@ -48,6 +49,7 @@ export interface ActorTranslationFlag {
   fallbackTextSegments: number;
   /** Glossary hash at translation time; a changed glossary invalidates reuse. */
   glossaryFingerprint?: string;
+  providerFingerprint?: string;
   /** Fingerprint of the generated copy, used to detect later manual edits. */
   outputHash?: string;
 }
@@ -112,10 +114,12 @@ export function canReuseActorTranslation(
   flag: ActorTranslationFlag,
   sourceHash: string,
   glossaryHash?: string,
+  providerHash?: string,
 ): boolean {
   return flag.sourceHash === sourceHash &&
     flag.engineRevision === ACTOR_TRANSLATION_ENGINE_REVISION &&
-    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash);
+    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash) &&
+    (providerHash === undefined || flag.providerFingerprint === providerHash);
 }
 
 function sourceSnapshot(source: ActorData): string {
@@ -187,6 +191,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
 
   const sourceHash = await actorSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);
+  const providerHash = await providerFingerprint(options.settings.providerId, options.provider, options.settings.sourceLanguage);
   copy.flags = {
     ...copy.flags,
     [MODULE_ID]: {
@@ -203,6 +208,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
         translatedHtmlFields,
         fallbackTextSegments,
         glossaryFingerprint: glossaryHash,
+          providerFingerprint: providerHash,
       },
     },
   };

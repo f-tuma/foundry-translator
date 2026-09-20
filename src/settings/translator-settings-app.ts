@@ -74,6 +74,7 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     try {
       await saveTranslatorSettings(settings);
       ui.notifications.success("FOUNDRY_TRANSLATE.Settings.Status.Saved", { localize: true });
+      await this.close();
     } catch (error) {
       logger.error("Translator settings could not be saved.", error);
       const message =

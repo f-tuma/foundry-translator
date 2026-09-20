@@ -158,6 +158,7 @@ interface FoundrySettingMenuConfig {
 declare class FoundryApplicationV2 {
   static DEFAULT_OPTIONS: Record<string, unknown>;
   readonly element: HTMLElement;
+  addEventListener(type: string, listener: EventListener, options?: AddEventListenerOptions): void;
   render(options?: boolean | Record<string, unknown>): Promise<FoundryApplicationV2>;
   close(options?: Record<string, unknown>): Promise<FoundryApplicationV2>;
 }

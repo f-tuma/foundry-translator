@@ -1,3 +1,4 @@
+import { providerFingerprint } from "./provider-fingerprint";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { logger } from "../logger";
 import { createTranslationProvider } from "../providers/factory";
@@ -47,10 +48,12 @@ import {
 import { hasManualOutputEdits } from "./output-hash";
 import {
   discoverSystemHtmlFieldPaths,
+  discoverEmberTextFieldPaths,
   readPath,
   type HtmlFieldPath,
 } from "./system-html-fields";
 import { containsTranslationPromptLeak, glossaryFingerprint } from "./unit-translator";
+import { availableDocumentReferences } from "./available-references";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
@@ -129,6 +132,7 @@ interface TranslationRuntime {
   runId: number;
   rootUuid: string;
   glossaryHash: string;
+  providerHash: string;
   settings: ReturnType<typeof getTranslatorSettings>;
   provider: ReturnType<typeof createTranslationProvider>;
   glossary: Awaited<ReturnType<GlossaryCompendiumRepository["load"]>>;
@@ -160,6 +164,15 @@ function systemHtmlFieldPaths(
   return source.pages.map((page, index) => discoverSystemHtmlFieldPaths(
     pages[index]?.system?.constructor?.schema?.fields,
     page.system,
+  ));
+}
+
+function systemTextFieldPaths(sourceDocument: FoundryJournalWorldDocument, source: JournalData): readonly (readonly HtmlFieldPath[])[] {
+  const pages = (sourceDocument as FoundryJournalWorldDocument & {
+    pages?: { contents?: (RuntimeJournalPage & { id?: string })[] };
+  }).pages?.contents ?? [];
+  return source.pages.map((page, index) => discoverEmberTextFieldPaths(
+    page.type, pages[index]?.system?.constructor?.schema?.fields, page.system,
   ));
 }
 
@@ -397,7 +410,9 @@ export class JournalTranslationService {
     sourceDocument: FoundryJournalWorldDocument,
     pageId: string,
   ): Promise<JournalTranslationResult> {
-    return this.#run(sourceDocument, { rootPageIds: [pageId], dependencyDepthLimit: 1 });
+    // Reading one page must not trigger an entire linked guide or campaign.
+    // Existing translated targets are still linked by the repair preflight.
+    return this.#run(sourceDocument, { rootPageIds: [pageId], dependencyDepthLimit: 0 });
   }
 
   async #run(
@@ -426,7 +441,7 @@ export class JournalTranslationService {
     });
 
     const [glossary] = await Promise.all([
-      new GlossaryCompendiumRepository().load(),
+      new GlossaryCompendiumRepository().prepareForTranslation(),
       preparation ?? Promise.resolve(),
     ]);
     runId = activeTranslations.start(
@@ -438,6 +453,7 @@ export class JournalTranslationService {
       runId,
       rootUuid: sourceDocument.uuid,
       glossaryHash: await glossaryFingerprint(glossary),
+      providerHash: await providerFingerprint(settings.provider, provider, settings.sourceLanguage),
       settings,
       provider,
       glossary,
@@ -703,6 +719,9 @@ export class JournalTranslationService {
       const node = nodes.get(document.uuid);
       if (!node?.result) continue;
       const replacements: DocumentReferenceReplacement[] = [];
+      if (scope.dependencyDepthLimit === 0) {
+        replacements.push(...await availableDocumentReferences(node.result.data, runtime.settings.targetLanguage));
+      }
       for (const dependency of node.dependencies) {
         const translatedDependency = nodes.get(dependency.root.uuid)?.result?.document;
         if (!translatedDependency) continue;
@@ -903,13 +922,16 @@ export class JournalTranslationService {
     );
     const existingFlag = existing ? readJournalTranslationFlag(existing.flags) : null;
     const existingData = existing?.toObject() as JournalData | undefined;
+    if (pageIds && existingFlag && existingFlag.sourceHash !== sourceHash) {
+      throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.StalePageRefresh"));
+    }
     const manuallyEdited = existingData && existingFlag
       ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
       : false;
     const reusable = existing && existingFlag && (pageIds
       ? pageIds.every((pageId) =>
-          canReuseJournalPageTranslation(existingFlag, sourceHash, pageId, runtime.glossaryHash))
-      : canReuseJournalTranslation(existingFlag, sourceHash, runtime.glossaryHash));
+          canReuseJournalPageTranslation(existingFlag, sourceHash, pageId, runtime.glossaryHash, runtime.providerHash))
+      : canReuseJournalTranslation(existingFlag, sourceHash, runtime.glossaryHash, runtime.providerHash));
     if (existing && existingFlag && reusable && !manuallyEdited) {
       return {
         data: existing.toObject() as JournalData,
@@ -953,6 +975,7 @@ export class JournalTranslationService {
       },
       cache: runtime.cache,
       systemHtmlFieldPaths: systemHtmlFieldPaths(sourceDocument, source),
+      systemTextFieldPaths: systemTextFieldPaths(sourceDocument, source),
       ...(pageIds ? { pageIds } : {}),
       onPageStart: (pageName) => activeTranslations.update(runtime.runId, {
         currentDocument: sourceDocument.name,
@@ -978,9 +1001,9 @@ export class JournalTranslationService {
         documentName: sourceDocument.name,
       }),
     });
-    if (pageIds && existing && existingFlag) {
+    if (pageIds && existingData && existingFlag) {
       translated.data = mergePartialJournalTranslation(
-        existing.toObject() as JournalData,
+        existingData,
         translated.data,
       );
     }
@@ -1013,7 +1036,7 @@ export class JournalTranslationService {
       ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
       : false;
     if (existing && existingFlag && !manuallyEdited &&
-      canReuseActorTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
+      canReuseActorTranslation(existingFlag, sourceHash, runtime.glossaryHash, runtime.providerHash)) {
       return {
         data: existing.toObject() as ActorData,
         document: existing,
@@ -1081,7 +1104,7 @@ export class JournalTranslationService {
       ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
       : false;
     if (existing && existingFlag && !manuallyEdited &&
-      canReuseItemTranslation(existingFlag, sourceHash, runtime.glossaryHash)) {
+      canReuseItemTranslation(existingFlag, sourceHash, runtime.glossaryHash, runtime.providerHash)) {
       return {
         data: existing.toObject() as ItemData,
         document: existing,

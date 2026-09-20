@@ -941,3 +941,44 @@
 .ft-active-translations__run[data-state="cancelled"] .ft-progress__fill {
   background: var(--ft-color-warning);
 }
+
+/* Glossary classification stays secondary to the term/replacement editor. */
+.ft-glossary__details { grid-column: 1 / -1; color: var(--ft-muted, #687174); font-size: 12px; }
+.ft-glossary__details summary { cursor: pointer; padding: 3px 0; }
+.ft-glossary__metadata { display: grid; gap: 8px; padding: 10px 0; }
+.ft-glossary__metadata label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ft-glossary__metadata input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 16px; }
+.ft-glossary__metadata input[type="text"] { flex: 1; min-width: 160px; }
+.ft-glossary__category-filter { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.ft-glossary__manual { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 145px auto; }
+.ft-glossary__row[hidden] { display: none; }
+.ft-glossary select { max-width: 100%; }
+@media (max-width: 700px) { .ft-glossary__manual { grid-template-columns: 1fr; } }
+.foundry-translate-bundle-window .window-content,
+.foundry-translate-desk-window .window-content { padding: 0; overflow: auto; background: var(--ft-color-bg); }
+.foundry-translate-glossary-window, .foundry-translate-bundle-window, .foundry-translate-desk-window { max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+.ft-desk__status { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ft-desk__status strong { border: 1px solid var(--ft-color-accent); border-radius: 4px; padding: 4px 8px; color: var(--ft-color-accent); }
+.ft-desk__status span { overflow-wrap: anywhere; color: var(--ft-color-text-muted); }
+.ft-desk__tip, .ft-bundles__card p { color: var(--ft-color-text-muted); }
+.ft-desk__actions { display: grid; gap: 10px; }
+.ft-desk__actions button { display: flex; gap: 16px; align-items: center; text-align: left; padding: 16px; height: auto; background: var(--ft-color-surface); border: 1px solid var(--ft-color-border); border-radius: 6px; color: var(--ft-color-text); }
+.ft-desk__actions button > span { flex: 1; }
+.ft-desk__actions small { display: block; margin-top: 4px; color: var(--ft-color-text-muted); font-weight: normal; }
+.ft-desk__actions button:hover { border-color: var(--ft-color-accent); background: var(--ft-color-surface-raised); }
+.ft-desk-launcher { width: 100%; margin-top: 6px; }
+.ft-bundles__card { padding: 16px; border: 1px solid var(--ft-color-border); border-radius: 6px; background: var(--ft-color-surface); }
+.ft-bundles__card h3 { margin-top: 0; font-size: 16px; }
+.ft-bundles__file { display: grid; gap: 8px; }
+.ft-bundles__file input { width: 100%; }
+.ft-bundles__rows { list-style: none; padding: 0; margin: 14px 0; max-height: 260px; overflow: auto; }
+.ft-bundles__rows li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--ft-color-border); }
+.ft-bundles__rows li > div { min-width: 0; overflow-wrap: anywhere; }
+.ft-bundles__rows li > span { flex: 0 0 120px; text-align: right; font-size: 12px; }
+.ft-bundles__rows small { display: block; color: var(--ft-color-text-muted); }
+.ft-bundles__rows [data-state="ready"] > span { color: var(--ft-color-success); }
+.ft-bundles__warning, .ft-bundles__rows [data-state="invalid"] > span { color: var(--ft-color-warning) !important; }
+.ft-bundles__status { overflow-wrap: anywhere; }
+.ft-bundles__status[data-error="true"] { color: var(--ft-color-danger); }
+.ft-bundles pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto; font-size: 12px; }
+.ft-glossary__details { color: var(--ft-color-text-muted); }

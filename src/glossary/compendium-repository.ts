@@ -1,7 +1,9 @@
 import { MODULE_ID, MODULE_TITLE } from "../constants";
 import { organizeCompendiumPack } from "../storage/compendium-folder";
-import { GLOSSARY_SCHEMA_VERSION, type GlossaryDocumentFlag, type GlossaryEntry } from "./types";
+import { GLOSSARY_SCHEMA_VERSION, isGlossaryCategory, type GlossaryDocumentFlag, type GlossaryEntry } from "./types";
 import { planGlossarySync } from "./sync";
+import { validateGlossary } from "./protection";
+import { discoverWorldGlossary } from "./discovery";
 
 export const GLOSSARY_PACK_NAME = "foundry-translate-glossary" as const;
 export const GLOSSARY_PACK_ID = `world.${GLOSSARY_PACK_NAME}` as const;
@@ -14,10 +16,6 @@ export interface GlossarySyncResult {
   unchanged: number;
 }
 
-function isCategory(value: unknown): value is GlossaryEntry["category"] {
-  return value === "character" || value === "location" || value === "term";
-}
-
 function readFlag(indexEntry: FoundryCompendiumIndexEntry): GlossaryEntry | null {
   const namespace = indexEntry.flags?.[MODULE_ID];
   const value = namespace?.glossary;
@@ -28,7 +26,7 @@ function readFlag(indexEntry: FoundryCompendiumIndexEntry): GlossaryEntry | null
     flag.schemaVersion !== GLOSSARY_SCHEMA_VERSION ||
     typeof flag.source !== "string" ||
     typeof flag.replacement !== "string" ||
-    !isCategory(flag.category) ||
+    !isGlossaryCategory(flag.category) ||
     !Array.isArray(flag.aliases) ||
     !flag.aliases.every((alias) => typeof alias === "string")
   ) {
@@ -41,6 +39,8 @@ function readFlag(indexEntry: FoundryCompendiumIndexEntry): GlossaryEntry | null
     replacement: flag.replacement,
     category: flag.category,
     aliases: flag.aliases,
+    ...(typeof flag.enabled === "boolean" ? { enabled: flag.enabled } : {}),
+    ...(typeof flag.customized === "boolean" ? { customized: flag.customized } : {}),
     ...(typeof flag.sourceUuid === "string" ? { sourceUuid: flag.sourceUuid } : {}),
   };
 }
@@ -52,6 +52,8 @@ function toFlag(entry: GlossaryEntry): GlossaryDocumentFlag {
     replacement: entry.replacement,
     category: entry.category,
     aliases: entry.aliases,
+    ...(entry.enabled !== undefined ? { enabled: entry.enabled } : {}),
+    ...(entry.customized !== undefined ? { customized: entry.customized } : {}),
     ...(entry.sourceUuid ? { sourceUuid: entry.sourceUuid } : {}),
   };
 }
@@ -94,7 +96,20 @@ async function loadFromPack(pack: FoundryCompendiumCollection): Promise<Glossary
   return [...index.values()].map(readFlag).filter((entry): entry is GlossaryEntry => !!entry);
 }
 
+let preparingGlossary: Promise<GlossaryEntry[]> | undefined;
+
 export class GlossaryCompendiumRepository {
+  async loadExisting(): Promise<GlossaryEntry[]> {
+    const pack = game.packs.get(GLOSSARY_PACK_ID);
+    return pack ? loadFromPack(pack) : [];
+  }
+  async prepareForTranslation(): Promise<GlossaryEntry[]> {
+    preparingGlossary ??= (async () => {
+      await this.sync(discoverWorldGlossary());
+      return this.load();
+    })().finally(() => { preparingGlossary = undefined; });
+    return preparingGlossary;
+  }
   async getPack(): Promise<FoundryCompendiumCollection> {
     return ensureGlossaryPack();
   }
@@ -114,7 +129,9 @@ export class GlossaryCompendiumRepository {
       throw new Error("Compendium se slovníkem je zamčené. Nejdřív jej ve Foundry odemkněte.");
     }
 
-    const plan = planGlossarySync(await loadFromPack(pack), discovered);
+    const stored = await loadFromPack(pack);
+    const plan = planGlossarySync(stored, discovered);
+    validateGlossary([...stored.filter((entry) => !plan.update.some((updated) => updated.id === entry.id)), ...plan.create, ...plan.update]);
     if (plan.create.length) {
       await foundry.documents.JournalEntry.implementation.createDocuments(
         plan.create.map(toDocumentData),
@@ -137,6 +154,10 @@ export class GlossaryCompendiumRepository {
 
   /** Overwrites the stored entry, e.g. with a user-supplied custom translation. */
   async saveEntry(entry: GlossaryEntry): Promise<void> {
+    return this.saveEntries([entry]);
+  }
+
+  async saveEntries(entries: readonly GlossaryEntry[]): Promise<void> {
     if (!game.user?.isGM) {
       throw new Error("Slovník může měnit pouze Game Master.");
     }
@@ -144,14 +165,19 @@ export class GlossaryCompendiumRepository {
     if (pack.locked) {
       throw new Error("Compendium se slovníkem je zamčené. Nejdřív jej ve Foundry odemkněte.");
     }
-    if (entry.id) {
+    const existing = await loadFromPack(pack);
+    validateGlossary([...existing.filter((stored) => !entries.some((entry) => entry.id === stored.id)), ...entries]);
+    const updates = entries.filter((entry) => entry.id);
+    const creates = entries.filter((entry) => !entry.id);
+    if (updates.length) {
       await foundry.documents.JournalEntry.implementation.updateDocuments(
-        [toDocumentData(entry)],
+        updates.map(toDocumentData),
         { pack: pack.collection },
       );
-    } else {
+    }
+    if (creates.length) {
       await foundry.documents.JournalEntry.implementation.createDocuments(
-        [toDocumentData(entry)],
+        creates.map(toDocumentData),
         { pack: pack.collection },
       );
     }

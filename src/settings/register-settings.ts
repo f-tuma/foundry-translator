@@ -4,8 +4,18 @@ import { SETTINGS } from "./settings";
 import { TranslatorSettingsApplication } from "./translator-settings-app";
 import { JournalTranslationApplication } from "../translation/journal-translation-app";
 import { ActiveTranslationsApplication } from "../translation/active-translations-app";
+import { BundleApplication } from "../bundles/bundle-app";
+import { TranslationDesk } from "../ui/translation-desk";
 
 export function registerSettings(): void {
+  game.settings.registerMenu(MODULE_ID, "desk", {
+    name: "FOUNDRY_TRANSLATE.Desk.Title", label: "FOUNDRY_TRANSLATE.Desk.Title", hint: "FOUNDRY_TRANSLATE.Desk.Intro",
+    icon: "fa-solid fa-language", type: TranslationDesk, restricted: true,
+  });
+  game.settings.registerMenu(MODULE_ID, "bundles", {
+    name: "FOUNDRY_TRANSLATE.Bundles.Heading", label: "FOUNDRY_TRANSLATE.Bundles.Heading", hint: "FOUNDRY_TRANSLATE.Bundles.Intro",
+    icon: "fa-solid fa-box-archive", type: BundleApplication, restricted: true,
+  });
   game.settings.register(MODULE_ID, SETTINGS.PROVIDER, {
     name: "FOUNDRY_TRANSLATE.Settings.Provider.Name",
     hint: "FOUNDRY_TRANSLATE.Settings.Provider.Hint",
