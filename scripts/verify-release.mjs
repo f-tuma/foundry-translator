@@ -9,6 +9,7 @@ const expectedTag = `v${packageJson.version}`;
 const expectedManifest = `https://github.com/${repository}/releases/latest/download/module.json`;
 const expectedDownload = `https://github.com/${repository}/releases/download/${expectedTag}/foundry-translate.zip`;
 const expectedScript = `foundry-translate-${packageJson.version}.js`;
+const expectedStyle = `styles/foundry-translate-${packageJson.version}.css`;
 const constantsSource = await readFile("src/constants.ts", "utf8");
 const sourceVersion = constantsSource.match(/MODULE_VERSION = "([^"]+)"/)?.[1];
 
@@ -36,6 +37,18 @@ if (moduleJson.download !== expectedDownload) {
 
 if (moduleJson.esmodules?.length !== 1 || moduleJson.esmodules[0] !== expectedScript) {
   failures.push(`ES module path must be ${expectedScript}`);
+}
+
+if (moduleJson.styles?.length !== 1 || moduleJson.styles[0] !== expectedStyle) {
+  failures.push(`Stylesheet path must be ${expectedStyle}`);
+}
+
+try {
+  const sourceStyle = await readFile("public/styles/foundry-translate.css", "utf8");
+  const builtStyle = await readFile(`dist/${expectedStyle}`, "utf8");
+  if (builtStyle !== sourceStyle) failures.push("Versioned stylesheet does not match the source CSS");
+} catch {
+  failures.push(`Build the module first: dist/${expectedStyle} must exist`);
 }
 
 if (failures.length > 0) {

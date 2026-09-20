@@ -1,6 +1,6 @@
 {
   "name": "foundry-translate",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "private": true,
   "type": "module",
   "description": "Reliable, glossary-aware adventure translation for Foundry VTT v14.",
@@ -19,6 +19,7 @@
     "release:verify": "node scripts/verify-release.mjs"
   },
   "devDependencies": {
+    "@types/node": "^22.20.4",
     "linkedom": "^0.18.13",
     "playwright-core": "^1.61.1",
     "typescript": "^5.8.3",

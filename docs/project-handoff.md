@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.16.0`; see the deployment and QA entries below.
+- Current implementation: `v0.16.1`; see the deployment and QA entries below.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -12,7 +12,13 @@ and the recommended implementation order.
 ## Current work log
 
 - 2026-09-20: the user authorized release and installation of the current work.
-  Preparing v0.16.0 from PR #15. AI naming is now explicitly opt-in (off by
+  PR #15 merged as `a63b5d6`; v0.16.0 was published and installed through Foundry
+  Setup. Both PR/main CI and the release workflow passed; 231 tests, typecheck,
+  build and metadata checks passed. Downloaded release hashes matched GitHub,
+  and ZIP contents matched the source manifest. Ember started and GM login,
+  Journal Notes → Adventure translation → Translator and language all worked.
+  The browser loaded the versioned 0.16.0 script and preserved Hy-MT2 settings.
+  AI naming is now explicitly opt-in (off by
   default), so upgrading an existing world without a naming-model selection
   preserves its prior workflow without a missing-model warning. The separate
   naming model still requires an explicit choice. The release includes the
@@ -20,7 +26,14 @@ and the recommended implementation order.
   The earlier no-instance-change restriction is superseded by this deployment
   request; ordinary translation runs still require their own task scope.
 
-- 2026-09-20 development branch `codex/ui-alignment-help` (not deployed):
+  Live visual QA caught stale cached CSS at the unversioned module stylesheet
+  URL: the browser's imported sheet had no `.ft-help-*` rules, so new help icons
+  appeared as full buttons below labels. Preparing v0.16.1 to emit a versioned
+  stylesheet and verify that the packaged CSS matches its source. Keep the
+  stable public CSS file for source/fixture use. The browser will request a new
+  URL on each release, matching the existing JS versioning strategy.
+
+- 2026-09-20 development branch `codex/ui-alignment-help` (included in v0.16.0):
   added AI naming during glossary sync, saved in batches of eight with progress,
   cancellation/resume and protection against manual edits made during inference.
   Only new, enabled, uncustomized, discovered names are analyzed. Opaque roots
@@ -114,9 +127,9 @@ and the recommended implementation order.
   The live Ember world was read only, with no reload, injection or installation.
   At inspection it contained only the empty Glossary pack in the module folder;
   don't recreate the user's deleted test output. Prior no-instance-change request
-  remains in force despite the later report that the translation was stopped.
+  remained in force during that QA; it is superseded by the release request above.
 
-- 2026-09-20 local UI polish (not deployed): aligned and centered active-run
+- 2026-09-20 local UI polish (included in v0.16.0): aligned and centered active-run
   actions, removed Copy log's extra top margin, made long titles wrap, matched
   glossary select/input heights, and made narrow layouts respond to the Foundry
   window width. Longer explanations now live behind native Foundry info
