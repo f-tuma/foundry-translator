@@ -34,7 +34,7 @@ function read(data: Record<string, unknown>, path: string): unknown {
   return value;
 }
 
-/** Use descriptions and nearby mentions; never send whole documents or mechanics. */
+/** Use descriptions and nearby mentions; export bounded reference text without mechanics. */
 export function collectNameContexts(
   entries: readonly GlossaryEntry[],
   sources: NameContextSources = {

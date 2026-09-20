@@ -1,4 +1,5 @@
-import { NamingCancelledError } from "./name-analysis";
+import { GlossarySyncCancelledError } from "./types";
+import { GlossaryFilesApplication } from "./files-app";
 import { logger } from "../logger";
 import { GlossaryCompendiumRepository } from "./compendium-repository";
 import { discoverWorldGlossary } from "./discovery";
@@ -74,6 +75,12 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
     this.element.querySelector(".ft-glossary__rows")?.addEventListener("focusout", () => {
       queueMicrotask(() => this.#refreshRows());
     });
+    this.element.querySelector("[data-action='glossary-files']")?.addEventListener("click", () => {
+      if (this.#hasUnsavedEdits()) { this.#setStatus("error", "FOUNDRY_TRANSLATE.Glossary.Files.Unsaved"); return; }
+      const files = new GlossaryFilesApplication();
+      files.hasUnsavedEdits = () => this.#hasUnsavedEdits();
+      void files.render({ force: true });
+    });
     const manualTerm = this.element.querySelector<HTMLInputElement>("[name='manualTerm']");
     manualTerm?.addEventListener("input", () => {
       updateGlossaryFilter(this.element, manualTerm.value);
@@ -118,6 +125,14 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
     }
   }
 
+  #hasUnsavedEdits(): boolean {
+    const stored = new Map(this.#stored.map((entry) => [entry.source, entry]));
+    return [...this.element.querySelectorAll<HTMLElement>("[data-glossary-row]")].some((row) => {
+      const entry = stored.get(row.querySelector<HTMLInputElement>("[data-source]")?.dataset.source ?? "");
+      return !!entry && hasGlossaryEdits(readGlossaryRow(row, entry), entry);
+    }) || !!this.element.querySelector<HTMLInputElement>("[name='manualReplacement']")?.value.trim();
+  }
+
   #discover(): GlossaryEntry[] {
     return discoverWorldGlossary();
   }
@@ -149,7 +164,7 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
     try {
       const result = await this.#repository.sync(this.#discover(), {
         shouldCancel: () => this.#syncCancelled,
-        onProgress: ({ completed, total }) => this.#setStatus("testing", game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Progress")
+        onProgress: ({ completed, total }) => this.#setStatus("testing", game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Progress")
           .replace("{completed}", String(completed)).replace("{total}", String(total)), false),
       });
       const template = game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Synced");
@@ -157,15 +172,13 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
         .replace("{created}", String(result.created))
         .replace("{updated}", String(result.updated))
         .replace("{unchanged}", String(result.unchanged));
-      this.#setStatus(result.aiWarning ? "error" : "success", result.aiWarning ?? message, false);
-      if (result.aiWarning) ui.notifications.warn(result.aiWarning);
-      else ui.notifications.success(message + (result.aiTranslated !== undefined ? " " + game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Summary")
-        .replace("{translated}", String(result.aiTranslated)).replace("{preserved}", String(result.aiPreserved ?? 0)) : ""));
+      this.#setStatus("success", message, false);
+      ui.notifications.success(message);
       this.#refreshRows();
     } catch (error) {
-      if (error instanceof NamingCancelledError) {
+      if (error instanceof GlossarySyncCancelledError) {
         this.#refreshRows();
-        this.#setStatus("idle", "FOUNDRY_TRANSLATE.Glossary.AI.Cancelled");
+        this.#setStatus("idle", "FOUNDRY_TRANSLATE.Glossary.Status.Cancelled");
         return;
       }
       logger.error("Glossary synchronization failed.", error);

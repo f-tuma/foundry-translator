@@ -1,4 +1,4 @@
-import { NamingCancelledError } from "../glossary/name-analysis";
+import { GlossarySyncCancelledError } from "../glossary/types";
 import { providerFingerprint } from "./provider-fingerprint";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { logger } from "../logger";
@@ -447,9 +447,9 @@ export class JournalTranslationService {
       const [glossary] = await Promise.all([
         new GlossaryCompendiumRepository().prepareForTranslation({
           shouldCancel: () => activeTranslations.isCancelRequested(activeRunId),
-          onProgress: ({ completed, total, model }) => activeTranslations.update(activeRunId, {
+          onProgress: ({ completed, total }) => activeTranslations.update(activeRunId, {
             state: "glossary", glossaryCompleted: completed, glossaryTotal: total,
-            currentDocument: model ?? game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Preparing"),
+            currentDocument: game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Syncing"),
           }),
         }),
         preparation ?? Promise.resolve(),
@@ -470,7 +470,7 @@ export class JournalTranslationService {
       activeTranslations.finish(runId);
       return result;
     } catch (error) {
-      if (error instanceof NamingCancelledError) error = new TranslationCancelledError();
+      if (error instanceof GlossarySyncCancelledError) error = new TranslationCancelledError();
       if (error instanceof TranslationCancelledError) {
         activeTranslations.finishCancelled(runId);
       } else {

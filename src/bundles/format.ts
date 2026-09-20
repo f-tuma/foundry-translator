@@ -64,7 +64,7 @@ export function parseTranslationBundle(text: string): TranslationBundle {
     requireValue(key && !seenTerms.has(key), `duplicate term ${entry.source}.`);
     seenTerms.add(key);
     return { source: entry.source, replacement: entry.replacement, category: entry.category, aliases: entry.aliases as string[],
-      ...(entry.enabled === false ? { enabled: false } : {}), customized: true };
+      ...(entry.enabled === false ? { enabled: false } : {}), ...(typeof entry.notes === "string" ? { notes: entry.notes.slice(0, 2000) } : {}), customized: true };
   });
   validateGlossary(glossary);
   requireValue(Array.isArray(value.documents) && value.documents.length <= 10000, "invalid document list.");

@@ -1,11 +1,11 @@
 import { logger } from "../logger";
-import type { NamingProgress } from "./name-analysis";
+import type { GlossaryProgress } from "./types";
 import type { GlossaryEntry } from "./types";
 
 export interface GlossaryLiveState {
   entries?: readonly GlossaryEntry[];
   running: boolean;
-  progress?: NamingProgress;
+  progress?: GlossaryProgress;
   status?: { state: "idle" | "testing" | "success" | "error"; message: string };
 }
 

@@ -1076,3 +1076,30 @@
   .ft-bundles__rows li { flex-direction: column; gap: 4px; }
   .ft-bundles__rows li > span { flex-basis: auto; text-align: left; }
 }
+
+/* Reviewed glossary files, scoped to the module window. */
+.ft-glossary-files__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ft-glossary-files__check { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; min-width: 0; }
+.ft-glossary-files__check input[type="checkbox"] { flex: 0 0 18px; width: 18px; height: 18px; margin: 0; padding: 0; }
+.ft-glossary-files__check strong { overflow-wrap: anywhere; }
+.ft-glossary-files__state { margin-left: auto; font-size: 12px; color: var(--ft-color-text-muted); }
+.ft-glossary-files__rows { list-style: none; padding: 0; margin: 12px 0; max-height: 340px; overflow: auto; }
+.ft-glossary-files__rows li { padding: 12px 0; border-bottom: 1px solid var(--ft-color-border); }
+.ft-glossary-files__rows li[hidden] { display: none; }
+.ft-glossary-files__comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-left: 26px; }
+.ft-glossary-files__comparison > div { display: grid; gap: 4px; align-content: start; overflow-wrap: anywhere; white-space: pre-wrap; }
+.ft-glossary-files__comparison small { color: var(--ft-color-text-muted); }
+.ft-glossary-files__rows [data-state="new"] .ft-glossary-files__state { color: var(--ft-color-success); }
+.ft-glossary-files__rows [data-state="changed"] .ft-glossary-files__state { color: var(--ft-color-warning); }
+.ft-glossary__metadata textarea { width: 100%; min-height: 56px; resize: vertical; }
+@container (max-width: 500px) { .ft-glossary-files__comparison { grid-template-columns: 1fr; } }
+.ft-glossary-files input[type="search"], .ft-glossary__metadata textarea {
+  box-sizing: border-box; width: 100%; min-height: 36px; padding: 8px 10px;
+  border: 1px solid var(--ft-color-border); border-radius: var(--ft-radius-sm);
+  background: var(--ft-color-surface); color: var(--ft-color-text);
+}
+.ft-glossary-files input[type="file"]::file-selector-button {
+  padding: 8px 12px; margin-right: 8px; border: 1px solid var(--ft-color-border); border-radius: var(--ft-radius-sm);
+  color: var(--ft-color-text); background: var(--ft-color-surface-raised); cursor: pointer;
+}
+.ft-glossary-files .ft-button:disabled { opacity: .5; cursor: default; }

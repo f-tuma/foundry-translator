@@ -74,17 +74,6 @@ export function renderTranslatorSettingsForm(
           </div>
         </div>
         <div class="ft-field">
-          <div class="ft-field__label"><label for="ft-glossary-ai">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name")}</label>${help("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint", "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name")}</div>
-          <select id="ft-glossary-ai" name="glossaryAiEnabled">
-            <option value="false">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Preserve")}</option>
-            <option value="true">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Automatic")}</option>
-          </select>
-        </div>
-        <div class="ft-field">
-          <div class="ft-field__label"><label for="ft-glossary-model">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model")}</label>${help("FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelHint", "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model")}</div>
-          <input id="ft-glossary-model" name="glossaryAiModel" type="text" spellcheck="false" placeholder="${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelAuto")}">
-        </div>
-        <div class="ft-field">
           <div class="ft-field__label"><label for="ft-world-context">${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.Name")}</label>${help("FOUNDRY_TRANSLATE.Settings.WorldContext.Hint", "FOUNDRY_TRANSLATE.Settings.WorldContext.Name")}</div>
           <textarea id="ft-world-context" name="worldContext" rows="7" maxlength="6000" placeholder="${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.Placeholder")}"></textarea>
           <div class="ft-help-row"><button type="button" class="ft-button ft-button--secondary ft-settings__generate-context" data-action="generate-world-context">
@@ -184,10 +173,6 @@ export function renderTranslatorSettingsForm(
   if (openAiApiKey instanceof HTMLInputElement) openAiApiKey.value = settings.openAiApiKey;
   if (worldContext instanceof HTMLTextAreaElement) worldContext.value = settings.worldContext;
 
-  const glossaryAiEnabled = form.querySelector<HTMLSelectElement>("[name='glossaryAiEnabled']");
-  const glossaryAiModel = form.querySelector<HTMLInputElement>("[name='glossaryAiModel']");
-  if (glossaryAiEnabled instanceof HTMLSelectElement) glossaryAiEnabled.value = String(settings.glossaryAiEnabled === true);
-  if (glossaryAiModel instanceof HTMLInputElement) glossaryAiModel.value = settings.glossaryAiModel ?? "";
   updateProviderFields(form, settings.provider);
   activateHelpTooltips(form);
   return form;

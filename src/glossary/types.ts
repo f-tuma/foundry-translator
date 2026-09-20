@@ -13,6 +13,7 @@ export interface GlossaryEntry {
   replacement: string;
   category: GlossaryCategory;
   aliases: string[];
+  notes?: string;
   sourceUuid?: string;
   /** Disabled entries remain stored so discovery cannot silently enable them again. */
   enabled?: boolean;
@@ -50,8 +51,12 @@ export interface GlossaryDocumentFlag {
   replacement: string;
   category: GlossaryCategory;
   aliases: string[];
+  notes?: string;
   sourceUuid?: string;
   enabled?: boolean;
   customized?: boolean;
   naming?: GlossaryNamingDecision;
 }
+
+export interface GlossaryProgress { completed: number; total: number }
+export class GlossarySyncCancelledError extends Error {}

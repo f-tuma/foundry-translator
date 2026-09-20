@@ -4,10 +4,8 @@ import { GLOSSARY_SCHEMA_VERSION, isGlossaryCategory, readNamingDecision, type G
 import { planGlossarySync } from "./sync";
 import { validateGlossary } from "./protection";
 import { discoverWorldGlossary } from "./discovery";
-import { getTranslatorSettings } from "../settings/settings";
-import { collectNameContexts } from "./name-context";
-import { NameAnalysisClient, NamingCancelledError, NamingResponseError, needsNameAnalysis, type NamingProgress } from "./name-analysis";
-import { logger } from "../logger";
+import { GlossarySyncCancelledError, type GlossaryProgress } from "./types";
+import { glossaryEntryKey, entryFingerprint, validateSelectedImport, type GlossaryImportRow } from "./files";
 import { glossaryLive } from "./live";
 
 export const GLOSSARY_PACK_NAME = "foundry-translate-glossary" as const;
@@ -19,13 +17,10 @@ export interface GlossarySyncResult {
   created: number;
   updated: number;
   unchanged: number;
-  aiTranslated?: number;
-  aiPreserved?: number;
-  aiWarning?: string;
 }
 
 export interface GlossarySyncOptions {
-  onProgress?: (progress: NamingProgress) => void;
+  onProgress?: (progress: GlossaryProgress) => void;
   shouldCancel?: () => boolean;
 }
 
@@ -54,6 +49,7 @@ function readFlag(indexEntry: FoundryCompendiumIndexEntry): GlossaryEntry | null
     category: flag.category,
     aliases: flag.aliases,
     ...(naming ? { naming } : {}),
+    ...(typeof flag.notes === "string" ? { notes: flag.notes } : {}),
     ...(typeof flag.enabled === "boolean" ? { enabled: flag.enabled } : {}),
     ...(typeof flag.customized === "boolean" ? { customized: flag.customized } : {}),
     ...(typeof flag.sourceUuid === "string" ? { sourceUuid: flag.sourceUuid } : {}),
@@ -68,6 +64,7 @@ function toFlag(entry: GlossaryEntry): GlossaryDocumentFlag {
     category: entry.category,
     aliases: entry.aliases,
     ...(entry.naming ? { naming: entry.naming } : {}),
+    notes: entry.notes ?? "",
     ...(entry.enabled !== undefined ? { enabled: entry.enabled } : {}),
     ...(entry.customized !== undefined ? { customized: entry.customized } : {}),
     ...(entry.sourceUuid ? { sourceUuid: entry.sourceUuid } : {}),
@@ -131,11 +128,10 @@ export class GlossaryCompendiumRepository {
     preparationObservers.add(options);
     try {
       preparingGlossary ??= (async () => {
-        const result = await this.sync(discoverWorldGlossary(), {
+        await this.sync(discoverWorldGlossary(), {
           onProgress: (progress) => preparationObservers.forEach((observer) => observer.onProgress?.(progress)),
           shouldCancel: () => [...preparationObservers].every((observer) => observer.shouldCancel?.() === true),
         });
-        if (result.aiWarning) ui.notifications.warn(result.aiWarning);
         return this.load();
       })().finally(() => { preparingGlossary = undefined; });
       return await preparingGlossary;
@@ -158,12 +154,12 @@ export class GlossaryCompendiumRepository {
         const result = await this.#sync(entries, options);
         const summary = game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Synced")
           .replace("{created}", String(result.created)).replace("{updated}", String(result.updated)).replace("{unchanged}", String(result.unchanged));
-        glossaryLive.publish({ running: false, status: { state: result.aiWarning ? "error" : "success", message: result.aiWarning ?? summary } });
+        glossaryLive.publish({ running: false, status: { state: "success", message: summary } });
         return result;
       } catch (error) {
         glossaryLive.publish({ running: false, status: {
-          state: error instanceof NamingCancelledError ? "idle" : "error",
-          message: error instanceof NamingCancelledError ? game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Cancelled")
+          state: error instanceof GlossarySyncCancelledError ? "idle" : "error",
+          message: error instanceof GlossarySyncCancelledError ? game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Cancelled")
             : error instanceof Error ? error.message : game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Error"),
         } });
         throw error;
@@ -174,7 +170,7 @@ export class GlossaryCompendiumRepository {
   }
 
   async #sync(discovered: readonly GlossaryEntry[], options: GlossarySyncOptions): Promise<GlossarySyncResult> {
-    if (options.shouldCancel?.()) throw new NamingCancelledError();
+    if (options.shouldCancel?.()) throw new GlossarySyncCancelledError();
     if (!game.user?.isGM) {
       throw new Error("Slovník může měnit pouze Game Master.");
     }
@@ -187,6 +183,7 @@ export class GlossaryCompendiumRepository {
     const discoveredEntries = [...discovered];
     const plan = await writeGlossary(async () => {
       const stored = await loadFromPack(pack);
+      if (options.shouldCancel?.()) throw new GlossarySyncCancelledError();
       const plan = planGlossarySync(stored, discoveredEntries);
       validateGlossary([...stored.filter((entry) => !plan.update.some((updated) => updated.id === entry.id)), ...plan.create, ...plan.update]);
       if (plan.create.length) {
@@ -210,45 +207,7 @@ export class GlossaryCompendiumRepository {
       updated: plan.update.length,
       unchanged: plan.unchanged.length,
     };
-    const settings = getTranslatorSettings();
-    if (settings.provider !== "openai-compatible" || settings.glossaryAiEnabled !== true) return result;
-    const discoveredSources = new Set(discoveredEntries.map((entry) => entry.source));
-    const pending = (await loadFromPack(pack)).filter((entry) => discoveredSources.has(entry.source) && needsNameAnalysis(entry, settings.targetLanguage));
-    if (!pending.length) return result;
-    const contexts = collectNameContexts(pending);
-    const checkCancelled = () => { if (options.shouldCancel?.()) throw new NamingCancelledError(); };
-    const progress = (value: NamingProgress) => {
-      glossaryLive.publish({ progress: value, status: { state: "testing", message: game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Progress")
-        .replace("{completed}", String(value.completed)).replace("{total}", String(value.total)) } });
-      options.onProgress?.(value);
-    };
-    progress({ completed: 0, total: pending.length });
-    try {
-      checkCancelled();
-      const client = new NameAnalysisClient(settings);
-      const model = await client.model();
-      result.aiTranslated = 0;
-      result.aiPreserved = 0;
-      for (let start = 0; start < pending.length; start += 8) {
-        checkCancelled();
-        progress({ completed: start, total: pending.length, model });
-        const established = (await loadFromPack(pack)).filter((entry) => entry.enabled !== false
-          && (entry.customized || entry.naming || !entry.sourceUuid || entry.replacement !== entry.source));
-        const decisions = await client.analyze(pending.slice(start, start + 8), contexts, model, established);
-        checkCancelled();
-        // A GM may edit an entry while the model is working. Re-read before
-        // applying results; manual/imported choices and earlier decisions win.
-        const updates = await this.#saveEntries(decisions, settings.targetLanguage);
-        result.aiTranslated += updates.filter((entry) => entry.naming?.action === "translate").length;
-        result.aiPreserved += updates.filter((entry) => entry.naming?.action === "preserve").length;
-        progress({ completed: Math.min(start + 8, pending.length), total: pending.length, model });
-      }
-    } catch (error) {
-      if (error instanceof NamingCancelledError) throw error;
-      logger.warn("AI glossary naming stopped; remaining names are preserved.", error);
-      result.aiWarning = game.i18n.localize(error instanceof NamingResponseError
-        ? "FOUNDRY_TRANSLATE.Glossary.AI.InvalidResponse" : "FOUNDRY_TRANSLATE.Glossary.AI.Unavailable");
-    }
+    options.onProgress?.({ completed: discovered.length, total: discovered.length });
     return result;
   }
 
@@ -261,7 +220,12 @@ export class GlossaryCompendiumRepository {
     await this.#saveEntries(entries);
   }
 
-  async #saveEntries(proposed: readonly GlossaryEntry[], namingLanguage?: string): Promise<GlossaryEntry[]> {
+  /** Recheck the preview inside the same write queue used by sync/manual edits. */
+  async importEntries(rows: readonly GlossaryImportRow[]): Promise<void> {
+    await this.#saveEntries(rows.map((row) => ({ ...row.after, customized: true })), rows);
+  }
+
+  async #saveEntries(proposed: readonly GlossaryEntry[], expected?: readonly GlossaryImportRow[]): Promise<GlossaryEntry[]> {
     return writeGlossary(async () => {
       if (!game.user?.isGM) {
         throw new Error("Slovník může měnit pouze Game Master.");
@@ -271,13 +235,16 @@ export class GlossaryCompendiumRepository {
         throw new Error("Compendium se slovníkem je zamčené. Nejdřív jej ve Foundry odemkněte.");
       }
       const existing = await loadFromPack(pack);
-      const latest = new Map(existing.map((entry) => [entry.id, entry]));
-      const entries = namingLanguage ? proposed.flatMap((decision) => {
-        const current = latest.get(decision.id);
-        if (!current || current.source !== decision.source || current.sourceUuid !== decision.sourceUuid
-          || current.category !== decision.category || !needsNameAnalysis(current, namingLanguage)) return [];
-        return [{ ...current, replacement: decision.replacement, naming: decision.naming! }];
-      }) : [...proposed];
+      if (expected) {
+        validateSelectedImport(existing, expected);
+        for (const row of expected) {
+          const current = existing.find((entry) => glossaryEntryKey(entry.source) === row.key);
+          if (entryFingerprint(current) !== entryFingerprint(row.before)) {
+            throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Files.Stale"));
+          }
+        }
+      }
+      const entries = [...proposed];
       validateGlossary([...existing.filter((stored) => !entries.some((entry) => entry.id === stored.id)), ...entries]);
       const updates = entries.filter((entry) => entry.id);
       const creates = entries.filter((entry) => !entry.id);
