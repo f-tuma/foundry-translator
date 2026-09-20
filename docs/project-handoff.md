@@ -28,10 +28,25 @@ and the recommended implementation order.
 
   Live visual QA caught stale cached CSS at the unversioned module stylesheet
   URL: the browser's imported sheet had no `.ft-help-*` rules, so new help icons
-  appeared as full buttons below labels. Preparing v0.16.1 to emit a versioned
-  stylesheet and verify that the packaged CSS matches its source. Keep the
+  appeared as full buttons below labels. v0.16.1 emits a versioned
+  stylesheet and verifies that the packaged CSS matches its source. Keep the
   stable public CSS file for source/fixture use. The browser will request a new
   URL on each release, matching the existing JS versioning strategy.
+
+  PR #16 merged as `fce3fb4`; v0.16.1 is published and installed in Foundry
+  14.368. PR/main CI and release workflow passed; the downloaded ZIP contains
+  the exact source CSS at the versioned manifest path. The same in-app browser
+  session loaded `foundry-translate-0.16.1.js` and
+  `styles/foundry-translate-0.16.1.css` without clearing cache. Live QA at
+  1855×1256 followed Journal Notes → Adventure translation → Translator and
+  language. Help icons are 24×24 px inline with labels; the naming help renders
+  its full explanation, and Escape leaves the tooltip hidden (opacity 0).
+  No console errors or module warnings were captured; unrelated Crucible/Ember
+  content warnings appeared on startup. No bulk translation or glossary sync
+  was started, and no provider/world settings were saved. The settings window
+  remains open for the user; Hy-MT2 and Czech target settings are preserved,
+  AI naming is off and the glossary model field is empty. Live validation used
+  the available CUA browser API; no separate browser process or injected code.
 
 - 2026-09-20 development branch `codex/ui-alignment-help` (included in v0.16.0):
   added AI naming during glossary sync, saved in batches of eight with progress,
