@@ -71,8 +71,9 @@ mezi frakce, aby mohly získat popisný překlad.
 
 Model pro glosář běží na stejném serveru jako překladač, ale může být jiný.
 ID zatím vyberte výslovně; automatická volba čeká na model s ověřenou češtinou.
-Qwen3.5 9B Q4_K_M v místním testu chyboval ve významu i gramatice názvů;
-Granite 4.2 8B čeká na zkoušku. Hy-MT2 může dál
+Qwen3.5 9B Q4_K_M i Granite 4.2 8B Q4_K_S v místním testu chybovaly ve významu
+i gramatice názvů. Ani jeden zatím nedoporučujeme pro automatické ukládání názvů.
+Hy-MT2 může dál
 překládat samotné příběhy. S Chrome nebo Google se AI pojmenování nespouští.
 
 Hotová rozhodnutí se při další synchronizaci neopakují. V detailu položky

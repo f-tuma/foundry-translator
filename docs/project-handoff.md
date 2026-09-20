@@ -37,8 +37,15 @@ and the recommended implementation order.
   accepted output still had Czech semantic/grammar errors. Supported vendor
   nonthinking parameters did not fix those errors (1/3 batches accepted).
   A thinking-mode trial used all 6,144 output tokens without a final message.
-  The user is downloading Granite 4.2 8B; it was not exposed by LM Studio at
-  the latest check. Test it before choosing a default. See
+  Granite 4.2 8B is now downloaded as Q4_K_S (not the initially discussed
+  Q4_K_M). It failed naming QA: 0/6 baseline batches, 2/6 IBM-sampling batches
+  accepted, with severe Czech errors even in accepted output. Low-effort
+  reasoning returned a final answer but did not fix meaning or root preservation.
+  Short single-name prompts and English-only decomposition also failed.
+  Hy-MT's single-name Czech was better but translated personal/opaque names;
+  Qwen's English-only root extractor preserved the test fixture's protected
+  names but overprotected clear descriptions. These are separate probes, not a
+  validated combined pipeline. No default or live settings were changed. See
   [benchmark notes](benchmarks/naming-2026-09-20.md) and the repeatable
   `npm run benchmark:naming` script. Old Carinth and Strayhearth are
   user-preferred few-shot examples, not held-out evidence.

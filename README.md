@@ -116,8 +116,9 @@ as factions so their descriptive names can be considered.
 
 Under **Translator and language**, choose the naming policy and an explicit
 **Glossary model** ID on the same OpenAI-compatible server. No automatic model is
-selected until a candidate passes Czech naming QA. Qwen3.5 9B Q4_K_M failed the
-[local benchmark](docs/benchmarks/naming-2026-09-20.md); Granite 4.2 8B is pending.
+selected until a candidate passes Czech naming QA. Qwen3.5 9B Q4_K_M and
+Granite 4.2 8B Q4_K_S failed the
+[local benchmark](docs/benchmarks/naming-2026-09-20.md).
 Unit tests do not establish translation quality. The
 ordinary text model can remain Hy-MT2. Chrome/Google skip AI naming, and an
 unavailable model leaves pending names unchanged with a warning. Saved choices
