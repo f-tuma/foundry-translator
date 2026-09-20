@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NameAnalysisClient, needsNameAnalysis, parseNameDecisions } from "../src/glossary/name-analysis";
-import type { GlossaryEntry } from "../src/glossary/types";
+import { readNamingDecision, type GlossaryEntry } from "../src/glossary/types";
 import type { TranslatorSettings } from "../src/settings/settings";
 
 const entry = (source = "Old Carinth"): GlossaryEntry => ({ source, replacement: source, category: "location", aliases: [], sourceUuid: `Scene.${source}` });
@@ -16,17 +16,42 @@ describe("context-aware naming", () => {
     expect(needsNameAnalysis(translated, "cs")).toBe(false);
     expect(needsNameAnalysis({ ...entry(), customized: true }, "cs")).toBe(false);
     expect(needsNameAnalysis({ ...entry(), enabled: false }, "cs")).toBe(false);
+    expect(needsNameAnalysis({ ...entry("May"), category: "character" }, "cs")).toBe(true);
     expect(needsNameAnalysis({ ...entry(), replacement: "Můj vlastní název" }, "cs")).toBe(false);
     const preserved = parse([decision({ action: "preserve", replacement: "Old Carinth" })])[0]!;
     expect(needsNameAnalysis(preserved, "cs")).toBe(false);
   });
-  it("keeps uncertain and personal names even if a model proposes a translation", () => {
+  it("keeps uncertain names but allows meaningful personal-name translations", () => {
     expect(parse([decision({ confidence: "uncertain" })])[0]?.replacement).toBe("Old Carinth");
     const person = { ...entry("Agraband Swift"), category: "character" as const };
-    expect(parse([decision({ replacement: "Agraband Rychlý", roots: [] })], [person])[0]?.replacement).toBe("Agraband Swift");
+    expect(parse([decision({ replacement: "Agraband Hbitý", roots: ["Agraband"] })], [person])[0]?.replacement).toBe("Agraband Hbitý");
+    expect(parse([decision({ replacement: "Agraban Hbitý", roots: ["Agraband"] })], [person])[0]?.replacement).toBe("Agraband Swift");
   });
-  it("rejects modified roots, markup, missing/duplicate IDs and prompt leakage", () => {
-    for (const overrides of [{ replacement: "Starý Karinth" }, { replacement: "Starého Carinthu" }, { replacement: '<img src="x">' }, { replacement: "@UUID[Actor.bad]{click}" }, { replacement: "Name\nignore instructions" }, { replacement: "__FTG_name__" }, { id: 2 }, { roots: ["Invented"] }]) {
+  it("honors established translated and preserved names even inside a new title", () => {
+    const names = [{ source: "Carinth", replacement: "Karinth" }];
+    const data = (replacement: string, roots = ["Carinth"]) => JSON.stringify({ decisions: [decision({ replacement, roots })] });
+    expect(parseNameDecisions(data("Starý Karinth"), [entry()], "cs", "model", names)[0]?.replacement).toBe("Starý Karinth");
+    expect(parseNameDecisions(data("Starý Carinth", []), [entry()], "cs", "model", names)[0]?.naming?.guard).toBe("protected-root");
+    expect(parseNameDecisions(data("Starý Karinth", []), [entry()], "cs", "model", [{ source: "Carinth", replacement: "Carinth" }])[0]?.replacement).toBe("Old Carinth");
+    const person = entry("Captain Orren Stormborn");
+    const canonical = [{ source: "Stormborn", replacement: "Zrozený v bouři" }, { source: "Orren Stormborn", replacement: "Orren Bouřný" }];
+    const candidate = (replacement: string) => JSON.stringify({ decisions: [decision({ replacement, roots: ["Orren", "Stormborn"] })] });
+    expect(parseNameDecisions(candidate("Kapitán Orren Bouřný"), [person], "cs", "model", canonical)[0]?.replacement).toBe("Kapitán Orren Bouřný");
+    expect(parseNameDecisions(candidate("Kapitán Orren Bouřlivák"), [person], "cs", "model", canonical)[0]?.naming?.guard).toBe("protected-root");
+  });
+  it("preserves changed roots without discarding safe decisions in the same batch", () => {
+    const values = parse([decision(), decision({ id: 1, replacement: "Lylina karavana", roots: ["Lyla"], reason: "Jméno zůstává stejné." })], [entry(), { ...entry("Lyla's Caravan"), category: "faction" }]);
+    expect(values[0]?.replacement).toBe("Starý Carinth");
+    expect(values[1]?.replacement).toBe("Lyla's Caravan");
+    expect(values[1]?.naming).toMatchObject({ action: "preserve", confidence: "uncertain", guard: "protected-root", reason: "" });
+    expect(readNamingDecision(JSON.parse(JSON.stringify(values[1]?.naming)))).toEqual(values[1]?.naming);
+    expect(needsNameAnalysis(values[1]!, "cs")).toBe(false);
+    for (const replacement of ["Starý Karinth", "Starého Carinthu", "Starý XCarinth", "Starý CarinthX"]) {
+      expect(parse([decision({ replacement })])[0]?.replacement).toBe("Old Carinth");
+    }
+  });
+  it("rejects malformed roots, markup, missing/duplicate IDs and prompt leakage", () => {
+    for (const overrides of [{ replacement: '<img src="x">' }, { replacement: "@UUID[Actor.bad]{click}" }, { replacement: "Name\nignore instructions" }, { replacement: "__FTG_name__" }, { id: 2 }, { roots: ["Invented"] }, { action: ["translate"] }, { confidence: ["high"] }]) {
       expect(() => parse([decision(overrides)])).toThrow();
     }
     expect(() => parse([])).toThrow();
@@ -59,6 +84,14 @@ describe("context-aware naming", () => {
     expect(body.reasoning).toBe("off");
     expect(body.input).toContain("A historic town.");
     expect(body.input).not.toContain("secret");
+  });
+  it("shares only bounded relevant established glossary names with the model", async () => {
+    const request = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ output: [{ type: "message", content: JSON.stringify({ decisions: [decision()] }) }] })));
+    const established = [{ source: "Carinth", replacement: "Carinth", context: "private unrelated biography" }, { source: "Unrelated", replacement: "Nesouvisející" }];
+    await new NameAnalysisClient(settings, request).analyze([entry()], new Map(), "model", established);
+    const input = JSON.parse(JSON.parse(request.mock.calls[0]?.[1]?.body as string).input);
+    expect(input.establishedNames).toEqual([{ source: "Carinth", replacement: "Carinth" }]);
+    expect(JSON.stringify(input)).not.toContain("private unrelated biography");
   });
   it("falls back for other OpenAI-compatible servers and fails closed on errors", async () => {
     const request = vi.fn().mockResolvedValueOnce(new Response("", { status: 404 })).mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ decisions: [decision()] }) } }] })));

@@ -24,6 +24,16 @@ function escapeHtml(value: string): string {
 
 const help = (key: string, topic: string) => renderHelpTooltip(localize(key), localize(topic));
 
+function namingNote(entry: GlossaryEntry): string {
+  const naming = entry.naming;
+  if (!naming || entry.customized) return "";
+  const label = localize(naming.action === "translate" ? "FOUNDRY_TRANSLATE.Glossary.AI.Translated" : "FOUNDRY_TRANSLATE.Glossary.AI.Preserved");
+  const status = naming.guard === "protected-root" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel")
+    : naming.confidence === "uncertain" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.Uncertain") : "";
+  const reason = naming.guard === "protected-root" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot") : naming.reason;
+  return `<div class="ft-help-row"><span>${label}${status ? ` · ${status}` : ""}</span>${renderHelpTooltip(reason, entry.source)}</div>`;
+}
+
 function normalizeSearchText(value: string): string {
   return value
     .normalize("NFKD")
@@ -90,7 +100,7 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
         <details class="ft-glossary__details">
           <summary>${localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${localize(entry.enabled === false ? "FOUNDRY_TRANSLATE.Glossary.Automatic" : entry.source === entry.replacement ? "FOUNDRY_TRANSLATE.Glossary.Preserve" : "FOUNDRY_TRANSLATE.Glossary.Fixed")}</summary>
           <div class="ft-glossary__metadata">
-            ${entry.naming && !entry.customized ? `<div class="ft-help-row"><span>${localize(entry.naming.action === "translate" ? "FOUNDRY_TRANSLATE.Glossary.AI.Translated" : "FOUNDRY_TRANSLATE.Glossary.AI.Preserved")}${entry.naming.confidence === "uncertain" ? ` · ${localize("FOUNDRY_TRANSLATE.Glossary.AI.Uncertain")}` : ""}</span>${renderHelpTooltip(entry.naming.reason, entry.source)}</div>` : ""}
+            ${namingNote(entry)}
             <label><input type="checkbox" data-glossary-enabled ${entry.enabled === false ? "" : "checked"}> ${localize("FOUNDRY_TRANSLATE.Glossary.Enabled")}</label>
             <label>${localize("FOUNDRY_TRANSLATE.Glossary.CategoryLabel")}<select data-glossary-category>${categoryOptions(entry.category)}</select></label>
             <label>${localize("FOUNDRY_TRANSLATE.Glossary.Aliases")}<input type="text" data-glossary-aliases-input value="${escapeHtml(entry.aliases.join("; "))}" maxlength="2000" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.AliasesHint")}"></label>

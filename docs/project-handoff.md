@@ -15,8 +15,10 @@ and the recommended implementation order.
   added AI naming during glossary sync, saved in batches of eight with progress,
   cancellation/resume and protection against manual edits made during inference.
   Only new, enabled, uncustomized, discovered names are analyzed. Opaque roots
-  must survive exactly; uncertain decisions and character names retain source
-  form. Existing manual/imported choices win, and portable bundles contain the
+  must survive exactly unless an established glossary choice supplies their
+  canonical translation; uncertain decisions retain source form. Meaningful
+  character names can also translate under the user's latest policy below.
+  Existing manual/imported choices win, and portable bundles contain the
   chosen replacements without AI provenance or context. Source documents stay
   untouched. Ember Actor `group` is a faction (the actual Strayhearth Caravan is
   `Actor.emberStrayhearth`, not a Journal page).
@@ -50,12 +52,41 @@ and the recommended implementation order.
   `npm run benchmark:naming` script. Old Carinth and Strayhearth are
   user-preferred few-shot examples, not held-out evidence.
 
-  Follow-up Qwen3.8 check: only two MTP auxiliary downloads became available
-  (`Mtp Qwen3.8 27B`, 3.0B parameters, BF16 and Q4_0). The main 27B model is not
-  available yet. The user was given the exact main-file choice
-  `ggml-org/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf` (~19 GB), without `mtp-`.
-  Do not grade the helper models as Qwen3.8 quality. Benchmark transport failures
-  now stop immediately and are excluded from the evaluated-batch count.
+  Qwen3.8's main model is now available: `qwen/qwen3.8-27b`, curated Q4_K_M,
+  17,742,040,464 bytes, 27B. This is different from the initially linked ggml-org
+  ~19 GB file. The two `Mtp Qwen3.8 27B` files are separate 3.0B helpers and were
+  not loaded. The curated main model's bundled MTP is enabled. Matched original
+  prompts measured median 11.39 tok/s with MTP versus 6.73 without (about 1.7×).
+  Context is 8,192, parallel slots 4, Flash Attention and GPU KV cache enabled.
+  The model was left loaded with MTP on; no persistent global preset was changed.
+  The REST load API accepted `speculative_draft_mtp` and the effective config
+  was read back to verify it. Published npm SDK 1.5.0 lacks that option.
+
+  Qwen3.8 has better Czech, but remains unvalidated for unattended naming:
+  original prompt 3/6 batches accepted; shorter-reason prompt 4/6 under the old
+  strict parser. The new 16-name fixture exposed "Prasklý Sluneční Hodiny" and
+  "Lévna Rook". Do not equate parser acceptance or repeated identical outputs
+  with language quality. The new parser retains the complete source name when
+  the model changes a declared protected root, records a localized protection
+  explanation, and continues with other names instead of aborting the batch.
+  Malformed IDs/fields/JSON still fail closed. Saved fallbacks are stable.
+
+  Latest user clarification (2026-09-20): **personal names may translate too**.
+  The priority is consistent, believable fantasy naming, not preserving English
+  spellings. Meaningful surnames and epithets may localize; opaque/ambiguous names
+  stay original. The temporary character inference bypass was removed before
+  committing. Related saved glossary choices are sent as bounded reference data
+  (32 names / 4,000 characters), refreshed before every batch. A matching full
+  name overrides its components, and a proposal that conflicts with a supplied
+  canonical name falls back to the original. Manual/imported choices still win.
+  The new `naming-fantasy-personal.cs.json` fixture exercises this policy and a
+  pre-established translated name. Earlier benchmark reports used the older
+  personal-name policy and must be interpreted in that context.
+  Two live batches returned stable Agraband Rychlý, Tamsin Popelavá and the
+  pre-established Kapitán Orren Bouřný, but also an incorrect Reed → Rostová
+  etymology. A single low-reasoning trial timed out after 180 seconds with no
+  received final response; no quality score was assigned. Qwen was reloaded
+  with MTP on afterward. No automatic model default is enabled.
 
   Compendium folder root cause was confirmed by read-only inspection of Foundry
   14.368: setFolder -> configure rewrites the full core.compendiumConfiguration
@@ -65,7 +96,7 @@ and the recommended implementation order.
   race, failed move recovery and duplicate folder creation. This is client-local
   serialization, not a server transaction across independent GM browsers.
 
-  Final local validation: TypeScript, 223 tests across 39 files, production build.
+  Final local validation: TypeScript, 230 tests across 39 files, production build.
   New tests cover stable decisions, malformed output, modified roots, context
   bounds, concurrent sync, interrupted batches, manual edits and reclassification.
   Local controller QA also exercised sync → rerender → cancel → enabled sync

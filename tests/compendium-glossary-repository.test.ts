@@ -37,6 +37,53 @@ function fixture(onRequest?: () => void, invalid = false) {
 
 describe("AI glossary persistence", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it("includes character names in contextual naming and reuses the saved choice", async () => {
+    const { request } = fixture();
+    const repo = new GlossaryCompendiumRepository();
+    const person = { ...entry(0), category: "character" as const };
+    await repo.sync([person]);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect((await repo.loadExisting())[0]?.replacement).toBe("Starý Town0");
+    await repo.sync([person]);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+  it("checkpoints protected-root fallbacks and continues into the next batch", async () => {
+    const { request } = fixture();
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (url, init) => {
+      const response = await original(url, init);
+      if (init?.method === "GET") return response;
+      const data = await response.json();
+      const content = JSON.parse(data.output[0].content);
+      if (content.decisions[0]?.replacement === "Starý Town0") {
+        content.decisions[0].replacement = "Starý Town0x";
+      }
+      data.output[0].content = JSON.stringify(content);
+      return new Response(JSON.stringify(data));
+    });
+    const repo = new GlossaryCompendiumRepository();
+    const entries = Array.from({ length: 9 }, (_, i) => entry(i));
+    const result = await repo.sync(entries);
+    expect(result.aiTranslated).toBe(8);
+    expect(result.aiPreserved).toBe(1);
+    expect(result.aiWarning).toBeFalsy();
+    const saved = await repo.loadExisting();
+    expect(saved.find((e) => e.source === "Old Town0")).toMatchObject({ replacement: "Old Town0", naming: { guard: "protected-root" } });
+    expect(saved.find((e) => e.source === "Old Town8")?.replacement).toBe("Starý Town8");
+    const calls = request.mock.calls.length;
+    await repo.sync(entries);
+    expect(request).toHaveBeenCalledTimes(calls);
+  });
+  it("passes saved choices from an earlier batch as authoritative name context", async () => {
+    const { request } = fixture();
+    const repo = new GlossaryCompendiumRepository();
+    const entries = Array.from({ length: 8 }, (_, i) => entry(i));
+    entries.push({ ...entry(8), source: "Old Town0 Keep", replacement: "Old Town0 Keep" });
+    await repo.sync(entries);
+    const body = JSON.parse(request.mock.calls.at(-1)?.[1]?.body as string);
+    expect(JSON.parse(body.input).establishedNames).toEqual([{ source: "Old Town0", replacement: "Starý Town0" }]);
+    expect((await repo.loadExisting()).find((e) => e.source === "Old Town0 Keep")?.replacement).toBe("Starý Town0 Keep");
+  });
   it("saves choices once and reuses them on subsequent and simultaneous syncs", async () => {
     const { request } = fixture();
     const repo = new GlossaryCompendiumRepository();

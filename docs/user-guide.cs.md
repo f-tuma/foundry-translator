@@ -64,7 +64,9 @@ Tato část popisuje vývojovou větev; v nainstalované verzi 0.15.2 zatím nen
 
 V nastavení překladače přibývají **Pravidla překladu názvů** a **Model pro glosář**.
 AI dostane krátký popis a okolní zmínky. Jasně popisné názvy uloží rovnou jako
-pevný překlad; nejasné názvy a jména postav ponechá. Cílové příklady jsou
+pevný překlad; nejasné názvy ponechá. Překládat lze i smysluplná jména postav,
+příjmení a přídomky, pokud výsledek zní přirozeně a uvěřitelně ve fantasy světě.
+Zvolená podoba se uloží do glosáře a dál se používá jednotně. Cílové příklady jsou
 „Old Carinth → Starý Carinth“ a „Strayhearth Caravan → Karavana Putujícího Ohniště“.
 Nejde o záruku kvality každého názvu. Karavany typu Actor „group“ se nyní řadí
 mezi frakce, aby mohly získat popisný překlad.
@@ -73,6 +75,9 @@ Model pro glosář běží na stejném serveru jako překladač, ale může být
 ID zatím vyberte výslovně; automatická volba čeká na model s ověřenou češtinou.
 Qwen3.5 9B Q4_K_M i Granite 4.2 8B Q4_K_S v místním testu chybovaly ve významu
 i gramatice názvů. Ani jeden zatím nedoporučujeme pro automatické ukládání názvů.
+Qwen3.8 27B Q4_K_M měl lepší češtinu, ale na nových názvech stále chyboval;
+ani ten zatím není automatickou volbou. V místním testu mu zapnuté MTP zrychlilo
+generování přibližně 1,7×.
 Hy-MT2 může dál
 překládat samotné příběhy. S Chrome nebo Google se AI pojmenování nespouští.
 
@@ -80,6 +85,10 @@ Hotová rozhodnutí se při další synchronizaci neopakují. V detailu položky
 najdete původ rozhodnutí a vysvětlení pod ikonou ⓘ; ruční změny i importovaný
 glosář mají přednost. Synchronizaci lze zastavit a později dokončit. Při chybě
 modelu se hotové dávky zachovají a zbývající názvy zůstanou původní.
+AI dostává i související už uložené názvy. Celé ustálené jméno má přednost před
+překlady jeho jednotlivých částí. Pokud návrh změní nejasnou chráněnou část jména
+nebo poruší uloženou volbu, daný název zůstane původní a ostatní se zpracují dál.
+V jeho detailu se zobrazí „ochrana jména“ s vysvětlením pod ikonou ⓘ.
 
 Compendia modulu se při načtení světa znovu zařadí do složky **Foundry Translate**.
 Přesuny probíhají postupně, aby si jejich souběžné vytváření nepřepsalo nastavení.

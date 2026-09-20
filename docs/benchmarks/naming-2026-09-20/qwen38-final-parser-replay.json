@@ -1,0 +1,1648 @@
+{
+  "note": "Offline deterministic replay of recorded final messages through the final parser after the personal-name policy clarification. No new inference. Each report retains its original prompt/policy; replay does not reassess language quality or regenerate historical decisions. Processing success includes source-name fallbacks.",
+  "clientSourceSha256": "1e90587179b4a08a9391f1d59a6c1882b100bf48e275229b836ab098d8560ac4",
+  "reports": [
+    {
+      "report": "qwen38-refined-mtp-on.json",
+      "batches": [
+        {
+          "repeat": 0,
+          "start": 0,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Old Carinth",
+              "replacement": "Starý Carinth",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.0",
+              "naming": {
+                "revision": 1,
+                "source": "Old Carinth",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo deskriptivní 'Old', kořen 'Carinth' zachován."
+              }
+            },
+            {
+              "source": "Strayhearth Caravan",
+              "replacement": "Karavana Putujícího Ohniště",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.1",
+              "naming": {
+                "revision": 1,
+                "source": "Strayhearth Caravan",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo deskriptivní slovní spojení, bez nejasných kořenů."
+              }
+            },
+            {
+              "source": "Agraband Swift",
+              "replacement": "Agraband Swift",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.2",
+              "naming": {
+                "revision": 1,
+                "source": "Agraband Swift",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Osobní jméno a příjmení se nepřekládají."
+              }
+            },
+            {
+              "source": "Ordain Waterfront",
+              "replacement": "Nábřeží Ordain",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.3",
+              "naming": {
+                "revision": 1,
+                "source": "Ordain Waterfront",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo 'Waterfront', vlastní jméno města zachováno."
+              }
+            },
+            {
+              "source": "Arctus Plateau",
+              "replacement": "Vysoká planina Arctus",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.4",
+              "naming": {
+                "revision": 1,
+                "source": "Arctus Plateau",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo 'Plateau', nejasný geografický kořen zachován."
+              }
+            },
+            {
+              "source": "Burnished Hand",
+              "replacement": "Oleštěná Ruka",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.5",
+              "naming": {
+                "revision": 1,
+                "source": "Burnished Hand",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo deskriptivní jméno řádu, bez nejasných kořenů."
+              }
+            },
+            {
+              "source": "Ordain",
+              "replacement": "Ordain",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.6",
+              "naming": {
+                "revision": 1,
+                "source": "Ordain",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vlastní jméno města s neznámou etymologií."
+              }
+            },
+            {
+              "source": "Ember",
+              "replacement": "Ember",
+              "category": "lore",
+              "aliases": [],
+              "sourceUuid": "Test.7",
+              "naming": {
+                "revision": 1,
+                "source": "Ember",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Oficiální název světa, zachován dle kontextu."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 0,
+          "start": 8,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "New Varenth",
+              "replacement": "Nový Varenth",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.8",
+              "naming": {
+                "revision": 1,
+                "source": "New Varenth",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeložen deskriptivní člen 'New', jméno Varenth zůstává."
+              }
+            },
+            {
+              "source": "Eastern Lurak Pass",
+              "replacement": "Východní průsmyk Lurak",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.9",
+              "naming": {
+                "revision": 1,
+                "source": "Eastern Lurak Pass",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženy deskriptivní části, Lurak je nejasné jméno."
+              }
+            },
+            {
+              "source": "Sunken Observatory",
+              "replacement": "Potopená observatoř",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.10",
+              "naming": {
+                "revision": 1,
+                "source": "Sunken Observatory",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Obě slova jsou běžná a přeložitelná."
+              }
+            },
+            {
+              "source": "Blackthorn Company",
+              "replacement": "Společnost Blackthorn",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.11",
+              "naming": {
+                "revision": 1,
+                "source": "Blackthorn Company",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Blackthorn je příjmení, musí zůstat bez překladu."
+              }
+            },
+            {
+              "source": "The Silver Lantern",
+              "replacement": "Stříbrná lucerna",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.12",
+              "naming": {
+                "revision": 1,
+                "source": "The Silver Lantern",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeložen deskriptivní název hostince."
+              }
+            },
+            {
+              "source": "Circle of the Last Flame",
+              "replacement": "Kruh Posledního Plamene",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.13",
+              "naming": {
+                "revision": 1,
+                "source": "Circle of the Last Flame",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeložen deskriptivní název řádu."
+              }
+            },
+            {
+              "source": "Mara Reed",
+              "replacement": "Mara Reed",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.14",
+              "naming": {
+                "revision": 1,
+                "source": "Mara Reed",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Osobní jméno a příjmení se nepřekládají."
+              }
+            },
+            {
+              "source": "Ash",
+              "replacement": "Ash",
+              "category": "deity",
+              "aliases": [],
+              "sourceUuid": "Test.15",
+              "naming": {
+                "revision": 1,
+                "source": "Ash",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jméno boha je nejasné, nepřekládá se."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 0,
+          "start": 16,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Amber Watch",
+              "replacement": "Jantarová hlídka",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.16",
+              "naming": {
+                "revision": 1,
+                "source": "Amber Watch",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přímý překlad popisného názvu hlídky podle emblému."
+              }
+            },
+            {
+              "source": "Whitebridge",
+              "replacement": "Bílý most",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.17",
+              "naming": {
+                "revision": 1,
+                "source": "Whitebridge",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přímý překlad geografického pojmenování vesnice."
+              }
+            },
+            {
+              "source": "Lyla's Caravan",
+              "replacement": "Lyla's Caravan",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.18",
+              "naming": {
+                "revision": 1,
+                "source": "Lyla's Caravan",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "",
+                "guard": "protected-root"
+              }
+            },
+            {
+              "source": "Silver Reed",
+              "replacement": "Silver Reed",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.19",
+              "naming": {
+                "revision": 1,
+                "source": "Silver Reed",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jedná se o osobní jméno zakladatele, ne o popisný termín."
+              }
+            },
+            {
+              "source": "The Hollow",
+              "replacement": "The Hollow",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.20",
+              "naming": {
+                "revision": 1,
+                "source": "The Hollow",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "Význam pojmenování je nejednoznačný a chybí kontext."
+              }
+            },
+            {
+              "source": "May",
+              "replacement": "May",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.21",
+              "naming": {
+                "revision": 1,
+                "source": "May",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Osobní jméno postavy, nelze překládat jako měsíc."
+              }
+            },
+            {
+              "source": "Keldrath",
+              "replacement": "Keldrath",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.22",
+              "naming": {
+                "revision": 1,
+                "source": "Keldrath",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vymyšlený toponymum bez známé etymologie."
+              }
+            },
+            {
+              "source": "The Copper Gate",
+              "replacement": "Měděná brána",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.23",
+              "naming": {
+                "revision": 1,
+                "source": "The Copper Gate",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přímý překlad popisného názvu městské brány."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "start": 0,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Old Carinth",
+              "replacement": "Starý Carinth",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.0",
+              "naming": {
+                "revision": 1,
+                "source": "Old Carinth",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo deskriptivní 'Old', kořen 'Carinth' zachován."
+              }
+            },
+            {
+              "source": "Strayhearth Caravan",
+              "replacement": "Karavana Putujícího Ohniště",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.1",
+              "naming": {
+                "revision": 1,
+                "source": "Strayhearth Caravan",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo deskriptivní slovní spojení, žádné nejasné kořeny."
+              }
+            },
+            {
+              "source": "Agraband Swift",
+              "replacement": "Agraband Swift",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.2",
+              "naming": {
+                "revision": 1,
+                "source": "Agraband Swift",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Osobní jméno a příjmení se nepřekládají."
+              }
+            },
+            {
+              "source": "Ordain Waterfront",
+              "replacement": "Nábřeží Ordain",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.3",
+              "naming": {
+                "revision": 1,
+                "source": "Ordain Waterfront",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo 'Waterfront', vlastní jméno města 'Ordain' zachováno."
+              }
+            },
+            {
+              "source": "Arctus Plateau",
+              "replacement": "Vysoká planina Arctus",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.4",
+              "naming": {
+                "revision": 1,
+                "source": "Arctus Plateau",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo 'Plateau', vymyšlený geografický kořen 'Arctus' zachován."
+              }
+            },
+            {
+              "source": "Burnished Hand",
+              "replacement": "Oleštěná ruka",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.5",
+              "naming": {
+                "revision": 1,
+                "source": "Burnished Hand",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo deskriptivní jméno řádu, žádné nejasné kořeny."
+              }
+            },
+            {
+              "source": "Ordain",
+              "replacement": "Ordain",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.6",
+              "naming": {
+                "revision": 1,
+                "source": "Ordain",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vlastní jméno města s neznámou etymologií se zachovává."
+              }
+            },
+            {
+              "source": "Ember",
+              "replacement": "Ember",
+              "category": "lore",
+              "aliases": [],
+              "sourceUuid": "Test.7",
+              "naming": {
+                "revision": 1,
+                "source": "Ember",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Oficiální název světa se podle kontextu zachovává."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "start": 8,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "New Varenth",
+              "replacement": "Nový Varenth",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.8",
+              "naming": {
+                "revision": 1,
+                "source": "New Varenth",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo 'New', jméno Varenth zachováno."
+              }
+            },
+            {
+              "source": "Eastern Lurak Pass",
+              "replacement": "Východní průsmyk Lurak",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.9",
+              "naming": {
+                "revision": 1,
+                "source": "Eastern Lurak Pass",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo 'Eastern Pass', jméno Lurak zachováno."
+              }
+            },
+            {
+              "source": "Sunken Observatory",
+              "replacement": "Potopená observatoř",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.10",
+              "naming": {
+                "revision": 1,
+                "source": "Sunken Observatory",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné jméno přeloženo do češtiny."
+              }
+            },
+            {
+              "source": "Blackthorn Company",
+              "replacement": "Blackthorn Company",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.11",
+              "naming": {
+                "revision": 1,
+                "source": "Blackthorn Company",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Příjmení Blackthorn je chráněno, nepřekládá se."
+              }
+            },
+            {
+              "source": "The Silver Lantern",
+              "replacement": "Stříbrná lucerna",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.12",
+              "naming": {
+                "revision": 1,
+                "source": "The Silver Lantern",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné jméno hostince přeloženo."
+              }
+            },
+            {
+              "source": "Circle of the Last Flame",
+              "replacement": "Kruh Posledního Plamene",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.13",
+              "naming": {
+                "revision": 1,
+                "source": "Circle of the Last Flame",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Název řádu přeložen jako významový celek."
+              }
+            },
+            {
+              "source": "Mara Reed",
+              "replacement": "Mara Reed",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.14",
+              "naming": {
+                "revision": 1,
+                "source": "Mara Reed",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Osobní jméno a příjmení se nepřekládají."
+              }
+            },
+            {
+              "source": "Ash",
+              "replacement": "Ash",
+              "category": "deity",
+              "aliases": [],
+              "sourceUuid": "Test.15",
+              "naming": {
+                "revision": 1,
+                "source": "Ash",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jméno boha je nejasné, zachováno v originále."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "start": 16,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Amber Watch",
+              "replacement": "Jantarová stráž",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.16",
+              "naming": {
+                "revision": 1,
+                "source": "Amber Watch",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přímý překlad popisu odznaku a funkce."
+              }
+            },
+            {
+              "source": "Whitebridge",
+              "replacement": "Bílý most",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.17",
+              "naming": {
+                "revision": 1,
+                "source": "Whitebridge",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přímý překlad geografického popisu."
+              }
+            },
+            {
+              "source": "Lyla's Caravan",
+              "replacement": "Lyla's Caravan",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.18",
+              "naming": {
+                "revision": 1,
+                "source": "Lyla's Caravan",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "",
+                "guard": "protected-root"
+              }
+            },
+            {
+              "source": "Silver Reed",
+              "replacement": "Silver Reed",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.19",
+              "naming": {
+                "revision": 1,
+                "source": "Silver Reed",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jde o jméno zakladatele, ne o popis."
+              }
+            },
+            {
+              "source": "The Hollow",
+              "replacement": "The Hollow",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.20",
+              "naming": {
+                "revision": 1,
+                "source": "The Hollow",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "Význam je nejednoznačný, nelze určit překlad."
+              }
+            },
+            {
+              "source": "May",
+              "replacement": "May",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.21",
+              "naming": {
+                "revision": 1,
+                "source": "May",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jde o osobní jméno, ne měsíc."
+              }
+            },
+            {
+              "source": "Keldrath",
+              "replacement": "Keldrath",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.22",
+              "naming": {
+                "revision": 1,
+                "source": "Keldrath",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vymyšlené jméno bez etymologie."
+              }
+            },
+            {
+              "source": "The Copper Gate",
+              "replacement": "Měděná brána",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.23",
+              "naming": {
+                "revision": 1,
+                "source": "The Copper Gate",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přímý překlad materiálu a stavby."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "qwen38-holdout-mtp-on.json",
+      "batches": [
+        {
+          "repeat": 0,
+          "start": 0,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Lower Velmora",
+              "replacement": "Dolní Velmora",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.0",
+              "naming": {
+                "revision": 1,
+                "source": "Lower Velmora",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přeloženo popisné 'Lower', jméno Velmora zachováno."
+              }
+            },
+            {
+              "source": "Oath of the Broken Spear",
+              "replacement": "Přísaha zlomeného kopí",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.1",
+              "naming": {
+                "revision": 1,
+                "source": "Oath of the Broken Spear",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Všechna slova jsou popisná a přeložitelná."
+              }
+            },
+            {
+              "source": "Tamsin Ash",
+              "replacement": "Tamsin Ash",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.2",
+              "naming": {
+                "revision": 1,
+                "source": "Tamsin Ash",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jméno a příjmení se nepřekládají."
+              }
+            },
+            {
+              "source": "Rook Foundry",
+              "replacement": "Rook Foundry",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.3",
+              "naming": {
+                "revision": 1,
+                "source": "Rook Foundry",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "",
+                "guard": "protected-root"
+              }
+            },
+            {
+              "source": "The Drowned Bell",
+              "replacement": "Potopený zvon",
+              "category": "item",
+              "aliases": [],
+              "sourceUuid": "Test.4",
+              "naming": {
+                "revision": 1,
+                "source": "The Drowned Bell",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisný název přeložen do češtiny."
+              }
+            },
+            {
+              "source": "The Turning",
+              "replacement": "The Turning",
+              "category": "lore",
+              "aliases": [],
+              "sourceUuid": "Test.5",
+              "naming": {
+                "revision": 1,
+                "source": "The Turning",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "Význam je nejednoznačný, původní tvar zachován."
+              }
+            },
+            {
+              "source": "Neris's Tower",
+              "replacement": "Neris's Tower",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.6",
+              "naming": {
+                "revision": 1,
+                "source": "Neris's Tower",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "",
+                "guard": "protected-root"
+              }
+            },
+            {
+              "source": "The Glass Orchard",
+              "replacement": "Skleněný sad",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.7",
+              "naming": {
+                "revision": 1,
+                "source": "The Glass Orchard",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisný název přeložen, vandalism ignorován."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 0,
+          "start": 8,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Western Drenor Marsh",
+              "replacement": "Western Drenor Marsh",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.8",
+              "naming": {
+                "revision": 1,
+                "source": "Western Drenor Marsh",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "",
+                "guard": "protected-root"
+              }
+            },
+            {
+              "source": "Gilded Wheel Caravan",
+              "replacement": "Karavana Zlatého Kola",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.9",
+              "naming": {
+                "revision": 1,
+                "source": "Gilded Wheel Caravan",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné pojmenování podle emblému přeloženo do češtiny."
+              }
+            },
+            {
+              "source": "Winter",
+              "replacement": "Winter",
+              "category": "deity",
+              "aliases": [],
+              "sourceUuid": "Test.10",
+              "naming": {
+                "revision": 1,
+                "source": "Winter",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Nejasné jméno boha bez etymologie, zachováno v originále."
+              }
+            },
+            {
+              "source": "Quiet Lantern",
+              "replacement": "Quiet Lantern",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.11",
+              "naming": {
+                "revision": 1,
+                "source": "Quiet Lantern",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jméno odkazuje na konkrétní osobu, není to popis předmětu."
+              }
+            },
+            {
+              "source": "Saltwind Harbor",
+              "replacement": "Přístav Solného Větru",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.12",
+              "naming": {
+                "revision": 1,
+                "source": "Saltwind Harbor",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné slovo Saltwind přeloženo jako přirozený český výraz."
+              }
+            },
+            {
+              "source": "Edravel",
+              "replacement": "Edravel",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.13",
+              "naming": {
+                "revision": 1,
+                "source": "Edravel",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vymyšlené jméno města bez popisných prvků, zachováno."
+              }
+            },
+            {
+              "source": "The Cracked Sundial",
+              "replacement": "Prasklý Sluneční Hodiny",
+              "category": "item",
+              "aliases": [],
+              "sourceUuid": "Test.14",
+              "naming": {
+                "revision": 1,
+                "source": "The Cracked Sundial",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné jméno předmětu přeloženo do přirozené češtiny."
+              }
+            },
+            {
+              "source": "Order of Seven Keys",
+              "replacement": "Řád Sedmi Klíčů",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.15",
+              "naming": {
+                "revision": 1,
+                "source": "Order of Seven Keys",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné jméno řádu přeloženo s zachováním významu."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "start": 0,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Lower Velmora",
+              "replacement": "Dolní Velmora",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.0",
+              "naming": {
+                "revision": 1,
+                "source": "Lower Velmora",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisná část 'Lower' přeložena, vlastní jméno Velmora zachováno."
+              }
+            },
+            {
+              "source": "Oath of the Broken Spear",
+              "replacement": "Přísaha Lomeného Kopí",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.1",
+              "naming": {
+                "revision": 1,
+                "source": "Oath of the Broken Spear",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Všechny slova jsou popisná a přeložitelná, žádné nejasné kořeny."
+              }
+            },
+            {
+              "source": "Tamsin Ash",
+              "replacement": "Tamsin Ash",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.2",
+              "naming": {
+                "revision": 1,
+                "source": "Tamsin Ash",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jméno a příjmení jsou vlastní jména, příjmení Ash se nepřekládá."
+              }
+            },
+            {
+              "source": "Rook Foundry",
+              "replacement": "Lévna Rook",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.3",
+              "naming": {
+                "revision": 1,
+                "source": "Rook Foundry",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Příjmení Rook je chráněné, slovo Foundry přeloženo jako Lévna."
+              }
+            },
+            {
+              "source": "The Drowned Bell",
+              "replacement": "Zatopený Zvonec",
+              "category": "item",
+              "aliases": [],
+              "sourceUuid": "Test.4",
+              "naming": {
+                "revision": 1,
+                "source": "The Drowned Bell",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisný název předmětu přeložen do přirozeného českého tvaru."
+              }
+            },
+            {
+              "source": "The Turning",
+              "replacement": "The Turning",
+              "category": "lore",
+              "aliases": [],
+              "sourceUuid": "Test.5",
+              "naming": {
+                "revision": 1,
+                "source": "The Turning",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "Význam je nejasný, proto se zachovává původní název."
+              }
+            },
+            {
+              "source": "Neris's Tower",
+              "replacement": "Neris's Tower",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.6",
+              "naming": {
+                "revision": 1,
+                "source": "Neris's Tower",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "",
+                "guard": "protected-root"
+              }
+            },
+            {
+              "source": "The Glass Orchard",
+              "replacement": "Skleněný Sad",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.7",
+              "naming": {
+                "revision": 1,
+                "source": "The Glass Orchard",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisný název místa přeložen, ignorován vložný text v kontextu."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "start": 8,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Western Drenor Marsh",
+              "replacement": "Western Drenor Marsh",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.8",
+              "naming": {
+                "revision": 1,
+                "source": "Western Drenor Marsh",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "",
+                "guard": "protected-root"
+              }
+            },
+            {
+              "source": "Gilded Wheel Caravan",
+              "replacement": "Karavana Zlatého Kola",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.9",
+              "naming": {
+                "revision": 1,
+                "source": "Gilded Wheel Caravan",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné pojmenování odvozené od emblému, přeloženo jako celek."
+              }
+            },
+            {
+              "source": "Winter",
+              "replacement": "Winter",
+              "category": "deity",
+              "aliases": [],
+              "sourceUuid": "Test.10",
+              "naming": {
+                "revision": 1,
+                "source": "Winter",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Nejasné jméno boha bez spojení s ročním obdobím, zachováno."
+              }
+            },
+            {
+              "source": "Quiet Lantern",
+              "replacement": "Quiet Lantern",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.11",
+              "naming": {
+                "revision": 1,
+                "source": "Quiet Lantern",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Jméno zakladatelky, ne popis předmětu, zachováno jako celek."
+              }
+            },
+            {
+              "source": "Saltwind Harbor",
+              "replacement": "Přístav Solného Větru",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.12",
+              "naming": {
+                "revision": 1,
+                "source": "Saltwind Harbor",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné spojení běžných slov, přeloženo do češtiny."
+              }
+            },
+            {
+              "source": "Edravel",
+              "replacement": "Edravel",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.13",
+              "naming": {
+                "revision": 1,
+                "source": "Edravel",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vymyšlené jméno města bez etymologie, zachováno."
+              }
+            },
+            {
+              "source": "The Cracked Sundial",
+              "replacement": "Prasklý sluneční hodiny",
+              "category": "item",
+              "aliases": [],
+              "sourceUuid": "Test.14",
+              "naming": {
+                "revision": 1,
+                "source": "The Cracked Sundial",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné jméno předmětu, přeloženo do přirozené češtiny."
+              }
+            },
+            {
+              "source": "Order of Seven Keys",
+              "replacement": "Řád Sedmi Klíčů",
+              "category": "faction",
+              "aliases": [],
+              "sourceUuid": "Test.15",
+              "naming": {
+                "revision": 1,
+                "source": "Order of Seven Keys",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné jméno řádu odkazující na symboliku, přeloženo."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "qwen38-fantasy-personal.json",
+      "batches": [
+        {
+          "repeat": 0,
+          "start": 0,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Agraband Swift",
+              "replacement": "Agraband Rychlý",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.0",
+              "naming": {
+                "revision": 1,
+                "source": "Agraband Swift",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Vymyšlené křestní jméno zůstává, přejmenováno je srozumitelné příjmení."
+              }
+            },
+            {
+              "source": "Mara Reed",
+              "replacement": "Mara Rostová",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.1",
+              "naming": {
+                "revision": 1,
+                "source": "Mara Reed",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Příjmení odvozené od rostlin je přeloženo do přirozené české podoby."
+              }
+            },
+            {
+              "source": "Tamsin the Ashen",
+              "replacement": "Tamsin Popelavá",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.2",
+              "naming": {
+                "revision": 1,
+                "source": "Tamsin the Ashen",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisný přídavek je přeložen s ohledem na ženský rod."
+              }
+            },
+            {
+              "source": "Borun Ironhand",
+              "replacement": "Borun Železná ruka",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.3",
+              "naming": {
+                "revision": 1,
+                "source": "Borun Ironhand",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přezdívka je přeložena jako srozumitelný popisný výraz."
+              }
+            },
+            {
+              "source": "Seren",
+              "replacement": "Seren",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.4",
+              "naming": {
+                "revision": 1,
+                "source": "Seren",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vymyšlené jméno bez významu zůstává v původní podobě."
+              }
+            },
+            {
+              "source": "Neris Shade",
+              "replacement": "Neris Shade",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.5",
+              "naming": {
+                "revision": 1,
+                "source": "Neris Shade",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "Příjmení je nejasného původu, proto se nepřekládá."
+              }
+            },
+            {
+              "source": "Captain Orren Stormborn",
+              "replacement": "Kapitán Orren Bouřný",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.6",
+              "naming": {
+                "revision": 1,
+                "source": "Captain Orren Stormborn",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Použito je již ustálené přeložené jméno z glosáře."
+              }
+            },
+            {
+              "source": "Old Carinth",
+              "replacement": "Starý Carinth",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.7",
+              "naming": {
+                "revision": 1,
+                "source": "Old Carinth",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisná část je přeložena, nejasný kořen zůstává."
+              }
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "start": 0,
+          "protectedReferenceViolations": [],
+          "decisions": [
+            {
+              "source": "Agraband Swift",
+              "replacement": "Agraband Rychlý",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.0",
+              "naming": {
+                "revision": 1,
+                "source": "Agraband Swift",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přejmení Swift přeloženo jako Rychlý, jméno Agraband ponecháno."
+              }
+            },
+            {
+              "source": "Mara Reed",
+              "replacement": "Mara Rostová",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.1",
+              "naming": {
+                "revision": 1,
+                "source": "Mara Reed",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Příjmení Reed (rosty) přeloženo jako Rostová, jméno Mara ponecháno."
+              }
+            },
+            {
+              "source": "Tamsin the Ashen",
+              "replacement": "Tamsin Popelavá",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.2",
+              "naming": {
+                "revision": 1,
+                "source": "Tamsin the Ashen",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přízvisko the Ashen přeloženo jako Popelavá, jméno Tamsin ponecháno."
+              }
+            },
+            {
+              "source": "Borun Ironhand",
+              "replacement": "Borun Železná ruka",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.3",
+              "naming": {
+                "revision": 1,
+                "source": "Borun Ironhand",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Přízvisko Ironhand přeloženo jako Železná ruka, jméno Borun ponecháno."
+              }
+            },
+            {
+              "source": "Seren",
+              "replacement": "Seren",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.4",
+              "naming": {
+                "revision": 1,
+                "source": "Seren",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "high",
+                "reason": "Vymyšlené jméno bez významu, ponecháno v originálu."
+              }
+            },
+            {
+              "source": "Neris Shade",
+              "replacement": "Neris Shade",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.5",
+              "naming": {
+                "revision": 1,
+                "source": "Neris Shade",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "preserve",
+                "confidence": "uncertain",
+                "reason": "Příjmení Shade je nejasného původu, přeložení by bylo spekulativní."
+              }
+            },
+            {
+              "source": "Captain Orren Stormborn",
+              "replacement": "Kapitán Orren Bouřný",
+              "category": "character",
+              "aliases": [],
+              "sourceUuid": "Test.6",
+              "naming": {
+                "revision": 1,
+                "source": "Captain Orren Stormborn",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Použito ustálené jméno Orren Bouřný, titul přeložen jako Kapitán."
+              }
+            },
+            {
+              "source": "Old Carinth",
+              "replacement": "Starý Carinth",
+              "category": "location",
+              "aliases": [],
+              "sourceUuid": "Test.7",
+              "naming": {
+                "revision": 1,
+                "source": "Old Carinth",
+                "targetLanguage": "cs",
+                "model": "qwen/qwen3.8-27b",
+                "action": "translate",
+                "confidence": "high",
+                "reason": "Popisné slovo Old přeloženo jako Starý, kořen Carinth ponechán."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

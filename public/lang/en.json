@@ -245,7 +245,7 @@
   "FOUNDRY_TRANSLATE.Settings.PrivacyLabel": "Text and privacy",
   "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Whole journal and linked documents",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name": "Naming policy",
-  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint": "Before translation, AI reviews newly discovered names with short descriptions and nearby mentions. Clear descriptive names get a fixed translation; ambiguous names keep their original form. Personal names, manual edits and imported glossary choices are protected. Requires an instruction model on the configured server.",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint": "AI reviews new names in context, including meaningful personal names, surnames and epithets. Natural fantasy translations are saved in the glossary for consistent reuse; ambiguous names retain their original form. Established names, manual edits and imported glossary choices take precedence. Requires an instruction model on the configured server.",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Automatic": "AI with context · preserve uncertain names",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Preserve": "Preserve all discovered names",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model": "Glossary model",
@@ -260,5 +260,7 @@
   "FOUNDRY_TRANSLATE.Glossary.AI.Translated": "AI · fixed translation",
   "FOUNDRY_TRANSLATE.Glossary.AI.Preserved": "AI · original name",
   "FOUNDRY_TRANSLATE.Glossary.AI.Uncertain": "uncertain meaning",
+  "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot": "The AI proposal changed a protected name root. The original name was retained; other names can still be processed.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel": "name protected",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Preparing names"
 }

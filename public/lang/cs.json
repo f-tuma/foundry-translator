@@ -245,7 +245,7 @@
   "FOUNDRY_TRANSLATE.Settings.PrivacyLabel": "Texty a soukromí",
   "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Celý deník a propojené dokumenty",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name": "Pravidla překladu názvů",
-  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint": "Před překladem AI posoudí nové názvy podle krátkých popisů a okolních zmínek. Jasně popisné názvy dostanou pevný překlad; nejasné zůstanou původní. Jména postav, ruční úpravy a importovaný glosář mají ochranu. Vyžaduje obecný instrukční model na nastaveném serveru.",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint": "AI posoudí nové názvy podle kontextu, včetně smysluplných jmen postav, příjmení a přídomků. Přirozené fantasy překlady se uloží do glosáře pro jednotné používání; nejasné názvy zůstanou původní. Už uložené názvy, ruční úpravy a importovaný glosář mají přednost. Vyžaduje instrukční model na nastaveném serveru.",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Automatic": "AI s kontextem · nejasné názvy zachovat",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Preserve": "Všechny nalezené názvy zachovat",
   "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model": "Model pro glosář",
@@ -260,5 +260,7 @@
   "FOUNDRY_TRANSLATE.Glossary.AI.Translated": "AI · pevný překlad",
   "FOUNDRY_TRANSLATE.Glossary.AI.Preserved": "AI · původní název",
   "FOUNDRY_TRANSLATE.Glossary.AI.Uncertain": "nejistý význam",
+  "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot": "Návrh AI změnil chráněnou část jména. Původní název zůstal zachovaný; ostatní názvy lze zpracovat dál.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel": "ochrana jména",
   "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Příprava názvů"
 }

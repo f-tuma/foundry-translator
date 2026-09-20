@@ -30,6 +30,8 @@ export interface GlossaryNamingDecision {
   confidence: "high" | "uncertain";
   reason: string;
   model: string;
+  /** Local validation overrode the model; never populated from model metadata. */
+  guard?: "protected-root";
 }
 
 export function readNamingDecision(value: unknown): GlossaryNamingDecision | undefined {
@@ -39,7 +41,8 @@ export function readNamingDecision(value: unknown): GlossaryNamingDecision | und
     || !["preserve", "translate"].includes(n.action ?? "") || !["high", "uncertain"].includes(n.confidence ?? "")
     || typeof n.reason !== "string" || typeof n.model !== "string") return undefined;
   return { revision: 1, source: n.source, targetLanguage: n.targetLanguage,
-    action: n.action!, confidence: n.confidence!, reason: n.reason.slice(0, 300), model: n.model.slice(0, 160) };
+    action: n.action!, confidence: n.confidence!, reason: n.reason.slice(0, 300), model: n.model.slice(0, 160),
+    ...(n.guard === "protected-root" ? { guard: n.guard } : {}) };
 }
 export interface GlossaryDocumentFlag {
   schemaVersion: typeof GLOSSARY_SCHEMA_VERSION;

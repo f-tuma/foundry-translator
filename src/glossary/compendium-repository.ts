@@ -200,7 +200,9 @@ export class GlossaryCompendiumRepository {
       for (let start = 0; start < pending.length; start += 8) {
         checkCancelled();
         options.onProgress?.({ completed: start, total: pending.length, model });
-        const decisions = await client.analyze(pending.slice(start, start + 8), contexts, model);
+        const established = (await loadFromPack(pack)).filter((entry) => entry.enabled !== false
+          && (entry.customized || entry.naming || !entry.sourceUuid || entry.replacement !== entry.source));
+        const decisions = await client.analyze(pending.slice(start, start + 8), contexts, model, established);
         checkCancelled();
         // A GM may edit an entry while the model is working. Re-read before
         // applying results; manual/imported choices and earlier decisions win.

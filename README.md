@@ -110,7 +110,9 @@ with billing and the Cloud Translation API enabled.
 The unreleased build can use a separate instruction model to decide stable
 translations for newly discovered names. Short descriptions and nearby mentions
 provide context. Clear descriptive names are saved automatically; uncertain
-names and personal names retain their source form. Manual edits and imported
+names retain their source form. Meaningful personal names, surnames and epithets
+may also be localized when they sound natural and believable in the fantasy
+setting. The resulting glossary choice is reused consistently. Manual edits and imported
 glossaries take precedence. Ember group Actors, including caravans, are categorized
 as factions so their descriptive names can be considered.
 
@@ -119,11 +121,19 @@ Under **Translator and language**, choose the naming policy and an explicit
 selected until a candidate passes Czech naming QA. Qwen3.5 9B Q4_K_M and
 Granite 4.2 8B Q4_K_S failed the
 [local benchmark](docs/benchmarks/naming-2026-09-20.md).
+Qwen3.8 27B Q4_K_M produced better Czech but still made errors on new names;
+it is not an automatic default either. Bundled MTP improved its local generation
+speed by about 1.7× in this workload.
 Unit tests do not establish translation quality. The
 ordinary text model can remain Hy-MT2. Chrome/Google skip AI naming, and an
 unavailable model leaves pending names unchanged with a warning. Saved choices
 are reused, exported with the glossary, and visible with a short reason in the
 entry's info tooltip. Cancellation preserves completed batches.
+Relevant established glossary choices are included in each request. The longest
+matching full name takes precedence over its components. When a proposal changes
+a declared opaque root or conflicts with an established name, that entry retains
+its original name with a localized explanation and the other entries continue.
+Malformed responses still stop the batch safely.
 
 This branch also serializes compendium folder updates and repairs existing
 module packs on world startup. This avoids simultaneous pack creation undoing

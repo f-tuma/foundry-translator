@@ -6,6 +6,21 @@ import { renderGlossaryView, updateGlossaryFilter } from "../src/glossary/glossa
 describe("Glossary view", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it("explains locally blocked name changes instead of repeating the model's misleading reason", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document", document);
+    vi.stubGlobal("game", { i18n: { localize: (key: string) => key } });
+    const view = renderGlossaryView({ discovered: [], stored: [{
+      source: "Lyla's Caravan", replacement: "Lyla's Caravan", category: "faction", aliases: [],
+      naming: { revision: 1, source: "Lyla's Caravan", targetLanguage: "cs", model: "test", action: "preserve", confidence: "uncertain", reason: "The changed name is safe", guard: "protected-root" },
+    }] });
+    const row = view.querySelector("[data-glossary-row]")!;
+    expect(row.textContent).toContain("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel");
+    expect(row.querySelector(".ft-help-tip")?.getAttribute("aria-description")).toBe("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot");
+    expect(row.innerHTML).not.toContain("The changed name is safe");
+    expect(row.querySelector<HTMLInputElement>("[data-glossary-replacement]")?.value).toBe("Lyla's Caravan");
+  });
+
   it("renders stored terms as an escaped two-column editor", () => {
     const { document } = parseHTML("<html><body></body></html>");
     vi.stubGlobal("document", document);

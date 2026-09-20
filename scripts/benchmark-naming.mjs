@@ -11,17 +11,22 @@ const { values } = parseArgs({ options: {
   profile: { type: "string", default: "production" },
   repetitions: { type: "string", default: "2" },
   output: { type: "string" },
+  cases: { type: "string" },
   help: { type: "boolean" },
 } });
 if (values.help || !values.model) {
-  console.log("npm run benchmark:naming -- --model <server-model-id> [--profile production|granite|qwen] [--repetitions 2] [--output report.json] [--url http://127.0.0.1:1234/v1]");
+  console.log("npm run benchmark:naming -- --model <server-model-id> [--profile production|granite|qwen] [--repetitions 2] [--cases fixture.json] [--output report.json] [--url http://127.0.0.1:1234/v1]");
   process.exit(values.help ? 0 : 1);
 }
 const repetitions = Number(values.repetitions);
 if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 10) throw new Error("Use 1–10 repetitions.");
 if (!["production", "granite", "qwen"].includes(values.profile)) throw new Error("Unknown sampling profile.");
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const cases = JSON.parse(await readFile(join(root, "tests/fixtures/naming-cases.cs.json"), "utf8"));
+const casesFile = values.cases ? resolve(values.cases) : join(root, "tests/fixtures/naming-cases.cs.json");
+const cases = JSON.parse(await readFile(casesFile, "utf8"));
+if (!Array.isArray(cases) || !cases.length || cases.some((c) => !c || typeof c.source !== "string" || typeof c.category !== "string" || typeof c.context !== "string")) {
+  throw new Error("Naming cases must be a nonempty array with source, category and context strings.");
+}
 const work = await mkdtemp(join(tmpdir(), "foundry-naming-"));
 const output = resolve(values.output ?? join(tmpdir(), `naming-${values.model.replace(/[^a-z0-9.-]/giu, "_")}-${values.profile}-${Date.now()}.json`));
 const report = { model: values.model, profile: values.profile, startedAt: new Date().toISOString(),
@@ -77,7 +82,7 @@ try {
       requests = [];
       const began = performance.now();
       let decisions, error;
-      try { decisions = await client.analyze(entries, contexts, values.model); }
+      try { decisions = await client.analyze(entries, contexts, values.model, subset.flatMap((c) => c.establishedNames ?? [])); }
       catch (cause) { error = cause.message; }
       const lastRequest = requests.at(-1);
       const inferenceCompleted = !!lastRequest && lastRequest.status >= 200 && lastRequest.status < 300;
@@ -87,13 +92,15 @@ try {
       report.batches.push(batch);
       await writeFile(output, JSON.stringify(report, null, 2) + "\n");
       console.log(JSON.stringify({ repeat, start, seconds: batch.seconds, inferenceCompleted, error,
-        decisions: decisions?.map((d) => ({ source: d.source, replacement: d.replacement })) }));
+        decisions: decisions?.map((d) => ({ source: d.source, replacement: d.replacement, guard: d.naming?.guard })) }));
       if (!inferenceCompleted) break runs;
     }
   }
   console.log(JSON.stringify({ output, acceptedBatches: report.batches.filter((b) => b.inferenceCompleted && !b.error).length,
     evaluatedBatches: report.batches.filter((b) => b.inferenceCompleted).length,
-    attemptedBatches: report.batches.length, aborted: report.aborted }));
+    attemptedBatches: report.batches.length,
+    guardedNames: report.batches.flatMap((b) => b.decisions ?? []).filter((d) => d.naming?.guard).length,
+    aborted: report.aborted }));
   if (report.aborted) process.exitCode = 1;
 } finally {
   await rm(work, { recursive: true, force: true });
