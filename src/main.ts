@@ -6,6 +6,7 @@ import { registerJournalTranslationHeaderControl } from "./translation/journal-h
 import { registerGlossaryCandidateHooks } from "./glossary/candidate-hooks";
 import { registerTranslatedLinkNavigation } from "./translation/translated-link-navigation";
 import { registerTranslationDesk } from "./ui/translation-desk";
+import { organizeExistingStoragePacks } from "./storage/compendium-folder";
 
 let ready = false;
 
@@ -29,6 +30,9 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
   ready = true;
   registerTranslatedLinkNavigation();
+  void organizeExistingStoragePacks().catch((error) => {
+    logger.error("Translation compendia could not be organized.", error);
+  });
   Hooks.callAll(MODULE_HOOKS.READY);
   logger.info(`${MODULE_TITLE} is ready.`);
 });

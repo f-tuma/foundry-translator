@@ -5,6 +5,16 @@ export const STORAGE_FOLDER_COLOR = "#6b7280";
 export const STORAGE_FOLDER_TYPE = "Compendium" as const;
 export const STORAGE_FOLDER_FLAG = "storageFolder" as const;
 
+const STORAGE_PACK_IDS = new Set([
+  "world.foundry-translate-glossary",
+  "world.foundry-translate-cache",
+  "world.foundry-translate-translations",
+  "world.foundry-translate-actors",
+  "world.foundry-translate-items",
+]);
+let creatingFolder: Promise<FoundryFolder> | undefined;
+let organizingPacks: Promise<void> = Promise.resolve();
+
 export interface CompendiumFolderLike {
   id?: string | null;
   name?: string | null;
@@ -43,8 +53,8 @@ export function storageFolderData(): FoundryFolderData {
   };
 }
 
-export async function ensureStorageFolder(): Promise<FoundryFolder> {
-  let folder = findStorageFolder(game.folders.contents) as FoundryFolder | undefined;
+async function createStorageFolder(): Promise<FoundryFolder> {
+  const folder = findStorageFolder(game.folders.contents) as FoundryFolder | undefined;
   if (folder) return folder;
 
   if (!game.user?.isGM) {
@@ -58,10 +68,29 @@ export async function ensureStorageFolder(): Promise<FoundryFolder> {
   return created;
 }
 
+export async function ensureStorageFolder(): Promise<FoundryFolder> {
+  creatingFolder ??= createStorageFolder().finally(() => { creatingFolder = undefined; });
+  return creatingFolder;
+}
+
 export async function organizeCompendiumPack(
   pack: FoundryCompendiumCollection,
 ): Promise<void> {
   if (!game.user?.isGM) return;
-  const folder = await ensureStorageFolder();
-  if (pack.folder?.id !== folder.id) await pack.setFolder(folder);
+  // Foundry setFolder rewrites the shared core.compendiumConfiguration object.
+  // Parallel calls can each save an old snapshot, undoing another pack's move.
+  const operation = organizingPacks.then(async () => {
+    const folder = await ensureStorageFolder();
+    if (pack.folder?.id !== folder.id) await pack.setFolder(folder);
+  });
+  organizingPacks = operation.catch(() => {});
+  return operation;
+}
+
+/** Repair existing module packs without creating any packs or changing content. */
+export async function organizeExistingStoragePacks(): Promise<void> {
+  if (!game.user?.isGM) return;
+  for (const pack of game.packs.values()) {
+    if (STORAGE_PACK_IDS.has(pack.collection)) await organizeCompendiumPack(pack);
+  }
 }
