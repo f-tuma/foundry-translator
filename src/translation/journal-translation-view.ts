@@ -1,3 +1,4 @@
+import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
 import type { TranslatorSettings } from "../settings/settings";
 
 export interface JournalTranslationViewData {
@@ -18,6 +19,8 @@ function escapeHtml(value: string): string {
       ] ?? character,
   );
 }
+
+const help = (key: string, topic: string) => renderHelpTooltip(localize(key), localize(topic));
 
 export function renderJournalTranslationView(
   data: JournalTranslationViewData,
@@ -42,8 +45,10 @@ export function renderJournalTranslationView(
         <i class="fa-solid fa-book-open-reader"></i>
       </span>
       <div>
-        <h2>${localize("FOUNDRY_TRANSLATE.JournalTranslation.Heading")}</h2>
-        <p>${localize("FOUNDRY_TRANSLATE.JournalTranslation.Intro")}</p>
+        <div class="ft-heading-with-help"><h2>${localize("FOUNDRY_TRANSLATE.JournalTranslation.Heading")}</h2>${renderHelpTooltip(
+          ["Intro", "CopyHint", "LimitHint"].map((key) => localize(`FOUNDRY_TRANSLATE.JournalTranslation.${key}`)).join("\n\n"),
+          localize("FOUNDRY_TRANSLATE.JournalTranslation.Heading"),
+        )}</div>
       </div>
     </header>
 
@@ -56,7 +61,7 @@ export function renderJournalTranslationView(
     </div>
 
     <div class="ft-field">
-      <label for="ft-journal-source">${localize("FOUNDRY_TRANSLATE.JournalTranslation.Source")}</label>
+      <div class="ft-field__label"><label for="ft-journal-source">${localize("FOUNDRY_TRANSLATE.JournalTranslation.Source")}</label>${help("FOUNDRY_TRANSLATE.JournalTranslation.SourceHint", "FOUNDRY_TRANSLATE.JournalTranslation.Source")}</div>
       <select id="ft-journal-source" name="journalId" ${data.journals.length ? "" : "disabled"}>
         ${
           data.journals.length
@@ -69,18 +74,7 @@ export function renderJournalTranslationView(
             : `<option value="">${localize("FOUNDRY_TRANSLATE.JournalTranslation.Empty")}</option>`
         }
       </select>
-      <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.JournalTranslation.SourceHint")}</p>
     </div>
-
-    <aside class="ft-settings__privacy">
-      <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
-      <p>${localize("FOUNDRY_TRANSLATE.JournalTranslation.CopyHint")}</p>
-    </aside>
-
-    <aside class="ft-journal-translation__notice">
-      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-      <p>${localize("FOUNDRY_TRANSLATE.JournalTranslation.LimitHint")}</p>
-    </aside>
 
     <div class="ft-connection-status" data-state="idle" role="status" aria-live="polite">
       <span class="ft-connection-status__dot" aria-hidden="true"></span>
@@ -88,12 +82,13 @@ export function renderJournalTranslationView(
     </div>
 
     <footer class="ft-settings__actions ft-journal-translation__actions">
-      <span>${localize("FOUNDRY_TRANSLATE.JournalTranslation.CacheHint")}</span>
+      <div class="ft-help-row"><span>${localize("FOUNDRY_TRANSLATE.JournalTranslation.Scope")}</span>${help("FOUNDRY_TRANSLATE.JournalTranslation.CacheHint", "FOUNDRY_TRANSLATE.JournalTranslation.Heading")}</div>
       <button type="submit" class="ft-button ft-button--primary" ${data.journals.length ? "" : "disabled"}>
         <i class="fa-solid fa-language" aria-hidden="true"></i>
         <span>${localize("FOUNDRY_TRANSLATE.JournalTranslation.Translate")}</span>
       </button>
     </footer>
   `;
+  activateHelpTooltips(form);
   return form;
 }

@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { discoverGlossaryEntries } from "../src/glossary/discovery";
 
 describe("glossary discovery", () => {
+  it("classifies Crucible group actors as factions, including caravans", () => {
+    const [caravan] = discoverGlossaryEntries({ actors: [{ name: "Strayhearth Caravan", type: "group", uuid: "Actor.caravan" }], scenes: [] });
+    expect(caravan?.category).toBe("faction");
+    expect(caravan?.replacement).toBe("Strayhearth Caravan");
+  });
   it("discovers actors and scenes while preserving their original names", () => {
     const entries = discoverGlossaryEntries({
       actors: [{ name: "Strahd von Zarovich", uuid: "Actor.strahd" }],

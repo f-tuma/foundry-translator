@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.15.2`; see the deployment and QA entries below.
+- Current implementation: `v0.16.0`; see the deployment and QA entries below.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,123 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20: the user authorized release and installation of the current work.
+  Preparing v0.16.0 from PR #15. AI naming is now explicitly opt-in (off by
+  default), so upgrading an existing world without a naming-model selection
+  preserves its prior workflow without a missing-model warning. The separate
+  naming model still requires an explicit choice. The release includes the
+  tested UI and compendium fixes and optional fantasy-name localization.
+  The earlier no-instance-change restriction is superseded by this deployment
+  request; ordinary translation runs still require their own task scope.
+
+- 2026-09-20 development branch `codex/ui-alignment-help` (not deployed):
+  added AI naming during glossary sync, saved in batches of eight with progress,
+  cancellation/resume and protection against manual edits made during inference.
+  Only new, enabled, uncustomized, discovered names are analyzed. Opaque roots
+  must survive exactly unless an established glossary choice supplies their
+  canonical translation; uncertain decisions retain source form. Meaningful
+  character names can also translate under the user's latest policy below.
+  Existing manual/imported choices win, and portable bundles contain the
+  chosen replacements without AI provenance or context. Source documents stay
+  untouched. Ember Actor `group` is a faction (the actual Strayhearth Caravan is
+  `Actor.emberStrayhearth`, not a Journal page).
+  Context uses bounded public descriptions and nearby mentions from loaded world
+  documents. LM Studio native requests disable reasoning and chat persistence;
+  other servers can use structured Chat Completions. A model ID must currently
+  be selected explicitly; the unvalidated Qwen automatic default was removed.
+  Missing/invalid model output stops AI naming safely and warns, while translation
+  can continue with the original names. Completed batches are not re-requested.
+  The user chose automatic saving with ambiguous names preserved.
+
+  Language QA remains pending: Gemma 4 12B generated incorrect Czech names even
+  with high confidence (Stará Carinth, Karavana Bloudomá); E2B returned incomplete
+  JSON. Gemma decomposition plus Hy-MT produced unnatural word order. Gemma
+  reasoning-on spent 6,000 tokens repeating text without a final answer. These
+  approaches are not selected automatically. Qwen3.5-9B Q4_K_M is now available
+  and failed local naming QA: only 1/6 production batches passed validation, and
+  accepted output still had Czech semantic/grammar errors. Supported vendor
+  nonthinking parameters did not fix those errors (1/3 batches accepted).
+  A thinking-mode trial used all 6,144 output tokens without a final message.
+  Granite 4.2 8B is now downloaded as Q4_K_S (not the initially discussed
+  Q4_K_M). It failed naming QA: 0/6 baseline batches, 2/6 IBM-sampling batches
+  accepted, with severe Czech errors even in accepted output. Low-effort
+  reasoning returned a final answer but did not fix meaning or root preservation.
+  Short single-name prompts and English-only decomposition also failed.
+  Hy-MT's single-name Czech was better but translated personal/opaque names;
+  Qwen's English-only root extractor preserved the test fixture's protected
+  names but overprotected clear descriptions. These are separate probes, not a
+  validated combined pipeline. No default or live settings were changed. See
+  [benchmark notes](benchmarks/naming-2026-09-20.md) and the repeatable
+  `npm run benchmark:naming` script. Old Carinth and Strayhearth are
+  user-preferred few-shot examples, not held-out evidence.
+
+  Qwen3.8's main model is now available: `qwen/qwen3.8-27b`, curated Q4_K_M,
+  17,742,040,464 bytes, 27B. This is different from the initially linked ggml-org
+  ~19 GB file. The two `Mtp Qwen3.8 27B` files are separate 3.0B helpers and were
+  not loaded. The curated main model's bundled MTP is enabled. Matched original
+  prompts measured median 11.39 tok/s with MTP versus 6.73 without (about 1.7×).
+  Context is 8,192, parallel slots 4, Flash Attention and GPU KV cache enabled.
+  The model was left loaded with MTP on; no persistent global preset was changed.
+  The REST load API accepted `speculative_draft_mtp` and the effective config
+  was read back to verify it. Published npm SDK 1.5.0 lacks that option.
+
+  Qwen3.8 has better Czech, but remains unvalidated for unattended naming:
+  original prompt 3/6 batches accepted; shorter-reason prompt 4/6 under the old
+  strict parser. The new 16-name fixture exposed "Prasklý Sluneční Hodiny" and
+  "Lévna Rook". Do not equate parser acceptance or repeated identical outputs
+  with language quality. The new parser retains the complete source name when
+  the model changes a declared protected root, records a localized protection
+  explanation, and continues with other names instead of aborting the batch.
+  Malformed IDs/fields/JSON still fail closed. Saved fallbacks are stable.
+
+  Latest user clarification (2026-09-20): **personal names may translate too**.
+  The priority is consistent, believable fantasy naming, not preserving English
+  spellings. Meaningful surnames and epithets may localize; opaque/ambiguous names
+  stay original. The temporary character inference bypass was removed before
+  committing. Related saved glossary choices are sent as bounded reference data
+  (32 names / 4,000 characters), refreshed before every batch. A matching full
+  name overrides its components, and a proposal that conflicts with a supplied
+  canonical name falls back to the original. Manual/imported choices still win.
+  The new `naming-fantasy-personal.cs.json` fixture exercises this policy and a
+  pre-established translated name. Earlier benchmark reports used the older
+  personal-name policy and must be interpreted in that context.
+  Two live batches returned stable Agraband Rychlý, Tamsin Popelavá and the
+  pre-established Kapitán Orren Bouřný, but also an incorrect Reed → Rostová
+  etymology. A single low-reasoning trial timed out after 180 seconds with no
+  received final response; no quality score was assigned. Qwen was reloaded
+  with MTP on afterward. No automatic model default is enabled.
+
+  Compendium folder root cause was confirmed by read-only inspection of Foundry
+  14.368: setFolder -> configure rewrites the full core.compendiumConfiguration
+  snapshot. Concurrent moves lose another pack's assignment. All module moves
+  now use one queue, folder creation shares one promise, and ready repairs the
+  five existing module packs only. Regression tests simulate the shared-setting
+  race, failed move recovery and duplicate folder creation. This is client-local
+  serialization, not a server transaction across independent GM browsers.
+
+  Final local validation: TypeScript, 230 tests across 39 files, production build.
+  New tests cover stable decisions, malformed output, modified roots, context
+  bounds, concurrent sync, interrupted batches, manual edits and reclassification.
+  Local controller QA also exercised sync → rerender → cancel → enabled sync
+  button, using actual controller code with a mocked repository. AI provenance
+  and its info tooltip rendered at 360 px without horizontal overflow.
+  The live Ember world was read only, with no reload, injection or installation.
+  At inspection it contained only the empty Glossary pack in the module folder;
+  don't recreate the user's deleted test output. Prior no-instance-change request
+  remains in force despite the later report that the translation was stopped.
+
+- 2026-09-20 local UI polish (not deployed): aligned and centered active-run
+  actions, removed Copy log's extra top margin, made long titles wrap, matched
+  glossary select/input heights, and made narrow layouts respond to the Foundry
+  window width. Longer explanations now live behind native Foundry info
+  tooltips, with focus/tap/Escape support and accessible descriptions. Costs,
+  import warnings, progress and whole-journal scope stay visible.
+  Local fixture QA used the actual view renderers/CSS with a simulated Foundry
+  shell/tooltip host at localhost:4174; six surfaces passed at 720 and 360 px,
+  and 480 px active-run actions had equal 38 px height and identical Y positions.
+  Hover, Tab focus and Escape were exercised; no console errors. The live Ember
+  page was not modified or reloaded. TypeScript, 203 tests and build passed.
 
 - 2026-09-20: v0.15.2 adds the requested Adventure translation button under the
   left Journal Notes scene controls using Foundry v14's `getSceneControlButtons`
@@ -21,10 +138,8 @@ and the recommended implementation order.
   the old world's configuration. TypeScript, 203 tests, build and release
   metadata validation passed.
   PR #14 merged as `ca9b38b`, and v0.15.2 is published with both assets. Live
-  installation is pending: Return to Setup stopped `ember`, but the server
-  now requires administrator login at `/auth`. The user has been asked to sign
-  in directly. After that, update only Foundry Translate and relaunch `ember`
-  (title Ember), then verify the installed button. The QA server is stopped.
+  installation was confirmed by the user, who tested the new button. The QA
+  server was stopped.
 
 - Deployment completed: PR #13 merged as `5a8e0a2`, tag `v0.15.1` published
   successfully by GitHub Actions, and Foundry Setup updated the installed module.

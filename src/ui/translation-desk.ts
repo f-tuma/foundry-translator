@@ -1,3 +1,4 @@
+import { activateHelpTooltips, renderHelpTooltip } from "./help-tooltip";
 import { GlossaryApplication } from "../glossary/glossary-app";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { TranslatorSettingsApplication } from "../settings/translator-settings-app";
@@ -19,9 +20,8 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
     const count = [...(index?.values() ?? [])].filter((r) => readJournalTranslationFlag(r.flags)?.targetLanguage === settings.targetLanguage).length;
     const root = document.createElement("section");
     root.className = "ft-settings ft-desk";
-    root.innerHTML = `<header class="ft-settings__intro"><span class="ft-settings__brand-icon"><i class="fa-solid fa-language" aria-hidden="true"></i></span><div><h2>${t("Heading")}</h2><p>${t("Intro")}</p></div></header>
+    root.innerHTML = `<header class="ft-settings__intro"><span class="ft-settings__brand-icon"><i class="fa-solid fa-language" aria-hidden="true"></i></span><div><div class="ft-heading-with-help"><h2>${t("Heading")}</h2>${renderHelpTooltip(t("PageTip"), t("Heading"))}</div><p>${t("Intro")}</p></div></header>
       <div class="ft-desk__status"><strong data-desk-language></strong><span data-desk-provider></span></div>
-      <p class="ft-desk__tip">${t("PageTip")}</p>
       <div class="ft-desk__actions">
         <button type="button" data-desk-action="settings"><i class="fa-solid fa-plug" aria-hidden="true"></i><span><strong>${t("Settings")}</strong><small>${t("SettingsHint")}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-desk-action="glossary"><i class="fa-solid fa-book-bookmark" aria-hidden="true"></i><span><strong>${t("Glossary")}</strong><small>${t("GlossaryHint").replace("{count}", String(glossary.filter((e) => e.enabled !== false).length))}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
@@ -30,6 +30,7 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
       <footer class="ft-settings__actions"><button type="button" class="ft-button ft-button--secondary" data-desk-action="active">${t("Active")}</button><button type="button" class="ft-button ft-button--primary" data-desk-action="journal">${t("Journal")}</button></footer>`;
     root.querySelector("[data-desk-language]")!.textContent = settings.targetLanguage.toUpperCase();
     root.querySelector("[data-desk-provider]")!.textContent = settings.provider === "chrome-local" ? "Chrome · " + t("Local") : settings.provider === "openai-compatible" ? "LM Studio · " + (settings.openAiModel || t("NotConfigured")) : "Google Cloud";
+    activateHelpTooltips(root);
     return root;
   }
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }

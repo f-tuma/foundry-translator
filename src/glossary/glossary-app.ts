@@ -1,3 +1,4 @@
+import { NamingCancelledError } from "./name-analysis";
 import { logger } from "../logger";
 import { GlossaryCompendiumRepository } from "./compendium-repository";
 import { discoverWorldGlossary } from "./discovery";
@@ -25,6 +26,8 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
   #stored: GlossaryEntry[] = [];
   #candidates: GlossaryCandidate[] = [];
   #loadError = "";
+  #syncCancelled = false;
+  #syncing = false;
 
   protected async _renderHTML(): Promise<HTMLElement> {
     try {
@@ -49,6 +52,7 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
   }
 
   protected async _onRender(): Promise<void> {
+    this.#updateSyncControls();
     const manualTerm = this.element.querySelector<HTMLInputElement>("[name='manualTerm']");
     manualTerm?.addEventListener("input", () => {
       updateGlossaryFilter(this.element, manualTerm.value);
@@ -58,6 +62,11 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
       updateGlossaryFilter(this.element, manualTerm?.value ?? "");
     });
 
+    this.element.querySelector<HTMLButtonElement>("[data-action='cancel-sync']")?.addEventListener("click", (event) => {
+      this.#syncCancelled = true;
+      (event.currentTarget as HTMLButtonElement).disabled = true;
+      this.#setStatus("testing", "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling");
+    });
     this.element
       .querySelector<HTMLElement>("[data-action='sync']")
       ?.addEventListener("click", () => void this.#sync());
@@ -92,26 +101,47 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
     return discoverWorldGlossary();
   }
 
-  async #sync(): Promise<void> {
+  #updateSyncControls(): void {
     const button = this.element.querySelector<HTMLButtonElement>("[data-action='sync']");
-    button?.setAttribute("disabled", "");
+    if (button) button.disabled = this.#syncing;
+    const cancel = this.element.querySelector<HTMLButtonElement>("[data-action='cancel-sync']");
+    if (cancel) { cancel.hidden = !this.#syncing; cancel.disabled = this.#syncCancelled; }
+  }
+
+  async #sync(): Promise<void> {
+    if (this.#syncing) return;
+    this.#syncing = true;
+    this.#syncCancelled = false;
+    this.#updateSyncControls();
     this.#setStatus("testing", "FOUNDRY_TRANSLATE.Glossary.Status.Syncing");
 
     try {
-      const result = await this.#repository.sync(this.#discover());
+      const result = await this.#repository.sync(this.#discover(), {
+        shouldCancel: () => this.#syncCancelled,
+        onProgress: ({ completed, total }) => this.#setStatus("testing", game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Progress")
+          .replace("{completed}", String(completed)).replace("{total}", String(total)), false),
+      });
       const template = game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Synced");
       const message = template
         .replace("{created}", String(result.created))
         .replace("{updated}", String(result.updated))
         .replace("{unchanged}", String(result.unchanged));
       this.#setStatus("success", message, false);
-      ui.notifications.success(message);
+      if (result.aiWarning) ui.notifications.warn(result.aiWarning);
+      else ui.notifications.success(message + (result.aiTranslated !== undefined ? " " + game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Summary")
+        .replace("{translated}", String(result.aiTranslated)).replace("{preserved}", String(result.aiPreserved ?? 0)) : ""));
       await this.render({ force: true });
     } catch (error) {
+      if (error instanceof NamingCancelledError) {
+        await this.render({ force: true });
+        this.#setStatus("idle", "FOUNDRY_TRANSLATE.Glossary.AI.Cancelled");
+        return;
+      }
       logger.error("Glossary synchronization failed.", error);
       this.#setStatus("error", this.#errorMessage(error), false);
     } finally {
-      button?.removeAttribute("disabled");
+      this.#syncing = false;
+      this.#updateSyncControls();
     }
   }
 

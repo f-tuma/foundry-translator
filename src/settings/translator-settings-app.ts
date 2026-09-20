@@ -260,6 +260,8 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
       worldContext: String(data.get("worldContext") ?? "").trim(),
       sourceLanguage: String(data.get("sourceLanguage") ?? "auto"),
       targetLanguage: String(data.get("targetLanguage") ?? "cs"),
+      glossaryAiEnabled: data.get("glossaryAiEnabled") === "true",
+      glossaryAiModel: String(data.get("glossaryAiModel") ?? "").trim(),
     };
   }
 

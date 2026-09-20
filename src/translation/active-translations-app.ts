@@ -41,6 +41,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
   const stateKey = run.cancelRequested && run.finishedAt === undefined
     ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling"
     : {
+        glossary: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary",
         scanning: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning",
         translating: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Translating",
         done: run.issues.length
@@ -49,10 +50,16 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         error: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Error",
         cancelled: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelled",
       }[run.state];
-  const percent = run.plan?.totalUnits
+  const showGlossaryProgress = run.state === "glossary"
+    || (!run.plan && run.finishedAt !== undefined && run.glossaryTotal !== undefined);
+  const percent = showGlossaryProgress && run.glossaryTotal
+    ? Math.min(100, Math.round(((run.glossaryCompleted ?? 0) / run.glossaryTotal) * 100))
+    : run.plan?.totalUnits
     ? Math.min(100, Math.round((run.completedUnits / run.plan.totalUnits) * 100))
     : 0;
-  const counts = run.plan
+  const counts = showGlossaryProgress
+    ? localize("FOUNDRY_TRANSLATE.Glossary.AI.Progress").replace("{completed}", String(run.glossaryCompleted ?? 0)).replace("{total}", String(run.glossaryTotal ?? 0))
+    : run.plan
     ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Counts")
         .replace("{units}", String(run.completedUnits))
         .replace("{totalUnits}", String(run.plan.totalUnits))
@@ -111,13 +118,13 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
     ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Issues").replace("{count}", String(run.issues.length))
     : "";
   const copyLog = run.issues.length || run.error
-    ? `<button type="button" class="ft-button ft-active-translations__copy" data-run-log="${run.id}">
+    ? `<button type="button" class="ft-button ft-button--secondary ft-active-translations__copy" data-run-log="${run.id}">
         <i class="fa-solid fa-copy" aria-hidden="true"></i>
         <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.CopyLog")}</span>
       </button>`
     : "";
   const cancel = run.finishedAt === undefined
-    ? `<button type="button" class="ft-button ft-active-translations__cancel" data-run-cancel="${run.id}" ${run.cancelRequested ? "disabled" : ""}>
+    ? `<button type="button" class="ft-button ft-button--secondary ft-active-translations__cancel" data-run-cancel="${run.id}" ${run.cancelRequested ? "disabled" : ""}>
         <i class="fa-solid fa-stop" aria-hidden="true"></i>
         <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Cancel")}</span>
       </button>`

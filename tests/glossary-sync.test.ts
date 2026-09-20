@@ -46,6 +46,23 @@ describe("glossary synchronization planning", () => {
     expect(plan.update[0]?.replacement).toBe("Hrabě Strahd");
   });
 
+  it("respects an explicit manual decision to keep the original name", () => {
+    const stored = entry({ id: "existing", customized: true });
+    const plan = planGlossarySync([stored], [entry({ replacement: "Strád" })]);
+    expect(plan.unchanged).toEqual([stored]);
+    expect(plan.update).toEqual([]);
+  });
+
+  it("reconsiders renamed automatic names but retains manual replacements", () => {
+    const naming = { revision: 1 as const, source: "Old Carinth", targetLanguage: "cs", model: "model", action: "translate" as const, confidence: "high" as const, reason: "Descriptive" };
+    const stored = entry({ id: "existing", source: "Old Carinth", replacement: "Starý Carinth", naming });
+    const incoming = entry({ source: "New Carinth", replacement: "New Carinth" });
+    const auto = planGlossarySync([stored], [incoming]).update[0]!;
+    expect(auto.replacement).toBe("New Carinth");
+    expect(auto.naming).toBeUndefined();
+    expect(planGlossarySync([{ ...stored, customized: true }], [incoming]).update[0]?.replacement).toBe("Starý Carinth");
+  });
+
   it("matches an existing manual term by name without stealing its metadata", () => {
     const manual: GlossaryEntry = {
       id: "manual",
@@ -68,15 +85,15 @@ describe("glossary synchronization planning", () => {
 
     expect(planManualTerm(stored, "Barovia", "")).toEqual({
       action: "create",
-      entry: { source: "Barovia", replacement: "Barovia", category: "term", aliases: [] },
+      entry: { source: "Barovia", replacement: "Barovia", category: "term", aliases: [], customized: true },
     });
     expect(planManualTerm(stored, "Ravenloft", "Havranov")).toEqual({
       action: "create",
-      entry: { source: "Ravenloft", replacement: "Havranov", category: "term", aliases: [] },
+      entry: { source: "Ravenloft", replacement: "Havranov", category: "term", aliases: [], customized: true },
     });
     expect(planManualTerm(stored, "strahd", "Hrabě Strahd")).toEqual({
       action: "update",
-      entry: { ...stored[0], replacement: "Hrabě Strahd" },
+      entry: { ...stored[0], replacement: "Hrabě Strahd", customized: true },
     });
     expect(planManualTerm(stored, "Strahd", "Strahd")).toEqual({ action: "duplicate" });
     expect(planManualTerm(stored, "Strahd", "")).toEqual({ action: "duplicate" });

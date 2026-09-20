@@ -10,6 +10,8 @@ export const SETTINGS = {
   OPENAI_MODEL: "openAiModel",
   OPENAI_API_KEY: "openAiApiKey",
   WORLD_CONTEXT: "worldContext",
+  GLOSSARY_AI_ENABLED: "glossaryAiEnabled",
+  GLOSSARY_AI_MODEL: "glossaryAiModel",
   AUTO_OPEN_TRANSLATIONS: "autoOpenTranslations",
 } as const;
 
@@ -24,6 +26,8 @@ export interface TranslatorSettings {
   worldContext: string;
   sourceLanguage: string;
   targetLanguage: string;
+  glossaryAiEnabled?: boolean;
+  glossaryAiModel?: string;
 }
 
 export function isProviderId(value: unknown): value is ProviderId {
@@ -37,6 +41,8 @@ export function getTranslatorSettings(): TranslatorSettings {
   );
 
   return {
+    glossaryAiEnabled: game.settings.get(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED) === true,
+    glossaryAiModel: String(game.settings.get(MODULE_ID, SETTINGS.GLOSSARY_AI_MODEL) ?? ""),
     provider: isProviderId(storedProvider) ? storedProvider : "chrome-local",
     apiKey: String(game.settings.get(MODULE_ID, SETTINGS.GOOGLE_API_KEY) ?? ""),
     openAiBaseUrl: String(
@@ -55,6 +61,8 @@ export function getTranslatorSettings(): TranslatorSettings {
 }
 
 export async function saveTranslatorSettings(settings: TranslatorSettings): Promise<void> {
+  await game.settings.set(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED, settings.glossaryAiEnabled === true);
+  await game.settings.set(MODULE_ID, SETTINGS.GLOSSARY_AI_MODEL, settings.glossaryAiModel?.trim() ?? "");
   await game.settings.set(MODULE_ID, SETTINGS.PROVIDER, settings.provider);
   await game.settings.set(MODULE_ID, SETTINGS.GOOGLE_API_KEY, settings.apiKey.trim());
   await game.settings.set(MODULE_ID, SETTINGS.OPENAI_BASE_URL, settings.openAiBaseUrl.trim());

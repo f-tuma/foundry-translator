@@ -41,11 +41,11 @@ export function planManualTerm(
   const wanted = replacement || source;
   if (existing) {
     if (existing.replacement === wanted) return { action: "duplicate" };
-    return { action: "update", entry: { ...existing, replacement: wanted } };
+    return { action: "update", entry: { ...existing, replacement: wanted, customized: true } };
   }
   return {
     action: "create",
-    entry: { source, replacement: wanted, category: "term", aliases: [] },
+    entry: { source, replacement: wanted, category: "term", aliases: [], customized: true },
   };
 }
 
@@ -84,7 +84,8 @@ export function planGlossarySync(
       ...matched,
       source: incoming.source,
       replacement:
-        matched.sourceUuid && matched.replacement === matched.source
+        !matched.customized && (matched.naming ? matched.source !== incoming.source
+          : matched.sourceUuid && matched.replacement === matched.source)
           ? incoming.replacement
           : matched.replacement,
       category: matched.customized ? matched.category : incoming.category,
@@ -94,6 +95,7 @@ export function planGlossarySync(
         ? { sourceUuid: incoming.sourceUuid ?? matched.sourceUuid }
         : {}),
     };
+    if (!matched.customized && matched.source !== incoming.source) delete merged.naming;
 
     if (sameEntry(matched, merged)) plan.unchanged.push(matched);
     else plan.update.push(merged);

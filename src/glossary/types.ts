@@ -18,6 +18,31 @@ export interface GlossaryEntry {
   enabled?: boolean;
   /** A human classification takes precedence over subsequent discovery. */
   customized?: boolean;
+  /** A completed naming decision is stable until the user edits the glossary. */
+  naming?: GlossaryNamingDecision;
+}
+
+export interface GlossaryNamingDecision {
+  revision: 1;
+  source: string;
+  targetLanguage: string;
+  action: "preserve" | "translate";
+  confidence: "high" | "uncertain";
+  reason: string;
+  model: string;
+  /** Local validation overrode the model; never populated from model metadata. */
+  guard?: "protected-root";
+}
+
+export function readNamingDecision(value: unknown): GlossaryNamingDecision | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const n = value as Partial<GlossaryNamingDecision>;
+  if (n.revision !== 1 || typeof n.source !== "string" || typeof n.targetLanguage !== "string"
+    || !["preserve", "translate"].includes(n.action ?? "") || !["high", "uncertain"].includes(n.confidence ?? "")
+    || typeof n.reason !== "string" || typeof n.model !== "string") return undefined;
+  return { revision: 1, source: n.source, targetLanguage: n.targetLanguage,
+    action: n.action!, confidence: n.confidence!, reason: n.reason.slice(0, 300), model: n.model.slice(0, 160),
+    ...(n.guard === "protected-root" ? { guard: n.guard } : {}) };
 }
 export interface GlossaryDocumentFlag {
   schemaVersion: typeof GLOSSARY_SCHEMA_VERSION;
@@ -28,4 +53,5 @@ export interface GlossaryDocumentFlag {
   sourceUuid?: string;
   enabled?: boolean;
   customized?: boolean;
+  naming?: GlossaryNamingDecision;
 }

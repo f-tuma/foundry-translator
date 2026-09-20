@@ -1,3 +1,4 @@
+import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
 import { getTranslatorSettings } from "../settings/settings";
 import { MAX_BUNDLE_BYTES, parseTranslationBundle } from "./format";
 import { exportTranslationBundle, importTranslationBundle, planBundleImport, type BundleImportPlan } from "./service";
@@ -8,9 +9,9 @@ export function renderBundleView(plan?: BundleImportPlan, fileName = ""): HTMLEl
   const root = document.createElement("section");
   root.className = "ft-settings ft-bundles";
   root.innerHTML = `
-    <header class="ft-settings__intro"><span class="ft-settings__brand-icon"><i class="fa-solid fa-box-archive" aria-hidden="true"></i></span><div><h2>${t("Heading")}</h2><p>${t("Intro")}</p></div></header>
-    <section class="ft-bundles__card"><h3>${t("ExportHeading")}</h3><p>${t("ExportHint")}</p><button type="button" class="ft-button ft-button--secondary" data-bundle-export><i class="fa-solid fa-download" aria-hidden="true"></i>${t("Export")}</button></section>
-    <section class="ft-bundles__card"><h3>${t("ImportHeading")}</h3><p>${t("ImportHint")}</p><label class="ft-bundles__file">${t("ChooseFile")}<input type="file" accept=".json,application/json" data-bundle-file></label></section>
+    <header class="ft-settings__intro"><span class="ft-settings__brand-icon"><i class="fa-solid fa-box-archive" aria-hidden="true"></i></span><div><div class="ft-heading-with-help"><h2>${t("Heading")}</h2>${renderHelpTooltip(t("Intro"), t("Heading"))}</div></div></header>
+    <section class="ft-bundles__card"><div class="ft-heading-with-help"><h3>${t("ExportHeading")}</h3>${renderHelpTooltip(t("ExportHint"), t("ExportHeading"))}</div><button type="button" class="ft-button ft-button--secondary" data-bundle-export><i class="fa-solid fa-download" aria-hidden="true"></i>${t("Export")}</button></section>
+    <section class="ft-bundles__card"><div class="ft-heading-with-help"><h3>${t("ImportHeading")}</h3>${renderHelpTooltip(t("ImportHint"), t("ImportHeading"))}</div><label class="ft-bundles__file">${t("ChooseFile")}<input type="file" accept=".json,application/json" data-bundle-file></label></section>
     ${plan ? `<section class="ft-bundles__card"><h3>${t("Preview")} · ${escape(plan.bundle.targetLanguage.toUpperCase())}</h3><p class="ft-bundles__filename">${escape(fileName)}</p>
       <p>${t("PreviewCount").replace("{ready}", String(plan.rows.filter((r) => r.state === "ready").length)).replace("{total}", String(plan.rows.length)).replace("{glossary}", String(plan.glossary.length))}</p>
       ${plan.glossaryConflicts.length ? `<p class="ft-bundles__warning">${t("GlossaryConflicts").replace("{count}", String(plan.glossaryConflicts.length))}</p>` : ""}
@@ -20,6 +21,7 @@ export function renderBundleView(plan?: BundleImportPlan, fileName = ""): HTMLEl
     </section>` : ""}
     <p class="ft-bundles__status" role="status" aria-live="polite" data-bundle-status>${t("Ready")}</p>
     <details data-bundle-issues hidden><summary>${t("Details")}</summary><pre></pre></details>`;
+  activateHelpTooltips(root);
   return root;
 }
 

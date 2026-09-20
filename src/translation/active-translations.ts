@@ -4,6 +4,7 @@ export interface TranslationPlan {
 }
 
 export type ActiveTranslationState =
+  | "glossary"
   | "scanning"
   | "translating"
   | "done"
@@ -33,6 +34,8 @@ export interface ActiveTranslationRun {
   finishedAt?: number;
   state: ActiveTranslationState;
   plan?: TranslationPlan;
+  glossaryCompleted?: number;
+  glossaryTotal?: number;
   completedUnits: number;
   completedDocuments: number;
   currentDocument?: string;

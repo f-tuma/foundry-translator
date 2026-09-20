@@ -1,0 +1,10 @@
+[
+  { "source": "Agraband Swift", "category": "character", "context": "A named bard and caravan captain. Agraband is an invented given name; Swift is a meaningful English surname. A natural fantasy localization of the surname is welcome.", "expected": "Agraband Hbitý", "roots": ["Agraband"] },
+  { "source": "Mara Reed", "category": "character", "context": "A female scout from a riverside family. Mara is her given name. Reed is a meaningful surname derived from the reeds near their home, and may be localized naturally as a fantasy surname.", "expected": "Mara Rákosová", "roots": ["Mara"] },
+  { "source": "Tamsin the Ashen", "category": "character", "context": "A named woman with an epithet describing her ash-grey hair. Tamsin is an invented given name; the Ashen is a descriptive epithet.", "expected": "Tamsin Popelavá", "roots": ["Tamsin"] },
+  { "source": "Borun Ironhand", "category": "character", "context": "A male dwarf called Ironhand because he has an iron prosthetic hand. Borun is his invented given name; Ironhand is a transparent nickname.", "expected": "Borun Železnoruký", "roots": ["Borun"] },
+  { "source": "Seren", "category": "character", "context": "An invented personal name with no known meaning or etymology. There is no descriptive epithet.", "expected": "Seren", "roots": ["Seren"] },
+  { "source": "Neris Shade", "category": "character", "context": "Neris is a personal given name. Shade is inherited from an unknown ancient language; its resemblance to the English word shade is coincidental, and no shadow-related meaning is established.", "expected": "Neris Shade", "roots": ["Neris", "Shade"] },
+  { "source": "Captain Orren Stormborn", "category": "character", "context": "A ship captain now addressed by his captain title. Use his already established localized name consistently.", "establishedNames": [{ "source": "Orren Stormborn", "replacement": "Orren Bouřný" }], "expected": "Kapitán Orren Bouřný", "roots": ["Orren"] },
+  { "source": "Old Carinth", "category": "location", "context": "A historic settlement. Carinth is an opaque invented root.", "example": true, "expected": "Starý Carinth", "roots": ["Carinth"] }
+]

@@ -1,3 +1,4 @@
+import { NamingCancelledError } from "../glossary/name-analysis";
 import { providerFingerprint } from "./provider-fingerprint";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { logger } from "../logger";
@@ -440,33 +441,36 @@ export class JournalTranslationService {
       format: "text",
     });
 
-    const [glossary] = await Promise.all([
-      new GlossaryCompendiumRepository().prepareForTranslation(),
-      preparation ?? Promise.resolve(),
-    ]);
-    runId = activeTranslations.start(
-      sourceDocument.name,
-      settings.targetLanguage,
-      sourceDocument.uuid,
-    );
-    const runtime: TranslationRuntime = {
-      runId,
-      rootUuid: sourceDocument.uuid,
-      glossaryHash: await glossaryFingerprint(glossary),
-      providerHash: await providerFingerprint(settings.provider, provider, settings.sourceLanguage),
-      settings,
-      provider,
-      glossary,
-      cache: new CompendiumTranslationCache(),
-      translations: new CompendiumJournalTranslationRepository(),
-      actorTranslations: new CompendiumActorTranslationRepository(),
-      itemTranslations: new CompendiumItemTranslationRepository(),
-    };
+    runId = activeTranslations.start(sourceDocument.name, settings.targetLanguage, sourceDocument.uuid);
+    const activeRunId = runId;
     try {
+      const [glossary] = await Promise.all([
+        new GlossaryCompendiumRepository().prepareForTranslation({
+          shouldCancel: () => activeTranslations.isCancelRequested(activeRunId),
+          onProgress: ({ completed, total, model }) => activeTranslations.update(activeRunId, {
+            state: "glossary", glossaryCompleted: completed, glossaryTotal: total,
+            currentDocument: model ?? game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Preparing"),
+          }),
+        }),
+        preparation ?? Promise.resolve(),
+      ]);
+      throwIfCancelled(activeRunId);
+      activeTranslations.update(activeRunId, { state: "scanning", currentDocument: "" });
+      const runtime: TranslationRuntime = {
+        runId, rootUuid: sourceDocument.uuid,
+        glossaryHash: await glossaryFingerprint(glossary),
+        providerHash: await providerFingerprint(settings.provider, provider, settings.sourceLanguage),
+        settings, provider, glossary,
+        cache: new CompendiumTranslationCache(),
+        translations: new CompendiumJournalTranslationRepository(),
+        actorTranslations: new CompendiumActorTranslationRepository(),
+        itemTranslations: new CompendiumItemTranslationRepository(),
+      };
       const result = await this.#translateGraph(sourceDocument, runtime, runId, scope);
       activeTranslations.finish(runId);
       return result;
     } catch (error) {
+      if (error instanceof NamingCancelledError) error = new TranslationCancelledError();
       if (error instanceof TranslationCancelledError) {
         activeTranslations.finishCancelled(runId);
       } else {
