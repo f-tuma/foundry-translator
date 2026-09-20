@@ -58,6 +58,30 @@ být objeven automaticky. Takové názvy přidejte jednou ručně. Například
 frakce uvedená pouze v odstavci nebude bezpečně rozpoznána podle toho, že
 začíná velkým písmenem. Pokyn modelu k zachování jmen sám není záruka.
 
+## Připravovaná verze: názvy podle kontextu
+
+Tato část popisuje vývojovou větev; v nainstalované verzi 0.15.2 zatím není.
+
+V nastavení překladače přibývají **Pravidla překladu názvů** a **Model pro glosář**.
+AI dostane krátký popis a okolní zmínky. Jasně popisné názvy uloží rovnou jako
+pevný překlad; nejasné názvy a jména postav ponechá. Cílové příklady jsou
+„Old Carinth → Starý Carinth“ a „Strayhearth Caravan → Karavana Putujícího Ohniště“.
+Nejde o záruku kvality každého názvu. Karavany typu Actor „group“ se nyní řadí
+mezi frakce, aby mohly získat popisný překlad.
+
+Model pro glosář běží na stejném serveru jako překladač, ale může být jiný.
+Prázdné pole automaticky hledá instrukční Qwen3.5, přednostně 9B. Kandidát
+Qwen3.5 9B Q4_K_M zatím čeká na ověření v místním LM Studio. Hy-MT2 může dál
+překládat samotné příběhy. S Chrome nebo Google se AI pojmenování nespouští.
+
+Hotová rozhodnutí se při další synchronizaci neopakují. V detailu položky
+najdete původ rozhodnutí a vysvětlení pod ikonou ⓘ; ruční změny i importovaný
+glosář mají přednost. Synchronizaci lze zastavit a později dokončit. Při chybě
+modelu se hotové dávky zachovají a zbývající názvy zůstanou původní.
+
+Compendia modulu se při načtení světa znovu zařadí do složky **Foundry Translate**.
+Přesuny probíhají postupně, aby si jejich souběžné vytváření nepřepsalo nastavení.
+
 ## Sdílení bez modelu
 
 **Sdílení a import překladů** exportuje JSON s textovými změnami a glosářem.

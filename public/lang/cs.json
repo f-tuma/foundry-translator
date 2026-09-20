@@ -243,5 +243,22 @@
   "FOUNDRY_TRANSLATE.Bundles.ImportIssues": "Importováno {count} dokumentů; {issues} problémů vyžaduje kontrolu. Podrobnosti najdete níže.",
   "FOUNDRY_TRANSLATE.Help": "Nápověda: {topic}",
   "FOUNDRY_TRANSLATE.Settings.PrivacyLabel": "Texty a soukromí",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Celý deník a propojené dokumenty"
+  "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Celý deník a propojené dokumenty",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name": "Pravidla překladu názvů",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint": "Před překladem AI posoudí nové názvy podle krátkých popisů a okolních zmínek. Jasně popisné názvy dostanou pevný překlad; nejasné zůstanou původní. Jména postav, ruční úpravy a importovaný glosář mají ochranu. Vyžaduje obecný instrukční model na nastaveném serveru.",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Automatic": "AI s kontextem · nejasné názvy zachovat",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Preserve": "Všechny nalezené názvy zachovat",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model": "Model pro glosář",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelHint": "Volitelné ID modelu ze stejného serveru. Prázdné pole vybere dostupný instrukční Qwen3.5, přednostně 9B. Model se může lišit od překladače. Pokud není dostupný, názvy zůstanou původní a zobrazí se upozornění.",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelAuto": "Automaticky · dostupný instrukční Qwen",
+  "FOUNDRY_TRANSLATE.Glossary.AI.ModelMissing": "V nastavení překladače zvolte dostupný instrukční model pro glosář.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Unavailable": "AI posouzení názvů se nepodařilo dokončit. Hotová rozhodnutí jsou uložená, ostatní názvy zůstávají původní. Zkontrolujte model pro glosář a připojení, potom synchronizaci zopakujte.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Preparing": "Příprava kontextu názvů",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Progress": "AI glosář · {completed}/{total} názvů",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Summary": "AI: {translated} přeloženo, {preserved} zachováno.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Cancelled": "Posuzování názvů zastaveno. Hotová rozhodnutí zůstávají uložená.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Translated": "AI · pevný překlad",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Preserved": "AI · původní název",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Uncertain": "nejistý význam",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Příprava názvů"
 }

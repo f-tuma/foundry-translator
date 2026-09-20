@@ -144,7 +144,7 @@ async function readLmStudioEventStream(
   );
 }
 
-function normalizedBaseUrl(value: string): string {
+export function normalizedBaseUrl(value: string): string {
   let url: URL;
   try {
     url = new URL(value.trim());

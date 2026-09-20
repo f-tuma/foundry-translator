@@ -11,6 +11,53 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-20 development branch `codex/ui-alignment-help` (not deployed):
+  added AI naming during glossary sync, saved in batches of eight with progress,
+  cancellation/resume and protection against manual edits made during inference.
+  Only new, enabled, uncustomized, discovered names are analyzed. Opaque roots
+  must survive exactly; uncertain decisions and character names retain source
+  form. Existing manual/imported choices win, and portable bundles contain the
+  chosen replacements without AI provenance or context. Source documents stay
+  untouched. Ember Actor `group` is a faction (the actual Strayhearth Caravan is
+  `Actor.emberStrayhearth`, not a Journal page).
+  Context uses bounded public descriptions and nearby mentions from loaded world
+  documents. LM Studio native requests disable reasoning and chat persistence;
+  other servers can use structured Chat Completions. Automatic model selection
+  is limited to Qwen3.5, preferring 9B; explicit IDs are available in settings.
+  Missing/invalid model output stops AI naming safely and warns, while translation
+  can continue with the original names. Completed batches are not re-requested.
+  The user chose automatic saving with ambiguous names preserved.
+
+  Language QA remains pending: Gemma 4 12B generated incorrect Czech names even
+  with high confidence (Stará Carinth, Karavana Bloudomá); E2B returned incomplete
+  JSON. Gemma decomposition plus Hy-MT produced unnatural word order. Gemma
+  reasoning-on spent 6,000 tokens repeating text without a final answer. These
+  approaches are not selected automatically. Requested Qwen3.5-9B Q4_K_M from
+  the user; the latest local server listing does not expose it yet.
+  Benchmark the actual client with held-out names after it arrives. Old Carinth
+  and Strayhearth are user-preferred few-shot examples, not held-out evidence.
+  Official references: https://lmstudio.ai/models/qwen/qwen3.5-9b and
+  https://huggingface.co/Qwen/Qwen3.5-9B.
+
+  Compendium folder root cause was confirmed by read-only inspection of Foundry
+  14.368: setFolder -> configure rewrites the full core.compendiumConfiguration
+  snapshot. Concurrent moves lose another pack's assignment. All module moves
+  now use one queue, folder creation shares one promise, and ready repairs the
+  five existing module packs only. Regression tests simulate the shared-setting
+  race, failed move recovery and duplicate folder creation. This is client-local
+  serialization, not a server transaction across independent GM browsers.
+
+  Final local validation: TypeScript, 223 tests across 39 files, production build.
+  New tests cover stable decisions, malformed output, modified roots, context
+  bounds, concurrent sync, interrupted batches, manual edits and reclassification.
+  Local controller QA also exercised sync → rerender → cancel → enabled sync
+  button, using actual controller code with a mocked repository. AI provenance
+  and its info tooltip rendered at 360 px without horizontal overflow.
+  The live Ember world was read only, with no reload, injection or installation.
+  At inspection it contained only the empty Glossary pack in the module folder;
+  don't recreate the user's deleted test output. Prior no-instance-change request
+  remains in force despite the later report that the translation was stopped.
+
 - 2026-09-20 local UI polish (not deployed): aligned and centered active-run
   actions, removed Copy log's extra top margin, made long titles wrap, matched
   glossary select/input heights, and made narrow layouts respond to the Foundry

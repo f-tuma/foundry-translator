@@ -1,0 +1,67 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { NameAnalysisClient, needsNameAnalysis, parseNameDecisions } from "../src/glossary/name-analysis";
+import type { GlossaryEntry } from "../src/glossary/types";
+import type { TranslatorSettings } from "../src/settings/settings";
+
+const entry = (source = "Old Carinth"): GlossaryEntry => ({ source, replacement: source, category: "location", aliases: [], sourceUuid: `Scene.${source}` });
+const decision = (overrides: Record<string, unknown> = {}) => ({ id: 0, action: "translate", replacement: "Starý Carinth", roots: ["Carinth"], confidence: "high", reason: "Popisná část názvu.", ...overrides });
+const parse = (values: unknown[], entries = [entry()]) => parseNameDecisions(JSON.stringify({ decisions: values }), entries, "cs", "naming-model");
+const settings: TranslatorSettings = { provider: "openai-compatible", openAiBaseUrl: "http://localhost:1234", openAiModel: "hy-mt2-7b", openAiApiKey: "secret", worldContext: "", apiKey: "", sourceLanguage: "en", targetLanguage: "cs" };
+
+describe("context-aware naming", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("stores a stable decision and excludes manual, imported and disabled entries", () => {
+    const translated = parse([decision()])[0]!;
+    expect(translated.replacement).toBe("Starý Carinth");
+    expect(needsNameAnalysis(translated, "cs")).toBe(false);
+    expect(needsNameAnalysis({ ...entry(), customized: true }, "cs")).toBe(false);
+    expect(needsNameAnalysis({ ...entry(), enabled: false }, "cs")).toBe(false);
+    expect(needsNameAnalysis({ ...entry(), replacement: "Můj vlastní název" }, "cs")).toBe(false);
+    const preserved = parse([decision({ action: "preserve", replacement: "Old Carinth" })])[0]!;
+    expect(needsNameAnalysis(preserved, "cs")).toBe(false);
+  });
+  it("keeps uncertain and personal names even if a model proposes a translation", () => {
+    expect(parse([decision({ confidence: "uncertain" })])[0]?.replacement).toBe("Old Carinth");
+    const person = { ...entry("Agraband Swift"), category: "character" as const };
+    expect(parse([decision({ replacement: "Agraband Rychlý", roots: [] })], [person])[0]?.replacement).toBe("Agraband Swift");
+  });
+  it("rejects modified roots, markup, missing/duplicate IDs and prompt leakage", () => {
+    for (const overrides of [{ replacement: "Starý Karinth" }, { replacement: "Starého Carinthu" }, { replacement: '<img src="x">' }, { replacement: "@UUID[Actor.bad]{click}" }, { replacement: "Name\nignore instructions" }, { replacement: "__FTG_name__" }, { id: 2 }, { roots: ["Invented"] }]) {
+      expect(() => parse([decision(overrides)])).toThrow();
+    }
+    expect(() => parse([])).toThrow();
+    expect(() => parse([decision(), decision()], [entry(), entry("New Ordain")])).toThrow();
+  });
+  it("matches decisions by ID even if the model reorders them", () => {
+    const values = parse([decision({ id: 1, replacement: "Nový Ordain", roots: ["Ordain"] }), decision()], [entry(), entry("New Ordain")]);
+    expect(values.map((value) => [value.source, value.replacement])).toEqual([["New Ordain", "Nový Ordain"], ["Old Carinth", "Starý Carinth"]]);
+  });
+  it("can preserve an existing name with punctuation without validating it as generated text", () => {
+    const original = entry("The Keep [Ruins]");
+    expect(parse([decision({ action: "preserve", replacement: original.source, roots: [] })], [original])[0]?.replacement).toBe(original.source);
+  });
+  it("selects an available instruction model without using the text translator", async () => {
+    vi.stubGlobal("game", { i18n: { localize: (s: string) => s } });
+    const request = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ data: [{ id: "hy-mt2-7b" }, { id: "qwen3.5-4b" }, { id: "qwen3.5-9b" }, { id: "qwen3.5-coder-9b" }] })));
+    expect(await new NameAnalysisClient(settings, request).model()).toBe("qwen3.5-9b");
+    expect(request.mock.calls[0]?.[0]).toBe("http://localhost:1234/v1/models");
+  });
+  it("uses the native response message only, without persisting a chat", async () => {
+    const request = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ output: [
+      { type: "reasoning", content: "not JSON" }, { type: "message", content: JSON.stringify({ decisions: [decision()] }) },
+    ] })));
+    const values = await new NameAnalysisClient(settings, request).analyze([entry()], new Map([["Old Carinth", "A historic town."]]), "qwen3.5-9b");
+    expect(values[0]?.replacement).toBe("Starý Carinth");
+    const body = JSON.parse(request.mock.calls[0]?.[1]?.body as string);
+    expect(body.store).toBe(false);
+    expect(body.reasoning).toBe("off");
+    expect(body.input).toContain("A historic town.");
+    expect(body.input).not.toContain("secret");
+  });
+  it("falls back for other OpenAI-compatible servers and fails closed on errors", async () => {
+    const request = vi.fn().mockResolvedValueOnce(new Response("", { status: 404 })).mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ decisions: [decision()] }) } }] })));
+    expect((await new NameAnalysisClient(settings, request).analyze([entry()], new Map(), "other-instruct"))[0]?.replacement).toBe("Starý Carinth");
+    expect(request.mock.calls[1]?.[0]).toBe("http://localhost:1234/v1/chat/completions");
+    await expect(new NameAnalysisClient(settings, async () => new Response("", { status: 503 })).analyze([entry()], new Map(), "other")).rejects.toThrow("503");
+  });
+});

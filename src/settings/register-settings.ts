@@ -8,6 +8,14 @@ import { BundleApplication } from "../bundles/bundle-app";
 import { TranslationDesk } from "../ui/translation-desk";
 
 export function registerSettings(): void {
+  game.settings.register(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED, {
+    name: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name", hint: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint",
+    scope: "world", config: false, type: Boolean, default: true,
+  });
+  game.settings.register(MODULE_ID, SETTINGS.GLOSSARY_AI_MODEL, {
+    name: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model", hint: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelHint",
+    scope: "client", config: false, type: String, default: "",
+  });
   game.settings.registerMenu(MODULE_ID, "desk", {
     name: "FOUNDRY_TRANSLATE.Desk.Title", label: "FOUNDRY_TRANSLATE.Desk.Title", hint: "FOUNDRY_TRANSLATE.Desk.Intro",
     icon: "fa-solid fa-language", type: TranslationDesk, restricted: true,

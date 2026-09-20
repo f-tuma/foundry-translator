@@ -53,7 +53,7 @@ export function discoverGlossaryEntries(
   for (const document of sources.actors) {
     if (document.flags?.["foundry-translate"]?.actorTranslation) continue;
     const creature = document.flags?.ember?.discoverable === "creature";
-    const entry = entryFromDocument(document, creature ? "term" : "character");
+    const entry = entryFromDocument(document, creature ? "term" : document.type === "group" ? "faction" : "character");
     // Ember distinguishes named characters from creature templates. Keep the
     // latter discoverable in the glossary, but let their ordinary names translate.
     if (entry && creature) entry.enabled = false;

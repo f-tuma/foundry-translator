@@ -1,9 +1,13 @@
 import { MODULE_ID, MODULE_TITLE } from "../constants";
 import { organizeCompendiumPack } from "../storage/compendium-folder";
-import { GLOSSARY_SCHEMA_VERSION, isGlossaryCategory, type GlossaryDocumentFlag, type GlossaryEntry } from "./types";
+import { GLOSSARY_SCHEMA_VERSION, isGlossaryCategory, readNamingDecision, type GlossaryDocumentFlag, type GlossaryEntry } from "./types";
 import { planGlossarySync } from "./sync";
 import { validateGlossary } from "./protection";
 import { discoverWorldGlossary } from "./discovery";
+import { getTranslatorSettings } from "../settings/settings";
+import { collectNameContexts } from "./name-context";
+import { NameAnalysisClient, NamingCancelledError, needsNameAnalysis, type NamingProgress } from "./name-analysis";
+import { logger } from "../logger";
 
 export const GLOSSARY_PACK_NAME = "foundry-translate-glossary" as const;
 export const GLOSSARY_PACK_ID = `world.${GLOSSARY_PACK_NAME}` as const;
@@ -14,6 +18,14 @@ export interface GlossarySyncResult {
   created: number;
   updated: number;
   unchanged: number;
+  aiTranslated?: number;
+  aiPreserved?: number;
+  aiWarning?: string;
+}
+
+export interface GlossarySyncOptions {
+  onProgress?: (progress: NamingProgress) => void;
+  shouldCancel?: () => boolean;
 }
 
 function readFlag(indexEntry: FoundryCompendiumIndexEntry): GlossaryEntry | null {
@@ -33,12 +45,14 @@ function readFlag(indexEntry: FoundryCompendiumIndexEntry): GlossaryEntry | null
     return null;
   }
 
+  const naming = readNamingDecision(flag.naming);
   return {
     id: indexEntry._id,
     source: flag.source,
     replacement: flag.replacement,
     category: flag.category,
     aliases: flag.aliases,
+    ...(naming ? { naming } : {}),
     ...(typeof flag.enabled === "boolean" ? { enabled: flag.enabled } : {}),
     ...(typeof flag.customized === "boolean" ? { customized: flag.customized } : {}),
     ...(typeof flag.sourceUuid === "string" ? { sourceUuid: flag.sourceUuid } : {}),
@@ -52,6 +66,7 @@ function toFlag(entry: GlossaryEntry): GlossaryDocumentFlag {
     replacement: entry.replacement,
     category: entry.category,
     aliases: entry.aliases,
+    ...(entry.naming ? { naming: entry.naming } : {}),
     ...(entry.enabled !== undefined ? { enabled: entry.enabled } : {}),
     ...(entry.customized !== undefined ? { customized: entry.customized } : {}),
     ...(entry.sourceUuid ? { sourceUuid: entry.sourceUuid } : {}),
@@ -97,18 +112,27 @@ async function loadFromPack(pack: FoundryCompendiumCollection): Promise<Glossary
 }
 
 let preparingGlossary: Promise<GlossaryEntry[]> | undefined;
+const preparationObservers = new Set<GlossarySyncOptions>();
+let syncingGlossary: Promise<void> = Promise.resolve();
 
 export class GlossaryCompendiumRepository {
   async loadExisting(): Promise<GlossaryEntry[]> {
     const pack = game.packs.get(GLOSSARY_PACK_ID);
     return pack ? loadFromPack(pack) : [];
   }
-  async prepareForTranslation(): Promise<GlossaryEntry[]> {
-    preparingGlossary ??= (async () => {
-      await this.sync(discoverWorldGlossary());
-      return this.load();
-    })().finally(() => { preparingGlossary = undefined; });
-    return preparingGlossary;
+  async prepareForTranslation(options: GlossarySyncOptions = {}): Promise<GlossaryEntry[]> {
+    preparationObservers.add(options);
+    try {
+      preparingGlossary ??= (async () => {
+        const result = await this.sync(discoverWorldGlossary(), {
+          onProgress: (progress) => preparationObservers.forEach((observer) => observer.onProgress?.(progress)),
+          shouldCancel: () => [...preparationObservers].every((observer) => observer.shouldCancel?.() === true),
+        });
+        if (result.aiWarning) ui.notifications.warn(result.aiWarning);
+        return this.load();
+      })().finally(() => { preparingGlossary = undefined; });
+      return await preparingGlossary;
+    } finally { preparationObservers.delete(options); }
   }
   async getPack(): Promise<FoundryCompendiumCollection> {
     return ensureGlossaryPack();
@@ -119,7 +143,15 @@ export class GlossaryCompendiumRepository {
     return loadFromPack(pack);
   }
 
-  async sync(discovered: Iterable<GlossaryEntry>): Promise<GlossarySyncResult> {
+  async sync(discovered: Iterable<GlossaryEntry>, options: GlossarySyncOptions = {}): Promise<GlossarySyncResult> {
+    const entries = [...discovered];
+    const operation = syncingGlossary.then(() => this.#sync(entries, options));
+    syncingGlossary = operation.then(() => {}, () => {});
+    return operation;
+  }
+
+  async #sync(discovered: readonly GlossaryEntry[], options: GlossarySyncOptions): Promise<GlossarySyncResult> {
+    if (options.shouldCancel?.()) throw new NamingCancelledError();
     if (!game.user?.isGM) {
       throw new Error("Slovník může měnit pouze Game Master.");
     }
@@ -130,7 +162,8 @@ export class GlossaryCompendiumRepository {
     }
 
     const stored = await loadFromPack(pack);
-    const plan = planGlossarySync(stored, discovered);
+    const discoveredEntries = [...discovered];
+    const plan = planGlossarySync(stored, discoveredEntries);
     validateGlossary([...stored.filter((entry) => !plan.update.some((updated) => updated.id === entry.id)), ...plan.create, ...plan.update]);
     if (plan.create.length) {
       await foundry.documents.JournalEntry.implementation.createDocuments(
@@ -145,11 +178,50 @@ export class GlossaryCompendiumRepository {
       );
     }
 
-    return {
+    const result: GlossarySyncResult = {
       created: plan.create.length,
       updated: plan.update.length,
       unchanged: plan.unchanged.length,
     };
+    const settings = getTranslatorSettings();
+    if (settings.provider !== "openai-compatible" || settings.glossaryAiEnabled === false) return result;
+    const discoveredSources = new Set(discoveredEntries.map((entry) => entry.source));
+    const pending = (await loadFromPack(pack)).filter((entry) => discoveredSources.has(entry.source) && needsNameAnalysis(entry, settings.targetLanguage));
+    if (!pending.length) return result;
+    const contexts = collectNameContexts(pending);
+    const checkCancelled = () => { if (options.shouldCancel?.()) throw new NamingCancelledError(); };
+    options.onProgress?.({ completed: 0, total: pending.length });
+    try {
+      checkCancelled();
+      const client = new NameAnalysisClient(settings);
+      const model = await client.model();
+      result.aiTranslated = 0;
+      result.aiPreserved = 0;
+      for (let start = 0; start < pending.length; start += 8) {
+        checkCancelled();
+        options.onProgress?.({ completed: start, total: pending.length, model });
+        const decisions = await client.analyze(pending.slice(start, start + 8), contexts, model);
+        checkCancelled();
+        // A GM may edit an entry while the model is working. Re-read before
+        // applying results; manual/imported choices and earlier decisions win.
+        const latest = new Map((await loadFromPack(pack)).map((entry) => [entry.id, entry]));
+        const updates = decisions.flatMap((decision) => {
+          const current = latest.get(decision.id);
+          if (!current || current.source !== decision.source || current.sourceUuid !== decision.sourceUuid
+            || current.category !== decision.category || !needsNameAnalysis(current, settings.targetLanguage)) return [];
+          return [{ ...current, replacement: decision.replacement, naming: decision.naming! }];
+        });
+        if (updates.length) await this.saveEntries(updates);
+        result.aiTranslated += updates.filter((entry) => entry.naming.action === "translate").length;
+        result.aiPreserved += updates.filter((entry) => entry.naming.action === "preserve").length;
+        options.onProgress?.({ completed: Math.min(start + 8, pending.length), total: pending.length, model });
+      }
+    } catch (error) {
+      if (error instanceof NamingCancelledError) throw error;
+      logger.warn("AI glossary naming stopped; remaining names are preserved.", error);
+      result.aiWarning = game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Unavailable");
+    }
+    return result;
   }
 
   /** Overwrites the stored entry, e.g. with a user-supplied custom translation. */

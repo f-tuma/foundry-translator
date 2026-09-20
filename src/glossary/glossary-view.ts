@@ -90,6 +90,7 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
         <details class="ft-glossary__details">
           <summary>${localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${localize(entry.enabled === false ? "FOUNDRY_TRANSLATE.Glossary.Automatic" : entry.source === entry.replacement ? "FOUNDRY_TRANSLATE.Glossary.Preserve" : "FOUNDRY_TRANSLATE.Glossary.Fixed")}</summary>
           <div class="ft-glossary__metadata">
+            ${entry.naming && !entry.customized ? `<div class="ft-help-row"><span>${localize(entry.naming.action === "translate" ? "FOUNDRY_TRANSLATE.Glossary.AI.Translated" : "FOUNDRY_TRANSLATE.Glossary.AI.Preserved")}${entry.naming.confidence === "uncertain" ? ` · ${localize("FOUNDRY_TRANSLATE.Glossary.AI.Uncertain")}` : ""}</span>${renderHelpTooltip(entry.naming.reason, entry.source)}</div>` : ""}
             <label><input type="checkbox" data-glossary-enabled ${entry.enabled === false ? "" : "checked"}> ${localize("FOUNDRY_TRANSLATE.Glossary.Enabled")}</label>
             <label>${localize("FOUNDRY_TRANSLATE.Glossary.CategoryLabel")}<select data-glossary-category>${categoryOptions(entry.category)}</select></label>
             <label>${localize("FOUNDRY_TRANSLATE.Glossary.Aliases")}<input type="text" data-glossary-aliases-input value="${escapeHtml(entry.aliases.join("; "))}" maxlength="2000" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.AliasesHint")}"></label>
@@ -206,10 +207,11 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
         <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
       </button>
       ${help("FOUNDRY_TRANSLATE.Glossary.StorageHint", "FOUNDRY_TRANSLATE.Glossary.OpenPack")}</div>
+      <div><button type="button" class="ft-button ft-button--secondary" data-action="cancel-sync" hidden>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Cancel")}</button>
       <button type="button" class="ft-button ft-button--primary" data-action="sync">
         <i class="fa-solid fa-rotate" aria-hidden="true"></i>
         <span>${localize("FOUNDRY_TRANSLATE.Glossary.Sync")}</span>
-      </button>
+      </button></div>
     </footer>
   `;
   activateHelpTooltips(section);

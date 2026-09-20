@@ -243,5 +243,22 @@
   "FOUNDRY_TRANSLATE.Bundles.ImportIssues": "Imported {count} documents; {issues} issues need attention. See details below.",
   "FOUNDRY_TRANSLATE.Help": "Help: {topic}",
   "FOUNDRY_TRANSLATE.Settings.PrivacyLabel": "Text and privacy",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Whole journal and linked documents"
+  "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Whole journal and linked documents",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name": "Naming policy",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint": "Before translation, AI reviews newly discovered names with short descriptions and nearby mentions. Clear descriptive names get a fixed translation; ambiguous names keep their original form. Personal names, manual edits and imported glossary choices are protected. Requires an instruction model on the configured server.",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Automatic": "AI with context · preserve uncertain names",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Preserve": "Preserve all discovered names",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model": "Glossary model",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelHint": "Optional model ID from the same server. When empty, selects an available Qwen3.5+ instruction model, preferring 9B. This can differ from the translation model. If unavailable, original names remain intact and a warning is shown.",
+  "FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelAuto": "Automatic · available Qwen instruction model",
+  "FOUNDRY_TRANSLATE.Glossary.AI.ModelMissing": "Select an available instruction model for glossary naming in translator settings.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Unavailable": "AI naming could not finish. Completed decisions are saved; remaining names keep their original form. Check the glossary model and connection, then synchronize again.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Preparing": "Preparing name context",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Progress": "AI glossary · {completed}/{total} names",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Summary": "AI: {translated} translated, {preserved} preserved.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Cancelled": "Name review stopped. Completed decisions remain saved.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Translated": "AI · fixed translation",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Preserved": "AI · original name",
+  "FOUNDRY_TRANSLATE.Glossary.AI.Uncertain": "uncertain meaning",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Preparing names"
 }
