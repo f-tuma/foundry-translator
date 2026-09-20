@@ -128,11 +128,12 @@ function glossarySnapshot(entries: readonly GlossaryEntry[]): string {
   return JSON.stringify(
     [...entries]
       .filter((entry) => entry.enabled !== false)
-      .map(({ source, replacement, category, aliases }) => ({
+      .map(({ source, replacement, category, aliases, mode }) => ({
         source,
         replacement,
         category,
         aliases: [...aliases].sort(),
+        mode: mode ?? "fixed",
       }))
       .sort((left, right) => left.source.localeCompare(right.source)),
   );
@@ -146,7 +147,7 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 5,
+      schemaVersion: 6,
       segments,
       glossaryFingerprint,
       ...(providerIdentity ? { providerIdentity } : {}),
@@ -423,6 +424,7 @@ function prepareSegment(
   segment: string,
   glossary: readonly GlossaryEntry[],
   nonce: string,
+  allowInflection: boolean,
 ): PreparedSegment {
   const leading = segment.match(/^\s*/u)?.[0] ?? "";
   const withoutLeading = segment.slice(leading.length);
@@ -436,7 +438,7 @@ function prepareSegment(
     protection: protectGlossaryTerms(
       syntax.text,
       glossary,
-      { nonce, opaqueTokens: syntax.tokens.map(({ token }) => token) },
+      { nonce, opaqueTokens: syntax.tokens.map(({ token }) => token), allowInflection },
     ),
   };
 }
@@ -538,6 +540,7 @@ export async function translateUnits(
         segment,
         options.glossary,
         `${nonce}${segmentIndex.toString(36)}`,
+        options.provider.supportsGlossaryInflection === true && options.settings.targetLanguage === "cs",
       ),
     );
     const inFlight = createInFlightTranslation();

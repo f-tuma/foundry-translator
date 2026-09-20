@@ -22,6 +22,15 @@ function eventStreamResponse(events: readonly unknown[]): Response {
 
 describe("OpenAiCompatibleProvider", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it.each(["qwen-test", "hy-mt2-7b"])("instructs %s to inflect only paired approved names", async model => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({choices:[{message:{content:"Do __FTG_T_0000__Starého Carinthu__FTG_T_0000END__."}}]}));
+    const provider = new OpenAiCompatibleProvider({baseUrl:"http://localhost:1234",model,fetchImplementation:fetchMock});
+    expect(provider.supportsGlossaryInflection).toBe(true);
+    await provider.translate({texts:["To __FTG_T_0000__Starý Carinth__FTG_T_0000END__."],sourceLanguage:"en",targetLanguage:"cs"});
+    const content = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).messages.map((m:{content:string})=>m.content).join(" ");
+    expect(content).toContain("only inflect");
+    expect(content).toContain("Do not rename");
+  });
 
   it("sends context, model, and token without repeating the protected glossary", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({

@@ -31,6 +31,8 @@ export interface ProviderRequestMetrics {
 }
 
 export interface TranslationProvider {
+  /** Can follow instructions for inflected, bounded Czech glossary names. */
+  readonly supportsGlossaryInflection?: boolean;
   /** Distinguishes model/configuration-specific cache entries without including secrets. */
   readonly cacheIdentity?: string;
   translate(request: TranslateRequest): Promise<TranslationResult[]>;

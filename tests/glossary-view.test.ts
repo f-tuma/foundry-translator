@@ -1,11 +1,30 @@
 import { parseHTML } from "linkedom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { refreshGlossaryRows, renderGlossaryView, updateGlossaryFilter } from "../src/glossary/glossary-view";
+import { hasGlossaryEdits, readGlossaryRow, refreshGlossaryRows, renderGlossaryView, updateGlossaryFilter } from "../src/glossary/glossary-view";
 import type { GlossaryEntry } from "../src/glossary/types";
 
 describe("Glossary view", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it("edits name usage without treating a legacy default as an unsaved change", () => {
+    const {document} = parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document",document);
+    vi.stubGlobal("game",{i18n:{localize:(key:string)=>key}});
+    const entry:GlossaryEntry = {source:"Old Carinth",replacement:"Starý Carinth",category:"location",aliases:[]};
+    const view = renderGlossaryView({discovered:[],stored:[entry]});
+    const row = view.querySelector<HTMLElement>("[data-glossary-row]")!;
+    const select = row.querySelector<HTMLSelectElement>("[data-glossary-mode]")!;
+    expect(hasGlossaryEdits(readGlossaryRow(row,entry),entry)).toBe(false);
+    const choose=(value:string)=>{for(const option of select.querySelectorAll("option")) option.toggleAttribute("selected",option.value===value);};
+    choose("inflect");
+    const edited=readGlossaryRow(row,entry);
+    expect(edited).toMatchObject({enabled:true,mode:"inflect"});
+    expect(hasGlossaryEdits(edited,entry)).toBe(true);
+    expect(refreshGlossaryRows(view,[entry],[entry])[0]).toEqual(entry);
+    expect(select.value).toBe("inflect");
+    choose("off");
+    expect(readGlossaryRow(row,edited)).toMatchObject({enabled:false,mode:"inflect"});
+  });
 
   it("explains locally blocked name changes instead of repeating the model's misleading reason", () => {
     const { document } = parseHTML("<html><body></body></html>");

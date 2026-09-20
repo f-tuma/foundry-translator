@@ -123,7 +123,7 @@ export async function exportTranslationBundle(language: string, onProgress?: (me
     } catch (error) { skipped.push(`${item.document.name ?? item.sourceUuid}: ${error instanceof Error ? error.message : String(error)}`); }
   }
   const glossary = (await new GlossaryCompendiumRepository().loadExisting()).map(({ id: _id, sourceUuid: _uuid, ...entry }) => entry);
-  const bundle: TranslationBundle = { format: BUNDLE_FORMAT, version: 1, createdAt: new Date().toISOString(), moduleVersion: MODULE_VERSION,
+  const bundle: TranslationBundle = { format: BUNDLE_FORMAT, version: glossary.some(entry => entry.mode === "inflect") ? 2 : 1, createdAt: new Date().toISOString(), moduleVersion: MODULE_VERSION,
     systemId: game.system?.id ?? "unknown", systemVersion: game.system?.version ?? "", targetLanguage: language, glossary, documents };
   // The same validation applies to our own exports and third-party imports.
   return { bundle: parseTranslationBundle(JSON.stringify(bundle)), skipped };
@@ -139,7 +139,7 @@ function glossaryMerge(stored: readonly GlossaryEntry[], incoming: readonly Glos
   for (const entry of incoming) {
     const existing = stored.find((s) => s.source.normalize("NFC").toLowerCase() === entry.source.normalize("NFC").toLowerCase());
     if (existing) {
-      if (existing.replacement !== entry.replacement || (existing.enabled !== false) !== (entry.enabled !== false) || JSON.stringify(existing.aliases) !== JSON.stringify(entry.aliases)) glossaryConflicts.push(entry.source);
+      if (existing.replacement !== entry.replacement || (existing.enabled !== false) !== (entry.enabled !== false) || (existing.mode ?? "fixed") !== (entry.mode ?? "fixed") || JSON.stringify(existing.aliases) !== JSON.stringify(entry.aliases)) glossaryConflicts.push(entry.source);
       continue;
     }
     try { validateGlossary([...stored, ...glossary, entry]); glossary.push(entry); }

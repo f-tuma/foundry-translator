@@ -1,5 +1,5 @@
 import type { GlossaryEntry } from "../glossary/types";
-import { isGlossaryCategory } from "../glossary/types";
+import { isGlossaryCategory, isGlossaryMode } from "../glossary/types";
 import { validateGlossary } from "../glossary/protection";
 import { protectFoundrySyntax } from "../translation/foundry-syntax";
 import { planMarkdownTranslation } from "../translation/markdown";
@@ -26,7 +26,7 @@ export interface BundleDocument {
 }
 export interface TranslationBundle {
   format: typeof BUNDLE_FORMAT;
-  version: 1;
+  version: 1 | 2;
   createdAt: string;
   moduleVersion: string;
   systemId: string;
@@ -49,7 +49,7 @@ function shortString(value: unknown, max = 500): value is string {
 export function parseTranslationBundle(text: string): TranslationBundle {
   requireValue(new TextEncoder().encode(text).length <= MAX_BUNDLE_BYTES, "maximum size is 50 MB.");
   const value: unknown = JSON.parse(text);
-  requireValue(record(value) && value.format === BUNDLE_FORMAT && value.version === 1, "unsupported format or version.");
+  requireValue(record(value) && value.format === BUNDLE_FORMAT && (value.version === 1 || value.version === 2), "unsupported format or version.");
   for (const key of ["createdAt", "moduleVersion", "systemId", "targetLanguage"]) requireValue(shortString(value[key]), `missing ${key}.`);
   requireValue(typeof value.systemVersion === "string", "missing system version.");
   requireValue(/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(value.targetLanguage as string), "invalid language.");
@@ -60,10 +60,12 @@ export function parseTranslationBundle(text: string): TranslationBundle {
     requireValue(isGlossaryCategory(entry.category), "invalid category.");
     requireValue(Array.isArray(entry.aliases) && entry.aliases.length <= 100 && entry.aliases.every((a) => shortString(a, 240)), "invalid aliases.");
     requireValue(entry.enabled === undefined || typeof entry.enabled === "boolean", "invalid glossary state.");
+    requireValue(entry.mode === undefined || isGlossaryMode(entry.mode), "invalid glossary mode.");
     const key = entry.source.normalize("NFC").trim().toLowerCase();
     requireValue(key && !seenTerms.has(key), `duplicate term ${entry.source}.`);
     seenTerms.add(key);
     return { source: entry.source, replacement: entry.replacement, category: entry.category, aliases: entry.aliases as string[],
+      ...(entry.mode === "inflect" ? { mode: "inflect" } : {}),
       ...(entry.enabled === false ? { enabled: false } : {}), ...(typeof entry.notes === "string" ? { notes: entry.notes.slice(0, 2000) } : {}), customized: true };
   });
   validateGlossary(glossary);
@@ -96,7 +98,7 @@ export function parseTranslationBundle(text: string): TranslationBundle {
       providerId: entry.providerId, sourceLanguage: entry.sourceLanguage, translatedAt: entry.translatedAt, engineRevision: Number(entry.engineRevision), patches };
   });
   // Reconstruct the object so credentials, flags and unknown fields are discarded.
-  return { format: BUNDLE_FORMAT, version: 1, createdAt: String(value.createdAt), moduleVersion: String(value.moduleVersion), systemId: String(value.systemId),
+  return { format: BUNDLE_FORMAT, version: value.version, createdAt: String(value.createdAt), moduleVersion: String(value.moduleVersion), systemId: String(value.systemId),
     systemVersion: String(value.systemVersion), targetLanguage: String(value.targetLanguage), glossary, documents };
 }
 

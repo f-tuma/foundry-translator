@@ -1,5 +1,5 @@
 import { parseTranslationBundle } from "../bundles/format";
-import { isGlossaryCategory, type GlossaryEntry } from "./types";
+import { isGlossaryCategory, isGlossaryMode, type GlossaryEntry } from "./types";
 import { validateGlossary } from "./protection";
 
 export const GLOSSARY_FILE_FORMAT = "foundry-translate-glossary";
@@ -29,10 +29,12 @@ function readEntry(value: unknown): GlossaryEntry {
   const source = field(value.source, 240);
   const replacement = field(value.replacement, 240) || source;
   if (!source || (value.enabled !== undefined && typeof value.enabled !== "boolean")) return fail("InvalidFields");
+  if (value.mode !== undefined && !isGlossaryMode(value.mode)) return fail("InvalidFields");
   const rawAliases = value.aliases ?? [];
   if (!Array.isArray(rawAliases) || rawAliases.length > 100) return fail("InvalidFields");
   const aliases = [...new Set(rawAliases.map((alias) => field(alias, 240)).filter(Boolean))];
   return { source, replacement, category: value.category, aliases, enabled: value.enabled !== false,
+    ...(value.mode === "inflect" ? { mode: "inflect" as const } : {}),
     notes: field(value.notes ?? "", 2000, true), customized: true };
 }
 
@@ -46,8 +48,9 @@ export function validateGlossaryFileEntries(entries: readonly GlossaryEntry[]): 
     if (entry.enabled === false) continue;
     for (const term of [entry.source, ...entry.aliases]) {
       const normalized = glossaryEntryKey(term);
-      if (terms.has(normalized) && terms.get(normalized) !== entry.replacement) fail("AliasConflict", term);
-      terms.set(normalized, entry.replacement);
+      const behavior = JSON.stringify([entry.replacement, entry.mode ?? "fixed"]);
+      if (terms.has(normalized) && terms.get(normalized) !== behavior) fail("AliasConflict", term);
+      terms.set(normalized, behavior);
     }
   }
   validateGlossary(entries);
@@ -81,7 +84,7 @@ function readCsv(text: string): string[][] {
 const formula = /^[\s]*[=+\-@\t\r]/u;
 const csvCell = (value: string) => `"${(formula.test(value) || value.startsWith("'") ? `'${value}` : value).replaceAll('"', '""')}"`;
 const unescapeCell = (value: string) => value.startsWith("'") && (value[1] === "'" || formula.test(value.slice(1))) ? value.slice(1) : value;
-const columns = ["source", "replacement", "category", "aliases", "enabled", "notes", "context", "language"];
+const columns = ["source", "replacement", "category", "aliases", "enabled", "notes", "context", "language", "mode"];
 
 export function parseGlossaryFile(raw: string, format: "json" | "csv", fallbackLanguage: string): GlossaryFile {
   if (new TextEncoder().encode(raw).length > MAX_GLOSSARY_BYTES) fail("TooLarge");
@@ -94,7 +97,7 @@ export function parseGlossaryFile(raw: string, format: "json" | "csv", fallbackL
       const bundle = parseTranslationBundle(text);
       language = bundle.targetLanguage; values = bundle.glossary;
     } else {
-      if (!object(data) || data.format !== GLOSSARY_FILE_FORMAT || data.version !== 1 || !Array.isArray(data.entries) || typeof data.targetLanguage !== "string") return fail("InvalidJson");
+      if (!object(data) || data.format !== GLOSSARY_FILE_FORMAT || (data.version !== 1 && data.version !== 2) || !Array.isArray(data.entries) || typeof data.targetLanguage !== "string") return fail("InvalidJson");
       language = data.targetLanguage; values = data.entries;
     }
   } else {
@@ -109,7 +112,7 @@ export function parseGlossaryFile(raw: string, format: "json" | "csv", fallbackL
       if (data.enabled && !["true", "false"].includes(data.enabled)) return fail("InvalidFields", String(index + 2));
       let aliases: unknown = [];
       if (data.aliases?.trim()) { try { aliases = JSON.parse(data.aliases); } catch { return fail("InvalidAliases", String(index + 2)); } }
-      return { ...data, aliases, enabled: data.enabled !== "false" };
+      return { ...data, aliases, enabled: data.enabled !== "false", mode: data.mode || undefined };
     });
     if (languages.size > 1) return fail("LanguageMismatch");
     language = [...languages][0] ?? fallbackLanguage;
@@ -125,14 +128,15 @@ export function serializeGlossaryFile(entries: readonly GlossaryEntry[], languag
   const portable = [...entries].sort((a, b) => a.source.localeCompare(b.source)).map((entry) => ({
     source: entry.source, replacement: entry.replacement, category: entry.category, aliases: entry.aliases,
     enabled: entry.enabled !== false, notes: entry.notes ?? "", context: contexts.get(entry.source) ?? "",
+    mode: entry.mode ?? "fixed",
   }));
-  if (format === "json") return JSON.stringify({ format: GLOSSARY_FILE_FORMAT, version: 1, targetLanguage: language, entries: portable }, null, 2);
+  if (format === "json") return JSON.stringify({ format: GLOSSARY_FILE_FORMAT, version: entries.some(entry => entry.mode === "inflect") ? 2 : 1, targetLanguage: language, entries: portable }, null, 2);
   return "\uFEFF" + [columns.map(csvCell).join(","), ...portable.map((entry) => [entry.source, entry.replacement, entry.category,
-    JSON.stringify(entry.aliases), String(entry.enabled), entry.notes, entry.context, language].map(csvCell).join(","))].join("\r\n") + "\r\n";
+    JSON.stringify(entry.aliases), String(entry.enabled), entry.notes, entry.context, language, entry.mode].map(csvCell).join(","))].join("\r\n") + "\r\n";
 }
 
 export function entryFingerprint(entry: GlossaryEntry | undefined): string {
-  return entry ? JSON.stringify([entry.id, entry.sourceUuid, entry.source, entry.replacement, entry.category, entry.aliases, entry.enabled !== false, entry.notes ?? "", entry.customized === true]) : "missing";
+  return entry ? JSON.stringify([entry.id, entry.sourceUuid, entry.source, entry.replacement, entry.category, entry.aliases, entry.enabled !== false, entry.mode ?? "fixed", entry.notes ?? "", entry.customized === true]) : "missing";
 }
 
 export function planGlossaryImport(stored: readonly GlossaryEntry[], file: GlossaryFile, language: string): GlossaryImportRow[] {

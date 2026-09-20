@@ -86,6 +86,16 @@ describe("manual glossary persistence", () => {
     expect(updateDocuments).not.toHaveBeenCalled();
     expect(await repo.loadExisting()).toHaveLength(1);
   });
+  it("persists imported inflection through reload and synchronization", async () => {
+    fixture();
+    const repo = new GlossaryCompendiumRepository();
+    await repo.sync([entry(0)]);
+    const old = (await repo.loadExisting())[0]!;
+    const rows = planGlossaryImport([old], {language:"cs",entries:[{...old,mode:"inflect",enabled:true}]},"cs");
+    await repo.importEntries(rows);
+    await repo.sync([entry(0)]);
+    expect((await repo.loadExisting())[0]).toMatchObject({mode:"inflect",enabled:true,customized:true});
+  });
   it("can clear notes and checks cancellation, GM access and locked packs", async () => {
     fixture();
     const repo = new GlossaryCompendiumRepository();

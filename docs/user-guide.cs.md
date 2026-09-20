@@ -1,4 +1,4 @@
-# Foundry Translate 0.17.0 — stručný návod
+# Foundry Translate 0.18.0 — stručný návod
 
 ## První spuštění
 
@@ -47,7 +47,20 @@ V glosáři lze hledat a filtrovat kategorie. Rozbalení položky nabízí:
 - pevný výstupní název nebo překlad;
 - alternativní zápisy oddělené středníkem;
 - kategorii;
-- zapnutí nebo vypnutí ochrany.
+- použití názvu: **Pevný tvar**, **Povolit skloňování**, nebo **Nepoužívat**.
+
+**Pevný tvar** vždy vloží přesný uložený název. **Povolit skloňování** dovolí
+modelu použít název v odpovídajícím pádu, například `Starý Carinth` →
+`do Starého Carinthu`. Funguje pro češtinu přes OpenAI-compatible / LM Studio.
+Model dostane český název přímo v kontextu věty. Modul kontroluje zachování
+slovního základu, počtu slov a ochranných značek. Jde o konzervativní kontrolu
+tvarů, nikoli úplný český morfologický slovník. Neobvyklý tvar může odmítnout;
+neúspěšný opakovaný překlad se zobrazí mezi problémy překladu. Výsledek je potřeba
+jazykově zkontrolovat, zejména nepravidelná fantasy jména.
+
+Chrome, Google a jiné cílové jazyky použijí pevný tvar a při spuštění překladu
+na to upozorní. **Nepoužívat** znamená, že se heslo vůbec nepředá překladači,
+ani jako doporučení. Starší hesla bez uvedeného režimu zůstávají pevná.
 
 Ručně nastavené hodnoty mají přednost při další synchronizaci. Vypnutí
 položku nesmaže; pouze dovolí běžný překlad. Rozlišování velikosti písmen
@@ -81,10 +94,13 @@ náhledu soubor znovu vyberte. Před hromadnými úpravami si můžete uložit p
 JSON jako zálohu a případně jeho změny později importovat stejným postupem.
 
 CSV má povinné sloupce **source, replacement, category**. Volitelné jsou
-**aliases, enabled, notes, context, language**. Export používá UTF-8 s BOM,
+**aliases, enabled, notes, context, language, mode**. Export používá UTF-8 s BOM,
 čárky a uvozovky; import přijme také středníkový oddělovač.
 Prázdný překlad znamená zachování originálu. Aliasy jsou JSON seznam, například
 `["krátký název","jiný zápis"]`; enabled přijímá `true` nebo `false`.
+`mode` přijímá `fixed` nebo `inflect`; prázdná hodnota znamená `fixed`.
+`enabled=false` vypíná i heslo s `mode=inflect`. JSON obsahující skloňování má
+verzi formátu 2. Starší modul ho odmítne, aby skloňování neztratil bez upozornění.
 Kategorie: `character`, `location`, `faction`, `deity`, `item`, `lore`, `term`.
 Kontext slouží jen jako podklad a při importu se neukládá. Poznámky se ukládají
 a jsou dostupné také v detailu položky. Limit souboru je 5 MB / 20 000 položek.

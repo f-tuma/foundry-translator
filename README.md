@@ -2,13 +2,14 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.17.0** includes an adventure translation desk, an Ember-aware name
+Version **0.18.0** includes an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
 Chrome or LM Studio, with Google Cloud available as an optional provider.
 Generated text is structurally validated; language quality still depends on the
 chosen model. The source adventure remains unchanged.
 
-This release replaces automatic AI naming with a reviewed glossary workflow.
+This release adds contextual Czech inflection of reviewed glossary names.
+Automatic AI naming remains disabled; names are chosen through the reviewed glossary workflow.
 Export names as CSV or JSON, edit them with context and notes, then preview and
 select additions or updates before importing. Synchronization only collects
 original names; it does not contact a naming model.
@@ -89,8 +90,9 @@ fills the remaining budget with random excerpts from different Journals and
 random Actor, Item, and Scene names. The prompt explicitly tells the model this
 is an incomplete sample and asks it to infer broad repeated patterns without
 overfitting to one adventure. The GM must review the result and explicitly save
-the settings. Each LLM request also receives the approved glossary as terminology
-reference, while glossary and Foundry tokens remain integrity-protected. Cache
+the settings. Names in the exact glossary mode stay hidden behind protected
+tokens. Names with Czech inflection enabled are inserted in their approved Czech
+form between checked marker pairs so the model can choose their grammatical case. Cache
 entries are separated by server, model, prompt revision, world profile, and
 glossary contents.
 
@@ -112,7 +114,7 @@ with billing and the Cloud Translation API enabled.
 Open **Names and terminology → Export / import**. Synchronize first to collect
 original names, then export **CSV** for collaborative editing or **JSON** for a
 portable backup. Save draft edits before exporting. Both formats include source,
-replacement, category, aliases, enabled state and editorial notes; optional
+replacement, category, aliases, enabled state, usage mode and editorial notes; optional
 context contains bounded excerpts from the adventure and may include spoilers.
 AI naming and its settings have been removed. Previous decisions remain stored;
 unreviewed legacy AI proposals are marked **needs review**.
@@ -128,20 +130,45 @@ server transaction spanning independent GM browsers.
 
 CSV uses UTF-8 with a BOM, quoted comma-separated cells and CRLF. Semicolon-separated
 input is also accepted. Required columns: `source,replacement,category`.
-Optional: `aliases,enabled,notes,context,language`. Keep source names intact;
+Optional: `aliases,enabled,notes,context,language,mode`. Keep source names intact;
 an empty replacement preserves the original. Categories use stable codes:
 `character`, `location`, `faction`, `deity`, `item`, `lore`, `term`.
 Aliases are a JSON array such as `["short name","other spelling"]`; enabled is
-`true` or `false`. Context is reference-only and is not imported.
+`true` or `false`. Mode is `fixed` (the legacy default) or `inflect`.
+Disabled entries are ignored in either mode. Context is reference-only and is not imported.
 Duplicate source names, ambiguous aliases, invalid fields, mixed/different
 languages and files over 5 MB are rejected. Spreadsheet formula prefixes are
 escaped on export and restored on import.
 
-JSON uses `format: "foundry-translate-glossary"`, `version: 1`,
+JSON uses `format: "foundry-translate-glossary"`, `version: 1` (or `2` for files with inflection),
 `targetLanguage` and `entries`. The glossary from older translation bundles can
 also be reviewed here; document translations in those bundles are ignored by
 this glossary-only screen. To revise existing glossary choices, use this screen;
 the separate adventure-bundle import continues to preserve local choices.
+
+### Czech name inflection
+
+Choose **Allow inflection** in a glossary row to retain its approved vocabulary
+while allowing case endings, for example `Starý Carinth` → `do Starého Carinthu`.
+This requires Czech and an OpenAI-compatible instruction model. Chrome, Google
+and other target languages use the exact form; a translation-run warning explains
+that fallback. **Do not use** omits the entry entirely, including terminology hints.
+
+The model sees the canonical name inside paired glossary markers. Restoration
+checks every occurrence, marker integrity, word count, punctuation, Czech suffixes
+and common stem alternations; it restores the glossary's capitalization. This is
+a conservative guard against renaming, not a complete Czech morphology engine or
+a guarantee of correct grammar. Unsupported irregular forms trigger retries and
+the existing visible source-fragment fallback. Failed translations are not cached.
+Foundry UUIDs, commands and HTML boundaries retain their existing protection.
+Mode changes invalidate translation caches and are preserved by sync, imports and
+translation bundles. Version-2 JSON prevents older releases silently dropping modes.
+
+To verify a local model through the production pipeline, run
+`LM_STUDIO_MODEL=hy-mt2-7b npm test -- tests/local-inflection.integration.test.ts`.
+Use the server's exact model ID; optional `LM_STUDIO_URL` and `LM_STUDIO_RESULT`
+set its address and the JSON result path. This integration check is opt-in and
+skipped by regular CI; unit tests alone do not establish a model's Czech quality.
 
 ### Discover and edit names
 

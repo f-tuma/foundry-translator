@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.17.0`; see the deployment and QA entries below.
+- Deployed version: `v0.17.0`. In development: `v0.18.0` on `codex/glossary-inflection`.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,37 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20: user requested grammatical inflection before importing the reviewed
+  Ember glossary. Added `mode: fixed | inflect` (missing = fixed); `enabled=false`
+  still means the entry is ignored. The editor now offers three named choices,
+  with explanations behind an info icon. Mode is persisted in compendium flags,
+  sync, stale-write fingerprints, import previews, CSV/JSON and adventure bundles.
+  Files/bundles with inflection use format version 2 so old releases reject them
+  rather than silently ignoring the behavior. Legacy version-1 JSON/CSV is accepted.
+  Czech OpenAI-compatible providers receive the chosen Czech name between paired
+  FTG markers and may change its case endings. Each occurrence is checked for
+  marker integrity, word count, punctuation and bounded Czech suffix/stem changes.
+  Capitalization follows the glossary, including internal apostrophes. This is a
+  conservative guard, not a full morphology analyser; irregular forms may fail
+  and grammar still depends on the model. Existing retries and visible source
+  fallbacks apply, and failed results are not cached. Chrome/Google/non-Czech use
+  exact forms with a run warning. Mode and prompt revisions invalidate caches.
+  Local CUA QA at 760/360 px: select/save inflection, select/save disabled, import
+  preview, explicit overwrite, immediate editor update and idempotent reimport
+  passed. The real 776-entry prepared import was also saved in the local mock
+  compendium and returned 776 unchanged entries; no console warnings/errors.
+  The live Foundry world and its glossary were not modified. Source exports and
+  the reviewed import stay outside the repository in the conversation directory.
+  JSON/CSV imports now enable all 776 reviewed names with `mode=inflect`, including
+  the 120 originally disabled terms, preserving all 522 chosen translations.
+  Actual local-model validation is still pending: localhost:1234 refused the
+  connection, including outside the sandbox. The user was asked to start LM Studio.
+  Run `LM_STUDIO_MODEL=hy-mt2-7b npm test -- tests/local-inflection.integration.test.ts`
+  (or the exact available model ID). `LM_STUDIO_RESULT=/tmp/result.json` records
+  ten real contextual examples through the production pipeline. This opt-in test
+  is skipped in normal CI. Do not report its language-quality checks as passed
+  until a real server run completes. Release/install have not been performed.
 
 - 2026-09-20: v0.17.0 follows the user's explicit switch to human-reviewed names.
   Removed the naming-model client, prompts, settings UI/registration and benchmark

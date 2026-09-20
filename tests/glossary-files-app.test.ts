@@ -39,6 +39,16 @@ async function fixture() {
 
 describe("glossary file import UI", () => {
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  it("previews and saves an inflection-only change", async () => {
+    const {editor,choose,apply,Event}=await fixture();
+    await choose(serializeGlossaryFile([{source:"Tower",replacement:"Věž",category:"location",aliases:[],mode:"inflect",customized:true}],"cs","json"));
+    expect(editor.element.querySelector('[data-state="changed"]')?.textContent).toContain("Glossary.Mode.inflect");
+    const select=editor.element.querySelector<HTMLInputElement>("[data-select-changed]")!;
+    select.checked=true;select.dispatchEvent(new Event("change"));
+    editor.element.querySelector("[data-file-apply]")!.dispatchEvent(new Event("click"));
+    await vi.waitFor(()=>expect(apply).toHaveBeenCalledOnce());
+    expect(apply.mock.calls[0]?.[0][0]?.after.mode).toBe("inflect");
+  });
   it("leaves existing changes unchecked, writes only selected new entries and prevents repeat import", async () => {
     const { editor, incoming, choose, apply, Event } = await fixture();
     await choose(serializeGlossaryFile(incoming, "cs", "json"));

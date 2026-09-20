@@ -8,7 +8,7 @@ import type { GlossaryEntry } from "./types";
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Glossary.Files.${key}`);
 const escape = (text: string) => text.replace(/[&<>"']/gu, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const help = (key: string) => renderHelpTooltip(t(`${key}Hint`), t(key));
-const metadata = (entry: GlossaryEntry) => t(entry.customized ? "Reviewed" : "NotReviewed") + " · " + `${game.i18n.localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${t(entry.enabled === false ? "Disabled" : "Enabled")}${entry.aliases.length ? ` · ${t("Aliases")}: ${entry.aliases.join("; ")}` : ""}${entry.notes ? ` · ${entry.notes}` : ""}`;
+const metadata = (entry: GlossaryEntry) => t(entry.customized ? "Reviewed" : "NotReviewed") + " · " + `${game.i18n.localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${game.i18n.localize(`FOUNDRY_TRANSLATE.Glossary.Mode.${entry.enabled === false ? "off" : entry.mode ?? "fixed"}`)}${entry.aliases.length ? ` · ${t("Aliases")}: ${entry.aliases.join("; ")}` : ""}${entry.notes ? ` · ${entry.notes}` : ""}`;
 
 export function renderGlossaryFilesView(rows: readonly GlossaryImportRow[], selected: ReadonlySet<string>, fileName: string, loaded: boolean): HTMLElement {
   const root = document.createElement("section");

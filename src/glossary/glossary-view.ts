@@ -87,11 +87,11 @@ export function renderGlossaryRow(entry: GlossaryEntry): HTMLElement {
         <span class="ft-glossary__source" title="${escapeHtml(entry.source)}">${escapeHtml(entry.source)}${needsReview ? `<small class="ft-glossary__review-status">${localize("FOUNDRY_TRANSLATE.Glossary.ReviewNeeded")}</small>` : ""}</span>
         <input type="text" maxlength="240" value="${escapeHtml(entry.replacement)}" data-glossary-replacement data-source="${escapeHtml(entry.source)}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}: ${escapeHtml(entry.source)}">
         <details class="ft-glossary__details">
-          <summary>${localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${localize(entry.enabled === false ? "FOUNDRY_TRANSLATE.Glossary.Automatic" : entry.source === entry.replacement ? "FOUNDRY_TRANSLATE.Glossary.Preserve" : "FOUNDRY_TRANSLATE.Glossary.Fixed")}</summary>
+          <summary>${localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${localize(`FOUNDRY_TRANSLATE.Glossary.Mode.${entry.enabled === false ? "off" : entry.mode ?? "fixed"}`)}</summary>
           <div class="ft-glossary__metadata">
             ${needsReview ? `<span>${localize("FOUNDRY_TRANSLATE.Glossary.LegacyProposal")}</span>` : ""}
             <label>${localize("FOUNDRY_TRANSLATE.Glossary.Notes")}<textarea data-glossary-notes maxlength="2000" rows="2">${escapeHtml(entry.notes ?? "")}</textarea></label>
-            <label><input type="checkbox" data-glossary-enabled ${entry.enabled === false ? "" : "checked"}> ${localize("FOUNDRY_TRANSLATE.Glossary.Enabled")}</label>
+            <label><span class="ft-heading-with-help">${localize("FOUNDRY_TRANSLATE.Glossary.Mode.Label")}${help("FOUNDRY_TRANSLATE.Glossary.Mode.Hint", "FOUNDRY_TRANSLATE.Glossary.Mode.Label")}</span><select data-glossary-mode aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Mode.Label")}: ${escapeHtml(entry.source)}">${["fixed", "inflect", "off"].map(mode => `<option value="${mode}" ${(entry.enabled === false ? "off" : entry.mode ?? "fixed") === mode ? "selected" : ""}>${localize(`FOUNDRY_TRANSLATE.Glossary.Mode.${mode}`)}</option>`).join("")}</select></label>
             <label>${localize("FOUNDRY_TRANSLATE.Glossary.CategoryLabel")}<select data-glossary-category>${categoryOptions(entry.category)}</select></label>
             <label>${localize("FOUNDRY_TRANSLATE.Glossary.Aliases")}<input type="text" data-glossary-aliases-input value="${escapeHtml(entry.aliases.join("; "))}" maxlength="2000" placeholder="${localize("FOUNDRY_TRANSLATE.Glossary.AliasesHint")}"></label>
           </div>
@@ -108,14 +108,16 @@ export function readGlossaryRow(row: HTMLElement, entry: GlossaryEntry): Glossar
   const category = row.querySelector<HTMLSelectElement>("[data-glossary-category]")?.value;
   const aliases = (row.querySelector<HTMLInputElement>("[data-glossary-aliases-input]")?.value ?? "")
     .split(";").map((alias) => alias.normalize("NFC").trim()).filter(Boolean);
-  const enabled = row.querySelector<HTMLInputElement>("[data-glossary-enabled]")?.checked !== false;
+  const selectedMode = row.querySelector<HTMLSelectElement>("[data-glossary-mode]")?.value ?? (entry.enabled === false ? "off" : entry.mode ?? "fixed");
+  const enabled = selectedMode !== "off";
+  const mode = selectedMode === "off" ? entry.mode ?? "fixed" : selectedMode === "inflect" ? "inflect" : "fixed";
   const notes = row.querySelector<HTMLTextAreaElement>("[data-glossary-notes]")?.value.normalize("NFC").trim() ?? entry.notes ?? "";
-  return { ...entry, replacement, aliases, enabled, notes, category: isGlossaryCategory(category) ? category : entry.category };
+  return { ...entry, replacement, aliases, enabled, mode, notes, category: isGlossaryCategory(category) ? category : entry.category };
 }
 
 export function hasGlossaryEdits(edited: GlossaryEntry, original: GlossaryEntry): boolean {
   return (edited.notes ?? "") !== (original.notes ?? "") || edited.replacement !== original.replacement || edited.category !== original.category
-    || (edited.enabled !== false) !== (original.enabled !== false) || JSON.stringify(edited.aliases) !== JSON.stringify(original.aliases);
+    || (edited.enabled !== false) !== (original.enabled !== false) || (edited.mode ?? "fixed") !== (original.mode ?? "fixed") || JSON.stringify(edited.aliases) !== JSON.stringify(original.aliases);
 }
 
 /** Update only settled rows. Keep draft inputs, focus, filters, details and scroll in place. */

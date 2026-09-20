@@ -7,7 +7,8 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 7;
+const PROMPT_REVISION = 8;
+const INFLECTION_INSTRUCTIONS = "Some __FTG_ markers form a pair: __FTG_NONCE_ID__Approved Czech Name__FTG_NONCE_IDEND__. The words inside each pair are an approved Czech glossary name, already translated. Keep BOTH markers unchanged and in place around that name. Use this exact vocabulary; only inflect its words to the grammatical case required by the surrounding Czech sentence. Do not rename, translate again, add or remove words inside a pair. For example: to __FTG_X_0000__Starý Carinth__FTG_X_0000END__ becomes do __FTG_X_0000__Starého Carinthu__FTG_X_0000END__. A standalone title keeps the canonical form. Adapt surrounding articles, prepositions, gender and agreement naturally. Fixed markers without an END partner remain opaque and unchanged.";
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
 
@@ -218,6 +219,7 @@ function splitBatch(text: string, boundaryTokens: readonly string[]): string[] |
 }
 
 export class OpenAiCompatibleProvider implements TranslationProvider {
+  readonly supportsGlossaryInflection = true;
   readonly #baseUrl: string;
   readonly #model: string;
   readonly #apiKey: string;
@@ -388,6 +390,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
   async #translateOne(text: string, request: TranslateRequest): Promise<string> {
     const source = languageLabel(request.sourceLanguage);
     const target = languageLabel(request.targetLanguage);
+    const inflection = request.targetLanguage === "cs" && /__FTG_[A-Z0-9]+_[A-Z0-9]+END__/iu.test(text)
+      ? INFLECTION_INSTRUCTIONS : "";
     const system = [
       `Translate from ${source} to ${target}.`,
       "Return only the translated text, without commentary, labels, or Markdown fences.",
@@ -396,7 +400,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       "Preserve every token beginning with __FTN_, __FTG_, __FTS_, or __FTB_ byte-for-byte, exactly once, and in the original order.",
       "FTB tokens delimit independent translation items. Translate every item independently and never move words across an FTB boundary.",
       "Preserve the meaning, tone, paragraph structure, and surrounding whitespace.",
-      "Keep proper names of people, places, factions and unique objects in their original spelling without inflection. Translate ordinary roles and game terms.",
+      "Keep other proper names in their original spelling. Translate ordinary roles and game terms.",
+      ...(inflection ? [inflection] : []),
       "This is a tabletop roleplaying adventure. Use fluent narration suitable for reading aloud and precise game instructions.",
       ...(request.targetLanguage === "cs" ? [
         "Use idiomatic, grammatically correct Czech. In game instructions, party means družina, a check means ověření, and roll the dice means hoďte kostkami. Silently check spelling before returning the translation.",
@@ -440,7 +445,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
               // the user message. Its sampling defaults also avoid degenerate
               // greedy decoding on long delimiter-heavy batches.
               role: "user",
-              content: `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep all proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}\n\n[Source Text]\n${text}`,
+              content: `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep other proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}${inflection ? `\n${inflection}` : ""}\n\n[Source Text]\n${text}`,
             }] : [
               { role: "system", content: system },
               { role: "user", content: `<text_to_translate>\n${text}\n</text_to_translate>` },
