@@ -262,5 +262,10 @@
   "FOUNDRY_TRANSLATE.Glossary.AI.Uncertain": "nejistý význam",
   "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot": "Návrh AI změnil chráněnou část jména. Původní název zůstal zachovaný; ostatní názvy lze zpracovat dál.",
   "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel": "ochrana jména",
-  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Příprava názvů"
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Příprava názvů",
+  "FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecisionLabel": "ke kontrole",
+  "FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecision": "AI vrátila pro tento název neplatný návrh. Název zůstal původní a zpracování ostatních položek pokračovalo. Překlad můžete upravit ručně.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.FilterLabel": "AI pojmenování",
+  "FOUNDRY_TRANSLATE.Glossary.AI.FilterAll": "Všechny názvy",
+  "FOUNDRY_TRANSLATE.Glossary.AI.InvalidResponse": "Model vrátil nečitelnou nebo neúplnou dávku názvů. Hotové položky jsou uložené; zbývající názvy zůstaly původní. Synchronizaci můžete zopakovat."
 }

@@ -2,14 +2,16 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.16.1** includes an adventure translation desk, an Ember-aware name
+Version **0.16.2** includes an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
 Chrome or LM Studio, with Google Cloud available as an optional provider.
 Generated text is structurally validated; language quality still depends on the
 chosen model. The source adventure remains unchanged.
 
-This release adds optional contextual fantasy naming, clearer help tooltips,
-aligned translation controls and reliable compendium folder placement.
+This release keeps the glossary editor live during naming: saved batches appear
+without closing the window, and drafts, filters and scroll position stay in place.
+Invalid individual AI proposals preserve the original name and are marked for
+review, while the other names continue processing.
 
 ## Quick start
 
