@@ -65,7 +65,11 @@ try {
   // Quantization/runtime metadata is useful when the server exposes it. Optional on other servers.
   const metadata = await fetch(`${new URL(values.url).origin}/api/v1/models`, { signal: AbortSignal.timeout(10_000) }).then((r) => r.ok ? r.json() : null).catch(() => null);
   report.modelMetadata = metadata?.models?.find((m) => m.key === values.model || m.loaded_instances?.some((instance) => instance.id === values.model));
-  for (let repeat = 0; repeat < repetitions; repeat++) {
+  const modelFile = report.modelMetadata?.key?.split("/").at(-1) ?? values.model.split("/").at(-1);
+  if (/^mtp[-_]/iu.test(modelFile) || /^mtp\s/iu.test(report.modelMetadata?.display_name ?? "")) {
+    throw new Error("This is an MTP auxiliary model. Select the main language model before benchmarking naming quality.");
+  }
+  runs: for (let repeat = 0; repeat < repetitions; repeat++) {
     for (let start = 0; start < cases.length; start += 8) {
       const subset = cases.slice(start, start + 8);
       const entries = subset.map((c, i) => ({ source: c.source, replacement: c.source, category: c.category, aliases: [], sourceUuid: `Test.${start + i}` }));
@@ -75,14 +79,22 @@ try {
       let decisions, error;
       try { decisions = await client.analyze(entries, contexts, values.model); }
       catch (cause) { error = cause.message; }
-      const batch = { repeat, start, seconds: Number(((performance.now() - began) / 1000).toFixed(3)), error, requests, decisions };
+      const lastRequest = requests.at(-1);
+      const inferenceCompleted = !!lastRequest && lastRequest.status >= 200 && lastRequest.status < 300;
+      const batch = { repeat, start, seconds: Number(((performance.now() - began) / 1000).toFixed(3)), inferenceCompleted, error, requests, decisions };
+      if (!inferenceCompleted) report.aborted = { reason: "Inference unavailable; not a language-quality result.",
+        status: lastRequest?.status, serverError: lastRequest?.error, error };
       report.batches.push(batch);
       await writeFile(output, JSON.stringify(report, null, 2) + "\n");
-      console.log(JSON.stringify({ repeat, start, seconds: batch.seconds, error,
+      console.log(JSON.stringify({ repeat, start, seconds: batch.seconds, inferenceCompleted, error,
         decisions: decisions?.map((d) => ({ source: d.source, replacement: d.replacement })) }));
+      if (!inferenceCompleted) break runs;
     }
   }
-  console.log(JSON.stringify({ output, acceptedBatches: report.batches.filter((b) => !b.error).length, totalBatches: report.batches.length }));
+  console.log(JSON.stringify({ output, acceptedBatches: report.batches.filter((b) => b.inferenceCompleted && !b.error).length,
+    evaluatedBatches: report.batches.filter((b) => b.inferenceCompleted).length,
+    attemptedBatches: report.batches.length, aborted: report.aborted }));
+  if (report.aborted) process.exitCode = 1;
 } finally {
   await rm(work, { recursive: true, force: true });
 }

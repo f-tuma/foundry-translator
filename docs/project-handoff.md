@@ -50,6 +50,13 @@ and the recommended implementation order.
   `npm run benchmark:naming` script. Old Carinth and Strayhearth are
   user-preferred few-shot examples, not held-out evidence.
 
+  Follow-up Qwen3.8 check: only two MTP auxiliary downloads became available
+  (`Mtp Qwen3.8 27B`, 3.0B parameters, BF16 and Q4_0). The main 27B model is not
+  available yet. The user was given the exact main-file choice
+  `ggml-org/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf` (~19 GB), without `mtp-`.
+  Do not grade the helper models as Qwen3.8 quality. Benchmark transport failures
+  now stop immediately and are excluded from the evaluated-batch count.
+
   Compendium folder root cause was confirmed by read-only inspection of Foundry
   14.368: setFolder -> configure rewrites the full core.compendiumConfiguration
   snapshot. Concurrent moves lose another pack's assignment. All module moves
