@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.15.2`; see the deployment and QA entries below.
+- Current implementation: `v0.16.0`; see the deployment and QA entries below.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,15 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20: the user authorized release and installation of the current work.
+  Preparing v0.16.0 from PR #15. AI naming is now explicitly opt-in (off by
+  default), so upgrading an existing world without a naming-model selection
+  preserves its prior workflow without a missing-model warning. The separate
+  naming model still requires an explicit choice. The release includes the
+  tested UI and compendium fixes and optional fantasy-name localization.
+  The earlier no-instance-change restriction is superseded by this deployment
+  request; ordinary translation runs still require their own task scope.
 
 - 2026-09-20 development branch `codex/ui-alignment-help` (not deployed):
   added AI naming during glossary sync, saved in batches of eight with progress,

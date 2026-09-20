@@ -76,8 +76,8 @@ export function renderTranslatorSettingsForm(
         <div class="ft-field">
           <div class="ft-field__label"><label for="ft-glossary-ai">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name")}</label>${help("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint", "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name")}</div>
           <select id="ft-glossary-ai" name="glossaryAiEnabled">
-            <option value="true">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Automatic")}</option>
             <option value="false">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Preserve")}</option>
+            <option value="true">${localize("FOUNDRY_TRANSLATE.Settings.GlossaryAI.Automatic")}</option>
           </select>
         </div>
         <div class="ft-field">
@@ -186,7 +186,7 @@ export function renderTranslatorSettingsForm(
 
   const glossaryAiEnabled = form.querySelector<HTMLSelectElement>("[name='glossaryAiEnabled']");
   const glossaryAiModel = form.querySelector<HTMLInputElement>("[name='glossaryAiModel']");
-  if (glossaryAiEnabled instanceof HTMLSelectElement) glossaryAiEnabled.value = String(settings.glossaryAiEnabled !== false);
+  if (glossaryAiEnabled instanceof HTMLSelectElement) glossaryAiEnabled.value = String(settings.glossaryAiEnabled === true);
   if (glossaryAiModel instanceof HTMLInputElement) glossaryAiModel.value = settings.glossaryAiModel ?? "";
   updateProviderFields(form, settings.provider);
   activateHelpTooltips(form);

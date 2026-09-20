@@ -10,7 +10,7 @@ import { TranslationDesk } from "../ui/translation-desk";
 export function registerSettings(): void {
   game.settings.register(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED, {
     name: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Name", hint: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Hint",
-    scope: "world", config: false, type: Boolean, default: true,
+    scope: "world", config: false, type: Boolean, default: false,
   });
   game.settings.register(MODULE_ID, SETTINGS.GLOSSARY_AI_MODEL, {
     name: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.Model", hint: "FOUNDRY_TRANSLATE.Settings.GlossaryAI.ModelHint",

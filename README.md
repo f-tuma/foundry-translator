@@ -2,14 +2,14 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.15.2** includes an adventure translation desk, an Ember-aware name
+Version **0.16.0** includes an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
 Chrome or LM Studio, with Google Cloud available as an optional provider.
 Generated text is structurally validated; language quality still depends on the
 chosen model. The source adventure remains unchanged.
 
-The 0.15.1 patch also protects glossary names inside Foundry link labels and
-keeps older page translations across repeated single-page refreshes.
+This release adds optional contextual fantasy naming, clearer help tooltips,
+aligned translation controls and reliable compendium folder placement.
 
 ## Quick start
 
@@ -105,9 +105,9 @@ with billing and the Cloud Translation API enabled.
 
 ## Protected name glossary
 
-### Development branch: contextual names
+### Optional contextual fantasy names
 
-The unreleased build can use a separate instruction model to decide stable
+The module can use a separate instruction model to decide stable
 translations for newly discovered names. Short descriptions and nearby mentions
 provide context. Clear descriptive names are saved automatically; uncertain
 names retain their source form. Meaningful personal names, surnames and epithets
@@ -116,7 +116,8 @@ setting. The resulting glossary choice is reused consistently. Manual edits and 
 glossaries take precedence. Ember group Actors, including caravans, are categorized
 as factions so their descriptive names can be considered.
 
-Under **Translator and language**, choose the naming policy and an explicit
+AI naming is off by default, preserving the existing translation workflow.
+Under **Translator and language**, enable the AI naming policy and choose an explicit
 **Glossary model** ID on the same OpenAI-compatible server. No automatic model is
 selected until a candidate passes Czech naming QA. Qwen3.5 9B Q4_K_M and
 Granite 4.2 8B Q4_K_S failed the
@@ -135,11 +136,11 @@ a declared opaque root or conflicts with an established name, that entry retains
 its original name with a localized explanation and the other entries continue.
 Malformed responses still stop the batch safely.
 
-This branch also serializes compendium folder updates and repairs existing
+The module also serializes compendium folder updates and repairs existing
 module packs on world startup. This avoids simultaneous pack creation undoing
 another pack's folder assignment.
 
-### Released behavior
+### Discover and edit names
 
 As Game Master open **Configure Settings → Module Settings → Name glossary** and
 select **Manage glossary**. The module discovers Actor and Scene names plus typed Ember location, biome,

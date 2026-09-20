@@ -41,7 +41,7 @@ export function getTranslatorSettings(): TranslatorSettings {
   );
 
   return {
-    glossaryAiEnabled: game.settings.get(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED) !== false,
+    glossaryAiEnabled: game.settings.get(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED) === true,
     glossaryAiModel: String(game.settings.get(MODULE_ID, SETTINGS.GLOSSARY_AI_MODEL) ?? ""),
     provider: isProviderId(storedProvider) ? storedProvider : "chrome-local",
     apiKey: String(game.settings.get(MODULE_ID, SETTINGS.GOOGLE_API_KEY) ?? ""),
@@ -61,7 +61,7 @@ export function getTranslatorSettings(): TranslatorSettings {
 }
 
 export async function saveTranslatorSettings(settings: TranslatorSettings): Promise<void> {
-  await game.settings.set(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED, settings.glossaryAiEnabled !== false);
+  await game.settings.set(MODULE_ID, SETTINGS.GLOSSARY_AI_ENABLED, settings.glossaryAiEnabled === true);
   await game.settings.set(MODULE_ID, SETTINGS.GLOSSARY_AI_MODEL, settings.glossaryAiModel?.trim() ?? "");
   await game.settings.set(MODULE_ID, SETTINGS.PROVIDER, settings.provider);
   await game.settings.set(MODULE_ID, SETTINGS.GOOGLE_API_KEY, settings.apiKey.trim());

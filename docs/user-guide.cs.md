@@ -1,4 +1,4 @@
-# Foundry Translate 0.15.2 — stručný návod
+# Foundry Translate 0.16.0 — stručný návod
 
 ## První spuštění
 
@@ -58,11 +58,12 @@ být objeven automaticky. Takové názvy přidejte jednou ručně. Například
 frakce uvedená pouze v odstavci nebude bezpečně rozpoznána podle toho, že
 začíná velkým písmenem. Pokyn modelu k zachování jmen sám není záruka.
 
-## Připravovaná verze: názvy podle kontextu
+## Volitelné názvy podle kontextu
 
-Tato část popisuje vývojovou větev; v nainstalované verzi 0.15.2 zatím není.
+AI pojmenování je při aktualizaci i nové instalaci vypnuté. Zapněte ho výběrem
+**AI s kontextem · nejasné názvy zachovat** a zadejte **Model pro glosář**.
 
-V nastavení překladače přibývají **Pravidla překladu názvů** a **Model pro glosář**.
+Tyto volby najdete v **Překladač a jazyk** pod poskytovatelem LM Studio.
 AI dostane krátký popis a okolní zmínky. Jasně popisné názvy uloží rovnou jako
 pevný překlad; nejasné názvy ponechá. Překládat lze i smysluplná jména postav,
 příjmení a přídomky, pokud výsledek zní přirozeně a uvěřitelně ve fantasy světě.

@@ -37,6 +37,18 @@ function fixture(onRequest?: () => void, invalid = false) {
 
 describe("AI glossary persistence", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it("keeps existing installations on original names until AI naming is explicitly enabled", async () => {
+    for (const enabled of [undefined, false]) {
+      const { request, settings } = fixture();
+      settings.glossaryAiEnabled = enabled;
+      settings.glossaryAiModel = "";
+      const repo = new GlossaryCompendiumRepository();
+      const result = await repo.sync([entry(0)]);
+      expect(request).not.toHaveBeenCalled();
+      expect(result.aiWarning).toBeUndefined();
+      expect((await repo.loadExisting())[0]?.replacement).toBe("Old Town0");
+    }
+  });
   it("includes character names in contextual naming and reuses the saved choice", async () => {
     const { request } = fixture();
     const repo = new GlossaryCompendiumRepository();

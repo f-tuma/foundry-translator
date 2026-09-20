@@ -184,7 +184,7 @@ export class GlossaryCompendiumRepository {
       unchanged: plan.unchanged.length,
     };
     const settings = getTranslatorSettings();
-    if (settings.provider !== "openai-compatible" || settings.glossaryAiEnabled === false) return result;
+    if (settings.provider !== "openai-compatible" || settings.glossaryAiEnabled !== true) return result;
     const discoveredSources = new Set(discoveredEntries.map((entry) => entry.source));
     const pending = (await loadFromPack(pack)).filter((entry) => discoveredSources.has(entry.source) && needsNameAnalysis(entry, settings.targetLanguage));
     if (!pending.length) return result;
