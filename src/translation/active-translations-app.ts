@@ -58,7 +58,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
     ? Math.min(100, Math.round((run.completedUnits / run.plan.totalUnits) * 100))
     : 0;
   const counts = showGlossaryProgress
-    ? localize("FOUNDRY_TRANSLATE.Glossary.AI.Progress").replace("{completed}", String(run.glossaryCompleted ?? 0)).replace("{total}", String(run.glossaryTotal ?? 0))
+    ? localize("FOUNDRY_TRANSLATE.Glossary.Status.Progress").replace("{completed}", String(run.glossaryCompleted ?? 0)).replace("{total}", String(run.glossaryTotal ?? 0))
     : run.plan
     ? localize("FOUNDRY_TRANSLATE.ActiveTranslations.Counts")
         .replace("{units}", String(run.completedUnits))

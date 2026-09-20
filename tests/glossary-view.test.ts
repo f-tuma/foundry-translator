@@ -16,8 +16,8 @@ describe("Glossary view", () => {
       naming: { revision: 1, source: "Lyla's Caravan", targetLanguage: "cs", model: "test", action: "preserve", confidence: "uncertain", reason: "The changed name is safe", guard: "protected-root" },
     }] });
     const row = view.querySelector("[data-glossary-row]")!;
-    expect(row.textContent).toContain("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel");
-    expect(row.querySelector(".ft-help-tip")?.getAttribute("aria-description")).toBe("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot");
+    expect(row.textContent).toContain("FOUNDRY_TRANSLATE.Glossary.ReviewNeeded");
+    expect(row.textContent).toContain("FOUNDRY_TRANSLATE.Glossary.LegacyProposal");
     expect(row.innerHTML).not.toContain("The changed name is safe");
     expect(row.querySelector<HTMLInputElement>("[data-glossary-replacement]")?.value).toBe("Lyla's Caravan");
   });
@@ -80,7 +80,7 @@ describe("Glossary view", () => {
     expect(view.querySelectorAll("[data-glossary-row]:not([hidden])")).toHaveLength(2);
   });
 
-  it("keeps a focused clean input stable until focus leaves, then shows its saved AI result", () => {
+  it("keeps a focused clean input stable until focus leaves, then shows its saved result", () => {
     const { document } = parseHTML("<html><body></body></html>");
     vi.stubGlobal("document", document);
     vi.stubGlobal("game", { i18n: { localize: (key: string) => key } });
@@ -107,8 +107,8 @@ describe("Glossary view", () => {
     filter.querySelector('[value="review"]')!.setAttribute("selected", "");
     filter.querySelector('[value=""]')!.removeAttribute("selected");
     expect(updateGlossaryFilter(view, "").matches).toBe(1);
-    expect(view.querySelector(".ft-glossary__review-status")?.textContent).toContain("InvalidDecisionLabel");
-    expect(view.querySelector('[data-naming-status="review"] .ft-help-tip')?.getAttribute("aria-description")).toContain("InvalidDecision");
+    expect(view.querySelector(".ft-glossary__review-status")?.textContent).toContain("ReviewNeeded");
+    expect(view.querySelector('[data-naming-status="review"]')?.textContent).toContain("LegacyProposal");
   });
 
   it("renders candidates as editable review rows with explicit decisions", () => {

@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.16.2`; see the deployment and QA entries below.
+- Current implementation: `v0.17.0`; see the deployment and QA entries below.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,38 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20: v0.17.0 follows the user's explicit switch to human-reviewed names.
+  Removed the naming-model client, prompts, settings UI/registration and benchmark
+  runner. Saved legacy decisions are retained and marked for review; no migration
+  rewrites replacements. Ordinary prose translation providers remain available.
+  Glossary → Export / import provides standalone JSON and UTF-8 CSV with optional
+  bounded context, category/aliases/enabled state and persistent editorial notes.
+  Import previews old/new values, selects only new rows initially, and requires
+  explicit selection of updates (including approval of an unchanged unreviewed
+  name). Blank replacements preserve originals; omitted entries are not deleted.
+  It rejects duplicate source keys, conflicting aliases, mismatched languages,
+  malformed files and stale selected rows before writing. CSV quotes/newlines,
+  semicolon separators and spreadsheet-formula escaping round-trip correctly.
+  Context and internal IDs/provenance are excluded from imported fields. Existing
+  world IDs/source links are retained when updating. Writes are serialized and
+  rechecked inside the local client's write queue; this is not a multi-client
+  server transaction. JSON from legacy adventure bundles is accepted for its
+  glossary; the separate adventure bundle importer still preserves local choices.
+  The active glossary refreshes through its existing live feed. Drafts block
+  file operations until saved, and file selection errors discard any older
+  actionable preview. Help text stays behind info icons.
+  Local CUA QA used the real editor, file controller, parser, repository and
+  compendium read/write adapter with synthetic records. CSV upload preview,
+  explicit overwrite selection, save, immediate editor refresh, unchanged-row
+  detection, search and invalid-file rejection passed. Actual CSV and JSON
+  downloads were parsed on disk and verified for notes/context and chosen names.
+  Windows at 760/360 px rendered without horizontal overflow; no relevant console
+  errors or framework overlays. A fixture import typo was fixed before UI testing.
+  One CUA file chooser wait was invalidated by Vite reloading during edits; the
+  chooser flow succeeded again after reacquiring the tab. No external browser
+  process or script injection was used. No world glossary changes were made in
+  these tests. Publication and installation verification follow after deployment.
 
 - 2026-09-20: v0.16.2 fixes the user's live glossary failure. Browser console
   reported `Invalid name decision fields`; LM Studio's server log at 16:02:12

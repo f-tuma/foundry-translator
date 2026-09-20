@@ -28,6 +28,7 @@ describe("translator settings view", () => {
       targetLanguage: "cs",
     });
 
+    expect(form.querySelector("[name=glossaryAiEnabled],[name=glossaryAiModel]")).toBeNull();
     expect(form.querySelector<HTMLInputElement>("[name='openAiModel']")?.value)
       .toBe("google/gemma-4-12b-qat");
     expect(form.querySelector<HTMLTextAreaElement>("[name='worldContext']")?.value)

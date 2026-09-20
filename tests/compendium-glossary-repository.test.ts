@@ -1,25 +1,19 @@
 import { parseHTML } from "linkedom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GlossaryCompendiumRepository, GLOSSARY_PACK_ID } from "../src/glossary/compendium-repository";
-import { NamingCancelledError } from "../src/glossary/name-analysis";
+import { GlossarySyncCancelledError } from "../src/glossary/types";
+import { planGlossaryImport } from "../src/glossary/files";
 import type { GlossaryEntry } from "../src/glossary/types";
 import { glossaryLive } from "../src/glossary/live";
 
 const entry = (index: number): GlossaryEntry => ({ source: `Old Town${index}`, replacement: `Old Town${index}`, aliases: [], category: "location", sourceUuid: `Scene.${index}` });
-function fixture(onRequest?: () => void, invalid = false) {
+function fixture() {
   const records = new Map<string, FoundryCompendiumIndexEntry>();
   let nextId = 1;
   const folder = { id: "folder", name: "Foundry Translate", type: "Compendium" };
   const pack = { collection: GLOSSARY_PACK_ID, folder, locked: false, getIndex: async () => new Map([...records].map(([id, record]) => [id, structuredClone(record)])) };
   const settings: Record<string, unknown> = { provider: "openai-compatible", glossaryAiEnabled: true, openAiBaseUrl: "http://localhost:1234/v1", openAiModel: "hy-mt2-7b", glossaryAiModel: "qwen3.5-9b", targetLanguage: "cs" };
-  const request = vi.fn(async (_url: string, init?: RequestInit) => {
-    if (init?.method === "GET") return new Response(JSON.stringify({ data: [{ id: "qwen3.5-9b" }] }));
-    onRequest?.();
-    if (invalid) return new Response(JSON.stringify({ output: [{ type: "message", content: "not valid JSON" }] }));
-    const input = JSON.parse(JSON.parse(init?.body as string).input);
-    const decisions = input.candidates.map((candidate: { id: number; name: string }) => ({ id: candidate.id, action: "translate", replacement: candidate.name.replace("Old", "Starý"), roots: [candidate.name.split(" ")[1]], confidence: "high", reason: "Popisné přídavné jméno." }));
-    return new Response(JSON.stringify({ output: [{ type: "message", content: JSON.stringify({ decisions }) }] }));
-  });
+  const request = vi.fn();
   const updateDocuments = vi.fn(async (documents: FoundryJournalEntryData[]) => {
     for (const doc of documents) records.set(doc._id as string, structuredClone(doc) as FoundryCompendiumIndexEntry);
     return [];
@@ -36,173 +30,72 @@ function fixture(onRequest?: () => void, invalid = false) {
   return { records, request, updateDocuments, settings };
 }
 
-describe("AI glossary persistence", () => {
+describe("manual glossary persistence", () => {
   afterEach(() => vi.unstubAllGlobals());
-  it("keeps existing installations on original names until AI naming is explicitly enabled", async () => {
-    for (const enabled of [undefined, false]) {
-      const { request, settings } = fixture();
-      settings.glossaryAiEnabled = enabled;
-      settings.glossaryAiModel = "";
-      const repo = new GlossaryCompendiumRepository();
-      const result = await repo.sync([entry(0)]);
-      expect(request).not.toHaveBeenCalled();
-      expect(result.aiWarning).toBeUndefined();
-      expect((await repo.loadExisting())[0]?.replacement).toBe("Old Town0");
-    }
-  });
-  it("includes character names in contextual naming and reuses the saved choice", async () => {
-    const { request } = fixture();
-    const repo = new GlossaryCompendiumRepository();
-    const person = { ...entry(0), category: "character" as const };
-    await repo.sync([person]);
-    expect(request).toHaveBeenCalledTimes(2);
-    expect((await repo.loadExisting())[0]?.replacement).toBe("Starý Town0");
-    await repo.sync([person]);
-    expect(request).toHaveBeenCalledTimes(2);
-  });
-  it("checkpoints protected-root fallbacks and continues into the next batch", async () => {
-    const { request } = fixture();
-    const original = request.getMockImplementation()!;
-    request.mockImplementation(async (url, init) => {
-      const response = await original(url, init);
-      if (init?.method === "GET") return response;
-      const data = await response.json();
-      const content = JSON.parse(data.output[0].content);
-      if (content.decisions[0]?.replacement === "Starý Town0") {
-        content.decisions[0].replacement = "Starý Town0x";
-      }
-      data.output[0].content = JSON.stringify(content);
-      return new Response(JSON.stringify(data));
-    });
-    const repo = new GlossaryCompendiumRepository();
-    const entries = Array.from({ length: 9 }, (_, i) => entry(i));
-    const result = await repo.sync(entries);
-    expect(result.aiTranslated).toBe(8);
-    expect(result.aiPreserved).toBe(1);
-    expect(result.aiWarning).toBeFalsy();
-    const saved = await repo.loadExisting();
-    expect(saved.find((e) => e.source === "Old Town0")).toMatchObject({ replacement: "Old Town0", naming: { guard: "protected-root" } });
-    expect(saved.find((e) => e.source === "Old Town8")?.replacement).toBe("Starý Town8");
-    const calls = request.mock.calls.length;
-    await repo.sync(entries);
-    expect(request).toHaveBeenCalledTimes(calls);
-  });
-  it("publishes saved batches while the next batch is still pending", async () => {
-    const { request } = fixture();
-    const original = request.getMockImplementation()!;
-    let finishNext!: () => void;
-    const waiting = new Promise<void>((resolve) => { finishNext = resolve; });
-    let nextStarted!: () => void;
-    const started = new Promise<void>((resolve) => { nextStarted = resolve; });
-    let batches = 0;
-    request.mockImplementation(async (url, init) => {
-      if (init?.method !== "GET" && ++batches === 2) { nextStarted(); await waiting; }
-      return original(url, init);
-    });
-    const snapshots: number[] = [];
-    const unsubscribe = glossaryLive.subscribe(({ entries }) => snapshots.push(entries?.filter((entry) => entry.naming).length ?? 0));
-    const repo = new GlossaryCompendiumRepository();
-    const running = repo.sync(Array.from({ length: 9 }, (_, i) => entry(i)));
-    try {
-      await started;
-      expect(glossaryLive.state.running).toBe(true);
-      expect(snapshots).toContain(8);
-      expect((await repo.loadExisting()).filter((entry) => entry.naming)).toHaveLength(8);
-    } finally { finishNext(); await running; unsubscribe(); }
-    expect(glossaryLive.state.running).toBe(false);
-    expect(glossaryLive.state.entries?.filter((entry) => entry.naming)).toHaveLength(9);
-  });
-  it("does not stop at an invalid individual root or retry the same bad proposal forever", async () => {
-    const { request } = fixture();
-    const original = request.getMockImplementation()!;
-    request.mockImplementation(async (url, init) => {
-      const response = await original(url, init);
-      if (init?.method === "GET") return response;
-      const data = await response.json();
-      const content = JSON.parse(data.output[0].content);
-      content.decisions[0].roots = ["not in source"];
-      data.output[0].content = JSON.stringify(content);
-      return new Response(JSON.stringify(data));
-    });
-    const repo = new GlossaryCompendiumRepository();
-    const entries = Array.from({ length: 9 }, (_, i) => entry(i));
-    const result = await repo.sync(entries);
-    expect(result.aiWarning).toBeUndefined();
-    expect(result.aiTranslated).toBe(7);
-    expect(result.aiPreserved).toBe(2);
-    expect((await repo.loadExisting())[0]?.naming?.guard).toBe("invalid-decision");
-    const calls = request.mock.calls.length;
-    await repo.sync(entries);
-    expect(request.mock.calls.length).toBe(calls);
-  });
-  it("passes saved choices from an earlier batch as authoritative name context", async () => {
-    const { request } = fixture();
-    const repo = new GlossaryCompendiumRepository();
-    const entries = Array.from({ length: 8 }, (_, i) => entry(i));
-    entries.push({ ...entry(8), source: "Old Town0 Keep", replacement: "Old Town0 Keep" });
-    await repo.sync(entries);
-    const body = JSON.parse(request.mock.calls.at(-1)?.[1]?.body as string);
-    expect(JSON.parse(body.input).establishedNames).toEqual([{ source: "Old Town0", replacement: "Starý Town0" }]);
-    expect((await repo.loadExisting()).find((e) => e.source === "Old Town0 Keep")?.replacement).toBe("Starý Town0 Keep");
-  });
-  it("saves choices once and reuses them on subsequent and simultaneous syncs", async () => {
+  it("never calls a naming model, including worlds with the former feature enabled", async () => {
     const { request } = fixture();
     const repo = new GlossaryCompendiumRepository();
     const results = await Promise.all([repo.sync([entry(0)]), repo.sync([entry(0)])]);
-    expect(results[0]?.aiTranslated).toBe(1);
-    expect((await repo.loadExisting())[0]?.replacement).toBe("Starý Town0");
-    expect(request).toHaveBeenCalledTimes(2); // one model list, one batch
-    await repo.sync([entry(0)]);
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(results.map((r) => r.created)).toEqual([1, 0]);
+    expect(request).not.toHaveBeenCalled();
+    expect((await repo.loadExisting())[0]?.replacement).toBe("Old Town0");
+    expect(glossaryLive.state.entries).toHaveLength(1);
   });
-  it("does not overwrite an edit made while inference is running", async () => {
-    const { records } = fixture(() => {
-      const record = records.get("1")!;
-      const flag = record.flags!["foundry-translate"]!.glossary as Record<string, unknown>;
-      flag.replacement = "Ruční překlad";
-      flag.customized = true;
-    });
-    const repo = new GlossaryCompendiumRepository();
-    await repo.sync([entry(0)]);
-    expect((await repo.loadExisting())[0]?.replacement).toBe("Ruční překlad");
-    expect((await repo.loadExisting())[0]?.naming).toBeUndefined();
-  });
-  it("checkpoints complete batches and resumes remaining names after cancellation", async () => {
+  it("keeps legacy decisions and manual edits during discovery", async () => {
     fixture();
     const repo = new GlossaryCompendiumRepository();
-    const entries = Array.from({ length: 9 }, (_, i) => entry(i));
-    let cancel = false;
-    await expect(repo.sync(entries, {
-      shouldCancel: () => cancel,
-      onProgress: ({ completed }) => { if (completed === 8) cancel = true; },
-    })).rejects.toBeInstanceOf(NamingCancelledError);
-    expect((await repo.loadExisting()).filter((term) => term.naming)).toHaveLength(8);
-    const resumed = await repo.sync(entries);
-    expect(resumed.aiTranslated).toBe(1);
-    expect((await repo.loadExisting()).filter((term) => term.naming)).toHaveLength(9);
+    await repo.sync([entry(0)]);
+    const initial = (await repo.loadExisting())[0]!;
+    await repo.saveEntry({ ...initial, replacement: "Starý Town0", customized: true, notes: "Schváleno" });
+    await repo.sync([entry(0)]);
+    expect((await repo.loadExisting())[0]).toMatchObject({ replacement: "Starý Town0", notes: "Schváleno", customized: true });
   });
-  it("rejects a stale decision when an entry is reclassified during inference", async () => {
-    const { records } = fixture(() => {
-      const flag = records.get("1")!.flags!["foundry-translate"]!.glossary as Record<string, unknown>;
-      flag.category = "character";
-    });
+  it("imports only selected rows and keeps identity, context link and unrelated entries", async () => {
+    fixture();
+    const repo = new GlossaryCompendiumRepository();
+    await repo.sync([entry(0), entry(1)]);
+    const stored = await repo.loadExisting();
+    const rows = planGlossaryImport(stored, { language: "cs", entries: [{ ...entry(0), replacement: "Starý Town0", notes: "Ručně schváleno" }, entry(2)] }, "cs");
+    await repo.importEntries(rows.filter((row) => row.state === "changed"));
+    const after = await repo.loadExisting();
+    expect(after).toHaveLength(2);
+    expect(after[0]).toMatchObject({ id: stored[0]?.id, sourceUuid: "Scene.0", replacement: "Starý Town0", customized: true, notes: "Ručně schváleno" });
+    await repo.sync([entry(0)]);
+    expect((await repo.loadExisting())[0]?.replacement).toBe("Starý Town0");
+  });
+  it("refuses stale updates and newly conflicting names inside the write queue", async () => {
+    const { updateDocuments } = fixture();
     const repo = new GlossaryCompendiumRepository();
     await repo.sync([entry(0)]);
-    expect((await repo.loadExisting())[0]?.replacement).toBe("Old Town0");
-    expect((await repo.loadExisting())[0]?.naming).toBeUndefined();
+    const stored = await repo.loadExisting();
+    const rows = planGlossaryImport(stored, { language: "cs", entries: [{ ...entry(0), replacement: "Import" }] }, "cs");
+    await repo.saveEntry({ ...stored[0]!, replacement: "New manual choice", customized: true });
+    updateDocuments.mockClear();
+    await expect(repo.importEntries(rows)).rejects.toThrow("Stale");
+    expect(updateDocuments).not.toHaveBeenCalled();
+    const newRows = planGlossaryImport([], { language: "cs", entries: [entry(1)] }, "cs");
+    await repo.sync([entry(1)]);
+    await expect(repo.importEntries(newRows)).rejects.toThrow("Stale");
   });
-  it("preserves names on malformed output and skips AI for Chrome", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      const { request, settings } = fixture(undefined, true);
-      const repo = new GlossaryCompendiumRepository();
-      expect((await repo.sync([entry(0)])).aiWarning).toBeTruthy();
-      expect((await repo.loadExisting())[0]?.replacement).toBe("Old Town0");
-      expect((await repo.loadExisting())[0]?.naming).toBeUndefined();
-      settings.provider = "chrome-local";
-      request.mockClear();
-      await repo.sync([entry(0)]);
-      expect(request).not.toHaveBeenCalled();
-    } finally { warn.mockRestore(); }
+  it("rejects alias conflicts before writing any part of the import", async () => {
+    const { updateDocuments } = fixture();
+    const repo = new GlossaryCompendiumRepository();
+    await repo.sync([entry(0)]);
+    const rows = planGlossaryImport(await repo.loadExisting(), { language: "cs", entries: [{ ...entry(1), replacement: "Conflict", aliases: ["old town0"] }] }, "cs");
+    await expect(repo.importEntries(rows)).rejects.toThrow("AliasConflict");
+    expect(updateDocuments).not.toHaveBeenCalled();
+    expect(await repo.loadExisting()).toHaveLength(1);
+  });
+  it("can clear notes and checks cancellation, GM access and locked packs", async () => {
+    fixture();
+    const repo = new GlossaryCompendiumRepository();
+    await expect(repo.sync([entry(0)], { shouldCancel: () => true })).rejects.toBeInstanceOf(GlossarySyncCancelledError);
+    expect(await repo.loadExisting()).toHaveLength(0);
+    await repo.sync([entry(0)]);
+    await repo.saveEntry({ ...(await repo.loadExisting())[0]!, notes: "Delete me" });
+    await repo.saveEntry({ ...(await repo.loadExisting())[0]!, notes: "" });
+    expect((await repo.loadExisting())[0]?.notes).toBe("");
+    game.packs.get(GLOSSARY_PACK_ID)!.locked = true;
+    await expect(repo.saveEntry(entry(1))).rejects.toThrow("zamčené");
   });
 });

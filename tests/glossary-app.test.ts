@@ -34,9 +34,9 @@ describe("live glossary editor", () => {
   it("shows persisted results and progress from another translation and unsubscribes on close", async () => {
     const { editor, glossaryLive, initial } = await fixture();
     const incoming = [{ ...initial[0]!, replacement: "Starý Carinth" }];
-    glossaryLive.publish({ entries: incoming, running: true, status: { state: "testing", message: "AI 8/16" } });
+    glossaryLive.publish({ entries: incoming, running: true, status: { state: "testing", message: "Collecting names" } });
     expect(editor.element.querySelector<HTMLInputElement>("[data-glossary-replacement]")?.value).toBe("Starý Carinth");
-    expect(editor.element.querySelector("[data-status-text]")?.textContent).toBe("AI 8/16");
+    expect(editor.element.querySelector("[data-status-text]")?.textContent).toBe("Collecting names");
     expect(editor.element.querySelector<HTMLButtonElement>("[data-action='sync']")?.disabled).toBe(true);
     glossaryLive.publish({ running: false, status: { state: "error", message: "A batch could not be read" } });
     await editor.mount();
@@ -46,7 +46,7 @@ describe("live glossary editor", () => {
     glossaryLive.publish({ status: { state: "testing", message: "Must not update the closed editor" } });
     expect(editor.element.querySelector("[data-status-text]")?.textContent).toBe("A batch could not be read");
   });
-  it("lets a GM save a draft during AI work without losing typing made during the save", async () => {
+  it("lets a GM save a draft during glossary updates without losing typing made during the save", async () => {
     const { editor, glossaryLive, initial, Event, GlossaryCompendiumRepository } = await fixture();
     let release!: () => void;
     const pending = new Promise<void>((resolve) => { release = resolve; });

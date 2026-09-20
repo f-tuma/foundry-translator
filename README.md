@@ -2,16 +2,16 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.16.2** includes an adventure translation desk, an Ember-aware name
+Version **0.17.0** includes an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
 Chrome or LM Studio, with Google Cloud available as an optional provider.
 Generated text is structurally validated; language quality still depends on the
 chosen model. The source adventure remains unchanged.
 
-This release keeps the glossary editor live during naming: saved batches appear
-without closing the window, and drafts, filters and scroll position stay in place.
-Invalid individual AI proposals preserve the original name and are marked for
-review, while the other names continue processing.
+This release replaces automatic AI naming with a reviewed glossary workflow.
+Export names as CSV or JSON, edit them with context and notes, then preview and
+select additions or updates before importing. Synchronization only collects
+original names; it does not contact a naming model.
 
 ## Quick start
 
@@ -107,40 +107,41 @@ with billing and the Cloud Translation API enabled.
 
 ## Protected name glossary
 
-### Optional contextual fantasy names
+### Reviewed glossary files
 
-The module can use a separate instruction model to decide stable
-translations for newly discovered names. Short descriptions and nearby mentions
-provide context. Clear descriptive names are saved automatically; uncertain
-names retain their source form. Meaningful personal names, surnames and epithets
-may also be localized when they sound natural and believable in the fantasy
-setting. The resulting glossary choice is reused consistently. Manual edits and imported
-glossaries take precedence. Ember group Actors, including caravans, are categorized
-as factions so their descriptive names can be considered.
+Open **Names and terminology → Export / import**. Synchronize first to collect
+original names, then export **CSV** for collaborative editing or **JSON** for a
+portable backup. Save draft edits before exporting. Both formats include source,
+replacement, category, aliases, enabled state and editorial notes; optional
+context contains bounded excerpts from the adventure and may include spoilers.
+AI naming and its settings have been removed. Previous decisions remain stored;
+unreviewed legacy AI proposals are marked **needs review**.
 
-AI naming is off by default, preserving the existing translation workflow.
-Under **Translator and language**, enable the AI naming policy and choose an explicit
-**Glossary model** ID on the same OpenAI-compatible server. No automatic model is
-selected until a candidate passes Czech naming QA. Qwen3.5 9B Q4_K_M and
-Granite 4.2 8B Q4_K_S failed the
-[local benchmark](docs/benchmarks/naming-2026-09-20.md).
-Qwen3.8 27B Q4_K_M produced better Czech but still made errors on new names;
-it is not an automatic default either. Bundled MTP improved its local generation
-speed by about 1.7× in this workload.
-Unit tests do not establish translation quality. The
-ordinary text model can remain Hy-MT2. Chrome/Google skip AI naming, and an
-unavailable model leaves pending names unchanged with a warning. Saved choices
-are reused, exported with the glossary, and visible with a short reason in the
-entry's info tooltip. Cancellation preserves completed batches.
-Relevant established glossary choices are included in each request. The longest
-matching full name takes precedence over its components. When a proposal changes
-a declared opaque root or conflicts with an established name, that entry retains
-its original name with a localized explanation and the other entries continue.
-Malformed responses still stop the batch safely.
+Choose the edited file to preview additions, updates and unchanged entries.
+New entries are selected initially; existing names require an explicit selection.
+The preview compares translations, categories, aliases, notes, enabled state and
+manual approval. Importing an unreviewed entry also approves it. Only selected
+rows are saved; omitted rows are never deleted. Changes made since the preview
+and conflicting aliases block writes. The open glossary refreshes after import
+without overwriting drafts. Writes are serialized within this client, not as a
+server transaction spanning independent GM browsers.
 
-The module also serializes compendium folder updates and repairs existing
-module packs on world startup. This avoids simultaneous pack creation undoing
-another pack's folder assignment.
+CSV uses UTF-8 with a BOM, quoted comma-separated cells and CRLF. Semicolon-separated
+input is also accepted. Required columns: `source,replacement,category`.
+Optional: `aliases,enabled,notes,context,language`. Keep source names intact;
+an empty replacement preserves the original. Categories use stable codes:
+`character`, `location`, `faction`, `deity`, `item`, `lore`, `term`.
+Aliases are a JSON array such as `["short name","other spelling"]`; enabled is
+`true` or `false`. Context is reference-only and is not imported.
+Duplicate source names, ambiguous aliases, invalid fields, mixed/different
+languages and files over 5 MB are rejected. Spreadsheet formula prefixes are
+escaped on export and restored on import.
+
+JSON uses `format: "foundry-translate-glossary"`, `version: 1`,
+`targetLanguage` and `entries`. The glossary from older translation bundles can
+also be reviewed here; document translations in those bundles are ignored by
+this glossary-only screen. To revise existing glossary choices, use this screen;
+the separate adventure-bundle import continues to preserve local choices.
 
 ### Discover and edit names
 
