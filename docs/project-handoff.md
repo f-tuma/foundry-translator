@@ -34,7 +34,21 @@ and the recommended implementation order.
   across batch arrival, manual save while running, next-batch insertion and review
   filter all passed. The 360 px window had no horizontal overflow. An initial QA
   harness module-identity mistake was fixed; no new console errors followed.
-  Publication and installation verification are recorded after deployment below.
+  PR #17 merged as `7a731f8`; v0.16.2 was published and installed through
+  Foundry Setup. All 240 tests, typecheck, build, release metadata checks,
+  PR/main CI and release workflow passed. Downloaded release assets matched
+  the source manifest; the ZIP contained the expected versioned JS and CSS.
+  Live Ember smoke testing followed Journal Notes → Adventure translation →
+  Names and terminology. The new AI naming filter switched to `needs review`
+  and back to `All names`; layout and help icons rendered correctly at
+  1855×1256. The live DOM loaded `foundry-translate-0.16.2.js` and imported
+  `styles/foundry-translate-0.16.2.css`. No new module errors or warnings were
+  captured; old 0.16.1 failures remain in browser history, alongside unrelated
+  Crucible/Ember startup warnings. The glossary was already empty before the
+  update and remains empty; no bulk sync/translation was started and no saved
+  decisions were restored or recreated. The glossary window is left open for
+  the user. Ongoing batch behavior was verified in the local real-code replay,
+  not by starting a long live world run.
 
 
 - 2026-09-20: the user authorized release and installation of the current work.
