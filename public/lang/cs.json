@@ -240,5 +240,8 @@
   "FOUNDRY_TRANSLATE.Desk.Local": "v tomto zařízení",
   "FOUNDRY_TRANSLATE.Desk.NotConfigured": "model není vybraný",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.StalePageRefresh": "Originál se od uloženého překladu změnil. Pro zachování ostatních přeložených stránek otevřete uloženou verzi, nebo zvolte Přeložit celý deník a vytvořte aktuální překlad.",
-  "FOUNDRY_TRANSLATE.Bundles.ImportIssues": "Importováno {count} dokumentů; {issues} problémů vyžaduje kontrolu. Podrobnosti najdete níže."
+  "FOUNDRY_TRANSLATE.Bundles.ImportIssues": "Importováno {count} dokumentů; {issues} problémů vyžaduje kontrolu. Podrobnosti najdete níže.",
+  "FOUNDRY_TRANSLATE.Help": "Nápověda: {topic}",
+  "FOUNDRY_TRANSLATE.Settings.PrivacyLabel": "Texty a soukromí",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Celý deník a propojené dokumenty"
 }

@@ -1,3 +1,4 @@
+import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
 import type { ProviderId, TranslatorSettings } from "./settings";
 
 function localize(key: string): string {
@@ -9,6 +10,8 @@ export function updateProviderFields(form: HTMLFormElement, provider: ProviderId
     element.hidden = element.dataset.providerOnly !== provider;
   }
 }
+
+const help = (key: string, topic: string) => renderHelpTooltip(localize(key), localize(topic));
 
 export function renderTranslatorSettingsForm(
   settings: TranslatorSettings,
@@ -22,26 +25,26 @@ export function renderTranslatorSettingsForm(
         <i class="fa-solid fa-language"></i>
       </span>
       <div>
-        <h2>${localize("FOUNDRY_TRANSLATE.Settings.Heading")}</h2>
-        <p>${localize("FOUNDRY_TRANSLATE.Settings.Intro")}</p>
+        <div class="ft-heading-with-help"><h2>${localize("FOUNDRY_TRANSLATE.Settings.Heading")}</h2>${help("FOUNDRY_TRANSLATE.Settings.Intro", "FOUNDRY_TRANSLATE.Settings.Heading")}</div>
       </div>
     </header>
 
     <div class="ft-settings__fields">
       <div class="ft-field">
-        <label for="ft-provider">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Name")}</label>
+        <div class="ft-field__label"><label for="ft-provider">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Name")}</label>
+          <span data-provider-only="chrome-local">${help("FOUNDRY_TRANSLATE.Settings.Provider.ChromeHint", "FOUNDRY_TRANSLATE.Settings.Provider.Name")}</span>
+          <span data-provider-only="openai-compatible">${help("FOUNDRY_TRANSLATE.Settings.Provider.OpenAIHint", "FOUNDRY_TRANSLATE.Settings.Provider.Name")}</span>
+        </div>
         <select id="ft-provider" name="provider">
           <option value="chrome-local">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Chrome")}</option>
           <option value="openai-compatible">${localize("FOUNDRY_TRANSLATE.Settings.Provider.OpenAI")}</option>
           <option value="google-cloud-basic">Google Cloud Translation — Basic v2</option>
         </select>
-        <p class="ft-field__hint" data-provider-only="chrome-local">${localize("FOUNDRY_TRANSLATE.Settings.Provider.ChromeHint")}</p>
         <p class="ft-field__hint" data-provider-only="google-cloud-basic">${localize("FOUNDRY_TRANSLATE.Settings.Provider.GoogleHint")}</p>
-        <p class="ft-field__hint" data-provider-only="openai-compatible">${localize("FOUNDRY_TRANSLATE.Settings.Provider.OpenAIHint")}</p>
       </div>
 
       <div class="ft-field" data-provider-only="google-cloud-basic">
-        <label for="ft-api-key">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Name")}</label>
+        <div class="ft-field__label"><label for="ft-api-key">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Name")}</label>${help("FOUNDRY_TRANSLATE.Settings.ApiKey.Hint", "FOUNDRY_TRANSLATE.Settings.ApiKey.Name")}</div>
         <div class="ft-secret-input">
           <input id="ft-api-key" name="apiKey" type="password" spellcheck="false" autocomplete="off">
           <button type="button" data-action="toggle-key" aria-pressed="false" title="${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Show")}">
@@ -49,22 +52,19 @@ export function renderTranslatorSettingsForm(
             <span class="sr-only">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Show")}</span>
           </button>
         </div>
-        <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Hint")}</p>
       </div>
 
       <div class="ft-settings__local-model" data-provider-only="openai-compatible">
         <div class="ft-field">
-          <label for="ft-openai-base-url">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrl")}</label>
+          <div class="ft-field__label"><label for="ft-openai-base-url">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrl")}</label>${help("FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrlHint", "FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrl")}</div>
           <input id="ft-openai-base-url" name="openAiBaseUrl" type="url" spellcheck="false" autocomplete="off" placeholder="http://localhost:1234">
-          <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrlHint")}</p>
         </div>
         <div class="ft-field">
-          <label for="ft-openai-model">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.Model")}</label>
+          <div class="ft-field__label"><label for="ft-openai-model">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.Model")}</label>${help("FOUNDRY_TRANSLATE.Settings.OpenAI.ModelHint", "FOUNDRY_TRANSLATE.Settings.OpenAI.Model")}</div>
           <input id="ft-openai-model" name="openAiModel" type="text" spellcheck="false" autocomplete="off" placeholder="google/translategemma-12b-it">
-          <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.ModelHint")}</p>
         </div>
         <div class="ft-field">
-          <label for="ft-openai-api-key">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKey")}</label>
+          <div class="ft-field__label"><label for="ft-openai-api-key">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKey")}</label>${help("FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKeyHint", "FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKey")}</div>
           <div class="ft-secret-input">
             <input id="ft-openai-api-key" name="openAiApiKey" type="password" spellcheck="false" autocomplete="off">
             <button type="button" data-action="toggle-openai-key" data-secret-target="openAiApiKey" aria-pressed="false" title="${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Show")}">
@@ -72,17 +72,15 @@ export function renderTranslatorSettingsForm(
               <span class="sr-only">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Show")}</span>
             </button>
           </div>
-          <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKeyHint")}</p>
         </div>
         <div class="ft-field">
-          <label for="ft-world-context">${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.Name")}</label>
+          <div class="ft-field__label"><label for="ft-world-context">${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.Name")}</label>${help("FOUNDRY_TRANSLATE.Settings.WorldContext.Hint", "FOUNDRY_TRANSLATE.Settings.WorldContext.Name")}</div>
           <textarea id="ft-world-context" name="worldContext" rows="7" maxlength="6000" placeholder="${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.Placeholder")}"></textarea>
-          <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.Hint")}</p>
-          <button type="button" class="ft-button ft-button--secondary ft-settings__generate-context" data-action="generate-world-context">
+          <div class="ft-help-row"><button type="button" class="ft-button ft-button--secondary ft-settings__generate-context" data-action="generate-world-context">
             <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
             <span>${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.Generate")}</span>
           </button>
-          <p class="ft-field__hint">${localize("FOUNDRY_TRANSLATE.Settings.WorldContext.GenerateHint")}</p>
+          ${help("FOUNDRY_TRANSLATE.Settings.WorldContext.GenerateHint", "FOUNDRY_TRANSLATE.Settings.WorldContext.Generate")}</div>
         </div>
       </div>
 
@@ -111,20 +109,20 @@ export function renderTranslatorSettingsForm(
       </div>
     </div>
 
-    <aside class="ft-settings__privacy" data-provider-only="chrome-local">
-      <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-      <p>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyChrome")}</p>
-    </aside>
+    <div class="ft-help-row ft-settings__privacy-summary" data-provider-only="chrome-local">
+      <span>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}</span>
+      ${help("FOUNDRY_TRANSLATE.Settings.PrivacyChrome", "FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}
+    </div>
 
-    <aside class="ft-settings__privacy" data-provider-only="google-cloud-basic">
-      <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-      <p>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyGoogle")}</p>
-    </aside>
+    <div class="ft-help-row ft-settings__privacy-summary" data-provider-only="google-cloud-basic">
+      <span>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}</span>
+      ${help("FOUNDRY_TRANSLATE.Settings.PrivacyGoogle", "FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}
+    </div>
 
-    <aside class="ft-settings__privacy" data-provider-only="openai-compatible">
-      <i class="fa-solid fa-server" aria-hidden="true"></i>
-      <p>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyOpenAI")}</p>
-    </aside>
+    <div class="ft-help-row ft-settings__privacy-summary" data-provider-only="openai-compatible">
+      <span>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}</span>
+      ${help("FOUNDRY_TRANSLATE.Settings.PrivacyOpenAI", "FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}
+    </div>
 
     <div class="ft-connection-status" data-state="idle" role="status" aria-live="polite">
       <span class="ft-connection-status__dot" aria-hidden="true"></span>
@@ -176,5 +174,6 @@ export function renderTranslatorSettingsForm(
   if (worldContext instanceof HTMLTextAreaElement) worldContext.value = settings.worldContext;
 
   updateProviderFields(form, settings.provider);
+  activateHelpTooltips(form);
   return form;
 }

@@ -11,6 +11,18 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-20 local UI polish (not deployed): aligned and centered active-run
+  actions, removed Copy log's extra top margin, made long titles wrap, matched
+  glossary select/input heights, and made narrow layouts respond to the Foundry
+  window width. Longer explanations now live behind native Foundry info
+  tooltips, with focus/tap/Escape support and accessible descriptions. Costs,
+  import warnings, progress and whole-journal scope stay visible.
+  Local fixture QA used the actual view renderers/CSS with a simulated Foundry
+  shell/tooltip host at localhost:4174; six surfaces passed at 720 and 360 px,
+  and 480 px active-run actions had equal 38 px height and identical Y positions.
+  Hover, Tab focus and Escape were exercised; no console errors. The live Ember
+  page was not modified or reloaded. TypeScript, 203 tests and build passed.
+
 - 2026-09-20: v0.15.2 adds the requested Adventure translation button under the
   left Journal Notes scene controls using Foundry v14's `getSceneControlButtons`
   hook. It is GM-only, uses the existing localized title/language icon and opens
@@ -21,10 +33,8 @@ and the recommended implementation order.
   the old world's configuration. TypeScript, 203 tests, build and release
   metadata validation passed.
   PR #14 merged as `ca9b38b`, and v0.15.2 is published with both assets. Live
-  installation is pending: Return to Setup stopped `ember`, but the server
-  now requires administrator login at `/auth`. The user has been asked to sign
-  in directly. After that, update only Foundry Translate and relaunch `ember`
-  (title Ember), then verify the installed button. The QA server is stopped.
+  installation was confirmed by the user, who tested the new button. The QA
+  server was stopped.
 
 - Deployment completed: PR #13 merged as `5a8e0a2`, tag `v0.15.1` published
   successfully by GitHub Actions, and Foundry Setup updated the installed module.

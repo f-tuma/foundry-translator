@@ -240,5 +240,8 @@
   "FOUNDRY_TRANSLATE.Desk.Local": "on this device",
   "FOUNDRY_TRANSLATE.Desk.NotConfigured": "no model selected",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.StalePageRefresh": "The source has changed since the stored translation. To preserve the other translated pages, open the stored copy or choose Translate this journal to regenerate the current version.",
-  "FOUNDRY_TRANSLATE.Bundles.ImportIssues": "Imported {count} documents; {issues} issues need attention. See details below."
+  "FOUNDRY_TRANSLATE.Bundles.ImportIssues": "Imported {count} documents; {issues} issues need attention. See details below.",
+  "FOUNDRY_TRANSLATE.Help": "Help: {topic}",
+  "FOUNDRY_TRANSLATE.Settings.PrivacyLabel": "Text and privacy",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Scope": "Whole journal and linked documents"
 }

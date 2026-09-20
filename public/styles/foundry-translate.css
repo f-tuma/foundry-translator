@@ -23,11 +23,12 @@
   color: var(--ft-color-text);
   background: var(--ft-color-bg);
   font-family: var(--font-sans, system-ui, sans-serif);
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
 }
 
-.foundry-translate-settings-window .window-content,
-.foundry-translate-glossary-window .window-content,
-.foundry-translate-journal-window .window-content {
+.foundry-translate .window-content {
+  container-type: inline-size;
   padding: 0;
   overflow: hidden auto;
   color: var(--ft-color-text);
@@ -90,6 +91,63 @@
   margin: 0 0 var(--ft-space-1);
   color: var(--ft-color-text);
   font: 500 28px/1.15 var(--font-serif, Georgia, serif);
+}
+
+.ft-settings__intro > div {
+  min-width: 0;
+}
+
+.ft-heading-with-help,
+.ft-field__label,
+.ft-help-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ft-space-2);
+  min-width: 0;
+}
+
+.ft-heading-with-help :is(h2, h3) {
+  margin: 0;
+}
+
+.ft-settings .ft-help-tip {
+  display: inline-flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ft-radius-sm);
+  color: var(--ft-color-text-muted);
+  background: transparent;
+  box-shadow: none;
+  cursor: help;
+}
+
+.ft-settings .ft-help-tip > i {
+  margin: 0;
+}
+
+.ft-settings .ft-help-tip:is(:hover, :focus-visible) {
+  color: var(--ft-color-accent);
+  background: var(--ft-color-surface-raised);
+}
+
+.ft-help-tooltip {
+  max-width: min(360px, calc(100vw - 24px));
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.ft-settings__privacy-summary,
+.ft-journal-translation__actions .ft-help-row {
+  color: var(--ft-color-text-muted);
+  font-size: 12px;
 }
 
 .ft-settings__intro p,
@@ -259,6 +317,7 @@
 }
 
 .ft-connection-status__dot {
+  flex: 0 0 9px;
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -296,6 +355,7 @@
 
 .ft-settings__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--ft-space-3);
@@ -305,6 +365,7 @@
 
 .ft-settings__actions > div {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ft-space-2);
 }
 
@@ -441,8 +502,9 @@
   color: var(--ft-color-warning);
 }
 
-.ft-glossary__manual input,
-.ft-glossary__row input {
+.ft-glossary__manual :is(input, select),
+.ft-glossary__row :is(input, select) {
+  box-sizing: border-box;
   min-width: 0;
   height: 38px;
   padding: 8px 10px;
@@ -557,6 +619,7 @@
 
 .ft-glossary__candidate-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--ft-space-2);
 }
@@ -648,8 +711,13 @@
 
 .ft-button {
   display: inline-flex;
+  box-sizing: border-box;
+  flex: 0 1 auto;
   width: auto;
+  height: auto;
   min-height: 38px;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: center;
   gap: var(--ft-space-2);
@@ -657,6 +725,17 @@
   padding: 8px 14px;
   border-radius: var(--ft-radius-sm);
   box-shadow: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ft-button > i {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.ft-button > span {
+  min-width: 0;
 }
 
 .ft-button--secondary {
@@ -677,7 +756,7 @@
 }
 
 .ft-button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.58;
 }
 
@@ -698,7 +777,8 @@
   }
 }
 
-@media (max-width: 640px) {
+/* Foundry windows can be narrow even on a wide desktop. */
+@container (max-width: 560px) {
   .ft-settings {
     padding: var(--ft-space-4);
   }
@@ -715,8 +795,12 @@
   }
 
   .ft-settings__actions > div,
-  .ft-button {
+  .ft-settings__actions > .ft-button {
     width: 100%;
+  }
+
+  .ft-settings__actions > div > .ft-button {
+    flex: 1 1 150px;
   }
 
   .ft-glossary__stats {
@@ -798,8 +882,15 @@
 .ft-active-translations__title {
   align-items: baseline;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ft-space-2);
   justify-content: space-between;
+}
+
+.ft-active-translations__title strong {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .ft-active-translations__state {
@@ -851,6 +942,8 @@
   flex-direction: column;
   font-size: 0.85em;
   gap: var(--ft-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .ft-active-translations__error {
@@ -914,24 +1007,17 @@
   text-align: center;
 }
 
-.ft-active-translations__copy {
-  align-self: flex-start;
-  margin-top: var(--ft-space-1);
-}
-
 .ft-active-translations__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
   gap: var(--ft-space-2);
   margin-top: var(--ft-space-1);
 }
 
 .ft-active-translations__cancel {
   color: var(--ft-color-danger);
-}
-
-.ft-active-translations__remove {
-  margin-left: auto;
 }
 
 .ft-active-translations__run[data-state="cancelled"] .ft-active-translations__state {
@@ -943,32 +1029,30 @@
 }
 
 /* Glossary classification stays secondary to the term/replacement editor. */
-.ft-glossary__details { grid-column: 1 / -1; color: var(--ft-muted, #687174); font-size: 12px; }
+.ft-glossary__details { grid-column: 1 / -1; color: var(--ft-color-text-muted); font-size: 12px; }
 .ft-glossary__details summary { cursor: pointer; padding: 3px 0; }
 .ft-glossary__metadata { display: grid; gap: 8px; padding: 10px 0; }
 .ft-glossary__metadata label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.ft-glossary__metadata input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 16px; }
+.ft-glossary__metadata input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 16px; padding: 0; }
 .ft-glossary__metadata input[type="text"] { flex: 1; min-width: 160px; }
-.ft-glossary__category-filter { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.ft-glossary__category-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; }
 .ft-glossary__manual { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 145px auto; }
 .ft-glossary__row[hidden] { display: none; }
 .ft-glossary select { max-width: 100%; }
-@media (max-width: 700px) { .ft-glossary__manual { grid-template-columns: 1fr; } }
-.foundry-translate-bundle-window .window-content,
-.foundry-translate-desk-window .window-content { padding: 0; overflow: auto; background: var(--ft-color-bg); }
-.foundry-translate-glossary-window, .foundry-translate-bundle-window, .foundry-translate-desk-window { max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+@container (max-width: 660px) { .ft-glossary__manual { grid-template-columns: 1fr; } }
 .ft-desk__status { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .ft-desk__status strong { border: 1px solid var(--ft-color-accent); border-radius: 4px; padding: 4px 8px; color: var(--ft-color-accent); }
 .ft-desk__status span { overflow-wrap: anywhere; color: var(--ft-color-text-muted); }
-.ft-desk__tip, .ft-bundles__card p { color: var(--ft-color-text-muted); }
+.ft-bundles__card p { color: var(--ft-color-text-muted); overflow-wrap: anywhere; }
 .ft-desk__actions { display: grid; gap: 10px; }
 .ft-desk__actions button { display: flex; gap: 16px; align-items: center; text-align: left; padding: 16px; height: auto; background: var(--ft-color-surface); border: 1px solid var(--ft-color-border); border-radius: 6px; color: var(--ft-color-text); }
-.ft-desk__actions button > span { flex: 1; }
+.ft-desk__actions button > span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .ft-desk__actions small { display: block; margin-top: 4px; color: var(--ft-color-text-muted); font-weight: normal; }
 .ft-desk__actions button:hover { border-color: var(--ft-color-accent); background: var(--ft-color-surface-raised); }
 .ft-desk-launcher { width: 100%; margin-top: 6px; }
 .ft-bundles__card { padding: 16px; border: 1px solid var(--ft-color-border); border-radius: 6px; background: var(--ft-color-surface); }
 .ft-bundles__card h3 { margin-top: 0; font-size: 16px; }
+.ft-bundles__card > .ft-heading-with-help { margin-bottom: 12px; }
 .ft-bundles__file { display: grid; gap: 8px; }
 .ft-bundles__file input { width: 100%; }
 .ft-bundles__rows { list-style: none; padding: 0; margin: 14px 0; max-height: 260px; overflow: auto; }
@@ -981,4 +1065,7 @@
 .ft-bundles__status { overflow-wrap: anywhere; }
 .ft-bundles__status[data-error="true"] { color: var(--ft-color-danger); }
 .ft-bundles pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto; font-size: 12px; }
-.ft-glossary__details { color: var(--ft-color-text-muted); }
+@container (max-width: 400px) {
+  .ft-bundles__rows li { flex-direction: column; gap: 4px; }
+  .ft-bundles__rows li > span { flex-basis: auto; text-align: left; }
+}

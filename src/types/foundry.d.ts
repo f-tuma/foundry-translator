@@ -5,6 +5,12 @@ interface FoundryModuleRecord {
 }
 
 interface FoundryGame {
+  tooltip: {
+    element: HTMLElement | null;
+    activate(element: HTMLElement): void;
+    deactivate(): void;
+    clearPending(): void;
+  };
   modules: Map<string, FoundryModuleRecord>;
   i18n: {
     localize(key: string): string;
