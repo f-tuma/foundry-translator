@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.15.1` released and installed; live module API verified ready.
+- Current implementation: `v0.15.2`; see the deployment and QA entries below.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,16 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20: v0.15.2 adds the requested Adventure translation button under the
+  left Journal Notes scene controls using Foundry v14's `getSceneControlButtons`
+  hook. It is GM-only, uses the existing localized title/language icon and opens
+  the same desk without changing the active note tool. Live click/repeated-click
+  QA passed in the user's current `ember` world at 1855×1256; this is a different
+  world from the earlier `bublina-ember` tests and currently has default provider
+  settings and no translation packs. Do not overwrite those settings based on
+  the old world's configuration. TypeScript, 203 tests, build and release
+  metadata validation passed.
 
 - Deployment completed: PR #13 merged as `5a8e0a2`, tag `v0.15.1` published
   successfully by GitHub Actions, and Foundry Setup updated the installed module.

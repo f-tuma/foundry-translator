@@ -48,6 +48,27 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
 export function openTranslationDesk(): void { void new TranslationDesk().render(true); }
 
 export function registerTranslationDesk(): void {
+  Hooks.on("getSceneControlButtons", (controls: Record<string, {
+    tools: Record<string, {
+      name: string;
+      title: string;
+      icon: string;
+      order: number;
+      button?: boolean;
+      onChange?: () => void;
+    }>;
+  }>) => {
+    const notes = controls.notes;
+    if (!game.user?.isGM || !notes || notes.tools.foundryTranslate) return;
+    notes.tools.foundryTranslate = {
+      name: "foundryTranslate",
+      title: "FOUNDRY_TRANSLATE.Desk.Title",
+      icon: "fa-solid fa-language",
+      order: Math.max(-1, ...Object.values(notes.tools).map((tool) => tool.order)) + 1,
+      button: true,
+      onChange: openTranslationDesk,
+    };
+  });
   Hooks.on("renderJournalDirectory", (app: { element?: HTMLElement }, html?: HTMLElement) => {
     if (!game.user?.isGM) return;
     const root = html instanceof HTMLElement ? html : app.element;

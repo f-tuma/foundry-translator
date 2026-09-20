@@ -2,7 +2,7 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.15.1** includes an adventure translation desk, an Ember-aware name
+Version **0.15.2** includes an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
 Chrome or LM Studio, with Google Cloud available as an optional provider.
 Generated text is structurally validated; language quality still depends on the
@@ -13,7 +13,7 @@ keeps older page translations across repeated single-page refreshes.
 
 ## Quick start
 
-1. Open **Adventure translation** in the Journal sidebar (or Module Settings).
+1. Open **Adventure translation** under the left **Journal Notes** controls, in the Journal sidebar, or in Module Settings.
 2. Open **Translator and language**, choose a provider, test the connection and save.
 3. Open a Journal page and click **Translate this page** in its header.
 4. Use **Show original** to switch back without losing the current page.
