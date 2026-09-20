@@ -1,4 +1,4 @@
-# Foundry Translate 0.16.0 — stručný návod
+# Foundry Translate 0.16.1 — stručný návod
 
 ## První spuštění
 
