@@ -41,7 +41,18 @@ and the recommended implementation order.
   One CUA file chooser wait was invalidated by Vite reloading during edits; the
   chooser flow succeeded again after reacquiring the tab. No external browser
   process or script injection was used. No world glossary changes were made in
-  these tests. Publication and installation verification follow after deployment.
+  these tests. PR #18 merged as `44b7727`; v0.17.0 is published and installed in
+  Foundry 14.368. All 235 tests, typecheck, build, metadata checks, PR/main CI and
+  release workflow passed. Downloaded release manifest and ZIP matched source,
+  including the versioned stylesheet. Before updating, the live progress window
+  confirmed no translation was running. Ember restarted and GM login succeeded.
+  Live QA followed Journal Notes → Adventure translation → Names and terminology
+  → Export / import. The UI renders correctly at 1855×1256 and loads the versioned
+  0.17.0 JS/CSS. No new module errors were captured. No glossary sync or import
+  was run in the live world; its previously empty glossary remains empty.
+  The glossary file window is left open for the user. The local QA tab/server
+  are closed, and byte-verified synthetic downloads were removed from Downloads
+  (copies remain under `/tmp/ft-manual-glossary-qa`).
 
 - 2026-09-20: v0.16.2 fixes the user's live glossary failure. Browser console
   reported `Invalid name decision fields`; LM Studio's server log at 16:02:12
