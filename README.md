@@ -114,10 +114,11 @@ names and personal names retain their source form. Manual edits and imported
 glossaries take precedence. Ember group Actors, including caravans, are categorized
 as factions so their descriptive names can be considered.
 
-Under **Translator and language**, choose the naming policy and optional
-**Glossary model** ID on the same OpenAI-compatible server. An empty ID selects
-an available Qwen3.5 instruction model, preferring 9B. This is a candidate pending
-real-model validation; unit tests do not establish translation quality. The
+Under **Translator and language**, choose the naming policy and an explicit
+**Glossary model** ID on the same OpenAI-compatible server. No automatic model is
+selected until a candidate passes Czech naming QA. Qwen3.5 9B Q4_K_M failed the
+[local benchmark](docs/benchmarks/naming-2026-09-20.md); Granite 4.2 8B is pending.
+Unit tests do not establish translation quality. The
 ordinary text model can remain Hy-MT2. Chrome/Google skip AI naming, and an
 unavailable model leaves pending names unchanged with a warning. Saved choices
 are reused, exported with the glossary, and visible with a short reason in the

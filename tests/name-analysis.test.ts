@@ -40,10 +40,12 @@ describe("context-aware naming", () => {
     const original = entry("The Keep [Ruins]");
     expect(parse([decision({ action: "preserve", replacement: original.source, roots: [] })], [original])[0]?.replacement).toBe(original.source);
   });
-  it("selects an available instruction model without using the text translator", async () => {
+  it("requires an explicitly selected model until a naming default passes language QA", async () => {
     vi.stubGlobal("game", { i18n: { localize: (s: string) => s } });
     const request = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ data: [{ id: "hy-mt2-7b" }, { id: "qwen3.5-4b" }, { id: "qwen3.5-9b" }, { id: "qwen3.5-coder-9b" }] })));
-    expect(await new NameAnalysisClient(settings, request).model()).toBe("qwen3.5-9b");
+    await expect(new NameAnalysisClient(settings, request).model()).rejects.toThrow("ModelMissing");
+    expect(await new NameAnalysisClient({ ...settings, glossaryAiModel: "qwen3.5-9b" }, request).model()).toBe("qwen3.5-9b");
+    await expect(new NameAnalysisClient({ ...settings, glossaryAiModel: "missing" }, request).model()).rejects.toThrow("ModelMissing");
     expect(request.mock.calls[0]?.[0]).toBe("http://localhost:1234/v1/models");
   });
   it("uses the native response message only, without persisting a chat", async () => {

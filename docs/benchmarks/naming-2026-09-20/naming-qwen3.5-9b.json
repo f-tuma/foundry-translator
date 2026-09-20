@@ -1,0 +1,260 @@
+{
+  "model": "qwen3.5-9b",
+  "startedAt": "2026-09-20T09:56:45.746Z",
+  "cases": 24,
+  "examples": 2,
+  "batches": [
+    {
+      "repeat": 0,
+      "start": 0,
+      "seconds": 10.259,
+      "error": "An opaque name root was changed.",
+      "requests": [
+        {
+          "status": 200,
+          "stats": {
+            "input_tokens": 691,
+            "total_output_tokens": 630,
+            "reasoning_output_tokens": 0,
+            "tokens_per_second": 102.93155280838677,
+            "time_to_first_token_seconds": 0.953429,
+            "model_load_time_seconds": 3.179
+          },
+          "raw": "{\n  \"decisions\": [\n    {\n      \"id\": 0,\n      \"action\": \"translate\",\n      \"replacement\": \"Starý Carinth\",\n      \"roots\": [\"Carinth\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Přeložená přídavná část 'Old' s zachráněným vlastním jménem.\"\n    },\n    {\n      \"id\": 1,\n      \"action\": \"translate\",\n      \"replacement\": \"Karavana Putujícího Ohniště\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Přeložená deskriptivní složenina pro název karavany.\"\n    },\n    {\n      \"id\": 2,\n      \"action\": \"preserve\",\n      \"replacement\": \"Agraband Swift\",\n      \"roots\": [\"Agraband\", \"Swift\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Vlastní jméno postavy; příjmení se nepřekládá.\"\n    },\n    {\n      \"id\": 3,\n      \"action\": \"translate\",\n      \"replacement\": \"Přívoz Ordain\",\n      \"roots\": [\"Ordain\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Přeložená funkční část 'Waterfront' s zachráněným názvem města.\"\n    },\n    {\n      \"id\": 4,\n      \"action\": \"translate\",\n      \"replacement\": \"Arctusská vysočina\",\n      \"roots\": [\"Arctus\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Přeložená geografická část 'Plateau' s zachráněným vlastním jménem.\"\n    },\n    {\n      \"id\": 5,\n      \"action\": \"translate\",\n      \"replacement\": \"Ruka Vyrovnání\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Přeložená deskriptivní složenina označující vojenský řád.\"\n    },\n    {\n      \"id\": 6,\n      \"action\": \"preserve\",\n      \"replacement\": \"Ordain\",\n      \"roots\": [\"Ordain\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Čisté vlastní jméno města bez přeložitelných popisných částí.\"\n    },\n    {\n      \"id\": 7,\n      \"action\": \"preserve\",\n      \"replacement\": \"Ember\",\n      \"roots\": [\"Ember\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Oficiální název světa musí být zachován podle instrukcí.\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "start": 8,
+      "seconds": 7.455,
+      "requests": [
+        {
+          "status": 200,
+          "stats": {
+            "input_tokens": 695,
+            "total_output_tokens": 720,
+            "reasoning_output_tokens": 0,
+            "tokens_per_second": 98.76312577738186,
+            "time_to_first_token_seconds": 0.099908
+          },
+          "raw": "{\n  \"decisions\": [\n    {\n      \"id\": 0,\n      \"action\": \"translate\",\n      \"replacement\": \"Nový Varenth\",\n      \"roots\": [\"Varenth\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Jméno nově založeného města je přeloženo jako 'Nový', vlastní kořen 'Varenth' zůstal zachován.\"\n    },\n    {\n      \"id\": 1,\n      \"action\": \"translate\",\n      \"replacement\": \"Východní průsmyk Lurak\",\n      \"roots\": [\"Lurak\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Popisová část 'Eastern Pass' byla přeložena do češtiny, vlastní název hor 'Lurak' zůstal nezměněn.\"\n    },\n    {\n      \"id\": 2,\n      \"action\": \"translate\",\n      \"replacement\": \"Zaniklé observatoře\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Všechny části názvu jsou popisné ('Sunken', 'Observatory') a byly přeloženy do češtiny.\"\n    },\n    {\n      \"id\": 3,\n      \"action\": \"preserve\",\n      \"replacement\": \"Blackthorn Company\",\n      \"roots\": [\"Blackthorn\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Podle kontextu je 'Blackthorn' příjmením rodiny a nesmí být přeložen, proto se celý název zachovává.\"\n    },\n    {\n      \"id\": 4,\n      \"action\": \"translate\",\n      \"replacement\": \"Stříbrní lampion\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Název hostince je tvořen čistě popisnými slovy ('Silver Lantern') a byl přeložen.\"\n    },\n    {\n      \"id\": 5,\n      \"action\": \"translate\",\n      \"replacement\": \"Kruh Posledního ohně\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Název náboženského řádu je tvořen významnými popisnými slovy a byl přeložen jako celek.\"\n    },\n    {\n      \"id\": 6,\n      \"action\": \"preserve\",\n      \"replacement\": \"Mara Reed\",\n      \"roots\": [\"Mara\", \"Reed\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Jde o jméno a příjmení postavy; obě části musí zůstat nezměněny.\"\n    },\n    {\n      \"id\": 7,\n      \"action\": \"preserve\",\n      \"replacement\": \"Ash\",\n      \"roots\": [\"Ash\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Jméno boha nemá známý význam a není spojeno se slovem 'popel', proto se zachovává v původním tvaru.\"\n    }\n  ]\n}"
+        }
+      ],
+      "decisions": [
+        {
+          "id": "8",
+          "source": "New Varenth",
+          "replacement": "Nový Varenth",
+          "category": "location",
+          "aliases": [],
+          "sourceUuid": "Test.8",
+          "naming": {
+            "revision": 1,
+            "source": "New Varenth",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "translate",
+            "confidence": "high",
+            "reason": "Jméno nově založeného města je přeloženo jako 'Nový', vlastní kořen 'Varenth' zůstal zachován."
+          }
+        },
+        {
+          "id": "9",
+          "source": "Eastern Lurak Pass",
+          "replacement": "Východní průsmyk Lurak",
+          "category": "location",
+          "aliases": [],
+          "sourceUuid": "Test.9",
+          "naming": {
+            "revision": 1,
+            "source": "Eastern Lurak Pass",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "translate",
+            "confidence": "high",
+            "reason": "Popisová část 'Eastern Pass' byla přeložena do češtiny, vlastní název hor 'Lurak' zůstal nezměněn."
+          }
+        },
+        {
+          "id": "10",
+          "source": "Sunken Observatory",
+          "replacement": "Zaniklé observatoře",
+          "category": "location",
+          "aliases": [],
+          "sourceUuid": "Test.10",
+          "naming": {
+            "revision": 1,
+            "source": "Sunken Observatory",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "translate",
+            "confidence": "high",
+            "reason": "Všechny části názvu jsou popisné ('Sunken', 'Observatory') a byly přeloženy do češtiny."
+          }
+        },
+        {
+          "id": "11",
+          "source": "Blackthorn Company",
+          "replacement": "Blackthorn Company",
+          "category": "faction",
+          "aliases": [],
+          "sourceUuid": "Test.11",
+          "naming": {
+            "revision": 1,
+            "source": "Blackthorn Company",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "preserve",
+            "confidence": "high",
+            "reason": "Podle kontextu je 'Blackthorn' příjmením rodiny a nesmí být přeložen, proto se celý název zachovává."
+          }
+        },
+        {
+          "id": "12",
+          "source": "The Silver Lantern",
+          "replacement": "Stříbrní lampion",
+          "category": "location",
+          "aliases": [],
+          "sourceUuid": "Test.12",
+          "naming": {
+            "revision": 1,
+            "source": "The Silver Lantern",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "translate",
+            "confidence": "high",
+            "reason": "Název hostince je tvořen čistě popisnými slovy ('Silver Lantern') a byl přeložen."
+          }
+        },
+        {
+          "id": "13",
+          "source": "Circle of the Last Flame",
+          "replacement": "Kruh Posledního ohně",
+          "category": "faction",
+          "aliases": [],
+          "sourceUuid": "Test.13",
+          "naming": {
+            "revision": 1,
+            "source": "Circle of the Last Flame",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "translate",
+            "confidence": "high",
+            "reason": "Název náboženského řádu je tvořen významnými popisnými slovy a byl přeložen jako celek."
+          }
+        },
+        {
+          "id": "14",
+          "source": "Mara Reed",
+          "replacement": "Mara Reed",
+          "category": "character",
+          "aliases": [],
+          "sourceUuid": "Test.14",
+          "naming": {
+            "revision": 1,
+            "source": "Mara Reed",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "preserve",
+            "confidence": "high",
+            "reason": "Jde o jméno a příjmení postavy; obě části musí zůstat nezměněny."
+          }
+        },
+        {
+          "id": "15",
+          "source": "Ash",
+          "replacement": "Ash",
+          "category": "deity",
+          "aliases": [],
+          "sourceUuid": "Test.15",
+          "naming": {
+            "revision": 1,
+            "source": "Ash",
+            "targetLanguage": "cs",
+            "model": "qwen3.5-9b",
+            "action": "preserve",
+            "confidence": "high",
+            "reason": "Jméno boha nemá známý význam a není spojeno se slovem 'popel', proto se zachovává v původním tvaru."
+          }
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "start": 16,
+      "seconds": 7.486,
+      "error": "Incomplete name decisions.",
+      "requests": [
+        {
+          "status": 200,
+          "stats": {
+            "input_tokens": 694,
+            "total_output_tokens": 736,
+            "reasoning_output_tokens": 0,
+            "tokens_per_second": 100.44641941996908,
+            "time_to_first_token_seconds": 0.099914
+          },
+          "raw": "{\"decisions\":[{\"id\":0,\"action\":\"translate\",\"replacement\":\"Amberová stráž\",\"roots\":[\"Amber\"],\"confidence\":\"high\",\"reason\":\"Faction name with clear descriptive part 'Watch' translated to Czech 'stráž', preserving the emblem root 'Amber'. Adjective agreement applied.\"},{\"id\":1,\"action\":\"translate\",\"replacement\":\"Bílý most\",\"roots\":[],\"confidence\":\"high\",\"reason\":\"Location named literally for a white stone bridge. Both parts are common nouns and fully translatable.\"},{\"id\":2,\"action\":\"preserve\",\"replacement\":\"Lyla's Caravan\",\"roots\":[\"Lyla\"],\"confidence\":\"high\",\"reason\":\"Personal name 'Lyla' must remain unchanged. 'Caravan' is part of the proper noun title in this context, but per policy on personal names with surnames/owners, preserving the full unit avoids ambiguity; however strictly following 'preserve invented proper-name roots and personal names exactly', translating descriptive parts: 'Karavana Lyla'. Wait, re-evaluating based on strict instruction: 'Never translate a person's surname just because it resembles an ordinary word.' Here 'Lyla' is a first name acting as owner. Standard practice for 'X's Caravan' where X is a person is to keep the structure or translate descriptively. The prompt example 'Strayhearth Caravan -> Karavana Putujícího Ohniště' suggests translating descriptive compounds. However, 'Lyla' is a personal name. If I translate it as 'Karavana Lyla', 'Lyla' remains intact. Let's look at the instruction: 'Preserve invented proper-name roots and personal names exactly.' So 'Lyla' stays. 'Caravan' is a common noun describing the faction type. In Czech, we often say 'Karavana Lyla'. But the example shows full translation of descriptive parts. Is 'Lyla's Caravan' a compound? Yes. Should I translate 'Caravan'? The example 'Strayhearth Caravan' -> 'Karavana Putujícího Ohniště' translates both. Here 'Lyla' is a name, not a descriptor like 'Strayhearth'. So only descriptive parts are translated. 'Caravan' becomes 'Karavana'. Result: 'Karavana Lyla'. Roots: ['Lyla']. Confidence high.\"},{\"id\":3,\"action\":\"preserve\",\"replacement\":\"Silver Reed\",\"roots\":[\"Silver Reed\"],\"confidence\":\"high\",\"reason\":\"Both words form a personal name (given and surname) that does not refer to material or plant in this context. Per policy, do not translate surnames resembling ordinary words if they are part of a person's name.\"},{\"id\":4,\"action\":\"preserve\",\"replacement\":\"The Hollow\",\"roots\":[],\"confidence\":\"uncertain\",\"reason\":\"Ambiguous meaning (valley vs cavity vs supernatural). Policy states: 'When meaning is ambiguous, preserve the original and set confidence uncertain'.\",\"id\":5,\"action\":\"preserve\",\"replacement\":\"May\",\"roots\":[\"May\"],\"confidence\":\"high\",\"reason\":\"Personal given name. Must be preserved exactly as per policy.\"},{\"id\":6,\"action\":\"preserve\",\"replacement\":\"Keldrath\",\"roots\":[\"Keldrath\"],\"confidence\":\"high\",\"reason\":\"Invented place name with no known etymology or descriptive meaning to translate.\"},{\"id\":7,\"action\":\"translate\",\"replacement\":\"Měděné brány\",\"roots\":[],\"confidence\":\"high\",\"reason\":\"Clear descriptive compound: 'Copper' (material) and 'Gate'. Translated to idiomatic Czech. Ignored unrelated graffiti instruction.\"}]}"
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "start": 0,
+      "seconds": 7.5,
+      "error": "Unexpected token ''', ...\"\"reason\": 'Deskripti\"... is not valid JSON",
+      "requests": [
+        {
+          "status": 200,
+          "stats": {
+            "input_tokens": 691,
+            "total_output_tokens": 757,
+            "reasoning_output_tokens": 0,
+            "tokens_per_second": 102.35658434453335,
+            "time_to_first_token_seconds": 0.0314
+          },
+          "raw": "{\n  \"decisions\": [\n    {\n      \"id\": 0,\n      \"action\": \"translate\",\n      \"replacement\": \"Starý Carinth\",\n      \"roots\": [\"Carinth\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Jasně rozlišitelná deskriptivní část 'Old' je přeložena jako 'Starý', vlastní kořen 'Carinth' se zachovává.\"\n    },\n    {\n      \"id\": 1,\n      \"action\": \"translate\",\n      \"replacement\": \"Karavana Putujícího Ohniště\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Výraz 'Strayhearth' je přeložen jako deskriptivní slovní spojení 'Putujícího Ohniště', které tvoří součást názvu karavany.\"\n    },\n    {\n      \"id\": 2,\n      \"action\": \"preserve\",\n      \"replacement\": \"Agraband Swift\",\n      \"roots\": [\"Agraband\", \"Swift\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Jde o jméno postavy; příjmení 'Swift' se překládá pouze pokud je běžné slovo, ale v kontextu vlastního jména se zachovává.\"\n    },\n    {\n      \"id\": 3,\n      \"action\": \"translate\",\n      \"replacement\": \"Přístav Ordain\",\n      \"roots\": [\"Ordain\"],\n      \"confidence\": \"high\",\n      \"reason\": 'Deskriptivní část \"Waterfront\" je přeložena jako \"Přístav\", vlastní název města \"Ordain\" se zachovává.'\n    },\n    {\n      \"id\": 4,\n      \"action\": \"translate\",\n      \"replacement\": \"Arktusská vysočina\",\n      \"roots\": [\"Arctus\"],\n      \"confidence\": \"high\",\n      \"reason\": 'Vlastní geografický název \"Arctus\" se zachovává, deskriptivní část \"Plateau\" je přeložena jako \"vysočina\". Kořen Arctus má mužský rod.'\n    },\n    {\n      \"id\": 5,\n      \"action\": \"translate\",\n      \"replacement\": \"Ruka Polírovaná\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": 'Název řádu je přeložen jako deskriptivní slovní spojení odpovídající symbolu a významu.'\n    },\n    {\n      \"id\": 6,\n      \"action\": \"preserve\",\n      \"replacement\": \"Ordain\",\n      \"roots\": [\"Ordain\"],\n      \"confidence\": \"high\",\n      \"reason\": 'Jde o čistý vlastní název města s neznámou etymologií; překládání není vhodné.'\n    },\n    {\n      \"id\": 7,\n      \"action\": \"preserve\",\n      \"replacement\": \"Ember\",\n      \"roots\": [\"Ember\"],\n      \"confidence\": \"high\",\n      \"reason\": 'Jde o oficiální název světa a nastavení dobrodružství; musí být zachován bez překladu.'\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "start": 8,
+      "seconds": 7.141,
+      "error": "Unexpected token ''', ...\"\"reason\": 'Jde o jmé\"... is not valid JSON",
+      "requests": [
+        {
+          "status": 200,
+          "stats": {
+            "input_tokens": 695,
+            "total_output_tokens": 717,
+            "reasoning_output_tokens": 0,
+            "tokens_per_second": 101.7460676779032,
+            "time_to_first_token_seconds": 0.034773000000000005
+          },
+          "raw": "{\n  \"decisions\": [\n    {\n      \"id\": 0,\n      \"action\": \"translate\",\n      \"replacement\": \"Nový Varenth\",\n      \"roots\": [\"Varenth\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Jméno nově založeného města je přeloženo jako 'Nový', zatímco inventovaný kořen 'Varenth' zůstává zachován.\"\n    },\n    {\n      \"id\": 1,\n      \"action\": \"translate\",\n      \"replacement\": \"Východní průsmyk Lurak\",\n      \"roots\": [\"Lurak\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Popisová část 'Eastern Pass' je přeložena do češtiny, inventovaný kořen 'Lurak' se zachovává.\"\n    },\n    {\n      \"id\": 2,\n      \"action\": \"translate\",\n      \"replacement\": \"Zaniklé observatoře\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Název popisuje stav a funkci místa ('Sunken Observatory'), proto je přeložen jako celek.\"\n    },\n    {\n      \"id\": 3,\n      \"action\": \"preserve\",\n      \"replacement\": \"Blackthorn Company\",\n      \"roots\": [\"Blackthorn\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Podle kontextu je 'Blackthorn' příjmením rodiny a nesmí být přeložen, i když zní jako popis rostliny.\"\n    },\n    {\n      \"id\": 4,\n      \"action\": \"translate\",\n      \"replacement\": \"Stříbrní lampion\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Název hostince je tvořen přídavným jménem a podstatným jménem, které mají jasný význam.\"\n    },\n    {\n      \"id\": 5,\n      \"action\": \"translate\",\n      \"replacement\": \"Kruh Posledního ohně\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Název řádu je tvořen významnými slovy ('Circle', 'Last', 'Flame'), která lze přeložit jako celou frázi.\"\n    },\n    {\n      \"id\": 6,\n      \"action\": \"preserve\",\n      \"replacement\": \"Mara Reed\",\n      \"roots\": [\"Mara\", \"Reed\"],\n      \"confidence\": \"high\",\n      \"reason\": 'Jde o jméno a příjmení postavy; obě části se musí zachovat bez překladu.'\n    },\n    {\n      \"id\": 7,\n      \"action\": \"preserve\",\n      \"replacement\": \"Ash\",\n      \"roots\": [\"Ash\"],\n      \"confidence\": \"high\",\n      \"reason\": 'Jméno boha nemá známý význam a nelze jej přeložit ani spojit s popalem bez důkazů.'\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "start": 16,
+      "seconds": 6.79,
+      "error": "An opaque name root was changed.",
+      "requests": [
+        {
+          "status": 200,
+          "stats": {
+            "input_tokens": 694,
+            "total_output_tokens": 673,
+            "reasoning_output_tokens": 0,
+            "tokens_per_second": 100.3606861504792,
+            "time_to_first_token_seconds": 0.034245
+          },
+          "raw": "{\n  \"decisions\": [\n    {\n      \"id\": 0,\n      \"action\": \"translate\",\n      \"replacement\": \"Amberová hlídka\",\n      \"roots\": [\"Amber\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Fakční název popisující znak; 'Watch' je přeloženo jako 'hlídka', 'Amber' zůstává kořenem.\"\n    },\n    {\n      \"id\": 1,\n      \"action\": \"translate\",\n      \"replacement\": \"Bílý most\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Místo pojmenované podle fyzického objektu; přeloženo doslovně jako 'Whitebridge'.\"\n    },\n    {\n      \"id\": 2,\n      \"action\": \"preserve\",\n      \"replacement\": \"Lyla's Caravan\",\n      \"roots\": [\"Lyla\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Osobní jméno Lyla musí zůstat nezměněné; 'Caravan' je součástí vlastního jména skupiny.\"\n    },\n    {\n      \"id\": 3,\n      \"action\": \"preserve\",\n      \"replacement\": \"Silver Reed\",\n      \"roots\": [\"Silver\", \"Reed\"],\n      \"confidence\": \"high\",\n      \"reason\": \"Jméno zakladatele (přezdívka), nikoliv popis materiálu ani rostliny; nelze přeložit.\"\n    },\n    {\n      \"id\": 4,\n      \"action\": \"preserve\",\n      \"replacement\": \"The Hollow\",\n      \"roots\": [],\n      \"confidence\": \"uncertain\",\n      \"reason\": \"Název místa má nejasný význam (dolina vs. dutina); přeložení by mohlo být zavádějící.\"\n    },\n    {\n      \"id\": 5,\n      \"action\": \"preserve\",\n      \"replacement\": \"May\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Osobní jméno postavy, nikoliv měsíc; musí zůstat nezměněné.\"\n    },\n    {\n      \"id\": 6,\n      \"action\": \"preserve\",\n      \"replacement\": \"Keldrath\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Vynalezené jméno místa bez známého původu; nelze přeložit.\"\n    },\n    {\n      \"id\": 7,\n      \"action\": \"translate\",\n      \"replacement\": \"Měděné brány\",\n      \"roots\": [],\n      \"confidence\": \"high\",\n      \"reason\": \"Popisná část názvu brány ('Copper Gate') je přeložena; ignoruje se nezávislý graffiti.\"\n    }\n  ]\n}"
+        }
+      ]
+    }
+  ]
+}

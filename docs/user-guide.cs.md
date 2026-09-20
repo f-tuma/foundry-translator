@@ -70,8 +70,9 @@ Nejde o záruku kvality každého názvu. Karavany typu Actor „group“ se nyn
 mezi frakce, aby mohly získat popisný překlad.
 
 Model pro glosář běží na stejném serveru jako překladač, ale může být jiný.
-Prázdné pole automaticky hledá instrukční Qwen3.5, přednostně 9B. Kandidát
-Qwen3.5 9B Q4_K_M zatím čeká na ověření v místním LM Studio. Hy-MT2 může dál
+ID zatím vyberte výslovně; automatická volba čeká na model s ověřenou češtinou.
+Qwen3.5 9B Q4_K_M v místním testu chyboval ve významu i gramatice názvů;
+Granite 4.2 8B čeká na zkoušku. Hy-MT2 může dál
 překládat samotné příběhy. S Chrome nebo Google se AI pojmenování nespouští.
 
 Hotová rozhodnutí se při další synchronizaci neopakují. V detailu položky

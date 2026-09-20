@@ -99,12 +99,9 @@ export class NameAnalysisClient {
       if (!ids.includes(requested)) throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.ModelMissing"));
       return requested;
     }
-    // Prefer the small multilingual instruction family; never silently use the
-    // specialized translation model or an embedding model as a naming editor.
-    const model = ids.filter((id) => /qwen3[.-]5(?!\d)/iu.test(id) && !/embed|coder/iu.test(id))
-      .sort((a, b) => Number(!/9b/iu.test(a)) - Number(!/9b/iu.test(b)) || a.localeCompare(b))[0];
-    if (!model) throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.ModelMissing"));
-    return model;
+    // No automatic default until a candidate passes real Czech naming QA.
+    // Qwen3.5-9B failed that check; model-family matching is not a quality gate.
+    throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.ModelMissing"));
   }
   async analyze(entries: readonly GlossaryEntry[], contexts: ReadonlyMap<string, string>, model: string): Promise<GlossaryEntry[]> {
     const candidates: NamingCandidate[] = entries.map((entry, id) => ({ id, name: entry.source, category: entry.category, context: contexts.get(entry.source) ?? "" }));

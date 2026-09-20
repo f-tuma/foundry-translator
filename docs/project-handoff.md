@@ -22,8 +22,8 @@ and the recommended implementation order.
   `Actor.emberStrayhearth`, not a Journal page).
   Context uses bounded public descriptions and nearby mentions from loaded world
   documents. LM Studio native requests disable reasoning and chat persistence;
-  other servers can use structured Chat Completions. Automatic model selection
-  is limited to Qwen3.5, preferring 9B; explicit IDs are available in settings.
+  other servers can use structured Chat Completions. A model ID must currently
+  be selected explicitly; the unvalidated Qwen automatic default was removed.
   Missing/invalid model output stops AI naming safely and warns, while translation
   can continue with the original names. Completed batches are not re-requested.
   The user chose automatic saving with ambiguous names preserved.
@@ -32,12 +32,16 @@ and the recommended implementation order.
   with high confidence (Stará Carinth, Karavana Bloudomá); E2B returned incomplete
   JSON. Gemma decomposition plus Hy-MT produced unnatural word order. Gemma
   reasoning-on spent 6,000 tokens repeating text without a final answer. These
-  approaches are not selected automatically. Requested Qwen3.5-9B Q4_K_M from
-  the user; the latest local server listing does not expose it yet.
-  Benchmark the actual client with held-out names after it arrives. Old Carinth
-  and Strayhearth are user-preferred few-shot examples, not held-out evidence.
-  Official references: https://lmstudio.ai/models/qwen/qwen3.5-9b and
-  https://huggingface.co/Qwen/Qwen3.5-9B.
+  approaches are not selected automatically. Qwen3.5-9B Q4_K_M is now available
+  and failed local naming QA: only 1/6 production batches passed validation, and
+  accepted output still had Czech semantic/grammar errors. Supported vendor
+  nonthinking parameters did not fix those errors (1/3 batches accepted).
+  A thinking-mode trial used all 6,144 output tokens without a final message.
+  The user is downloading Granite 4.2 8B; it was not exposed by LM Studio at
+  the latest check. Test it before choosing a default. See
+  [benchmark notes](benchmarks/naming-2026-09-20.md) and the repeatable
+  `npm run benchmark:naming` script. Old Carinth and Strayhearth are
+  user-preferred few-shot examples, not held-out evidence.
 
   Compendium folder root cause was confirmed by read-only inspection of Foundry
   14.368: setFolder -> configure rewrites the full core.compendiumConfiguration
