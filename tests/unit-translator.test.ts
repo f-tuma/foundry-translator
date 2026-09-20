@@ -374,6 +374,26 @@ describe("translation units", () => {
     ]]);
   });
 
+  it.each([
+    "Meet @UUID[JournalEntry.Tayan]{Tayan} and @UUID[Actor.abc]{the guard}.",
+    'Meet @Embed[Actor.Tayan readaloud="Tayan"]{Tayan} and @UUID[Actor.abc]{the guard}.',
+  ])("protects glossary names directly beside Foundry syntax tokens: %s", async (source) => {
+    const inputs: string[] = [];
+    const result = await translateUnits({
+      units: [[source]],
+      glossary: [{ source: "Tayan", replacement: "Tayan", category: "lore", aliases: [] }],
+      provider: provider((text) => {
+        inputs.push(text);
+        return text.replaceAll("Tayan", "Tayanem").replace("Meet", "Potkej")
+          .replace(" and ", " a ").replace("the guard", "strážného");
+      }),
+      settings,
+      nonceFactory: () => "LABEL",
+    });
+    expect(inputs.every((text) => !text.includes("Tayan"))).toBe(true);
+    expect(result).toEqual([[source.replace("Meet", "Potkej").replace(" and ", " a ").replace("the guard", "strážného")]]);
+  });
+
   it("retries a suspicious unchanged translation and only caches the verified result", async () => {
     const cache = new MemoryTranslationCache();
     let calls = 0;

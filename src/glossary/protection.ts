@@ -16,10 +16,13 @@ export interface GlossaryProtection {
   text: string;
   nonce: string;
   tokens: readonly GlossaryToken[];
+  opaqueTokens?: readonly string[];
 }
 
 export interface ProtectGlossaryOptions {
   nonce?: string;
+  /** Already protected syntax is opaque and separates words, even without spaces. */
+  opaqueTokens?: readonly string[];
 }
 
 export class GlossaryConflictError extends Error {
@@ -76,15 +79,25 @@ export function validateGlossary(entries: Iterable<GlossaryEntry>): void {
   collectCandidates(entries);
 }
 
-function hasValidBoundaries(text: string, start: number, term: string): boolean {
+function opaqueBefore(text: string, offset: number, tokens: readonly string[]): boolean {
+  return tokens.some((token) => offset >= token.length &&
+    text.slice(offset - token.length, offset).toUpperCase() === token.toUpperCase());
+}
+
+function opaqueAfter(text: string, offset: number, tokens: readonly string[]): boolean {
+  return tokens.some((token) =>
+    text.slice(offset, offset + token.length).toUpperCase() === token.toUpperCase());
+}
+
+function hasValidBoundaries(text: string, start: number, term: string, opaqueTokens: readonly string[]): boolean {
   const end = start + term.length;
   const first = term[0] ?? "";
   const last = term.at(-1) ?? "";
   const before = start > 0 ? text[start - 1] ?? "" : "";
   const after = end < text.length ? text[end] ?? "" : "";
 
-  if (WORD_CHARACTER.test(first) && WORD_CHARACTER.test(before)) return false;
-  if (WORD_CHARACTER.test(last) && WORD_CHARACTER.test(after)) return false;
+  if (WORD_CHARACTER.test(first) && WORD_CHARACTER.test(before) && !opaqueBefore(text, start, opaqueTokens)) return false;
+  if (WORD_CHARACTER.test(last) && WORD_CHARACTER.test(after) && !opaqueAfter(text, end, opaqueTokens)) return false;
   return true;
 }
 
@@ -100,15 +113,16 @@ function restoreTokenWithWordBoundaries(
   text: string,
   token: string,
   replacement: string,
+  opaqueTokens: readonly string[],
 ): string {
   const pattern = asciiTokenPattern(token);
   return text.replace(pattern, (matched, offset: number, whole: string) => {
     const before = offset > 0 ? whole[offset - 1] ?? "" : "";
     const after = whole[offset + matched.length] ?? "";
     const needsLeadingSpace = WORD_CHARACTER.test(before) &&
-      WORD_CHARACTER.test(replacement[0] ?? "");
+      WORD_CHARACTER.test(replacement[0] ?? "") && !opaqueBefore(whole, offset, opaqueTokens);
     const needsTrailingSpace = WORD_CHARACTER.test(replacement.at(-1) ?? "") &&
-      WORD_CHARACTER.test(after);
+      WORD_CHARACTER.test(after) && !opaqueAfter(whole, offset + matched.length, opaqueTokens);
     return `${needsLeadingSpace ? " " : ""}${replacement}${needsTrailingSpace ? " " : ""}`;
   });
 }
@@ -120,6 +134,12 @@ export function protectGlossaryTerms(
 ): GlossaryProtection {
   const nonce = (options.nonce ?? createNonce()).toUpperCase();
   assertNonce(nonce);
+  const opaqueTokens = [...new Set(options.opaqueTokens?.filter(Boolean) ?? [])];
+  const opaqueStarts = new Map<number, string>();
+  if (opaqueTokens.length) {
+    const pattern = new RegExp(opaqueTokens.map(escapeRegExp).join("|"), "gu");
+    for (const match of text.matchAll(pattern)) opaqueStarts.set(match.index, match[0]);
+  }
 
   const candidates = collectCandidates(entries);
   const candidatesByFirstCharacter = new Map<string, ProtectionCandidate[]>();
@@ -136,9 +156,15 @@ export function protectGlossaryTerms(
   let cursor = 0;
 
   while (cursor < text.length) {
+    const opaque = opaqueStarts.get(cursor);
+    if (opaque) {
+      output.push(opaque);
+      cursor += opaque.length;
+      continue;
+    }
     const matches = candidatesByFirstCharacter.get(text[cursor] ?? "") ?? [];
     const candidate = matches.find(
-      ({ term }) => text.startsWith(term, cursor) && hasValidBoundaries(text, cursor, term),
+      ({ term }) => text.startsWith(term, cursor) && hasValidBoundaries(text, cursor, term, opaqueTokens),
     );
 
     if (!candidate) {
@@ -157,7 +183,7 @@ export function protectGlossaryTerms(
     cursor += candidate.term.length;
   }
 
-  return { text: output.join(""), nonce, tokens };
+  return { text: output.join(""), nonce, tokens, opaqueTokens };
 }
 
 export function restoreGlossaryTerms(
@@ -189,7 +215,7 @@ export function restoreGlossaryTerms(
     // token (for example `To__FTG...__dorazilo`). Restore a word boundary
     // around the fixed glossary replacement without adding spaces before
     // punctuation.
-    restored = restoreTokenWithWordBoundaries(restored, token, replacement);
+    restored = restoreTokenWithWordBoundaries(restored, token, replacement, protection.opaqueTokens ?? []);
   }
 
   return restored;

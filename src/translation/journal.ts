@@ -16,7 +16,7 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
-export const TRANSLATION_ENGINE_REVISION = 9;
+export const TRANSLATION_ENGINE_REVISION = 10;
 const HTML_FORMAT = 1;
 const MARKDOWN_FORMAT = 2;
 
@@ -183,8 +183,8 @@ export function canReuseJournalPageTranslation(
 
 /**
  * Merges a new partial translation into an existing hash-compatible
- * translation: pages already processed earlier are taken from the stored
- * translation, counters are combined, and once every source page is covered
+ * translation: unselected pages are taken from the stored translation, even
+ * when their coverage is outdated. Once every source page is covered
  * the merged flag becomes a complete translation.
  */
 export function mergePartialJournalTranslation(
@@ -201,7 +201,7 @@ export function mergePartialJournalTranslation(
   const existingProcessed = new Set(existingFlag.partial ? existingFlag.processedPageIds ?? [] : existing.pages.map((p) => p._id).filter((id): id is string => !!id));
   const existingPages = new Map(existing.pages.map((page) => [page._id, page]));
   merged.pages = merged.pages.map((page) => {
-    if (!page._id || partialProcessed.has(page._id) || !existingProcessed.has(page._id)) {
+    if (!page._id || partialProcessed.has(page._id)) {
       return page;
     }
     return structuredClone(existingPages.get(page._id) ?? page);

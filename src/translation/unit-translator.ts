@@ -146,7 +146,7 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 4,
+      schemaVersion: 5,
       segments,
       glossaryFingerprint,
       ...(providerIdentity ? { providerIdentity } : {}),
@@ -436,7 +436,7 @@ function prepareSegment(
     protection: protectGlossaryTerms(
       syntax.text,
       glossary,
-      { nonce },
+      { nonce, opaqueTokens: syntax.tokens.map(({ token }) => token) },
     ),
   };
 }
