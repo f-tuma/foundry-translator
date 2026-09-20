@@ -5,6 +5,9 @@
 V seznamu deníků otevřete **Překlad dobrodružství** (v anglickém Foundry
 **Adventure translation**). Totéž okno najdete v nastavení modulu.
 
+Pokud po aktualizaci vypadají tlačítka stlačeně nebo chybí nové rozložení,
+obnovte stránku bez cache (`Ctrl+Shift+R`). Prohlížeč může držet staré CSS.
+
 V **Překladač a jazyk** vyberte OpenAI-compatible / LM Studio, adresu
 `http://127.0.0.1:1234/v1`, přesné ID modelu ze serveru a češtinu. LM Studio
 musí mít spuštěný server a povolené CORS. Použijte **Otestovat připojení** a

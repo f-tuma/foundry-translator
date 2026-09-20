@@ -16,6 +16,10 @@ and the recommended implementation order.
   After restarting the world, the loaded module/API both report 0.15.1 and ready,
   with no injected development module. The desk shows Hy-MT2 and 660 active
   glossary entries; the connection test passes. The temporary QA server is off.
+  Final screenshot caught stale pre-update CSS in the browser cache. A reload
+  with `ignoreCache: true` loaded the actual desk grid/cards and restored the
+  expected desktop layout. The user guide documents hard refresh recovery;
+  versioned stylesheet filenames are a useful future packaging improvement.
 
 - 2026-09-20 post-install QA: PR #12 was merged, v0.15.0 released successfully
   and installed through Foundry Setup. User signed back in as Gamemaster.
