@@ -1,9 +1,10 @@
-# Foundry Translate 0.15.1 — stručný návod
+# Foundry Translate 0.15.2 — stručný návod
 
 ## První spuštění
 
 V seznamu deníků otevřete **Překlad dobrodružství** (v anglickém Foundry
-**Adventure translation**). Totéž okno najdete v nastavení modulu.
+**Adventure translation**). Totéž okno otevře tlačítko s ikonou překladu v levé
+kategorii **Journal Notes** nebo položka v nastavení modulu.
 
 Pokud po aktualizaci vypadají tlačítka stlačeně nebo chybí nové rozložení,
 obnovte stránku bez cache (`Ctrl+Shift+R`). Prohlížeč může držet staré CSS.
