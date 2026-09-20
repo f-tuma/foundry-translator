@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-07-17
-- Repository state: `main`; active-translation UI follow-up `v0.14.12` prepared from `v0.14.11`
+- Updated: 2026-09-20
+- Current implementation: `v0.15.0` prepared; see September notes below for deployment/QA status.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,60 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20: `v0.15.0` adds a Journal-sidebar translation desk, glossary
+  categories/aliases/opt-out, automatic pre-translation name synchronization,
+  and portable JSON bundles with a read-only import preview. Ember semantic
+  page types supply places, factions, deities, cultures and lore; explicit
+  creature templates are unprotected terms. Manual choices always win. Unknown
+  Actor names stay protected conservatively; unique item names and prose-only
+  entities still require review. Schema-backed HTML plus reviewed subtitles and
+  event outcome labels translate; identifiers and mechanics do not.
+- One-page jobs now have dependency depth zero, relink to available translated
+  copies, retain the active page on original/translation switching, and preserve
+  other translated pages on a glossary/model refresh. Changed source books need
+  a whole-book refresh. Coverage is invalidated by model/profile/source-language
+  fingerprints as well as engine/glossary changes. Checkpoint merging uses the
+  initial stored snapshot so live document updates cannot double-count pages.
+- Bundle v1 exports allowlisted text patches, original field values for validation,
+  canonical source fingerprints and the glossary; no connection credentials or
+  executable document flags. Imports require matching system/UUID/content, keep
+  existing translations/local glossary choices, validate markup/rolls/references,
+  and repair cycles after creating copies. Embedded export fields match by ID,
+  not collection order. Preview is read-only and import rechecks before writing.
+- Live QA: Foundry 14.368, Crucible 0.11.0, Ember 0.6.2 at ember.frgtn.cz. New
+  dialogs were injected temporarily from localhost during development; this is
+  not a persistent server installation. LM Studio CORS now works and the saved
+  connection uses localhost. Source adventure data was unchanged by model tests.
+  Existing data export produced 190 portable documents and 582 skips (574 changed
+  source, 7 missing source, 1 changed Foundry reference). Do not bypass those checks.
+- Model QA: Gemma 4 12B QAT synthetic scene 6.584 s, E2B 4.475 s, one request
+  and zero structural fallbacks each after disabling native LM Studio reasoning.
+  The real Diplomatic Impunity overview exposed poor Czech despite Gemma's zero
+  structural fallbacks (37.207 s). E2B was worse. Structural success is not a
+  language-quality score. Hy-MT2 7B Q8 was subsequently downloaded for comparison;
+  the generic instruction path took 144.587 s with one original-text fallback.
+  The dedicated documented Hy-MT prompt/sampling adapter completed the same
+  page in 38.172 s, 3 requests, no reasoning tokens, zero structural fallbacks
+  and an unchanged source. Czech was better but still contained grammatical
+  and lexical errors; names absent from the glossary were not consistently
+  preserved. Model quality and prose-only name discovery remain open work.
+- Final local checks: `npm run check` passed TypeScript, 199 tests in 36 files
+  and the 227 kB production build; `npm run release:verify` passed. Browser QA
+  covered Journal sidebar → desk, settings test/save → refreshed model summary,
+  glossary search/category/details, existing-copy import preview (disabled write),
+  invalid JSON rejection, and desktop/1024×768 layout. Import writes/cyclic links
+  were exercised in isolated repository tests, not against production adventure
+  documents. UI navigation and read-only previews did not rewrite translations.
+- Official model references checked on 2026-09-20:
+  <https://huggingface.co/tencent/Hy-MT2-7B-GGUF>,
+  <https://lmstudio.ai/models/google/gemma-4-12b-qat>,
+  <https://lmstudio.ai/models/google/gemma-4-e2b-qat>.
+- Chrome Translator was detected in the in-app browser but its en→cs model
+  download failed. Do not claim it works in this browser from API availability
+  alone. Console warnings from existing Crucible Actor actions/gear were present
+  while loading old compendia; distinguish them from module regressions.
+
 
 - 2026-07-17: Patch `v0.14.12` keeps the active-translations window within the
   viewport using a scrollable history that preserves its position during live

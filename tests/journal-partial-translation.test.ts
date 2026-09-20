@@ -100,6 +100,26 @@ describe("Partial journal page translation", () => {
     expect(flag && canReuseJournalPageTranslation(flag, flag.sourceHash, "page-one", "changed-glossary")).toBe(false);
   });
 
+  it("preserves other pages of a completed journal when refreshing with a new glossary", async () => {
+    const first = await translatePage("page-one");
+    const second = await translatePage("page-two");
+    const complete = mergePartialJournalTranslation(first.data, second.data);
+    const fresh = await translatePage("page-one");
+    (fresh.data.flags!["foundry-translate"]!.translation as { glossaryFingerprint: string }).glossaryFingerprint = "new-glossary";
+    const merged = mergePartialJournalTranslation(complete, fresh.data);
+    expect(merged.pages[1]?.text?.content).toBe("<p>Text druhé stránky.</p>");
+    expect(readJournalTranslationFlag(merged.flags)).toMatchObject({ partial: true, processedPageIds: ["page-one"] });
+  });
+
+  it("does not count a repeated page twice or reuse a different model", async () => {
+    const first = await translatePage("page-one");
+    const merged = mergePartialJournalTranslation(first.data, first.data);
+    const flag = readJournalTranslationFlag(merged.flags)!;
+    expect(flag.translatedTextPages).toBe(1);
+    expect(canReuseJournalPageTranslation(flag, flag.sourceHash, "page-one", flag.glossaryFingerprint, "different-model")).toBe(false);
+    expect(canReuseJournalPageTranslation(flag, flag.sourceHash, "page-one", flag.glossaryFingerprint, flag.providerFingerprint)).toBe(true);
+  });
+
   it("keeps a partial result unchanged when the existing translation is stale", async () => {
     const fresh = await translatePage("page-one");
     const stale = structuredClone(fresh.data);

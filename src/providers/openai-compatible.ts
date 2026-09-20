@@ -7,7 +7,7 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 5;
+const PROMPT_REVISION = 7;
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
 
@@ -396,6 +396,11 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       "Preserve every token beginning with __FTN_, __FTG_, __FTS_, or __FTB_ byte-for-byte, exactly once, and in the original order.",
       "FTB tokens delimit independent translation items. Translate every item independently and never move words across an FTB boundary.",
       "Preserve the meaning, tone, paragraph structure, and surrounding whitespace.",
+      "Keep proper names of people, places, factions and unique objects in their original spelling without inflection. Translate ordinary roles and game terms.",
+      "This is a tabletop roleplaying adventure. Use fluent narration suitable for reading aloud and precise game instructions.",
+      ...(request.targetLanguage === "cs" ? [
+        "Use idiomatic, grammatically correct Czech. In game instructions, party means družina, a check means ověření, and roll the dice means hoďte kostkami. Silently check spelling before returning the translation.",
+      ] : []),
       ...(this.#worldContext
         ? [`World and translation context:\n${this.#worldContext}`]
         : []),
@@ -403,15 +408,16 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       // by unit-translator and are restored deterministically afterwards.
       // Repeating the entire glossary here only wastes input tokens.
     ].join(" ");
-    if (/\bgemma-4-e2b\b/iu.test(this.#model)) {
-      const structured = await this.#translateWithStructuredOutput(text, system);
-      if (structured !== null) return structured;
-    }
     if (/\bgemma-4\b/iu.test(this.#model) && this.#lmStudioNativeAvailable !== false) {
       const native = await this.#translateWithLmStudioNative(text, system);
       if (native !== null) return native;
     }
+    if (/\bgemma-4-e2b\b/iu.test(this.#model)) {
+      const structured = await this.#translateWithStructuredOutput(text, system);
+      if (structured !== null) return structured;
+    }
     let lastDetail = "";
+    const translationModel = /(?:^|\/)hy-?mt(?:2|1\.5)(?:-|$)/iu.test(this.#model);
     for (const [attemptIndex, maxTokens] of OUTPUT_TOKEN_LIMITS.entries()) {
       if (attemptIndex > 0) {
         this.#onMetrics?.({
@@ -429,13 +435,18 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
           method: "POST",
           body: JSON.stringify({
             model: this.#model,
-            // TranslateGemma's stock LM Studio template requires the first message
-            // to use the user role, so instructions and input share one message.
-            messages: [{
+            messages: translationModel ? [{
+              // Hy-MT's documented template puts translation instructions in
+              // the user message. Its sampling defaults also avoid degenerate
+              // greedy decoding on long delimiter-heavy batches.
               role: "user",
-              content: `${system}\n\n<text_to_translate>\n${text}\n</text_to_translate>`,
-            }],
-            temperature: 0,
+              content: `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep all proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}\n\n[Source Text]\n${text}`,
+            }] : [
+              { role: "system", content: system },
+              { role: "user", content: `<text_to_translate>\n${text}\n</text_to_translate>` },
+            ],
+            temperature: translationModel ? 0.7 : 0,
+            ...(translationModel ? { top_p: 0.6 } : {}),
             max_tokens: maxTokens,
             stream: false,
           }),

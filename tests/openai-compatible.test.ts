@@ -47,11 +47,11 @@ describe("OpenAiCompatibleProvider", () => {
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer local-secret");
     const payload = JSON.parse(String(init?.body));
     expect(payload.model).toBe("gemma-test");
-    expect(payload.messages).toHaveLength(1);
-    expect(payload.messages[0].role).toBe("user");
+    expect(payload.messages).toHaveLength(2);
+    expect(payload.messages[0].role).toBe("system");
     expect(payload.messages[0].content).toContain("Temné gotické fantasy");
     expect(payload.messages[0].content).not.toContain("Castle Ravenloft => Hrad Ravenloft");
-    expect(payload.messages[0].content).toContain("__FTG_TEST_0001__");
+    expect(payload.messages[1].content).toContain("__FTG_TEST_0001__");
   });
 
   it("checks the exact model ID and performs a real translation", async () => {
@@ -70,6 +70,17 @@ describe("OpenAiCompatibleProvider", () => {
       "http://localhost:1234/v1/models",
       "http://localhost:1234/v1/chat/completions",
     ]);
+  });
+
+  it("uses Hy-MT's translation instruction format and sampling parameters", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ choices: [{ message: { content: "Družina vstoupí." }, finish_reason: "stop" }] }));
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "tencent/Hy-MT2-7B", worldContext: "Ember fantasy", fetchImplementation: fetchMock });
+    await expect(provider.translate({ texts: ["The party enters."], sourceLanguage: "en", targetLanguage: "cs" })).resolves.toEqual([{ translatedText: "Družina vstoupí." }]);
+    const payload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(payload.messages).toEqual([{ role: "user", content: expect.stringContaining("[Source Text]\nThe party enters.") }]);
+    expect(payload.messages[0].content).toContain("from English into Czech");
+    expect(payload.messages[0].content).toContain("Ember fantasy");
+    expect(payload).toMatchObject({ temperature: 0.7, top_p: 0.6 });
   });
 
   it("reports available models when the selected model is missing", async () => {
@@ -192,7 +203,7 @@ describe("OpenAiCompatibleProvider", () => {
   });
 
   it("uses constrained structured output for Gemma 4 e2b", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({}, { status: 404 })).mockResolvedValue(jsonResponse({
       choices: [{
         message: { content: JSON.stringify({ translation: "Vítejte v Emberu." }) },
         finish_reason: "stop",
@@ -207,8 +218,8 @@ describe("OpenAiCompatibleProvider", () => {
 
     await expect(provider.translate({ texts: ["Welcome to Ember."], targetLanguage: "cs" }))
       .resolves.toEqual([{ translatedText: "Vítejte v Emberu." }]);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:1234/v1/chat/completions");
-    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("http://localhost:1234/v1/chat/completions");
+    const body = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
     expect(body.messages).toEqual([
       expect.objectContaining({ role: "system" }),
       { role: "user", content: "Welcome to Ember." },
@@ -268,7 +279,7 @@ describe("OpenAiCompatibleProvider", () => {
   it("translates multiple texts in one delimited LLM request", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
       const body = JSON.parse(String(init?.body));
-      const content = String(body.messages[0].content);
+      const content = String(body.messages.at(-1).content);
       const boundaries = [...content.matchAll(/__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu)]
         .map(([token]) => token);
       return jsonResponse({
@@ -336,7 +347,7 @@ describe("OpenAiCompatibleProvider", () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
       request += 1;
       const body = JSON.parse(String(init?.body));
-      const content = String(body.messages[0].content);
+      const content = String(body.messages.at(-1).content);
       const boundaries = [...content.matchAll(/__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu)]
         .map(([token]) => token);
       batchSizes.push(Math.max(1, boundaries.length - 1));
@@ -374,7 +385,7 @@ describe("OpenAiCompatibleProvider", () => {
     const batchSizes: number[] = [];
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
       const body = JSON.parse(String(init?.body));
-      const content = String(body.messages[0].content);
+      const content = String(body.messages.at(-1).content);
       const boundaries = [...content.matchAll(/__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu)]
         .map(([token]) => token);
       const size = Math.max(1, boundaries.length - 1);

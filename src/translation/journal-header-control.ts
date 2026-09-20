@@ -109,8 +109,9 @@ async function showDocument(
   application: JournalEntrySheetApplication,
   document: FoundryJournalDocument,
 ): Promise<void> {
+  const pageId = activePageId(application);
   await application.close?.();
-  document.sheet?.render(true);
+  document.sheet?.render({ force: true, ...(pageId ? { pageId } : {}) });
 }
 
 async function translateFromHeader(

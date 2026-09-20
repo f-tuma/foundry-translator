@@ -1,3 +1,4 @@
+import { providerFingerprint } from "./provider-fingerprint";
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
@@ -15,7 +16,7 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
-export const TRANSLATION_ENGINE_REVISION = 8;
+export const TRANSLATION_ENGINE_REVISION = 9;
 const HTML_FORMAT = 1;
 const MARKDOWN_FORMAT = 2;
 
@@ -64,6 +65,7 @@ export interface TranslateJournalOptions {
   ownerDocument?: Document;
   nonceFactory?: () => string;
   systemHtmlFieldPaths?: readonly (readonly HtmlFieldPath[])[];
+  systemTextFieldPaths?: readonly (readonly HtmlFieldPath[])[];
   /** Translate only these pages; the rest stay source copies and the flag records a partial translation. */
   pageIds?: readonly string[];
   onProgress?: (progress: JournalTranslationProgress) => void;
@@ -118,6 +120,7 @@ export interface JournalTranslationFlag {
   processedPageIds?: string[];
   /** Glossary hash at translation time; a changed glossary invalidates reuse. */
   glossaryFingerprint?: string;
+  providerFingerprint?: string;
   /** Fingerprint of the generated copy, used to detect later manual edits. */
   outputHash?: string;
 }
@@ -155,11 +158,13 @@ export function canReuseJournalTranslation(
   flag: JournalTranslationFlag,
   sourceHash: string,
   glossaryHash?: string,
+  providerHash?: string,
 ): boolean {
   return flag.sourceHash === sourceHash &&
     flag.engineRevision === TRANSLATION_ENGINE_REVISION &&
     !flag.partial &&
-    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash);
+    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash) &&
+    (providerHash === undefined || flag.providerFingerprint === providerHash);
 }
 
 export function canReuseJournalPageTranslation(
@@ -167,15 +172,17 @@ export function canReuseJournalPageTranslation(
   sourceHash: string,
   pageId: string,
   glossaryHash?: string,
+  providerHash?: string,
 ): boolean {
   return flag.sourceHash === sourceHash &&
     flag.engineRevision === TRANSLATION_ENGINE_REVISION &&
     (!flag.partial || (flag.processedPageIds?.includes(pageId) ?? false)) &&
-    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash);
+    (glossaryHash === undefined || flag.glossaryFingerprint === glossaryHash) &&
+    (providerHash === undefined || flag.providerFingerprint === providerHash);
 }
 
 /**
- * Merges a new partial translation into an existing hash-compatible partial
+ * Merges a new partial translation into an existing hash-compatible
  * translation: pages already processed earlier are taken from the stored
  * translation, counters are combined, and once every source page is covered
  * the merged flag becomes a complete translation.
@@ -186,14 +193,12 @@ export function mergePartialJournalTranslation(
 ): JournalData {
   const existingFlag = readJournalTranslationFlag(existing.flags);
   const partialFlag = readJournalTranslationFlag(partial.flags);
-  if (!existingFlag?.partial || !partialFlag?.partial) return partial;
-  if (!existingFlag.processedPageIds || !partialFlag.processedPageIds) return partial;
-  if (existingFlag.sourceHash !== partialFlag.sourceHash ||
-    existingFlag.engineRevision !== partialFlag.engineRevision) return partial;
+  if (!existingFlag || !partialFlag?.partial || !partialFlag.processedPageIds) return partial;
+  if (existingFlag.sourceUuid !== partialFlag.sourceUuid || existingFlag.targetLanguage !== partialFlag.targetLanguage || existingFlag.sourceHash !== partialFlag.sourceHash) return partial;
 
   const merged = structuredClone(partial);
   const partialProcessed = new Set(partialFlag.processedPageIds);
-  const existingProcessed = new Set(existingFlag.processedPageIds);
+  const existingProcessed = new Set(existingFlag.partial ? existingFlag.processedPageIds ?? [] : existing.pages.map((p) => p._id).filter((id): id is string => !!id));
   const existingPages = new Map(existing.pages.map((page) => [page._id, page]));
   merged.pages = merged.pages.map((page) => {
     if (!page._id || partialProcessed.has(page._id) || !existingProcessed.has(page._id)) {
@@ -202,12 +207,17 @@ export function mergePartialJournalTranslation(
     return structuredClone(existingPages.get(page._id) ?? page);
   });
 
-  const processedPageIds = [...new Set([...existingFlag.processedPageIds, ...partialFlag.processedPageIds])];
+  // Older pages remain readable, but only matching engine/glossary coverage
+  // counts as current. A page refresh must never erase the rest of a book.
+  const sameRevision = existingFlag.engineRevision === partialFlag.engineRevision && existingFlag.glossaryFingerprint === partialFlag.glossaryFingerprint && existingFlag.providerFingerprint === partialFlag.providerFingerprint;
+  const pageIds = new Set(merged.pages.map((page) => page._id));
+  const processedPageIds = [...new Set([...(sameRevision ? existingProcessed : []), ...partialFlag.processedPageIds])].filter((id) => pageIds.has(id));
   const complete = merged.pages.every((page) => page._id && processedPageIds.includes(page._id));
+  const translatedTextPages = Math.min(processedPageIds.length, (sameRevision ? existingFlag.translatedTextPages : 0) + partialFlag.translatedTextPages);
   const flag: JournalTranslationFlag = {
     ...partialFlag,
-    translatedTextPages: existingFlag.translatedTextPages + partialFlag.translatedTextPages,
-    skippedTextPages: existingFlag.skippedTextPages + partialFlag.skippedTextPages,
+    translatedTextPages,
+    skippedTextPages: Math.min(processedPageIds.length - translatedTextPages, (sameRevision ? existingFlag.skippedTextPages : 0) + partialFlag.skippedTextPages),
     fallbackTextSegments: existingFlag.fallbackTextSegments + partialFlag.fallbackTextSegments,
     partial: !complete,
     processedPageIds,
@@ -317,6 +327,7 @@ export async function translateJournalData(
   delete copy._stats;
   const sourceHash = await journalSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);
+  const providerHash = await providerFingerprint(options.settings.providerId, options.provider, options.settings.sourceLanguage);
   const translatedAt = new Date().toISOString();
 
   let translatedTextPages = 0;
@@ -390,6 +401,7 @@ export async function translateJournalData(
           partial,
           processedPageIds: [...processedPageIds],
           glossaryFingerprint: glossaryHash,
+          providerFingerprint: providerHash,
         },
       },
     };
@@ -482,6 +494,17 @@ export async function translateJournalData(
           throw new Error(`Nepodařilo se zapsat vlastní HTML pole Journalu: ${path.join(".")}`);
         }
       });
+    }
+
+    for (const path of options.systemTextFieldPaths?.[pageIndex] ?? []) {
+      const text = readPath(page.system, path);
+      if (typeof text !== "string" || !text.trim()) continue;
+      targets.push({ segments: [text], apply: ([translated]) => {
+        if (translated !== undefined && !writePath(page.system, path, translated)) {
+          throw new Error(`Cannot update Ember text field: ${path.join(".")}`);
+        }
+      } });
+      translatedPage = true;
     }
 
     pageWork.push({

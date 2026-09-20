@@ -1,9 +1,9 @@
 import { logger } from "../logger";
 import { GlossaryCompendiumRepository } from "./compendium-repository";
-import { discoverGlossaryEntries } from "./discovery";
+import { discoverWorldGlossary } from "./discovery";
 import { planManualTerm } from "./sync";
 import { renderGlossaryView, updateGlossaryFilter } from "./glossary-view";
-import type { GlossaryEntry } from "./types";
+import { isGlossaryCategory, type GlossaryEntry } from "./types";
 import { loadGlossaryCandidates, saveGlossaryCandidates } from "./candidate-store";
 import type { GlossaryCandidate } from "./candidates";
 
@@ -54,6 +54,9 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
       updateGlossaryFilter(this.element, manualTerm.value);
     });
     if (manualTerm) updateGlossaryFilter(this.element, manualTerm.value);
+    this.element.querySelector("[name='categoryFilter']")?.addEventListener("change", () => {
+      updateGlossaryFilter(this.element, manualTerm?.value ?? "");
+    });
 
     this.element
       .querySelector<HTMLElement>("[data-action='sync']")
@@ -86,10 +89,7 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
   }
 
   #discover(): GlossaryEntry[] {
-    return discoverGlossaryEntries({
-      actors: game.actors.contents,
-      scenes: game.scenes.contents,
-    });
+    return discoverWorldGlossary();
   }
 
   async #sync(): Promise<void> {
@@ -131,6 +131,9 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
 
     this.#setStatus("testing", "FOUNDRY_TRANSLATE.Glossary.Status.Adding");
     try {
+      const category = this.element.querySelector<HTMLSelectElement>("[name='manualCategory']")?.value;
+      if (isGlossaryCategory(category)) plan.entry.category = category;
+      plan.entry.customized = true;
       await this.#repository.saveEntry(plan.entry);
       ui.notifications.success(
         plan.action === "update"
@@ -154,7 +157,15 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
       const entry = entriesBySource.get(source);
       if (!entry) continue;
       const replacement = input.value.normalize("NFC").trim() || entry.source;
-      if (replacement !== entry.replacement) changed.push({ ...entry, replacement });
+      const row = input.closest("[data-glossary-row]");
+      const category = row?.querySelector<HTMLSelectElement>("[data-glossary-category]")?.value;
+      const aliases = (row?.querySelector<HTMLInputElement>("[data-glossary-aliases-input]")?.value ?? "")
+        .split(";").map((alias) => alias.normalize("NFC").trim()).filter(Boolean);
+      const enabled = row?.querySelector<HTMLInputElement>("[data-glossary-enabled]")?.checked !== false;
+      if (replacement !== entry.replacement || category !== entry.category || enabled !== (entry.enabled !== false) || JSON.stringify(aliases) !== JSON.stringify(entry.aliases)) {
+        changed.push({ ...entry, replacement, aliases, enabled, customized: true,
+          category: isGlossaryCategory(category) ? category : entry.category });
+      }
     }
     if (!changed.length) {
       this.#setStatus("idle", "FOUNDRY_TRANSLATE.Glossary.Status.NoEdits");
@@ -164,7 +175,7 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
     button?.setAttribute("disabled", "");
     this.#setStatus("testing", "FOUNDRY_TRANSLATE.Glossary.Status.SavingEdits");
     try {
-      for (const entry of changed) await this.#repository.saveEntry(entry);
+      await this.#repository.saveEntries(changed);
       const message = game.i18n
         .localize("FOUNDRY_TRANSLATE.Glossary.Status.EditsSaved")
         .replace("{count}", String(changed.length));

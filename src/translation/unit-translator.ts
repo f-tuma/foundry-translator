@@ -127,6 +127,7 @@ function createInFlightTranslation(): InFlightTranslation {
 function glossarySnapshot(entries: readonly GlossaryEntry[]): string {
   return JSON.stringify(
     [...entries]
+      .filter((entry) => entry.enabled !== false)
       .map(({ source, replacement, category, aliases }) => ({
         source,
         replacement,

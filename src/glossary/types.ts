@@ -1,6 +1,11 @@
 export const GLOSSARY_SCHEMA_VERSION = 1 as const;
 
-export type GlossaryCategory = "character" | "location" | "term";
+export const GLOSSARY_CATEGORIES = ["character", "location", "faction", "deity", "item", "lore", "term"] as const;
+export type GlossaryCategory = typeof GLOSSARY_CATEGORIES[number];
+
+export function isGlossaryCategory(value: unknown): value is GlossaryCategory {
+  return GLOSSARY_CATEGORIES.includes(value as GlossaryCategory);
+}
 
 export interface GlossaryEntry {
   id?: string;
@@ -9,6 +14,10 @@ export interface GlossaryEntry {
   category: GlossaryCategory;
   aliases: string[];
   sourceUuid?: string;
+  /** Disabled entries remain stored so discovery cannot silently enable them again. */
+  enabled?: boolean;
+  /** A human classification takes precedence over subsequent discovery. */
+  customized?: boolean;
 }
 export interface GlossaryDocumentFlag {
   schemaVersion: typeof GLOSSARY_SCHEMA_VERSION;
@@ -17,4 +26,6 @@ export interface GlossaryDocumentFlag {
   category: GlossaryCategory;
   aliases: string[];
   sourceUuid?: string;
+  enabled?: boolean;
+  customized?: boolean;
 }

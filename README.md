@@ -2,13 +2,22 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-> [!IMPORTANT]
-> The module is currently an early development build. Version `0.14.12` processes
-> long Journals page by page, validates and retries suspicious unchanged output,
-> safely keeps an isolated failed fragment in the original, translates human text
-> inside Foundry embeds, recursively translates linked Journals, Actors, and
-> Items, rewrites links and embeds to their stored translations, resumes from
-> the server cache, and reports live progress with overall totals.
+Version **0.15.0** adds an adventure translation desk, an Ember-aware name
+glossary, and portable JSON translation bundles. Translation runs locally through
+Chrome or LM Studio, with Google Cloud available as an optional provider.
+Generated text is structurally validated; language quality still depends on the
+chosen model. The source adventure remains unchanged.
+
+## Quick start
+
+1. Open **Adventure translation** in the Journal sidebar (or Module Settings).
+2. Open **Translator and language**, choose a provider, test the connection and save.
+3. Open a Journal page and click **Translate this page** in its header.
+4. Use **Show original** to switch back without losing the current page.
+
+Names are synchronized automatically before translation. For a long book, use
+**Translate a whole journal**; this also processes linked documents. A single-page
+translation only processes that page and reuses already available linked copies.
 
 ## Installation
 
@@ -59,6 +68,14 @@ local server. Enter either the server root (for example
 for another machine on the LAN, serve on the local network. The address, model,
 and token are client-scoped.
 
+For Czech, the current tested candidate is **Tencent Hy-MT2 7B Q8_0**
+(`hy-mt2-7b` in the test server). The provider automatically uses its documented
+translation instruction format and sampling settings. On the test PC, one real
+Ember quest overview took about 38 seconds with zero structural fallbacks. Its
+Czech was better than Gemma 4 12B/E2B QAT in this sample, but still needs review.
+Gemma 4 uses LM Studio's native API with reasoning disabled. These are measured
+samples, not guarantees for every adventure. See the [Czech guide](docs/user-guide.cs.md).
+
 LLM translation can use an editable world profile containing setting, genre,
 tone, lore, and translation preferences. **Suggest profile from world** builds a
 bounded stratified sample: it prioritizes Journal and page names associated with
@@ -86,11 +103,21 @@ with billing and the Cloud Translation API enabled.
 ## Protected name glossary
 
 As Game Master open **Configure Settings → Module Settings → Name glossary** and
-select **Manage glossary**. The module discovers the names of world Actors and
-Scenes without modifying those documents. **Synchronize names** creates or
+select **Manage glossary**. The module discovers Actor and Scene names plus typed Ember location, biome,
+cosmos, organization, deity, culture and lore pages, without changing those documents.
+It categorizes characters, locations, factions, deities, unique items, lore and
+ordinary terms. Ember creature templates (`flags.ember.discoverable=creature`)
+are listed as ordinary, unprotected terms; named characters remain protected.
+Actors without reliable classification retain the conservative name protection.
+Unique items and names mentioned only in prose require a manual entry. **Synchronize names** creates or
 updates entries in the `Foundry Translate — Glossary` world compendium. Module
 compendia are grouped in a gray `Foundry Translate` folder in the Compendium
 sidebar.
+
+Search and category filters make large glossaries manageable. Expand a row to
+edit its category, semicolon-separated aliases and protection checkbox. Disabled
+terms remain stored but are translated normally. Manual decisions and custom
+translations take precedence over future automatic synchronization.
 
 Repeated synchronization does not create duplicates. Renamed Actors and Scenes
 are detected by UUID, while manually customized replacements are preserved. You
@@ -102,7 +129,11 @@ replaced by unique integrity tokens and restored as the stored replacement; if
 a provider loses, duplicates, or changes a token, the translation is rejected
 instead of returning a corrupted name. Translations remember the glossary they
 were made with, so after a glossary change a re-run updates the stored copy
-instead of reusing it.
+instead of reusing it. Model, prompt, world-profile and source-language changes
+also invalidate document reuse. Refreshing one page preserves other translated
+pages but marks older glossary/model coverage as partial. If the source book
+itself changed, refresh the whole book first; a page refresh will explain this
+instead of replacing the other pages with English.
 
 The glossary window also contains a review queue for suggestions learned from
 manual corrections to translated Journal pages. A suggestion shows editable
@@ -124,15 +155,17 @@ You can also open a world Journal Entry and select **Translate this journal**
 directly in its header. A visible header button and the standard header controls
 menu provide the same safe translation action. The header controls menu also
 offers **Translate this page**: it translates only the currently viewed page
-plus one level of referenced documents, so a single chapter of a large journal
-is ready quickly. Page translations of the same journal merge into one stored
+without starting translations of linked documents, so a chapter does not launch
+an entire linked guide. Links use existing translations when available. Page translations of the same journal merge into one stored
 translation, and once every page has been processed the result counts as a
 complete translation. Clicking the translate action of a journal that is
 already being translated opens the global overview instead.
 
 The current development build translates the journal name, page-category names,
 page names, HTML-backed pages, and Markdown source pages, including custom page
-types used by adventure modules.
+types used by adventure modules. In Ember this includes schema-declared HTML
+fields, subtitles, and visible quest/standalone event outcome labels. Mechanical
+IDs, quest state, outcome IDs, conditions and graph structure remain unchanged.
 Inline markup and mechanical attributes remain local, while visible attributes
 such as `alt`, `title`, and `aria-label` are translated. Foundry references such
 as `@UUID[...]` and inline rolls such as `[[/r 1d20]]` are integrity-protected.
@@ -225,9 +258,26 @@ The production module is generated in `dist/`. A release tag such as `v0.9.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
 both `module.json` and `foundry-translate.zip` as GitHub Release assets.
 
-## Planned functionality
+## Share translations without an AI model
 
-- Portable export and import of translation bundles
+Open **Adventure translation → Share or import translations**. Export creates a
+JSON file containing the glossary and text patches for the selected language.
+Connection addresses, API keys, original document objects, images and executable
+flags are omitted. Text patches include original strings for validation, so a
+bundle can still contain adventure prose and spoilers.
+
+The recipient installs the same adventure/system and chooses the JSON file.
+A preview shows ready, existing, missing, changed and invalid documents before
+any writes. Import requires a GM but no AI model or server. Existing translated
+copies and local glossary decisions are preserved. Cyclic links are repaired
+after all new copies exist. Export skips stale or incompatible translations and
+lists reasons; it does not silently label them as current.
+
+This first bundle format uses **exact source UUIDs and content fingerprints**.
+It works with matching module/compendium IDs and matching imported worlds. It
+will not guess matches by title when a recipient's world assigned different
+IDs. HTML, Markdown, rolls and Foundry references are validated; only locally
+allowlisted prose fields can be imported.
 
 ## Project handoff
 

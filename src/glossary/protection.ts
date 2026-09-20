@@ -50,6 +50,7 @@ function collectCandidates(entries: Iterable<GlossaryEntry>): ProtectionCandidat
   const candidates = new Map<string, ProtectionCandidate>();
 
   for (const entry of entries) {
+    if (entry.enabled === false) continue;
     const replacement = entry.replacement.normalize("NFC").trim();
     const terms = [entry.source, ...entry.aliases];
 
@@ -68,6 +69,11 @@ function collectCandidates(entries: Iterable<GlossaryEntry>): ProtectionCandidat
   return [...candidates.values()].sort((left, right) =>
     right.term.length - left.term.length || left.term.localeCompare(right.term),
   );
+}
+
+/** Validate the entire glossary before persisting changes or starting a run. */
+export function validateGlossary(entries: Iterable<GlossaryEntry>): void {
+  collectCandidates(entries);
 }
 
 function hasValidBoundaries(text: string, start: number, term: string): boolean {

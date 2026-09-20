@@ -15,6 +15,7 @@ function sameEntry(left: GlossaryEntry, right: GlossaryEntry): boolean {
     left.source === right.source &&
     left.replacement === right.replacement &&
     left.category === right.category &&
+    left.enabled === right.enabled &&
     left.sourceUuid === right.sourceUuid
   );
 }
@@ -62,14 +63,20 @@ export function planGlossarySync(
     existingEntries.map((entry) => [normalizeKey(entry.source), entry]),
   );
   const plan: GlossarySyncPlan = { create: [], update: [], unchanged: [] };
+  const seenIncoming = new Set<string>();
 
   for (const incoming of discovered) {
+    const key = normalizeKey(incoming.source);
+    if (seenIncoming.has(key)) continue;
+    seenIncoming.add(key);
     const matched =
       (incoming.sourceUuid ? byUuid.get(incoming.sourceUuid) : undefined) ??
       bySource.get(normalizeKey(incoming.source));
 
     if (!matched) {
       plan.create.push(incoming);
+      bySource.set(normalizeKey(incoming.source), incoming);
+      if (incoming.sourceUuid) byUuid.set(incoming.sourceUuid, incoming);
       continue;
     }
 
@@ -80,7 +87,9 @@ export function planGlossarySync(
         matched.sourceUuid && matched.replacement === matched.source
           ? incoming.replacement
           : matched.replacement,
-      category: incoming.category,
+      category: matched.customized ? matched.category : incoming.category,
+      ...(!matched.customized && matched.replacement === matched.source && incoming.enabled === false
+        ? { enabled: false } : {}),
       ...((incoming.sourceUuid ?? matched.sourceUuid)
         ? { sourceUuid: incoming.sourceUuid ?? matched.sourceUuid }
         : {}),

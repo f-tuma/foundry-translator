@@ -5,6 +5,7 @@ import { registerSettings } from "./settings/register-settings";
 import { registerJournalTranslationHeaderControl } from "./translation/journal-header-control";
 import { registerGlossaryCandidateHooks } from "./glossary/candidate-hooks";
 import { registerTranslatedLinkNavigation } from "./translation/translated-link-navigation";
+import { registerTranslationDesk } from "./ui/translation-desk";
 
 let ready = false;
 
@@ -12,6 +13,7 @@ Hooks.once("init", () => {
   registerSettings();
   registerJournalTranslationHeaderControl();
   registerGlossaryCandidateHooks();
+  registerTranslationDesk();
 
   const module = game.modules.get(MODULE_ID);
 

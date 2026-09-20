@@ -52,6 +52,30 @@ export function discoverSystemHtmlFieldPaths(
   return paths;
 }
 
+/** Reviewed Ember UI strings which are not HTMLFields. Never scan every string:
+ * adjacent fields contain IDs, enums, scene configuration and automation data. */
+export function discoverEmberTextFieldPaths(
+  type: string,
+  fields: Record<string, unknown> | undefined,
+  system: unknown,
+): readonly HtmlFieldPath[] {
+  if (!type.startsWith("ember.") || !fields || !isRecord(system)) return [];
+  const paths: HtmlFieldPath[] = [];
+  const subtitle = fields.subtitle as RuntimeDataField | undefined;
+  if (subtitle?.constructor?.name === "StringField" && typeof system.subtitle === "string") {
+    paths.push(["subtitle"]);
+  }
+  if (type === "ember.questEvent" || type === "ember.standaloneEvent") {
+    const outcomes = fields.outcomes as RuntimeDataField | undefined;
+    if (outcomes?.element?.fields?.label?.constructor?.name === "StringField" && Array.isArray(system.outcomes)) {
+      system.outcomes.forEach((outcome, index) => {
+        if (isRecord(outcome) && typeof outcome.label === "string") paths.push(["outcomes", index, "label"]);
+      });
+    }
+  }
+  return paths;
+}
+
 export function readPath(source: unknown, path: HtmlFieldPath): unknown {
   let value = source;
   for (const part of path) {
