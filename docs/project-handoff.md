@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.15.1` patch prepared; `v0.15.0` released and installed.
+- Current implementation: `v0.15.1` released and installed; live module API verified ready.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,12 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- Deployment completed: PR #13 merged as `5a8e0a2`, tag `v0.15.1` published
+  successfully by GitHub Actions, and Foundry Setup updated the installed module.
+  After restarting the world, the loaded module/API both report 0.15.1 and ready,
+  with no injected development module. The desk shows Hy-MT2 and 660 active
+  glossary entries; the connection test passes. The temporary QA server is off.
 
 - 2026-09-20 post-install QA: PR #12 was merged, v0.15.0 released successfully
   and installed through Foundry Setup. User signed back in as Gamemaster.
