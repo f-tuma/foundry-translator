@@ -20,6 +20,11 @@ and the recommended implementation order.
   settings and no translation packs. Do not overwrite those settings based on
   the old world's configuration. TypeScript, 203 tests, build and release
   metadata validation passed.
+  PR #14 merged as `ca9b38b`, and v0.15.2 is published with both assets. Live
+  installation is pending: Return to Setup stopped `ember`, but the server
+  now requires administrator login at `/auth`. The user has been asked to sign
+  in directly. After that, update only Foundry Translate and relaunch `ember`
+  (title Ember), then verify the installed button. The QA server is stopped.
 
 - Deployment completed: PR #13 merged as `5a8e0a2`, tag `v0.15.1` published
   successfully by GitHub Actions, and Foundry Setup updated the installed module.
