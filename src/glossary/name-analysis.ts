@@ -4,6 +4,7 @@ import type { GlossaryEntry, GlossaryNamingDecision } from "./types";
 
 export interface NamingProgress { completed: number; total: number; model?: string }
 export class NamingCancelledError extends Error {}
+export class NamingResponseError extends Error {}
 
 type FetchImplementation = (url: string, init?: RequestInit) => Promise<Response>;
 interface NamingCandidate { id: number; name: string; category: string; context: string }
@@ -40,7 +41,7 @@ function containsRoot(name: string, root: string): boolean {
   return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "u").test(name);
 }
 
-/** Reject malformed/misassigned batches; uncertainty or modified roots keep the source. */
+/** Reject misassigned batches; an invalid individual proposal only preserves that name. */
 export function parseNameDecisions(
   raw: string,
   entries: readonly GlossaryEntry[],
@@ -48,29 +49,38 @@ export function parseNameDecisions(
   model: string,
   establishedNames: readonly EstablishedName[] = [],
 ): GlossaryEntry[] {
-  if (raw.length > 40_000) throw new Error("Name response is too large.");
-  const data = JSON.parse(raw.trim().replace(/^```json\s*/iu, "").replace(/\s*```$/u, "")) as { decisions?: unknown };
-  if (!data || !Array.isArray(data.decisions) || data.decisions.length !== entries.length) throw new Error("Incomplete name decisions.");
+  if (raw.length > 40_000) throw new NamingResponseError("Name response is too large.");
+  let data: { decisions?: unknown };
+  try { data = JSON.parse(raw.trim().replace(/^```json\s*/iu, "").replace(/\s*```$/u, "")); }
+  catch { throw new NamingResponseError("Naming model returned invalid JSON."); }
+  if (!data || !Array.isArray(data.decisions) || data.decisions.length !== entries.length) throw new NamingResponseError("Incomplete name decisions.");
   const seen = new Set<number>();
   const result: GlossaryEntry[] = [];
   for (const value of data.decisions) {
-    if (!value || typeof value !== "object") throw new Error("Invalid name decision.");
+    if (!value || typeof value !== "object") throw new NamingResponseError("Invalid name decision.");
     const decision = value as Record<string, unknown>;
     const id = decision.id;
-    if (typeof id !== "number" || !Number.isSafeInteger(id) || !entries[id] || seen.has(id)) throw new Error("Invalid name decision ID.");
+    if (typeof id !== "number" || !Number.isSafeInteger(id) || !entries[id] || seen.has(id)) throw new NamingResponseError("Invalid name decision ID.");
     seen.add(id);
     const entry = entries[id]!;
-    if (typeof decision.action !== "string" || !["preserve", "translate"].includes(decision.action)
+    const invalid = typeof decision.action !== "string" || !["preserve", "translate"].includes(decision.action)
       || typeof decision.confidence !== "string" || !["high", "uncertain"].includes(decision.confidence)
       || typeof decision.replacement !== "string" || typeof decision.reason !== "string" || decision.reason.length > 300
       || !Array.isArray(decision.roots) || decision.roots.length > 12
-      || !decision.roots.every((root) => validName(root) && containsRoot(entry.source, root))) throw new Error("Invalid name decision fields.");
+      || !decision.roots.every((root) => validName(root) && containsRoot(entry.source, root));
     const translate = decision.action === "translate" && decision.confidence === "high";
-    if (translate && !validName(decision.replacement)) throw new Error("Invalid translated name.");
-    const proposed = translate ? decision.replacement.normalize("NFC").trim() : entry.source;
+    if (invalid || (translate && !validName(decision.replacement))) {
+      result.push({ ...entry, replacement: entry.source, naming: {
+        revision: 1, source: entry.source, targetLanguage, model, action: "preserve",
+        confidence: "uncertain", reason: "", guard: "invalid-decision",
+      } });
+      continue;
+    }
+    const roots = decision.roots as string[];
+    const proposed = translate ? (decision.replacement as string).normalize("NFC").trim() : entry.source;
     const references = establishedNames.filter((name) => containsRoot(entry.source, name.source));
     const fixedReferences = references.filter((name) => !references.some((other) => other.source.length > name.source.length && containsRoot(other.source, name.source)));
-    const guarded = translate && (!decision.roots.every((root: string) => containsRoot(proposed,
+    const guarded = translate && (!roots.every((root: string) => containsRoot(proposed,
       fixedReferences.find((name) => containsRoot(name.source, root))?.replacement ?? root))
       || !fixedReferences.every((name) => containsRoot(proposed, name.replacement)));
     const replacement = guarded ? entry.source : proposed;
@@ -79,7 +89,7 @@ export function parseNameDecisions(
       confidence: guarded ? "uncertain" : decision.confidence as "high" | "uncertain",
       // The model's explanation may falsely claim that it preserved the name.
       // Render the local guard's localized explanation instead.
-      reason: guarded ? "" : decision.reason, ...(guarded ? { guard: "protected-root" as const } : {}) };
+      reason: guarded ? "" : decision.reason as string, ...(guarded ? { guard: "protected-root" as const } : {}) };
     result.push({ ...entry, replacement, naming });
   }
   return result;
@@ -156,7 +166,7 @@ export class NameAnalysisClient {
       const data = await response.json() as { choices?: { message?: { content?: unknown } }[] };
       raw = data.choices?.[0]?.message?.content;
     }
-    if (typeof raw !== "string" || !raw.trim()) throw new Error("Naming model returned no decisions.");
+    if (typeof raw !== "string" || !raw.trim()) throw new NamingResponseError("Naming model returned no decisions.");
     return parseNameDecisions(raw, entries, this.#settings.targetLanguage, model, establishedNames);
   }
 }

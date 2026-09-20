@@ -1,0 +1,83 @@
+{
+  "decisions": [
+    {
+      "id": 0,
+      "action": "translate",
+      "replacement": "Starý Sunvale",
+      "roots": [
+        "Sunvale"
+      ],
+      "confidence": "high",
+      "reason": "Synthetic regression example."
+    },
+    {
+      "id": 1,
+      "action": "translate",
+      "replacement": "Nový Mistford",
+      "roots": [
+        "Mistford"
+      ],
+      "confidence": "high",
+      "reason": "Synthetic regression example."
+    },
+    {
+      "id": 2,
+      "action": "translate",
+      "replacement": "Věž úsvitu",
+      "roots": [],
+      "confidence": "high",
+      "reason": "Synthetic regression example."
+    },
+    {
+      "id": 3,
+      "action": "preserve",
+      "replacement": "Mira Stormlake",
+      "roots": [
+        "Mira",
+        "Stormlake"
+      ],
+      "confidence": "high",
+      "reason": "Synthetic regression example."
+    },
+    {
+      "id": 4,
+      "action": "translate",
+      "replacement": "Kruh Vardel",
+      "roots": [
+        "vardel"
+      ],
+      "confidence": "uncertain",
+      "reason": "Synthetic regression example."
+    },
+    {
+      "id": 5,
+      "action": "preserve",
+      "replacement": "Velora",
+      "roots": [
+        "Velora"
+      ],
+      "confidence": "high",
+      "reason": "Synthetic regression example."
+    },
+    {
+      "id": 6,
+      "action": "preserve",
+      "replacement": "Orlith",
+      "roots": [
+        "Orlith"
+      ],
+      "confidence": "high",
+      "reason": "Synthetic regression example."
+    },
+    {
+      "id": 7,
+      "action": "preserve",
+      "replacement": "Orlithians",
+      "roots": [
+        "Orlithians"
+      ],
+      "confidence": "high",
+      "reason": "Synthetic regression example."
+    }
+  ]
+}

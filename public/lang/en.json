@@ -262,5 +262,10 @@
   "FOUNDRY_TRANSLATE.Glossary.AI.Uncertain": "uncertain meaning",
   "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot": "The AI proposal changed a protected name root. The original name was retained; other names can still be processed.",
   "FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel": "name protected",
-  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Preparing names"
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary": "Preparing names",
+  "FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecisionLabel": "needs review",
+  "FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecision": "The AI returned an invalid proposal for this name. The original name was retained and other entries continued processing. You can edit its translation manually.",
+  "FOUNDRY_TRANSLATE.Glossary.AI.FilterLabel": "AI naming",
+  "FOUNDRY_TRANSLATE.Glossary.AI.FilterAll": "All names",
+  "FOUNDRY_TRANSLATE.Glossary.AI.InvalidResponse": "The model returned an unreadable or incomplete batch of names. Completed entries are saved; remaining names retain their original form. You can synchronize again."
 }

@@ -1,4 +1,4 @@
-# Foundry Translate 0.16.1 — stručný návod
+# Foundry Translate 0.16.2 — stručný návod
 
 ## První spuštění
 
@@ -6,8 +6,8 @@ V seznamu deníků otevřete **Překlad dobrodružství** (v anglickém Foundry
 **Adventure translation**). Totéž okno otevře tlačítko s ikonou překladu v levé
 kategorii **Journal Notes** nebo položka v nastavení modulu.
 
-Pokud po aktualizaci vypadají tlačítka stlačeně nebo chybí nové rozložení,
-obnovte stránku bez cache (`Ctrl+Shift+R`). Prohlížeč může držet staré CSS.
+Od verze 0.16.1 mají skript i CSS adresu svázanou s verzí, takže aktualizace
+načte nové rozhraní bez ručního mazání cache.
 
 V **Překladač a jazyk** vyberte OpenAI-compatible / LM Studio, adresu
 `http://127.0.0.1:1234/v1`, přesné ID modelu ze serveru a češtinu. LM Studio
@@ -60,7 +60,8 @@ začíná velkým písmenem. Pokyn modelu k zachování jmen sám není záruka.
 
 ## Volitelné názvy podle kontextu
 
-AI pojmenování je při aktualizaci i nové instalaci vypnuté. Zapněte ho výběrem
+AI pojmenování je ve výchozím stavu vypnuté; aktualizace zachová vaši uloženou
+volbu. Zapněte ho výběrem
 **AI s kontextem · nejasné názvy zachovat** a zadejte **Model pro glosář**.
 
 Tyto volby najdete v **Překladač a jazyk** pod poskytovatelem LM Studio.
@@ -71,6 +72,17 @@ Zvolená podoba se uloží do glosáře a dál se používá jednotně. Cílové
 „Old Carinth → Starý Carinth“ a „Strayhearth Caravan → Karavana Putujícího Ohniště“.
 Nejde o záruku kvality každého názvu. Karavany typu Actor „group“ se nyní řadí
 mezi frakce, aby mohly získat popisný překlad.
+
+Okno glosáře můžete nechat otevřené během přípravy překladu. Hotové výsledky
+se zobrazí po každé uložené dávce (nejvýše osm názvů). Seznam zachová rozepsané
+ruční opravy, hledání, filtry i posunutí. Opravy lze uložit už během AI posuzování;
+ručně uložený název má přednost před pozdější odpovědí modelu.
+
+Filtr **AI pojmenování** ukáže jen přeložené názvy nebo položky **ke kontrole**.
+Neplatný návrh jednotlivého názvu zachová původní zápis a nezastaví ostatní
+položky. Důvod je v nápovědě rozbaleného řádku. Nečitelná celá odpověď nebo
+chyba spojení zůstane viditelná ve stavovém řádku; další synchronizace naváže
+na uložená rozhodnutí.
 
 Model pro glosář běží na stejném serveru jako překladač, ale může být jiný.
 ID zatím vyberte výslovně; automatická volba čeká na model s ověřenou češtinou.

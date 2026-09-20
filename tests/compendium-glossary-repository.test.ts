@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GlossaryCompendiumRepository, GLOSSARY_PACK_ID } from "../src/glossary/compendium-repository";
 import { NamingCancelledError } from "../src/glossary/name-analysis";
 import type { GlossaryEntry } from "../src/glossary/types";
+import { glossaryLive } from "../src/glossary/live";
 
 const entry = (index: number): GlossaryEntry => ({ source: `Old Town${index}`, replacement: `Old Town${index}`, aliases: [], category: "location", sourceUuid: `Scene.${index}` });
 function fixture(onRequest?: () => void, invalid = false) {
@@ -85,6 +86,54 @@ describe("AI glossary persistence", () => {
     const calls = request.mock.calls.length;
     await repo.sync(entries);
     expect(request).toHaveBeenCalledTimes(calls);
+  });
+  it("publishes saved batches while the next batch is still pending", async () => {
+    const { request } = fixture();
+    const original = request.getMockImplementation()!;
+    let finishNext!: () => void;
+    const waiting = new Promise<void>((resolve) => { finishNext = resolve; });
+    let nextStarted!: () => void;
+    const started = new Promise<void>((resolve) => { nextStarted = resolve; });
+    let batches = 0;
+    request.mockImplementation(async (url, init) => {
+      if (init?.method !== "GET" && ++batches === 2) { nextStarted(); await waiting; }
+      return original(url, init);
+    });
+    const snapshots: number[] = [];
+    const unsubscribe = glossaryLive.subscribe(({ entries }) => snapshots.push(entries?.filter((entry) => entry.naming).length ?? 0));
+    const repo = new GlossaryCompendiumRepository();
+    const running = repo.sync(Array.from({ length: 9 }, (_, i) => entry(i)));
+    try {
+      await started;
+      expect(glossaryLive.state.running).toBe(true);
+      expect(snapshots).toContain(8);
+      expect((await repo.loadExisting()).filter((entry) => entry.naming)).toHaveLength(8);
+    } finally { finishNext(); await running; unsubscribe(); }
+    expect(glossaryLive.state.running).toBe(false);
+    expect(glossaryLive.state.entries?.filter((entry) => entry.naming)).toHaveLength(9);
+  });
+  it("does not stop at an invalid individual root or retry the same bad proposal forever", async () => {
+    const { request } = fixture();
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (url, init) => {
+      const response = await original(url, init);
+      if (init?.method === "GET") return response;
+      const data = await response.json();
+      const content = JSON.parse(data.output[0].content);
+      content.decisions[0].roots = ["not in source"];
+      data.output[0].content = JSON.stringify(content);
+      return new Response(JSON.stringify(data));
+    });
+    const repo = new GlossaryCompendiumRepository();
+    const entries = Array.from({ length: 9 }, (_, i) => entry(i));
+    const result = await repo.sync(entries);
+    expect(result.aiWarning).toBeUndefined();
+    expect(result.aiTranslated).toBe(7);
+    expect(result.aiPreserved).toBe(2);
+    expect((await repo.loadExisting())[0]?.naming?.guard).toBe("invalid-decision");
+    const calls = request.mock.calls.length;
+    await repo.sync(entries);
+    expect(request.mock.calls.length).toBe(calls);
   });
   it("passes saved choices from an earlier batch as authoritative name context", async () => {
     const { request } = fixture();

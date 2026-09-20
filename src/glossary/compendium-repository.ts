@@ -6,8 +6,9 @@ import { validateGlossary } from "./protection";
 import { discoverWorldGlossary } from "./discovery";
 import { getTranslatorSettings } from "../settings/settings";
 import { collectNameContexts } from "./name-context";
-import { NameAnalysisClient, NamingCancelledError, needsNameAnalysis, type NamingProgress } from "./name-analysis";
+import { NameAnalysisClient, NamingCancelledError, NamingResponseError, needsNameAnalysis, type NamingProgress } from "./name-analysis";
 import { logger } from "../logger";
+import { glossaryLive } from "./live";
 
 export const GLOSSARY_PACK_NAME = "foundry-translate-glossary" as const;
 export const GLOSSARY_PACK_ID = `world.${GLOSSARY_PACK_NAME}` as const;
@@ -114,6 +115,12 @@ async function loadFromPack(pack: FoundryCompendiumCollection): Promise<Glossary
 let preparingGlossary: Promise<GlossaryEntry[]> | undefined;
 const preparationObservers = new Set<GlossarySyncOptions>();
 let syncingGlossary: Promise<void> = Promise.resolve();
+let writingGlossary: Promise<void> = Promise.resolve();
+function writeGlossary<T>(operation: () => Promise<T>): Promise<T> {
+  const result = writingGlossary.then(operation);
+  writingGlossary = result.then(() => {}, () => {});
+  return result;
+}
 
 export class GlossaryCompendiumRepository {
   async loadExisting(): Promise<GlossaryEntry[]> {
@@ -145,7 +152,23 @@ export class GlossaryCompendiumRepository {
 
   async sync(discovered: Iterable<GlossaryEntry>, options: GlossarySyncOptions = {}): Promise<GlossarySyncResult> {
     const entries = [...discovered];
-    const operation = syncingGlossary.then(() => this.#sync(entries, options));
+    const operation = syncingGlossary.then(async () => {
+      glossaryLive.publish({ running: true, status: { state: "testing", message: game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Syncing") } });
+      try {
+        const result = await this.#sync(entries, options);
+        const summary = game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Synced")
+          .replace("{created}", String(result.created)).replace("{updated}", String(result.updated)).replace("{unchanged}", String(result.unchanged));
+        glossaryLive.publish({ running: false, status: { state: result.aiWarning ? "error" : "success", message: result.aiWarning ?? summary } });
+        return result;
+      } catch (error) {
+        glossaryLive.publish({ running: false, status: {
+          state: error instanceof NamingCancelledError ? "idle" : "error",
+          message: error instanceof NamingCancelledError ? game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Cancelled")
+            : error instanceof Error ? error.message : game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.Status.Error"),
+        } });
+        throw error;
+      }
+    });
     syncingGlossary = operation.then(() => {}, () => {});
     return operation;
   }
@@ -161,22 +184,26 @@ export class GlossaryCompendiumRepository {
       throw new Error("Compendium se slovníkem je zamčené. Nejdřív jej ve Foundry odemkněte.");
     }
 
-    const stored = await loadFromPack(pack);
     const discoveredEntries = [...discovered];
-    const plan = planGlossarySync(stored, discoveredEntries);
-    validateGlossary([...stored.filter((entry) => !plan.update.some((updated) => updated.id === entry.id)), ...plan.create, ...plan.update]);
-    if (plan.create.length) {
-      await foundry.documents.JournalEntry.implementation.createDocuments(
-        plan.create.map(toDocumentData),
-        { pack: pack.collection },
-      );
-    }
-    if (plan.update.length) {
-      await foundry.documents.JournalEntry.implementation.updateDocuments(
-        plan.update.map(toDocumentData),
-        { pack: pack.collection },
-      );
-    }
+    const plan = await writeGlossary(async () => {
+      const stored = await loadFromPack(pack);
+      const plan = planGlossarySync(stored, discoveredEntries);
+      validateGlossary([...stored.filter((entry) => !plan.update.some((updated) => updated.id === entry.id)), ...plan.create, ...plan.update]);
+      if (plan.create.length) {
+        await foundry.documents.JournalEntry.implementation.createDocuments(
+          plan.create.map(toDocumentData),
+          { pack: pack.collection },
+        );
+      }
+      if (plan.update.length) {
+        await foundry.documents.JournalEntry.implementation.updateDocuments(
+          plan.update.map(toDocumentData),
+          { pack: pack.collection },
+        );
+      }
+      glossaryLive.publish({ entries: await loadFromPack(pack) });
+      return plan;
+    });
 
     const result: GlossarySyncResult = {
       created: plan.create.length,
@@ -190,7 +217,12 @@ export class GlossaryCompendiumRepository {
     if (!pending.length) return result;
     const contexts = collectNameContexts(pending);
     const checkCancelled = () => { if (options.shouldCancel?.()) throw new NamingCancelledError(); };
-    options.onProgress?.({ completed: 0, total: pending.length });
+    const progress = (value: NamingProgress) => {
+      glossaryLive.publish({ progress: value, status: { state: "testing", message: game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Progress")
+        .replace("{completed}", String(value.completed)).replace("{total}", String(value.total)) } });
+      options.onProgress?.(value);
+    };
+    progress({ completed: 0, total: pending.length });
     try {
       checkCancelled();
       const client = new NameAnalysisClient(settings);
@@ -199,29 +231,23 @@ export class GlossaryCompendiumRepository {
       result.aiPreserved = 0;
       for (let start = 0; start < pending.length; start += 8) {
         checkCancelled();
-        options.onProgress?.({ completed: start, total: pending.length, model });
+        progress({ completed: start, total: pending.length, model });
         const established = (await loadFromPack(pack)).filter((entry) => entry.enabled !== false
           && (entry.customized || entry.naming || !entry.sourceUuid || entry.replacement !== entry.source));
         const decisions = await client.analyze(pending.slice(start, start + 8), contexts, model, established);
         checkCancelled();
         // A GM may edit an entry while the model is working. Re-read before
         // applying results; manual/imported choices and earlier decisions win.
-        const latest = new Map((await loadFromPack(pack)).map((entry) => [entry.id, entry]));
-        const updates = decisions.flatMap((decision) => {
-          const current = latest.get(decision.id);
-          if (!current || current.source !== decision.source || current.sourceUuid !== decision.sourceUuid
-            || current.category !== decision.category || !needsNameAnalysis(current, settings.targetLanguage)) return [];
-          return [{ ...current, replacement: decision.replacement, naming: decision.naming! }];
-        });
-        if (updates.length) await this.saveEntries(updates);
-        result.aiTranslated += updates.filter((entry) => entry.naming.action === "translate").length;
-        result.aiPreserved += updates.filter((entry) => entry.naming.action === "preserve").length;
-        options.onProgress?.({ completed: Math.min(start + 8, pending.length), total: pending.length, model });
+        const updates = await this.#saveEntries(decisions, settings.targetLanguage);
+        result.aiTranslated += updates.filter((entry) => entry.naming?.action === "translate").length;
+        result.aiPreserved += updates.filter((entry) => entry.naming?.action === "preserve").length;
+        progress({ completed: Math.min(start + 8, pending.length), total: pending.length, model });
       }
     } catch (error) {
       if (error instanceof NamingCancelledError) throw error;
       logger.warn("AI glossary naming stopped; remaining names are preserved.", error);
-      result.aiWarning = game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Unavailable");
+      result.aiWarning = game.i18n.localize(error instanceof NamingResponseError
+        ? "FOUNDRY_TRANSLATE.Glossary.AI.InvalidResponse" : "FOUNDRY_TRANSLATE.Glossary.AI.Unavailable");
     }
     return result;
   }
@@ -232,28 +258,43 @@ export class GlossaryCompendiumRepository {
   }
 
   async saveEntries(entries: readonly GlossaryEntry[]): Promise<void> {
-    if (!game.user?.isGM) {
-      throw new Error("Slovník může měnit pouze Game Master.");
-    }
-    const pack = await ensureGlossaryPack();
-    if (pack.locked) {
-      throw new Error("Compendium se slovníkem je zamčené. Nejdřív jej ve Foundry odemkněte.");
-    }
-    const existing = await loadFromPack(pack);
-    validateGlossary([...existing.filter((stored) => !entries.some((entry) => entry.id === stored.id)), ...entries]);
-    const updates = entries.filter((entry) => entry.id);
-    const creates = entries.filter((entry) => !entry.id);
-    if (updates.length) {
-      await foundry.documents.JournalEntry.implementation.updateDocuments(
-        updates.map(toDocumentData),
-        { pack: pack.collection },
-      );
-    }
-    if (creates.length) {
-      await foundry.documents.JournalEntry.implementation.createDocuments(
-        creates.map(toDocumentData),
-        { pack: pack.collection },
-      );
-    }
+    await this.#saveEntries(entries);
+  }
+
+  async #saveEntries(proposed: readonly GlossaryEntry[], namingLanguage?: string): Promise<GlossaryEntry[]> {
+    return writeGlossary(async () => {
+      if (!game.user?.isGM) {
+        throw new Error("Slovník může měnit pouze Game Master.");
+      }
+      const pack = await ensureGlossaryPack();
+      if (pack.locked) {
+        throw new Error("Compendium se slovníkem je zamčené. Nejdřív jej ve Foundry odemkněte.");
+      }
+      const existing = await loadFromPack(pack);
+      const latest = new Map(existing.map((entry) => [entry.id, entry]));
+      const entries = namingLanguage ? proposed.flatMap((decision) => {
+        const current = latest.get(decision.id);
+        if (!current || current.source !== decision.source || current.sourceUuid !== decision.sourceUuid
+          || current.category !== decision.category || !needsNameAnalysis(current, namingLanguage)) return [];
+        return [{ ...current, replacement: decision.replacement, naming: decision.naming! }];
+      }) : [...proposed];
+      validateGlossary([...existing.filter((stored) => !entries.some((entry) => entry.id === stored.id)), ...entries]);
+      const updates = entries.filter((entry) => entry.id);
+      const creates = entries.filter((entry) => !entry.id);
+      if (updates.length) {
+        await foundry.documents.JournalEntry.implementation.updateDocuments(
+          updates.map(toDocumentData),
+          { pack: pack.collection },
+        );
+      }
+      if (creates.length) {
+        await foundry.documents.JournalEntry.implementation.createDocuments(
+          creates.map(toDocumentData),
+          { pack: pack.collection },
+        );
+      }
+      glossaryLive.publish({ entries: await loadFromPack(pack) });
+      return entries;
+    });
   }
 }

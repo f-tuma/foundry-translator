@@ -1,5 +1,5 @@
 import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
-import { GLOSSARY_CATEGORIES, type GlossaryEntry } from "./types";
+import { GLOSSARY_CATEGORIES, isGlossaryCategory, type GlossaryEntry } from "./types";
 import type { GlossaryCandidate } from "./candidates";
 
 export interface GlossaryViewData {
@@ -28,9 +28,11 @@ function namingNote(entry: GlossaryEntry): string {
   const naming = entry.naming;
   if (!naming || entry.customized) return "";
   const label = localize(naming.action === "translate" ? "FOUNDRY_TRANSLATE.Glossary.AI.Translated" : "FOUNDRY_TRANSLATE.Glossary.AI.Preserved");
-  const status = naming.guard === "protected-root" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel")
+  const status = naming.guard === "invalid-decision" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecisionLabel")
+    : naming.guard === "protected-root" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRootLabel")
     : naming.confidence === "uncertain" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.Uncertain") : "";
-  const reason = naming.guard === "protected-root" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot") : naming.reason;
+  const reason = naming.guard === "invalid-decision" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecision")
+    : naming.guard === "protected-root" ? localize("FOUNDRY_TRANSLATE.Glossary.AI.ProtectedRoot") : naming.reason;
   return `<div class="ft-help-row"><span>${label}${status ? ` · ${status}` : ""}</span>${renderHelpTooltip(reason, entry.source)}</div>`;
 }
 
@@ -55,6 +57,7 @@ export function updateGlossaryFilter(root: ParentNode, query: string): GlossaryF
   const terms = normalizeSearchText(query).split(/\s+/).filter(Boolean);
   const rows = Array.from(root.querySelectorAll<HTMLElement>("[data-glossary-row]"));
   const category = root.querySelector<HTMLSelectElement>("[name='categoryFilter']")?.value ?? "";
+  const naming = root.querySelector<HTMLSelectElement>("[name='namingFilter']")?.value ?? "";
   let matches = 0;
 
   for (const row of rows) {
@@ -63,7 +66,8 @@ export function updateGlossaryFilter(root: ParentNode, query: string): GlossaryF
     const aliases = row.querySelector<HTMLInputElement>("[data-glossary-aliases-input]")?.value ?? row.dataset.glossaryAliases ?? "";
     const searchable = normalizeSearchText(`${source} ${replacement} ${aliases}`);
     const rowCategory = row.querySelector<HTMLSelectElement>("[data-glossary-category]")?.value;
-    const isMatch = (!category || rowCategory === category) && terms.every((term) => searchable.includes(term));
+    const isMatch = (!category || rowCategory === category) && (!naming || row.dataset.namingStatus === naming)
+      && terms.every((term) => searchable.includes(term));
     row.hidden = !isMatch;
     if (isMatch) matches += 1;
   }
@@ -71,14 +75,14 @@ export function updateGlossaryFilter(root: ParentNode, query: string): GlossaryF
   const status = root.querySelector<HTMLElement>("[data-glossary-filter-status]");
   const statusText = status?.querySelector<HTMLElement>("[data-glossary-filter-text]");
   if (status) {
-    status.hidden = terms.length === 0 && !category;
-    status.dataset.empty = String(terms.length > 0 && matches === 0);
+    status.hidden = terms.length === 0 && !category && !naming;
+    status.dataset.empty = String(matches === 0);
   }
   if (statusText) {
     const template = matches === 0
       ? status?.dataset.emptyTemplate ?? ""
       : status?.dataset.resultsTemplate ?? "";
-    statusText.textContent = terms.length === 0 && !category
+    statusText.textContent = terms.length === 0 && !category && !naming
       ? ""
       : template.replace("{count}", String(matches)).replace("{total}", String(rows.length));
   }
@@ -86,16 +90,13 @@ export function updateGlossaryFilter(root: ParentNode, query: string): GlossaryF
   return { matches, total: rows.length };
 }
 
-export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
-  const actorCount = data.discovered.filter(({ category }) => category === "character").length;
-  const sceneCount = data.discovered.filter(({ category }) => category === "location").length;
-  const section = document.createElement("section");
-  section.className = "ft-settings ft-glossary";
-  const storedRows = [...data.stored]
-    .sort((left, right) => left.source.localeCompare(right.source))
-    .map((entry) => `
-      <div class="ft-glossary__row" data-glossary-row data-glossary-aliases="${escapeHtml(entry.aliases.join(" "))}">
-        <span class="ft-glossary__source" title="${escapeHtml(entry.source)}">${escapeHtml(entry.source)}</span>
+export function renderGlossaryRow(entry: GlossaryEntry): HTMLElement {
+  const container = document.createElement("div");
+  const needsReview = !entry.customized && !!entry.naming && (!!entry.naming.guard || entry.naming.confidence === "uncertain");
+  const namingStatus = entry.customized ? "manual" : needsReview ? "review" : entry.naming?.action ?? "pending";
+  container.innerHTML = `
+      <div class="ft-glossary__row" data-glossary-row data-naming-status="${namingStatus}" data-glossary-aliases="${escapeHtml(entry.aliases.join(" "))}">
+        <span class="ft-glossary__source" title="${escapeHtml(entry.source)}">${escapeHtml(entry.source)}${needsReview ? `<small class="ft-glossary__review-status">${localize("FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecisionLabel")}</small>` : ""}</span>
         <input type="text" maxlength="240" value="${escapeHtml(entry.replacement)}" data-glossary-replacement data-source="${escapeHtml(entry.source)}" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Replacement")}: ${escapeHtml(entry.source)}">
         <details class="ft-glossary__details">
           <summary>${localize(`FOUNDRY_TRANSLATE.Glossary.Category.${entry.category}`)} · ${localize(entry.enabled === false ? "FOUNDRY_TRANSLATE.Glossary.Automatic" : entry.source === entry.replacement ? "FOUNDRY_TRANSLATE.Glossary.Preserve" : "FOUNDRY_TRANSLATE.Glossary.Fixed")}</summary>
@@ -107,8 +108,76 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
           </div>
         </details>
       </div>
-    `)
-    .join("");
+    `;
+  const row = container.firstElementChild as HTMLElement;
+  activateHelpTooltips(row);
+  return row;
+}
+
+export function readGlossaryRow(row: HTMLElement, entry: GlossaryEntry): GlossaryEntry {
+  const replacement = row.querySelector<HTMLInputElement>("[data-glossary-replacement]")?.value.normalize("NFC").trim() || entry.source;
+  const category = row.querySelector<HTMLSelectElement>("[data-glossary-category]")?.value;
+  const aliases = (row.querySelector<HTMLInputElement>("[data-glossary-aliases-input]")?.value ?? "")
+    .split(";").map((alias) => alias.normalize("NFC").trim()).filter(Boolean);
+  const enabled = row.querySelector<HTMLInputElement>("[data-glossary-enabled]")?.checked !== false;
+  return { ...entry, replacement, aliases, enabled, category: isGlossaryCategory(category) ? category : entry.category };
+}
+
+export function hasGlossaryEdits(edited: GlossaryEntry, original: GlossaryEntry): boolean {
+  return edited.replacement !== original.replacement || edited.category !== original.category
+    || (edited.enabled !== false) !== (original.enabled !== false) || JSON.stringify(edited.aliases) !== JSON.stringify(original.aliases);
+}
+
+/** Update only settled rows. Keep draft inputs, focus, filters, details and scroll in place. */
+export function refreshGlossaryRows(root: HTMLElement, incoming: readonly GlossaryEntry[], previous: readonly GlossaryEntry[]): GlossaryEntry[] {
+  const list = root.querySelector<HTMLElement>(".ft-glossary__rows");
+  if (!list) return [...previous];
+  const old = new Map(previous.map((entry) => [entry.source, entry]));
+  const rows = new Map([...list.querySelectorAll<HTMLElement>("[data-glossary-row]")].map((row) => [row.querySelector<HTMLInputElement>("[data-source]")?.dataset.source, row]));
+  const stored: GlossaryEntry[] = [];
+  for (const entry of [...incoming].sort((a, b) => a.source.localeCompare(b.source))) {
+    const row = rows.get(entry.source);
+    const baseline = old.get(entry.source);
+    if (row && baseline && (row.contains(document.activeElement) || hasGlossaryEdits(readGlossaryRow(row, baseline), baseline))) {
+      stored.push(baseline);
+      continue;
+    }
+    if (!row || row.dataset.refreshNeeded || JSON.stringify(entry) !== JSON.stringify(baseline)) {
+      const fresh = renderGlossaryRow(entry);
+      if (row) {
+        const details = fresh.querySelector("details");
+        if (details && row.querySelector("details")?.open) details.open = true;
+        row.replaceWith(fresh);
+      } else {
+        list.querySelector(".ft-glossary__empty")?.remove();
+        const next = [...list.querySelectorAll<HTMLElement>("[data-glossary-row]")].find((candidate) =>
+          (candidate.querySelector<HTMLInputElement>("[data-source]")?.dataset.source ?? "").localeCompare(entry.source) > 0);
+        list.insertBefore(fresh, next ?? null);
+      }
+    }
+    stored.push(entry);
+  }
+  const sources = new Set(incoming.map((entry) => entry.source));
+  for (const [source, row] of rows) {
+    if (!source || sources.has(source)) continue;
+    const baseline = old.get(source);
+    if (baseline && (row.contains(document.activeElement) || hasGlossaryEdits(readGlossaryRow(row, baseline), baseline))) stored.push(baseline);
+    else row.remove();
+  }
+  const count = root.querySelector("[data-glossary-stored-count]");
+  if (count) count.textContent = String(incoming.length);
+  const save = root.querySelector<HTMLButtonElement>("[data-action='save-edits']");
+  if (save) save.disabled = !stored.length;
+  updateGlossaryFilter(root, root.querySelector<HTMLInputElement>("[name='manualTerm']")?.value ?? "");
+  return stored;
+}
+
+export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
+  const actorCount = data.discovered.filter(({ category }) => category === "character").length;
+  const sceneCount = data.discovered.filter(({ category }) => category === "location").length;
+  const section = document.createElement("section");
+  section.className = "ft-settings ft-glossary";
+  const storedRows = [...data.stored].sort((a, b) => a.source.localeCompare(b.source)).map((entry) => renderGlossaryRow(entry).outerHTML).join("");
   const candidates = data.candidates ?? [];
   const candidateRows = candidates.map((candidate) => `
     <article class="ft-glossary__candidate" data-candidate-id="${escapeHtml(candidate.id)}">
@@ -146,7 +215,7 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
     <div class="ft-glossary__stats" aria-label="${localize("FOUNDRY_TRANSLATE.Glossary.StatsLabel")}">
       <div><strong>${actorCount}</strong><span>${localize("FOUNDRY_TRANSLATE.Glossary.Stats.Characters")}</span></div>
       <div><strong>${sceneCount}</strong><span>${localize("FOUNDRY_TRANSLATE.Glossary.Stats.Locations")}</span></div>
-      <div><strong>${data.stored.length}</strong><span>${localize("FOUNDRY_TRANSLATE.Glossary.Stats.Stored")}</span></div>
+      <div><strong data-glossary-stored-count>${data.stored.length}</strong><span>${localize("FOUNDRY_TRANSLATE.Glossary.Stats.Stored")}</span></div>
     </div>
 
     ${
@@ -176,6 +245,13 @@ export function renderGlossaryView(data: GlossaryViewData): HTMLElement {
       <div class="ft-glossary__editor">
         <label class="ft-glossary__category-filter">${localize("FOUNDRY_TRANSLATE.Glossary.CategoryLabel")}
           <select name="categoryFilter"><option value="">${localize("FOUNDRY_TRANSLATE.Glossary.AllCategories")}</option>${categoryOptions("")}</select>
+        </label>
+        <label class="ft-glossary__category-filter">${localize("FOUNDRY_TRANSLATE.Glossary.AI.FilterLabel")}
+          <select name="namingFilter">
+            <option value="">${localize("FOUNDRY_TRANSLATE.Glossary.AI.FilterAll")}</option>
+            <option value="translate">${localize("FOUNDRY_TRANSLATE.Glossary.AI.Translated")}</option>
+            <option value="review">${localize("FOUNDRY_TRANSLATE.Glossary.AI.InvalidDecisionLabel")}</option>
+          </select>
         </label>
         <div class="ft-glossary__columns" aria-hidden="true">
           <strong>${localize("FOUNDRY_TRANSLATE.Glossary.Editor.Source")}</strong>

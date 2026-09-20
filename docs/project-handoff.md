@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.16.1`; see the deployment and QA entries below.
+- Current implementation: `v0.16.2`; see the deployment and QA entries below.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,32 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20: v0.16.2 fixes the user's live glossary failure. Browser console
+  reported `Invalid name decision fields`; LM Studio's server log at 16:02:12
+  showed a capitalized source root paired with a lowercase model root. The
+  original response was replayed locally. The committed fixture in
+  `tests/fixtures/naming-invalid-root.cs.json` uses synthetic names and reasons;
+  it reproduces the same case mismatch without publishing the private response.
+  Valid IDs with invalid per-name fields now produce a stable original-name
+  fallback marked for review; malformed JSON or missing/duplicate IDs still
+  reject the batch. The latter has a specific visible status instead of advice
+  to check a working connection.
+  A shared live feed publishes discovery and each saved naming batch, including
+  preparation started by journal translation. The glossary patches changed
+  rows without replacing drafts/focused inputs, filters, expanded details or
+  scroll. Writes are serialized and AI decisions recheck the latest entry inside
+  the write queue, so manual edits win. Review and translated-name filters help
+  inspect results before the whole run finishes. Status survives rerender; closing
+  a window unsubscribes its listener. This is client-local coordination, not a
+  server transaction across multiple independent GM browsers.
+  Local CUA QA used the real controller/view and a naming-response replay with a
+  mocked repository, not the live world: 760/360 px window widths, draft preserved
+  across batch arrival, manual save while running, next-batch insertion and review
+  filter all passed. The 360 px window had no horizontal overflow. An initial QA
+  harness module-identity mistake was fixed; no new console errors followed.
+  Publication and installation verification are recorded after deployment below.
+
 
 - 2026-09-20: the user authorized release and installation of the current work.
   PR #15 merged as `a63b5d6`; v0.16.0 was published and installed through Foundry

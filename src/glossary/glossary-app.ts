@@ -3,10 +3,11 @@ import { logger } from "../logger";
 import { GlossaryCompendiumRepository } from "./compendium-repository";
 import { discoverWorldGlossary } from "./discovery";
 import { planManualTerm } from "./sync";
-import { renderGlossaryView, updateGlossaryFilter } from "./glossary-view";
+import { hasGlossaryEdits, readGlossaryRow, refreshGlossaryRows, renderGlossaryView, updateGlossaryFilter } from "./glossary-view";
 import { isGlossaryCategory, type GlossaryEntry } from "./types";
 import { loadGlossaryCandidates, saveGlossaryCandidates } from "./candidate-store";
 import type { GlossaryCandidate } from "./candidates";
+import { glossaryLive, type GlossaryLiveState } from "./live";
 
 type GlossaryStatus = "idle" | "testing" | "success" | "error";
 
@@ -28,8 +29,19 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
   #loadError = "";
   #syncCancelled = false;
   #syncing = false;
+  #unsubscribe: (() => void) | undefined;
+  #latest: readonly GlossaryEntry[] | undefined;
+  #status: { state: GlossaryStatus; message: string; localize: boolean } | undefined;
+  #loadedRevision = 0;
+
+  override async close(options?: Record<string, unknown>): Promise<FoundryApplicationV2> {
+    this.#unsubscribe?.();
+    this.#unsubscribe = undefined;
+    return super.close(options);
+  }
 
   protected async _renderHTML(): Promise<HTMLElement> {
+    this.#loadedRevision = glossaryLive.revision;
     try {
       this.#stored = await this.#repository.load();
       this.#candidates = loadGlossaryCandidates();
@@ -52,13 +64,22 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
   }
 
   protected async _onRender(): Promise<void> {
+    this.#unsubscribe ??= glossaryLive.subscribe((state) => this.#onLiveUpdate(state));
+    // A freshly loaded pack may include edits from another client. Reuse the
+    // live snapshot only when a local write happened during this render.
+    this.#onLiveUpdate(glossaryLive.revision === this.#loadedRevision
+      ? { ...glossaryLive.state, entries: this.#stored } : glossaryLive.state);
+    if (this.#status) this.#setStatus(this.#status.state, this.#status.message, this.#status.localize);
     this.#updateSyncControls();
+    this.element.querySelector(".ft-glossary__rows")?.addEventListener("focusout", () => {
+      queueMicrotask(() => this.#refreshRows());
+    });
     const manualTerm = this.element.querySelector<HTMLInputElement>("[name='manualTerm']");
     manualTerm?.addEventListener("input", () => {
       updateGlossaryFilter(this.element, manualTerm.value);
     });
     if (manualTerm) updateGlossaryFilter(this.element, manualTerm.value);
-    this.element.querySelector("[name='categoryFilter']")?.addEventListener("change", () => {
+    for (const select of this.element.querySelectorAll("[name='categoryFilter'],[name='namingFilter']")) select.addEventListener("change", () => {
       updateGlossaryFilter(this.element, manualTerm?.value ?? "");
     });
 
@@ -101,9 +122,19 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
     return discoverWorldGlossary();
   }
 
+  #onLiveUpdate(state: GlossaryLiveState): void {
+    if (state.entries) { this.#latest = state.entries; this.#refreshRows(); }
+    if (state.status) this.#setStatus(state.status.state, state.status.message, false);
+    this.#updateSyncControls();
+  }
+
+  #refreshRows(): void {
+    if (this.#latest && this.element?.isConnected) this.#stored = refreshGlossaryRows(this.element, this.#latest, this.#stored);
+  }
+
   #updateSyncControls(): void {
     const button = this.element.querySelector<HTMLButtonElement>("[data-action='sync']");
-    if (button) button.disabled = this.#syncing;
+    if (button) button.disabled = this.#syncing || glossaryLive.state.running;
     const cancel = this.element.querySelector<HTMLButtonElement>("[data-action='cancel-sync']");
     if (cancel) { cancel.hidden = !this.#syncing; cancel.disabled = this.#syncCancelled; }
   }
@@ -126,14 +157,14 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
         .replace("{created}", String(result.created))
         .replace("{updated}", String(result.updated))
         .replace("{unchanged}", String(result.unchanged));
-      this.#setStatus("success", message, false);
+      this.#setStatus(result.aiWarning ? "error" : "success", result.aiWarning ?? message, false);
       if (result.aiWarning) ui.notifications.warn(result.aiWarning);
       else ui.notifications.success(message + (result.aiTranslated !== undefined ? " " + game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.AI.Summary")
         .replace("{translated}", String(result.aiTranslated)).replace("{preserved}", String(result.aiPreserved ?? 0)) : ""));
-      await this.render({ force: true });
+      this.#refreshRows();
     } catch (error) {
       if (error instanceof NamingCancelledError) {
-        await this.render({ force: true });
+        this.#refreshRows();
         this.#setStatus("idle", "FOUNDRY_TRANSLATE.Glossary.AI.Cancelled");
         return;
       }
@@ -171,7 +202,9 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
           : "FOUNDRY_TRANSLATE.Glossary.Status.Added",
         { localize: true },
       );
-      await this.render({ force: true });
+      if (input?.value.normalize("NFC").trim() === source) input.value = "";
+      if (replacementInput?.value.normalize("NFC").trim() === replacement) replacementInput.value = "";
+      this.#refreshRows();
     } catch (error) {
       logger.error("Manual glossary term could not be added.", error);
       this.#setStatus("error", this.#errorMessage(error), false);
@@ -186,16 +219,10 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
       const source = input.dataset.source ?? "";
       const entry = entriesBySource.get(source);
       if (!entry) continue;
-      const replacement = input.value.normalize("NFC").trim() || entry.source;
-      const row = input.closest("[data-glossary-row]");
-      const category = row?.querySelector<HTMLSelectElement>("[data-glossary-category]")?.value;
-      const aliases = (row?.querySelector<HTMLInputElement>("[data-glossary-aliases-input]")?.value ?? "")
-        .split(";").map((alias) => alias.normalize("NFC").trim()).filter(Boolean);
-      const enabled = row?.querySelector<HTMLInputElement>("[data-glossary-enabled]")?.checked !== false;
-      if (replacement !== entry.replacement || category !== entry.category || enabled !== (entry.enabled !== false) || JSON.stringify(aliases) !== JSON.stringify(entry.aliases)) {
-        changed.push({ ...entry, replacement, aliases, enabled, customized: true,
-          category: isGlossaryCategory(category) ? category : entry.category });
-      }
+      const row = input.closest<HTMLElement>("[data-glossary-row]");
+      if (!row) continue;
+      const edited = readGlossaryRow(row, entry);
+      if (hasGlossaryEdits(edited, entry)) changed.push({ ...edited, customized: true });
     }
     if (!changed.length) {
       this.#setStatus("idle", "FOUNDRY_TRANSLATE.Glossary.Status.NoEdits");
@@ -210,7 +237,17 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
         .localize("FOUNDRY_TRANSLATE.Glossary.Status.EditsSaved")
         .replace("{count}", String(changed.length));
       ui.notifications.success(message);
-      await this.render({ force: true });
+      // Advance the edit baseline only to what was actually saved. Any typing
+      // done while the write was in flight remains an unsaved draft.
+      const saved = new Map(changed.map((entry) => [entry.source, entry]));
+      this.#stored = this.#stored.map((entry) => saved.get(entry.source) ?? entry);
+      for (const row of this.element.querySelectorAll<HTMLElement>("[data-glossary-row]")) {
+        if (saved.has(row.querySelector<HTMLInputElement>("[data-source]")?.dataset.source ?? "")) row.dataset.refreshNeeded = "true";
+      }
+      this.#refreshRows();
+      const live = glossaryLive.state;
+      if (live.running && live.status) this.#setStatus(live.status.state, live.status.message, false);
+      else this.#setStatus("success", message, false);
     } catch (error) {
       logger.error("Glossary edits could not be saved.", error);
       this.#setStatus("error", this.#errorMessage(error), false);
@@ -275,6 +312,7 @@ export class GlossaryApplication extends foundry.applications.api.ApplicationV2 
   }
 
   #setStatus(state: GlossaryStatus, message: string, localize = true): void {
+    this.#status = { state, message, localize };
     const status = this.element.querySelector<HTMLElement>(".ft-connection-status");
     const text = status?.querySelector<HTMLElement>("[data-status-text]");
     if (!status || !text) return;

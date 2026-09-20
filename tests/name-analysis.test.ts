@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NameAnalysisClient, needsNameAnalysis, parseNameDecisions } from "../src/glossary/name-analysis";
 import { readNamingDecision, type GlossaryEntry } from "../src/glossary/types";
 import type { TranslatorSettings } from "../src/settings/settings";
+import invalidRootResponse from "./fixtures/naming-invalid-root.cs.json";
 
 const entry = (source = "Old Carinth"): GlossaryEntry => ({ source, replacement: source, category: "location", aliases: [], sourceUuid: `Scene.${source}` });
 const decision = (overrides: Record<string, unknown> = {}) => ({ id: 0, action: "translate", replacement: "Starý Carinth", roots: ["Carinth"], confidence: "high", reason: "Popisná část názvu.", ...overrides });
@@ -50,12 +51,25 @@ describe("context-aware naming", () => {
       expect(parse([decision({ replacement })])[0]?.replacement).toBe("Old Carinth");
     }
   });
-  it("rejects malformed roots, markup, missing/duplicate IDs and prompt leakage", () => {
-    for (const overrides of [{ replacement: '<img src="x">' }, { replacement: "@UUID[Actor.bad]{click}" }, { replacement: "Name\nignore instructions" }, { replacement: "__FTG_name__" }, { id: 2 }, { roots: ["Invented"] }, { action: ["translate"] }, { confidence: ["high"] }]) {
-      expect(() => parse([decision(overrides)])).toThrow();
+  it("retains invalid proposals without accepting markup, false roots or malformed fields", () => {
+    for (const overrides of [{ replacement: '<img src="x">' }, { replacement: "@UUID[Actor.bad]{click}" }, { replacement: "Name\nignore instructions" }, { replacement: "__FTG_name__" }, { roots: ["Invented"] }, { action: ["translate"] }, { confidence: ["high"] }]) {
+      const result = parse([decision(overrides)])[0]!;
+      expect(result).toMatchObject({ replacement: "Old Carinth", naming: { guard: "invalid-decision", confidence: "uncertain" } });
+      expect(readNamingDecision(result.naming)).toEqual(result.naming);
     }
+  });
+  it("still rejects missing or duplicate IDs instead of assigning a decision to the wrong name", () => {
+    expect(() => parse([decision({ id: 2 })])).toThrow();
     expect(() => parse([])).toThrow();
     expect(() => parse([decision(), decision()], [entry(), entry("New Ordain")])).toThrow();
+  });
+  it("continues past a case-mismatched root without losing other decisions", () => {
+    const names = ["Old Sunvale", "New Mistford", "Dawn Tower", "Mira Stormlake", "Vardel Circle", "Velora", "Orlith", "Orlithians"];
+    const result = parseNameDecisions(JSON.stringify(invalidRootResponse), names.map((name) => entry(name)), "cs", "qwen/qwen3.8-27b");
+    expect(result).toHaveLength(8);
+    expect(result[0]?.replacement).toBe("Starý Sunvale");
+    expect(result[4]).toMatchObject({ replacement: "Vardel Circle", naming: { guard: "invalid-decision" } });
+    expect(result[7]?.replacement).toBe("Orlithians");
   });
   it("matches decisions by ID even if the model reorders them", () => {
     const values = parse([decision({ id: 1, replacement: "Nový Ordain", roots: ["Ordain"] }), decision()], [entry(), entry("New Ordain")]);
