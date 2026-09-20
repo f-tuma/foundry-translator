@@ -14,7 +14,7 @@ import {
 } from "./unit-translator";
 
 export const ITEM_TRANSLATION_SCHEMA_VERSION = 1;
-export const ITEM_TRANSLATION_ENGINE_REVISION = 4;
+export const ITEM_TRANSLATION_ENGINE_REVISION = 5;
 
 export interface ItemData extends Record<string, unknown> {
   _id?: string;

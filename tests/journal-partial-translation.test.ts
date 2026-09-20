@@ -120,6 +120,25 @@ describe("Partial journal page translation", () => {
     expect(canReuseJournalPageTranslation(flag, flag.sourceHash, "page-one", flag.glossaryFingerprint, flag.providerFingerprint)).toBe(true);
   });
 
+  it("retains older page content through repeated partial refreshes without counting it as current", async () => {
+    const first = await translatePage("page-one");
+    const second = await translatePage("page-two");
+    const complete = mergePartialJournalTranslation(first.data, second.data);
+    complete.pages[1]!.text!.content = "<p>Ručně opravená druhá stránka.</p>";
+    const fresh = await translatePage("page-one");
+    const freshFlag = readJournalTranslationFlag(fresh.data.flags)!;
+    freshFlag.glossaryFingerprint = "new-glossary";
+    fresh.data.flags!["foundry-translate"]!.translation = freshFlag;
+    const refreshed = mergePartialJournalTranslation(complete, fresh.data);
+    const repeated = mergePartialJournalTranslation(refreshed, fresh.data);
+    expect(repeated.pages[1]).toEqual(complete.pages[1]);
+    const flag = readJournalTranslationFlag(repeated.flags)!;
+    expect(flag.processedPageIds).toEqual(["page-one"]);
+    expect(canReuseJournalPageTranslation(flag, flag.sourceHash, "page-two")).toBe(false);
+    freshFlag.providerFingerprint = "new-model";
+    expect(mergePartialJournalTranslation(repeated, fresh.data).pages[1]).toEqual(complete.pages[1]);
+  });
+
   it("keeps a partial result unchanged when the existing translation is stale", async () => {
     const fresh = await translatePage("page-one");
     const stale = structuredClone(fresh.data);

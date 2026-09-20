@@ -70,6 +70,20 @@ describe("glossary protection", () => {
     );
   });
 
+  it("treats opaque syntax as boundaries without changing it or adding label whitespace", () => {
+    const open = "__FTS_LABEL_0000__";
+    const close = "__FTS_LABEL_0001__";
+    const protection = protectGlossaryTerms(
+      `${open}Tayan${close} Tayan_name _Tayan`,
+      [entry("Tayan"), entry(open, "must not replace syntax")],
+      { nonce: "LABEL", opaqueTokens: [open, close] },
+    );
+    expect(protection.tokens.map(({ source }) => source)).toEqual(["Tayan"]);
+    const lowerCaseTokens = protection.text.replace(/__FT[GS]_[A-Z0-9_]+__/gu, (token) => token.toLowerCase());
+    expect(restoreGlossaryTerms(lowerCaseTokens, protection))
+      .toBe(`${open.toLowerCase()}Tayan${close.toLowerCase()} Tayan_name _Tayan`);
+  });
+
   it("accepts ASCII case changes made to otherwise exact glossary tokens", () => {
     const protection = protectGlossaryTerms(
       "Meet Strahd at Castle Ravenloft.",

@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-20
-- Current implementation: `v0.15.0` prepared; see September notes below for deployment/QA status.
+- Current implementation: `v0.15.1` patch prepared; `v0.15.0` released and installed.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,30 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-20 post-install QA: PR #12 was merged, v0.15.0 released successfully
+  and installed through Foundry Setup. User signed back in as Gamemaster.
+  The installed API reports 0.15.0/ready without development injection; the
+  saved Hy-MT2 connection test passed. Glossary synchronization stored 779
+  entries (659 enabled, 120 common creatures left for automatic translation).
+  Isota, a prose-only character, was subsequently added manually (780/660).
+- A real header-button translation of `Myths & Legends` → `The Knight & The
+  Dragon` exposed two bugs, fixed in the 0.15.1 patch: Foundry syntax tokens
+  blocked glossary word boundaries around link labels, and repeated partial
+  refreshes could erase old pages whose freshness coverage had expired.
+  Syntax tokens now stay opaque while separating glossary words; partial
+  merges retain every unselected stored page independently of freshness.
+  Unit-cache and Journal/Actor/Item engine revisions invalidate buggy output.
+- Verified the patch with Hy-MT2 on the same actual page (27.217 s, then
+  25.908 s after adding Isota, one page/document and zero new fallbacks).
+  Tayan/Kelmezian/Cascilian/Lumek/Ordani stayed exact inside links, and Isota
+  was no longer inflected after manual protection. The three older page
+  translations temporarily reset by the first failing test were restored
+  from the captured pre-test snapshot. A further refresh preserved their
+  names, text and system fields; only Foundry `_stats` changed. The source
+  document remained byte-for-byte unchanged throughout. Model grammar and
+  invented expansion of the era abbreviation AS remain quality limitations.
+  Patch checks: TypeScript, 203 tests, production build and release validation.
 
 - 2026-09-20: `v0.15.0` adds a Journal-sidebar translation desk, glossary
   categories/aliases/opt-out, automatic pre-translation name synchronization,
