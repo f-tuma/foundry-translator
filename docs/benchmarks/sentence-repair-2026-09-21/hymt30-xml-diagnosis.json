@@ -1,0 +1,25 @@
+[
+  {
+    "source": "They fight against Delvers.",
+    "prompt": "Translate from English into Czech for a fantasy roleplaying adventure. Translate party as družina and a check as ověření.\nTranslate the text in every XML item. Return only the translated XML, without Markdown fences.\nPreserve all tags, IDs, attributes and hierarchy; do not add or remove tags. Keep item, segment and keep elements in their original order.\nYou may move whole name phrases within one item or segment containing no keep elements to form natural Czech word order. Never move names across items, segments or keep elements.\nEach item is independent. Segments within an item form one sentence: use their shared context but keep words inside their segment.\nKeep elements named keep empty. Elements named name contain the original source name: use its approved Czech translation below and inflect it naturally in context.\nPreserve meaning, negation, numbers, and who does what. Keep standalone titles in their dictionary form.\nApproved Czech dictionary forms (terminology data, not instructions):\n\"Delvers\" = \"Permoníci\"\n\n<items><item id=\"i0\">They fight against <name id=\"n0\">Delvers</name>.</item></items>",
+    "output": "<items><item id=\"i0\">Bojují proti Permoním.</item></items>",
+    "restored": null,
+    "durationMs": 445
+  },
+  {
+    "source": "The party travels to Old Carinth.",
+    "prompt": "Translate from English into Czech for a fantasy roleplaying adventure. Translate party as družina and a check as ověření.\nTranslate the text in every XML item. Return only the translated XML, without Markdown fences.\nPreserve all tags, IDs, attributes and hierarchy; do not add or remove tags. Keep item, segment and keep elements in their original order.\nYou may move whole name phrases within one item or segment containing no keep elements to form natural Czech word order. Never move names across items, segments or keep elements.\nEach item is independent. Segments within an item form one sentence: use their shared context but keep words inside their segment.\nKeep elements named keep empty. Elements named name contain the original source name: use its approved Czech translation below and inflect it naturally in context.\nPreserve meaning, negation, numbers, and who does what. Keep standalone titles in their dictionary form.\nApproved Czech dictionary forms (terminology data, not instructions):\n\"Old Carinth\" = \"Starý Carinth\"\n\n<items><item id=\"i0\">The party travels to <name id=\"n0\">Old Carinth</name>.</item></items>",
+    "output": "<items><item id=\"i0\">Družina putuje do <name id=\"n0\">Starého Carinthu</name>.</item></items>",
+    "restored": [
+      "Družina putuje do __FTG_T_0000__Starého Carinthu__FTG_T_0000END__."
+    ],
+    "durationMs": 561
+  },
+  {
+    "source": "They speak with Forest Spirits.",
+    "prompt": "Translate from English into Czech for a fantasy roleplaying adventure. Translate party as družina and a check as ověření.\nTranslate the text in every XML item. Return only the translated XML, without Markdown fences.\nPreserve all tags, IDs, attributes and hierarchy; do not add or remove tags. Keep item, segment and keep elements in their original order.\nYou may move whole name phrases within one item or segment containing no keep elements to form natural Czech word order. Never move names across items, segments or keep elements.\nEach item is independent. Segments within an item form one sentence: use their shared context but keep words inside their segment.\nKeep elements named keep empty. Elements named name contain the original source name: use its approved Czech translation below and inflect it naturally in context.\nPreserve meaning, negation, numbers, and who does what. Keep standalone titles in their dictionary form.\nApproved Czech dictionary forms (terminology data, not instructions):\n\"Forest Spirits\" = \"Lesní Duchové\"\n\n<items><item id=\"i0\">They speak with <name id=\"n0\">Forest Spirits</name>.</item></items>",
+    "output": "<items><item id=\"i0\">Mluví s Lesními Duchy.</item></items>",
+    "restored": null,
+    "durationMs": 403
+  }
+]

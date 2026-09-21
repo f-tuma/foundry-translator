@@ -106,15 +106,19 @@ describe("OpenAiCompatibleProvider", () => {
     ]);
   });
 
-  it("uses Hy-MT's translation instruction format and sampling parameters", async () => {
+  it.each([
+    ["tencent/Hy-MT2-7B", 0.6],
+    ["hy-mt2-1.8b", 0.6],
+    ["hy-mt2-30b-a3b-apex", 1],
+  ])("uses %s translation instructions and sampling parameters", async (model, topP) => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ choices: [{ message: { content: "Družina vstoupí." }, finish_reason: "stop" }] }));
-    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "tencent/Hy-MT2-7B", worldContext: "Ember fantasy", fetchImplementation: fetchMock });
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model, worldContext: "Ember fantasy", fetchImplementation: fetchMock });
     await expect(provider.translate({ texts: ["The party enters."], sourceLanguage: "en", targetLanguage: "cs" })).resolves.toEqual([{ translatedText: "Družina vstoupí." }]);
     const payload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(payload.messages).toEqual([{ role: "user", content: expect.stringContaining("[Source Text]\nThe party enters.") }]);
     expect(payload.messages[0].content).toContain("from English into Czech");
     expect(payload.messages[0].content).toContain("Ember fantasy");
-    expect(payload).toMatchObject({ temperature: 0.7, top_p: 0.6 });
+    expect(payload).toMatchObject({ temperature: 0.7, top_p: topP });
   });
 
   it("reports available models when the selected model is missing", async () => {

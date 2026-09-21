@@ -1,0 +1,722 @@
+{
+  "model": "hy-mt2-1.8b",
+  "variant": "source-first",
+  "createdAt": "2026-09-21T13:07:37.234Z",
+  "sampling": {
+    "temperature": 0,
+    "top_p": 0.6,
+    "max_tokens": 512,
+    "stream": false
+  },
+  "note": "One observed sample per mode/case, no automatic semantic score. Inspect agreement, vocabulary, meaning, EXACT and syntax. Not a production pipeline run.",
+  "results": [
+    {
+      "id": "dashboard-agreement",
+      "mode": "direct",
+      "source": "The new dashboard was created.",
+      "glossary": [
+        [
+          "dashboard",
+          "řídicí panel",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\ndashboard translates to řídicí panel (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe new dashboard was created.",
+      "durationMs": 1544,
+      "status": 200,
+      "output": "Nový panel řízení byl vytvořen.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 98,
+        "completion_tokens": 15,
+        "total_tokens": 113,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "dashboard-agreement",
+      "mode": "repair-generated",
+      "source": "The new dashboard was created.",
+      "draft": "Nový panel řízení byl vytvořen.",
+      "glossary": [
+        [
+          "dashboard",
+          "řídicí panel",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\ndashboard translates to řídicí panel (Czech dictionary form)\n\nEarlier Czech draft:\nNový panel řízení byl vytvořen.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe new dashboard was created.",
+      "durationMs": 83,
+      "status": 200,
+      "output": "Nový panel řízení byl vytvořen.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 146,
+        "completion_tokens": 15,
+        "total_tokens": 161,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "dashboard-agreement",
+      "mode": "repair-seeded",
+      "source": "The new dashboard was created.",
+      "draft": "Nová nástěnka byla vytvořena.",
+      "glossary": [
+        [
+          "dashboard",
+          "řídicí panel",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\ndashboard translates to řídicí panel (Czech dictionary form)\n\nEarlier Czech draft:\nNová nástěnka byla vytvořena.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe new dashboard was created.",
+      "durationMs": 67,
+      "status": 200,
+      "output": "Nový panel byl vytvořen.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 147,
+        "completion_tokens": 11,
+        "total_tokens": 158,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "guardian-agreement",
+      "mode": "direct",
+      "source": "The wounded Frost Warden arrived. He was exhausted.",
+      "glossary": [
+        [
+          "Frost Warden",
+          "Mrazový Strážce",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nFrost Warden translates to Mrazový Strážce (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe wounded Frost Warden arrived. He was exhausted.",
+      "durationMs": 100,
+      "status": 200,
+      "output": "Zraněný Frost Warden dorazil. Byl vyčerpaný.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 109,
+        "completion_tokens": 20,
+        "total_tokens": 129,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "guardian-agreement",
+      "mode": "repair-generated",
+      "source": "The wounded Frost Warden arrived. He was exhausted.",
+      "draft": "Zraněný Frost Warden dorazil. Byl vyčerpaný.",
+      "glossary": [
+        [
+          "Frost Warden",
+          "Mrazový Strážce",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nFrost Warden translates to Mrazový Strážce (Czech dictionary form)\n\nEarlier Czech draft:\nZraněný Frost Warden dorazil. Byl vyčerpaný.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe wounded Frost Warden arrived. He was exhausted.",
+      "durationMs": 103,
+      "status": 200,
+      "output": "Zraněný Frost Warden dorazil. Byl vyčerpaný.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 162,
+        "completion_tokens": 20,
+        "total_tokens": 182,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "guardian-agreement",
+      "mode": "repair-seeded",
+      "source": "The wounded Frost Warden arrived. He was exhausted.",
+      "draft": "Zraněná Ledová Strážkyně dorazila. Byla vyčerpaná.",
+      "glossary": [
+        [
+          "Frost Warden",
+          "Mrazový Strážce",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nFrost Warden translates to Mrazový Strážce (Czech dictionary form)\n\nEarlier Czech draft:\nZraněná Ledová Strážkyně dorazila. Byla vyčerpaná.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe wounded Frost Warden arrived. He was exhausted.",
+      "durationMs": 119,
+      "status": 200,
+      "output": "Zraněný Ledový Strážce dorazil. Byl vyčerpaný.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 167,
+        "completion_tokens": 24,
+        "total_tokens": 191,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "plural-negation",
+      "mode": "direct",
+      "source": "The Forest Spirits were tired, but they did not leave.",
+      "glossary": [
+        [
+          "Forest Spirits",
+          "Lesní Duchové",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nForest Spirits translates to Lesní Duchové (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe Forest Spirits were tired, but they did not leave.",
+      "durationMs": 97,
+      "status": 200,
+      "output": "Lesní Duchové byli unavení, ale neodešli.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 108,
+        "completion_tokens": 19,
+        "total_tokens": 127,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "plural-negation",
+      "mode": "repair-generated",
+      "source": "The Forest Spirits were tired, but they did not leave.",
+      "draft": "Lesní Duchové byli unavení, ale neodešli.",
+      "glossary": [
+        [
+          "Forest Spirits",
+          "Lesní Duchové",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nForest Spirits translates to Lesní Duchové (Czech dictionary form)\n\nEarlier Czech draft:\nLesní Duchové byli unavení, ale neodešli.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe Forest Spirits were tired, but they did not leave.",
+      "durationMs": 96,
+      "status": 200,
+      "output": "Lesní Duchové byli unavení, ale neodešli.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 160,
+        "completion_tokens": 19,
+        "total_tokens": 179,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "plural-negation",
+      "mode": "repair-seeded",
+      "source": "The Forest Spirits were tired, but they did not leave.",
+      "draft": "Lesní Duch byl unavený, ale neodešel.",
+      "glossary": [
+        [
+          "Forest Spirits",
+          "Lesní Duchové",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nForest Spirits translates to Lesní Duchové (Czech dictionary form)\n\nEarlier Czech draft:\nLesní Duch byl unavený, ale neodešel.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe Forest Spirits were tired, but they did not leave.",
+      "durationMs": 101,
+      "status": 200,
+      "output": "Lesní Duchové byli unavení, ale neodešli.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 157,
+        "completion_tokens": 19,
+        "total_tokens": 176,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "delvers-dative",
+      "mode": "direct",
+      "source": "They fight against Delvers.",
+      "glossary": [
+        [
+          "Delvers",
+          "Permoníci",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nDelvers translates to Permoníci (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThey fight against Delvers.",
+      "durationMs": 67,
+      "status": 200,
+      "output": "Bojují proti Delversům.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 98,
+        "completion_tokens": 12,
+        "total_tokens": 110,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "delvers-dative",
+      "mode": "repair-generated",
+      "source": "They fight against Delvers.",
+      "draft": "Bojují proti Delversům.",
+      "glossary": [
+        [
+          "Delvers",
+          "Permoníci",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nDelvers translates to Permoníci (Czech dictionary form)\n\nEarlier Czech draft:\nBojují proti Delversům.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThey fight against Delvers.",
+      "durationMs": 68,
+      "status": 200,
+      "output": "Bojují proti Delversům.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 143,
+        "completion_tokens": 12,
+        "total_tokens": 155,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "delvers-dative",
+      "mode": "repair-seeded",
+      "source": "They fight against Delvers.",
+      "draft": "Bojují proti Permonícům.",
+      "glossary": [
+        [
+          "Delvers",
+          "Permoníci",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nDelvers translates to Permoníci (Czech dictionary form)\n\nEarlier Czech draft:\nBojují proti Permonícům.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThey fight against Delvers.",
+      "durationMs": 65,
+      "status": 200,
+      "output": "Bojují proti Delversům.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 144,
+        "completion_tokens": 12,
+        "total_tokens": 156,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "ownership",
+      "mode": "direct",
+      "source": "The tracks belong to Spirit Beasts.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nSpirit Beasts translates to Přízračné Šelmy (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe tracks belong to Spirit Beasts.",
+      "durationMs": 57,
+      "status": 200,
+      "output": "Stopy patří Spirit Beests.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 107,
+        "completion_tokens": 9,
+        "total_tokens": 116,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "ownership",
+      "mode": "repair-generated",
+      "source": "The tracks belong to Spirit Beasts.",
+      "draft": "Stopy patří Spirit Beests.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nSpirit Beasts translates to Přízračné Šelmy (Czech dictionary form)\n\nEarlier Czech draft:\nStopy patří Spirit Beests.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe tracks belong to Spirit Beasts.",
+      "durationMs": 54,
+      "status": 200,
+      "output": "Stopy patří Spirit Beests.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 149,
+        "completion_tokens": 9,
+        "total_tokens": 158,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "ownership",
+      "mode": "repair-seeded",
+      "source": "The tracks belong to Spirit Beasts.",
+      "draft": "Stopám patří Přízračné Šelmy.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nSpirit Beasts translates to Přízračné Šelmy (Czech dictionary form)\n\nEarlier Czech draft:\nStopám patří Přízračné Šelmy.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe tracks belong to Spirit Beasts.",
+      "durationMs": 55,
+      "status": 200,
+      "output": "Stopy patří Spirit Beests.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 155,
+        "completion_tokens": 9,
+        "total_tokens": 164,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "quantity-preposition",
+      "mode": "direct",
+      "source": "Only two guards returned from Old Carinth. They did not open the gate.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nOnly two guards returned from Old Carinth. They did not open the gate.",
+      "durationMs": 140,
+      "status": 200,
+      "output": "Pouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 109,
+        "completion_tokens": 31,
+        "total_tokens": 140,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "quantity-preposition",
+      "mode": "repair-generated",
+      "source": "Only two guards returned from Old Carinth. They did not open the gate.",
+      "draft": "Pouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nEarlier Czech draft:\nPouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nOnly two guards returned from Old Carinth. They did not open the gate.",
+      "durationMs": 144,
+      "status": 200,
+      "output": "Pouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 173,
+        "completion_tokens": 31,
+        "total_tokens": 204,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "quantity-preposition",
+      "mode": "repair-seeded",
+      "source": "Only two guards returned from Old Carinth. They did not open the gate.",
+      "draft": "Dva strážní se vrátili z Starého Carinthu. Neotevřeli bránu.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nEarlier Czech draft:\nDva strážní se vrátili z Starého Carinthu. Neotevřeli bránu.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nOnly two guards returned from Old Carinth. They did not open the gate.",
+      "durationMs": 143,
+      "status": 200,
+      "output": "Pouze dva strážní se vrátili z Starého Carinthu. Neotevřeli bránu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 170,
+        "completion_tokens": 31,
+        "total_tokens": 201,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "exact-and-inflect",
+      "mode": "direct",
+      "source": "They spoke about Dawn Star, but did not enter Old Carinth.",
+      "glossary": [
+        [
+          "Dawn Star",
+          "Dawn Star",
+          "EXACT"
+        ],
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nDawn Star translates to Dawn Star (EXACT)\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nNames marked EXACT must appear literally unchanged.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThey spoke about Dawn Star, but did not enter Old Carinth.",
+      "durationMs": 112,
+      "status": 200,
+      "output": "Mluvili o Dawn Staru, ale nevešli do Starýho Carinthu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 127,
+        "completion_tokens": 23,
+        "total_tokens": 150,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "exact-and-inflect",
+      "mode": "repair-generated",
+      "source": "They spoke about Dawn Star, but did not enter Old Carinth.",
+      "draft": "Mluvili o Dawn Staru, ale nevešli do Starýho Carinthu.",
+      "glossary": [
+        [
+          "Dawn Star",
+          "Dawn Star",
+          "EXACT"
+        ],
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nDawn Star translates to Dawn Star (EXACT)\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nEarlier Czech draft:\nMluvili o Dawn Staru, ale nevešli do Starýho Carinthu.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nNames marked EXACT must appear literally unchanged.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThey spoke about Dawn Star, but did not enter Old Carinth.",
+      "durationMs": 112,
+      "status": 200,
+      "output": "Mluvili o Dawn Staru, ale nevešli do Starýho Carinthu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 183,
+        "completion_tokens": 23,
+        "total_tokens": 206,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "exact-and-inflect",
+      "mode": "repair-seeded",
+      "source": "They spoke about Dawn Star, but did not enter Old Carinth.",
+      "draft": "Mluvili o Jitřní Hvězdě, ale nevstoupili do Starý Carinth.",
+      "glossary": [
+        [
+          "Dawn Star",
+          "Dawn Star",
+          "EXACT"
+        ],
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nDawn Star translates to Dawn Star (EXACT)\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nEarlier Czech draft:\nMluvili o Jitřní Hvězdě, ale nevstoupili do Starý Carinth.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nNames marked EXACT must appear literally unchanged.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThey spoke about Dawn Star, but did not enter Old Carinth.",
+      "durationMs": 131,
+      "status": 200,
+      "output": "Mluvili o Jitřní Hvězdě, ale nevstoupili do Starý Carinth.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 188,
+        "completion_tokens": 28,
+        "total_tokens": 216,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "already-correct",
+      "mode": "direct",
+      "source": "The tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nSpirit Beasts translates to Přízračné Šelmy (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "durationMs": 99,
+      "status": 200,
+      "output": "Stopy patří Spirit Beests. Nepatří strážníkům.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 115,
+        "completion_tokens": 20,
+        "total_tokens": 135,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "already-correct",
+      "mode": "repair-generated",
+      "source": "The tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "draft": "Stopy patří Spirit Beests. Nepatří strážníkům.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nSpirit Beasts translates to Přízračné Šelmy (Czech dictionary form)\n\nEarlier Czech draft:\nStopy patří Spirit Beests. Nepatří strážníkům.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "durationMs": 103,
+      "status": 200,
+      "output": "Stopy patří Spirit Beests. Nepatří strážníkům.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 168,
+        "completion_tokens": 20,
+        "total_tokens": 188,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "already-correct",
+      "mode": "repair-seeded",
+      "source": "The tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "draft": "Stopy patří Přízračným Šelmám. Nepatří strážným.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nSpirit Beasts translates to Přízračné Šelmy (Czech dictionary form)\n\nEarlier Czech draft:\nStopy patří Přízračným Šelmám. Nepatří strážným.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nThe tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "durationMs": 121,
+      "status": 200,
+      "output": "Stopy patří Přízračným Šelmám. Nepatří strážným.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 173,
+        "completion_tokens": 25,
+        "total_tokens": 198,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "uuid-label",
+      "mode": "direct",
+      "source": "Travel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nPreserve @UUID[identifier]{label} syntax and its exact identifier. Translate and inflect only the visible label.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nTravel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "durationMs": 118,
+      "status": 200,
+      "output": "Cestujte do @UUID[Scene.old]{Starý Carinth] před úsvitem.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 133,
+        "completion_tokens": 24,
+        "total_tokens": 157,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "uuid-label",
+      "mode": "repair-generated",
+      "source": "Travel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "draft": "Cestujte do @UUID[Scene.old]{Starý Carinth] před úsvitem.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nEarlier Czech draft:\nCestujte do @UUID[Scene.old]{Starý Carinth] před úsvitem.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nPreserve @UUID[identifier]{label} syntax and its exact identifier. Translate and inflect only the visible label.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nTravel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "durationMs": 124,
+      "status": 200,
+      "output": "Cestujte do @UUID[Scene.old]{Starý Carinth] před úsvitem.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 190,
+        "completion_tokens": 24,
+        "total_tokens": 214,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "uuid-label",
+      "mode": "repair-seeded",
+      "source": "Travel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "draft": "Cestujte do @UUID[Scene.old]{Starý Carinth} před úsvitem.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "[Background Information]\nApproved terminology:\nOld Carinth translates to Starý Carinth (Czech dictionary form)\n\nEarlier Czech draft:\nCestujte do @UUID[Scene.old]{Starý Carinth} před úsvitem.\n\nTranslate the English source into correct Czech using the approved terminology. The English source is authoritative for meaning, numbers, negation, tense and who owns or does what.\nThe earlier Czech draft is only a suggestion. It may have wrong grammar, wrong terms or reversed relationships. Correct the whole sentence, including surrounding agreement.\nInflect dictionary forms naturally; adjust surrounding adjectives, pronouns and verbs. Preserve glossary vocabulary and capitalization.\nPreserve @UUID[identifier]{label} syntax and its exact identifier. Translate and inflect only the visible label.\nOutput only the final Czech translation without any explanations.\n\n[Source Text]\nTravel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "durationMs": 120,
+      "status": 200,
+      "output": "Cestujte do @UUID[Scene.old]{Starý Carinth} před úsvitem.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 190,
+        "completion_tokens": 24,
+        "total_tokens": 214,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    }
+  ]
+}

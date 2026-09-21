@@ -1,0 +1,638 @@
+{
+  "model": "hy-mt2-1.8b",
+  "createdAt": "2026-09-21T13:02:03.862Z",
+  "sampling": {
+    "temperature": 0.7,
+    "top_p": 0.6,
+    "max_tokens": 512,
+    "stream": false
+  },
+  "note": "One observed sample per mode/case, no automatic semantic score. Inspect agreement, vocabulary, meaning, EXACT and syntax. Not a production pipeline run.",
+  "results": [
+    {
+      "id": "dashboard-agreement",
+      "mode": "direct",
+      "source": "The new dashboard was created.",
+      "glossary": [
+        [
+          "dashboard",
+          "řídicí panel",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe new dashboard was created.\n\n[Glossary]\nINFLECT: dashboard → řídicí panel",
+      "durationMs": 139,
+      "status": 200,
+      "output": "Nový panel kontrolních údajů byl vytvořen.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 154,
+        "completion_tokens": 19,
+        "total_tokens": 173,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "dashboard-agreement",
+      "mode": "repair-generated",
+      "source": "The new dashboard was created.",
+      "draft": "Nový panel kontrolních údajů byl vytvořen.",
+      "glossary": [
+        [
+          "dashboard",
+          "řídicí panel",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe new dashboard was created.\n\n[Current Czech translation]\nNový panel kontrolních údajů byl vytvořen.\n\n[Glossary]\nINFLECT: dashboard → řídicí panel",
+      "durationMs": 105,
+      "status": 200,
+      "output": "Nový panel kontrolních údajů byl vytvořen.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 198,
+        "completion_tokens": 19,
+        "total_tokens": 217,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "dashboard-agreement",
+      "mode": "repair-seeded",
+      "source": "The new dashboard was created.",
+      "draft": "Nová nástěnka byla vytvořena.",
+      "glossary": [
+        [
+          "dashboard",
+          "řídicí panel",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe new dashboard was created.\n\n[Current Czech translation]\nNová nástěnka byla vytvořena.\n\n[Glossary]\nINFLECT: dashboard → řídicí panel",
+      "durationMs": 82,
+      "status": 200,
+      "output": "Nová nástěnka byla vytvořena.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 195,
+        "completion_tokens": 16,
+        "total_tokens": 211,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "guardian-agreement",
+      "mode": "direct",
+      "source": "The wounded Frost Warden arrived. He was exhausted.",
+      "glossary": [
+        [
+          "Frost Warden",
+          "Mrazový Strážce",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe wounded Frost Warden arrived. He was exhausted.\n\n[Glossary]\nINFLECT: Frost Warden → Mrazový Strážce",
+      "durationMs": 119,
+      "status": 200,
+      "output": "Zraněný Mrazový Strážce dorazil. Byl vyčerpaný.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 164,
+        "completion_tokens": 25,
+        "total_tokens": 189,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "guardian-agreement",
+      "mode": "repair-generated",
+      "source": "The wounded Frost Warden arrived. He was exhausted.",
+      "draft": "Zraněný Mrazový Strážce dorazil. Byl vyčerpaný.",
+      "glossary": [
+        [
+          "Frost Warden",
+          "Mrazový Strážce",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe wounded Frost Warden arrived. He was exhausted.\n\n[Current Czech translation]\nZraněný Mrazový Strážce dorazil. Byl vyčerpaný.\n\n[Glossary]\nINFLECT: Frost Warden → Mrazový Strážce",
+      "durationMs": 118,
+      "status": 200,
+      "output": "Zraněný Mrazový Strážce dorazil. Byl vyčerpaný.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 214,
+        "completion_tokens": 25,
+        "total_tokens": 239,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "guardian-agreement",
+      "mode": "repair-seeded",
+      "source": "The wounded Frost Warden arrived. He was exhausted.",
+      "draft": "Zraněná Ledová Strážkyně dorazila. Byla vyčerpaná.",
+      "glossary": [
+        [
+          "Frost Warden",
+          "Mrazový Strážce",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe wounded Frost Warden arrived. He was exhausted.\n\n[Current Czech translation]\nZraněná Ledová Strážkyně dorazila. Byla vyčerpaná.\n\n[Glossary]\nINFLECT: Frost Warden → Mrazový Strážce",
+      "durationMs": 111,
+      "status": 200,
+      "output": "Zraněná Ledová Strážkyně dorazila. Byla vyčerpaná.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 214,
+        "completion_tokens": 25,
+        "total_tokens": 239,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "plural-negation",
+      "mode": "direct",
+      "source": "The Forest Spirits were tired, but they did not leave.",
+      "glossary": [
+        [
+          "Forest Spirits",
+          "Lesní Duchové",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe Forest Spirits were tired, but they did not leave.\n\n[Glossary]\nINFLECT: Forest Spirits → Lesní Duchové",
+      "durationMs": 95,
+      "status": 200,
+      "output": "Lesní duchové byli unavení, ale neodešli.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 164,
+        "completion_tokens": 19,
+        "total_tokens": 183,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "plural-negation",
+      "mode": "repair-generated",
+      "source": "The Forest Spirits were tired, but they did not leave.",
+      "draft": "Lesní duchové byli unavení, ale neodešli.",
+      "glossary": [
+        [
+          "Forest Spirits",
+          "Lesní Duchové",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe Forest Spirits were tired, but they did not leave.\n\n[Current Czech translation]\nLesní duchové byli unavení, ale neodešli.\n\n[Glossary]\nINFLECT: Forest Spirits → Lesní Duchové",
+      "durationMs": 94,
+      "status": 200,
+      "output": "Lesní duchové byli unavení, ale neodešli.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 208,
+        "completion_tokens": 19,
+        "total_tokens": 227,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "plural-negation",
+      "mode": "repair-seeded",
+      "source": "The Forest Spirits were tired, but they did not leave.",
+      "draft": "Lesní Duch byl unavený, ale neodešel.",
+      "glossary": [
+        [
+          "Forest Spirits",
+          "Lesní Duchové",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe Forest Spirits were tired, but they did not leave.\n\n[Current Czech translation]\nLesní Duch byl unavený, ale neodešel.\n\n[Glossary]\nINFLECT: Forest Spirits → Lesní Duchové",
+      "durationMs": 89,
+      "status": 200,
+      "output": "Lesní Duchové byli unavení, ale neodešli.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 205,
+        "completion_tokens": 19,
+        "total_tokens": 224,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "delvers-dative",
+      "mode": "direct",
+      "source": "They fight against Delvers.",
+      "glossary": [
+        [
+          "Delvers",
+          "Permoníci",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThey fight against Delvers.\n\n[Glossary]\nINFLECT: Delvers → Permoníci",
+      "durationMs": 765,
+      "status": 200,
+      "output": "Zachovejte lidi, čísla, zápis negace, tvar a vztahy: kdo dělá co a kdo vlastní co. Zachovejte slovní zásobu glosáře a pravopis; nevytvářejte nové názvy.\n\nZachovejte syntaxi @UUID[identifier]{label}. Nikdy neměňte identifikátor; pouze viditelné označení může být přeloženo a pozměněno.\n\nVyjádřete POUZE konečný český text, bez vysvětlení, nadpisů nebo uvozovek.\n\n[Anglický originál]\nBojují proti Delversům.\n\n[Glossary]\nPOZMOČÍ: Delvers → Permoníci",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 154,
+        "completion_tokens": 202,
+        "total_tokens": 356,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "delvers-dative",
+      "mode": "repair-seeded",
+      "source": "They fight against Delvers.",
+      "draft": "Bojují proti Permonícům.",
+      "glossary": [
+        [
+          "Delvers",
+          "Permoníci",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThey fight against Delvers.\n\n[Current Czech translation]\nBojují proti Permonícům.\n\n[Glossary]\nINFLECT: Delvers → Permoníci",
+      "durationMs": 839,
+      "status": 200,
+      "output": "Preservujte lidi, čísla, zápornosti, tvar a vztahy: kdo dělá co a kdo vlastní co. Zachovejte slovní zásobu a pravopis; nevymyslete nové názvy.\n\nZachovejte syntax @UUID[identifier]{label}. Nikdy neměňte identifikátor; pouze viditelné označení může být přeloženo a upraveno.\n\nVyjádřete POUZE konečný český text, bez vysvětlení, nadpisů nebo uvozovek.\n\n[Anglický originál]\nBojují proti Delversům.\n\n[Aktuální česká překlad] Bojují proti Permonícům.\n\n[Glossary] INFLECT: Delvers → Permoníci",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 192,
+        "completion_tokens": 214,
+        "total_tokens": 406,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "ownership",
+      "mode": "direct",
+      "source": "The tracks belong to Spirit Beasts.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe tracks belong to Spirit Beasts.\n\n[Glossary]\nINFLECT: Spirit Beasts → Přízračné Šelmy",
+      "durationMs": 98,
+      "status": 200,
+      "output": "Nástrahy patří k Duchovním Zvířatům.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 162,
+        "completion_tokens": 20,
+        "total_tokens": 182,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "ownership",
+      "mode": "repair-generated",
+      "source": "The tracks belong to Spirit Beasts.",
+      "draft": "Nástrahy patří k Duchovním Zvířatům.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe tracks belong to Spirit Beasts.\n\n[Current Czech translation]\nNástrahy patří k Duchovním Zvířatům.\n\n[Glossary]\nINFLECT: Spirit Beasts → Přízračné Šelmy",
+      "durationMs": 85,
+      "status": 200,
+      "output": "Ty stopy patří Duchovním Zvířatům.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 207,
+        "completion_tokens": 18,
+        "total_tokens": 225,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "ownership",
+      "mode": "repair-seeded",
+      "source": "The tracks belong to Spirit Beasts.",
+      "draft": "Stopám patří Přízračné Šelmy.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe tracks belong to Spirit Beasts.\n\n[Current Czech translation]\nStopám patří Přízračné Šelmy.\n\n[Glossary]\nINFLECT: Spirit Beasts → Přízračné Šelmy",
+      "durationMs": 54,
+      "status": 200,
+      "output": "Šlachy patří Spirit Beasts.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 202,
+        "completion_tokens": 11,
+        "total_tokens": 213,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "quantity-preposition",
+      "mode": "direct",
+      "source": "Only two guards returned from Old Carinth. They did not open the gate.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nOnly two guards returned from Old Carinth. They did not open the gate.\n\n[Glossary]\nINFLECT: Old Carinth → Starý Carinth",
+      "durationMs": 135,
+      "status": 200,
+      "output": "Pouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 165,
+        "completion_tokens": 31,
+        "total_tokens": 196,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "quantity-preposition",
+      "mode": "repair-generated",
+      "source": "Only two guards returned from Old Carinth. They did not open the gate.",
+      "draft": "Pouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nOnly two guards returned from Old Carinth. They did not open the gate.\n\n[Current Czech translation]\nPouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.\n\n[Glossary]\nINFLECT: Old Carinth → Starý Carinth",
+      "durationMs": 132,
+      "status": 200,
+      "output": "Pouze dva strážní se vrátili z Starého Karintu. Neotevřeli bránu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 221,
+        "completion_tokens": 31,
+        "total_tokens": 252,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "quantity-preposition",
+      "mode": "repair-seeded",
+      "source": "Only two guards returned from Old Carinth. They did not open the gate.",
+      "draft": "Dva strážní se vrátili z Starého Carinthu. Neotevřeli bránu.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nOnly two guards returned from Old Carinth. They did not open the gate.\n\n[Current Czech translation]\nDva strážní se vrátili z Starého Carinthu. Neotevřeli bránu.\n\n[Glossary]\nINFLECT: Old Carinth → Starý Carinth",
+      "durationMs": 114,
+      "status": 200,
+      "output": "Dva strážní se vrátili z Starého Carinthu. Neotevřeli bránu.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 218,
+        "completion_tokens": 28,
+        "total_tokens": 246,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "exact-and-inflect",
+      "mode": "direct",
+      "source": "They spoke about Dawn Star, but did not enter Old Carinth.",
+      "glossary": [
+        [
+          "Dawn Star",
+          "Dawn Star",
+          "EXACT"
+        ],
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThey spoke about Dawn Star, but did not enter Old Carinth.\n\n[Glossary]\nEXACT: Dawn Star → Dawn Star\nINFLECT: Old Carinth → Starý Carinth",
+      "durationMs": 804,
+      "status": 200,
+      "output": "Uchovávejte lidi, čísla, zápis negace, tvar a vztahy: kdo dělá co a kdo vlastní co. Uchovávejte slovní zásobu glosáře a pravopis; nevymýšlejte nové názvy.\n\nUchovávejte syntax @UUID[identifier]{label}. Nikdy neměňte identifikátor; pouze viditelné označení může být přeloženo a pozměněno.\n\nVydávejte POUZE konečný český text, bez vysvětlení, nadpisů nebo uvozovek.\n\n[Anglický originál]\nMluvili o Dawn Star, ale nevešli do Old Carinth.\n\n[Glossary]\nEXACT: Dawn Star → Dawn Star\nINFLECT: Old Carinth → Starý Carinth",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 172,
+        "completion_tokens": 218,
+        "total_tokens": 390,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "exact-and-inflect",
+      "mode": "repair-seeded",
+      "source": "They spoke about Dawn Star, but did not enter Old Carinth.",
+      "draft": "Mluvili o Jitřní Hvězdě, ale nevstoupili do Starý Carinth.",
+      "glossary": [
+        [
+          "Dawn Star",
+          "Dawn Star",
+          "EXACT"
+        ],
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThey spoke about Dawn Star, but did not enter Old Carinth.\n\n[Current Czech translation]\nMluvili o Jitřní Hvězdě, ale nevstoupili do Starý Carinth.\n\n[Glossary]\nEXACT: Dawn Star → Dawn Star\nINFLECT: Old Carinth → Starý Carinth",
+      "durationMs": 1070,
+      "status": 200,
+      "output": "Zachovejte lidi, čísla, zápornost, tínu a vztahy: kdo dělá co a kdo vlastní co. Zachovejte slovník a pravopis; nevymyslete nová jména.\n\nZachovejte syntaxi @UUID[identifier]{label}. Nikdy nezměňte identifikátor; pouze viditelné označení může být přeloženo a upraveno.\n\nVyjádřete POUZE konečný český text, bez vysvětlení, nadpisů nebo uvozovek.\n\n[Anglický originál]\nMluvili o Jitřní Hvězdě, ale nevstoupili do Starý Carinth.\n\n[Český aktuální překlad]\nMluvili o Jitřní Hvězdě, ale nevstoupili do Starý Carinth.\n\n[Glossary]\nEXACT: Jitřní Hvězda → Jitřní Hvězda\nINFLECT: Starý Carinth → Starý Carinth",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 225,
+        "completion_tokens": 270,
+        "total_tokens": 495,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "already-correct",
+      "mode": "direct",
+      "source": "The tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe tracks belong to Spirit Beasts. They do not belong to the guards.\n\n[Glossary]\nINFLECT: Spirit Beasts → Přízračné Šelmy",
+      "durationMs": 191,
+      "status": 200,
+      "output": "Stezky patří Spirit Beasts. Nepatří strážníkům.\n\n[Glossar]\nPŘEPOČTAT: Přízračné Šelmy",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 170,
+        "completion_tokens": 45,
+        "total_tokens": 215,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "already-correct",
+      "mode": "repair-generated",
+      "source": "The tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "draft": "Stezky patří Spirit Beasts. Nepatří strážníkům.\n\n[Glossar]\nPŘEPOČTAT: Přízračné Šelmy",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe tracks belong to Spirit Beasts. They do not belong to the guards.\n\n[Current Czech translation]\nStezky patří Spirit Beasts. Nepatří strážníkům.\n\n[Glossar]\nPŘEPOČTAT: Přízračné Šelmy\n\n[Glossary]\nINFLECT: Spirit Beasts → Přízračné Šelmy",
+      "durationMs": 186,
+      "status": 200,
+      "output": "Stezky patří Spirit Beasts. Nepatří strážníkům.\n\nGlossar\nPŘEPOČTAT: Přízračné Šelmy",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 240,
+        "completion_tokens": 44,
+        "total_tokens": 284,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "already-correct",
+      "mode": "repair-seeded",
+      "source": "The tracks belong to Spirit Beasts. They do not belong to the guards.",
+      "draft": "Stopy patří Přízračným Šelmám. Nepatří strážným.",
+      "glossary": [
+        [
+          "Spirit Beasts",
+          "Přízračné Šelmy",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nThe tracks belong to Spirit Beasts. They do not belong to the guards.\n\n[Current Czech translation]\nStopy patří Přízračným Šelmám. Nepatří strážným.\n\n[Glossary]\nINFLECT: Spirit Beasts → Přízračné Šelmy",
+      "durationMs": 106,
+      "status": 200,
+      "output": "Stopy patří Přízračným Šelmám. Nepatří strážným.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 220,
+        "completion_tokens": 25,
+        "total_tokens": 245,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "uuid-label",
+      "mode": "direct",
+      "source": "Travel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Translate the whole English source into Czech using the glossary.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nTravel to @UUID[Scene.old]{Old Carinth} before dawn.\n\n[Glossary]\nINFLECT: Old Carinth → Starý Carinth",
+      "durationMs": 753,
+      "status": 200,
+      "output": "Zachovejte lidi, čísla, zápornosti, tínu a vztahy: kdo dělá co a kdo vlastní co. Zachovejte slovník a pravopis; nevytvářejte nové názvy.\n\nZachovejte syntaxi @UUID[identifier]{label}. Nikdy neměňte identifikátor; pouze viditelné označení může být přeloženo a složeno.\n\nVyjádřete POUZE konečný český text, bez vysvětlení, nadpisů nebo uvozovek.\n\n[Anglický originál]\nCestujte do @UUID[Scene.old]{Old Carinth] před úsvitem.\n\n[Glossary]\nSLOŽKY: Starý Carinth → Starý Carinth",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 165,
+        "completion_tokens": 205,
+        "total_tokens": 370,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "uuid-label",
+      "mode": "repair-seeded",
+      "source": "Travel to @UUID[Scene.old]{Old Carinth} before dawn.",
+      "draft": "Cestujte do @UUID[Scene.old]{Starý Carinth} před úsvitem.",
+      "glossary": [
+        [
+          "Old Carinth",
+          "Starý Carinth",
+          "INFLECT"
+        ]
+      ],
+      "prompt": "Correct the entire current Czech translation using the English original and the glossary. Do not merely replace individual names. If the translation is already correct, leave it unchanged.\nGlossary terms are Czech dictionary forms. Inflect them correctly and adjust agreement of surrounding adjectives, pronouns and verbs. Keep terms marked EXACT literally unchanged. Never change the meaning of the English original.\nPreserve people, numbers, negation, tense and relationships: who does what and who owns what. Keep the glossary vocabulary and capitalization; do not invent different names.\nPreserve @UUID[identifier]{label} syntax. Never change the identifier; only the visible label may be translated and inflected.\nOutput ONLY the final Czech text, without explanations, headings or quotation marks.\n\n[English original]\nTravel to @UUID[Scene.old]{Old Carinth} before dawn.\n\n[Current Czech translation]\nCestujte do @UUID[Scene.old]{Starý Carinth} před úsvitem.\n\n[Glossary]\nINFLECT: Old Carinth → Starý Carinth",
+      "durationMs": 901,
+      "status": 200,
+      "output": "Zachovejte lidi, čísla, zápornost, tínu a vztahy: kdo dělá co a kdo vlastní co. Zachovejte slovník a pravopis; nevymyslete nová jména.\n\nZachovejte syntaxi @UUID[identifier]{label}. Nikdy nezměňte identifikátor; pouze viditelné označení může být přeloženo a upraveno.\n\nVyjádřete ONLY konečný český text, bez vysvětlení, nadpisů nebo uvozovek.\n\n[Anglický originál]\nCestujte do @UUID[Scene.old]{Starý Carinth} před úsvitem.\n\n[Aktuální český překlad]\nCestujte do @UUID[Scene.old]{Starý Carinth} před úsvitem.\n\n[Glossary]\nINFLECT: Starý Carinth → Starý Carinth",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 214,
+        "completion_tokens": 237,
+        "total_tokens": 451,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    }
+  ]
+}

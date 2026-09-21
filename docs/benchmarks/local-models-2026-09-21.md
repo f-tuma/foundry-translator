@@ -14,6 +14,14 @@ See [the MiLMMT evaluation](milmmt-2026-09-21.md). Hy-MT2 7B remains the current
 smaller-model baseline. The larger candidates below are optional research
 alternatives, not required next downloads.
 
+Further follow-up: installed Hy-MT2 1.8B Q8_0 and community 30B-A3B APEX-I-Nano
+were tested, including whole-sentence post-editing. See the
+[sentence repair evaluation](sentence-repair-2026-09-21.md). APEX's installed
+file is 12.45 GB, unlike the 18.2 GB official Q4_K_M below. It is fast on short
+warm requests but still loses name markup; 1.8B often fails terminology/EXACT.
+Whole-sentence repair corrected agreement on 7B/APEX but is not enabled by
+default because other errors and regressions remain.
+
 | Candidate | Verified availability and fit | Decision |
 | --- | --- | --- |
 | Gemma 4 26B-A4B QAT Q4_0 | Official Google GGUF: main file 14.4 GB; larger family member than the tested 12B | Previously requested, now optional given the smaller-model preference; not tested yet |

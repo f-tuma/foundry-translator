@@ -8,7 +8,7 @@ import { prepareInflectionXml } from "./inflection-xml";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 10;
+const PROMPT_REVISION = 11;
 const INFLECTION_INSTRUCTIONS = "Some __FTG_ markers form a pair: __FTG_NONCE_ID__Approved Czech Name__FTG_NONCE_IDEND__. The words inside each pair are an approved Czech glossary name, already translated. Keep BOTH markers unchanged and in place around that name. Use this exact vocabulary; only inflect its words to the grammatical case required by the surrounding Czech sentence. Do not rename, translate again, add or remove words inside a pair. For example: to __FTG_X_0000__Starý Carinth__FTG_X_0000END__ becomes do __FTG_X_0000__Starého Carinthu__FTG_X_0000END__. A standalone title keeps the canonical form. Adapt surrounding articles, prepositions, gender and agreement naturally. Fixed markers without an END partner remain opaque and unchanged.";
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
@@ -479,7 +479,9 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
               { role: "user", content: `<text_to_translate>\n${text}\n</text_to_translate>` },
             ],
             temperature: translationModel ? 0.7 : 0,
-            ...(translationModel ? { top_p: 0.6 } : {}),
+            // Tencent recommends full nucleus sampling for the 30B MoE;
+            // 1.8B and 7B retain their documented narrower distribution.
+            ...(translationModel ? { top_p: /hy-?mt2-30b-a3b/iu.test(this.#model) ? 1 : 0.6 } : {}),
             max_tokens: maxTokens,
             stream: false,
           }),

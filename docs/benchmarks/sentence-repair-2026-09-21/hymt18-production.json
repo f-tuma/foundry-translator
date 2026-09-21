@@ -1,0 +1,667 @@
+{
+  "model": "hy-mt2-1.8b",
+  "durationMs": 41161,
+  "metrics": [
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 3271,
+      "inputTokens": 775,
+      "outputTokens": 501,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 928,
+      "inputTokens": 476,
+      "outputTokens": 239,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 488,
+      "inputTokens": 334,
+      "outputTokens": 126,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 2037,
+      "inputTokens": 266,
+      "outputTokens": 545,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 368,
+      "inputTokens": 241,
+      "outputTokens": 36,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1856,
+      "inputTokens": 240,
+      "outputTokens": 483,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 281,
+      "inputTokens": 283,
+      "outputTokens": 67,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 442,
+      "inputTokens": 345,
+      "outputTokens": 116,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 276,
+      "inputTokens": 283,
+      "outputTokens": 68,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1900,
+      "inputTokens": 265,
+      "outputTokens": 487,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 2209,
+      "inputTokens": 250,
+      "outputTokens": 533,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "sequentialFallbackTexts": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 755,
+      "inputTokens": 113,
+      "outputTokens": 187,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1015,
+      "inputTokens": 514,
+      "outputTokens": 268,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 704,
+      "inputTokens": 389,
+      "outputTokens": 174,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 2244,
+      "inputTokens": 311,
+      "outputTokens": 592,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "diagnostic",
+      "model": "hy-mt2-1.8b",
+      "batchFallbacks": 1
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 2135,
+      "inputTokens": 260,
+      "outputTokens": 534,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 925,
+      "inputTokens": 266,
+      "outputTokens": 233,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 307,
+      "inputTokens": 281,
+      "outputTokens": 70,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 434,
+      "inputTokens": 328,
+      "outputTokens": 106,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 154,
+      "inputTokens": 241,
+      "outputTokens": 36,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 156,
+      "inputTokens": 241,
+      "outputTokens": 36,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 147,
+      "inputTokens": 240,
+      "outputTokens": 35,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 136,
+      "inputTokens": 240,
+      "outputTokens": 35,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1921,
+      "inputTokens": 241,
+      "outputTokens": 480,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 2127,
+      "inputTokens": 241,
+      "outputTokens": 518,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1944,
+      "inputTokens": 245,
+      "outputTokens": 488,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1854,
+      "inputTokens": 245,
+      "outputTokens": 488,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1764,
+      "inputTokens": 238,
+      "outputTokens": 475,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 1915,
+      "inputTokens": 238,
+      "outputTokens": 507,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 191,
+      "inputTokens": 248,
+      "outputTokens": 40,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 165,
+      "inputTokens": 250,
+      "outputTokens": 37,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 777,
+      "inputTokens": 113,
+      "outputTokens": 190,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 781,
+      "inputTokens": 113,
+      "outputTokens": 191,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 2037,
+      "inputTokens": 260,
+      "outputTokens": 488,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 2221,
+      "inputTokens": 260,
+      "outputTokens": 532,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    },
+    {
+      "phase": "started",
+      "model": "hy-mt2-1.8b"
+    },
+    {
+      "phase": "completed",
+      "model": "hy-mt2-1.8b",
+      "durationMs": 258,
+      "inputTokens": 260,
+      "outputTokens": 55,
+      "reasoningTokens": 0,
+      "finishReason": "stop"
+    }
+  ],
+  "fallbacks": [
+    {
+      "sourcePreview": "the party travels to starý carinth",
+      "reason": "integrity",
+      "detail": "Translation renamed the glossary term: Starý Carinth",
+      "attempts": 3,
+      "occurrences": 1
+    },
+    {
+      "sourcePreview": "they return from starý carinth",
+      "reason": "integrity",
+      "detail": "Translation renamed the glossary term: Starý Carinth",
+      "attempts": 3,
+      "occurrences": 1
+    },
+    {
+      "sourcePreview": "the ruins lie in starý carinth",
+      "reason": "empty",
+      "detail": "The provider returned empty text.",
+      "attempts": 3,
+      "occurrences": 1
+    },
+    {
+      "sourcePreview": "speak with brackus z tetu",
+      "reason": "empty",
+      "detail": "The provider returned empty text.",
+      "attempts": 3,
+      "occurrences": 1
+    },
+    {
+      "sourcePreview": "they fight against permoníci",
+      "reason": "empty",
+      "detail": "The provider returned empty text.",
+      "attempts": 3,
+      "occurrences": 1
+    },
+    {
+      "sourcePreview": "",
+      "reason": "integrity",
+      "detail": "The provider returned translation instructions or meta-commentary instead of only the translated text.",
+      "attempts": 3,
+      "occurrences": 1
+    },
+    {
+      "sourcePreview": "travel to starý carinth",
+      "reason": "empty",
+      "detail": "The provider returned empty text.",
+      "attempts": 3,
+      "occurrences": 1
+    }
+  ],
+  "results": [
+    {
+      "source": "The party travels to Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "The party travels to Starý Carinth.",
+      "passed": false
+    },
+    {
+      "source": "They return from Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "They return from Starý Carinth.",
+      "passed": false
+    },
+    {
+      "source": "The ruins lie in Old Carinth.",
+      "expected": "Starém Carinthu",
+      "translation": "The ruins lie in Starý Carinth.",
+      "passed": false
+    },
+    {
+      "source": "Speak with Brackus von Tet.",
+      "expected": "Brackusem Z Tetu",
+      "translation": "Speak with Brackus Z Tetu.",
+      "passed": false
+    },
+    {
+      "source": "They fight against Delvers.",
+      "expected": "Permoníkům",
+      "translation": "They fight against Permoníci.",
+      "passed": false
+    },
+    {
+      "source": "The tracks belong to Spirit Beasts.",
+      "expected": "Přízračným Šelmám",
+      "translation": "Stopy patří k Přízračným Šelmám. ",
+      "passed": true
+    },
+    {
+      "source": "They are afraid of the Abyssal Shear.",
+      "expected": "Průlomu Hlubiny",
+      "translation": "Bojí se Průlom Hlubiny. ",
+      "passed": false
+    },
+    {
+      "source": "Old Carinth",
+      "expected": "Starý Carinth",
+      "translation": "Starý Carinth",
+      "passed": true
+    },
+    {
+      "source": "Travel to @UUID[Scene.old]{Old Carinth}.",
+      "expected": "@UUID[Scene.old]{Starého Carinthu}",
+      "translation": "Travel to @UUID[Scene.old]{Starý Carinth}.",
+      "passed": false
+    },
+    {
+      "source": "The party returns to Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "Skupina se vrací do Starý Carinth.",
+      "passed": false
+    },
+    {
+      "source": "They return from the Silver Tower.",
+      "expected": "Stříbrné Věže",
+      "translation": "Vracejí se z Stříbrné Věže. ",
+      "passed": true
+    },
+    {
+      "source": "They speak with Forest Spirits.",
+      "expected": "Lesními Duchy",
+      "translation": "Povídají s Lesními Duchy. ",
+      "passed": true
+    },
+    {
+      "source": "They fight against Deep Dwarves.",
+      "expected": "Hlubinným Trpaslíkům",
+      "translation": "Bojují proti Hlubinným Trpaslíkům.",
+      "passed": true
+    },
+    {
+      "source": "They are afraid of Black Fang.",
+      "expected": "Černého Tesáku",
+      "translation": "Bojí se Černého Tesáka.",
+      "passed": false
+    },
+    {
+      "source": "She plays with the Emerald Cat.",
+      "expected": "Smaragdovou Kočkou",
+      "translation": "Hraje si s Smaragdovou Kočkou.",
+      "passed": true
+    }
+  ]
+}

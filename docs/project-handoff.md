@@ -11,6 +11,30 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-21, whole-sentence repair: user supplied the dashboard/řídicí panel
+  agreement example and installed `hy-mt2-1.8b` (Tencent Q8_0, 1.91 GB) and
+  `hy-mt2-30b-a3b-apex` (alphaZimuth APEX-I-Nano, 12.45 GB / 11.59 GiB).
+  Actual protected 15-case runs failed: 1.8B 6/15 expected substrings and seven
+  source fallbacks (41.2 s); APEX 10/15 and five fallbacks (47.6 s including
+  loading). Exact XML probes confirmed APEX sometimes deletes name elements;
+  rejection is correct, so no parser guard was loosened. Production now uses
+  Tencent's top_p=1 for 30B-A3B, still 0.6 for 1.8B/7B; prompt revision 11.
+  Added scripts/benchmark-sentence-repair.mjs: nine synthetic cases, direct vs
+  generated-draft repair vs deliberately faulty/correct supplied drafts. Baseline
+  and refined source-first prompts tested on 1.8B, 7B and APEX. Czech instructions
+  mostly echoed on 1.8B; English variants were used for fair comparisons. Refined
+  prompt also uses temperature zero, so it is not a single-variable experiment.
+  Both 7B and APEX repaired the dashboard, gender/plural agreement and (after
+  refinement) reversed ownership; Permoníci, some prepositions and UUID labels
+  remain wrong. Second passes sometimes worsen already reasonable text. Refined
+  repair median about 0.27–0.29 s on 7B, 0.39 s on APEX; these are short warm
+  requests, not equivalent to protected full-pipeline throughput. Small 1.8B often
+  violates terminology/EXACT and is not selected. Keep 7B baseline and APEX for
+  comparison; automatic post-editing is NOT enabled. Details and raw evidence:
+  docs/benchmarks/sentence-repair-2026-09-21.md. Unit checks: 290 pass, two opt-in
+  tests skipped; typecheck, build and metadata pass. No live-world changes or
+  release. PR #19 draft and all-inflect import still require language validation.
+
 - 2026-09-21, MiLMMT follow-up: user installed MiLMMT-46-12B-v1.0-GGUF and
   prefers a smaller model over a slow large one. LM Studio offers
   `milmmt-46-12b-v1.0`, mradermacher Q4_K_S, 7,789,533,216 bytes, loaded context
