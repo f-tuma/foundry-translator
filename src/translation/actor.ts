@@ -158,7 +158,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
   const prototype = copy.prototypeToken as { name?: unknown } | undefined;
   const tokenName = typeof prototype?.name === "string" && prototype.name.trim() ? prototype.name : undefined;
   const names = await translateDocumentNames([copy.name, ...namedItems.map(item => item.name), ...(tokenName ? [tokenName] : [])], options);
-  copy.name = `${names.names[0]} [${options.settings.targetLanguage.toUpperCase()}]`;
+  copy.name = names.names[0]!;
   namedItems.forEach((item, index) => { item.name = names.names[index + 1]!; });
   if (prototype && tokenName) prototype.name = names.names.at(-1)!;
   for (const item of copy.items ?? []) delete item._stats;

@@ -341,7 +341,7 @@ export async function translateJournalData(
   const nameTarget: TranslationTarget = {
     segments: [copy.name],
     apply: ([translatedName]) => {
-      copy.name = `${translatedName ?? copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
+      copy.name = translatedName ?? copy.name;
     },
   };
 

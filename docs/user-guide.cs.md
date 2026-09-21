@@ -1,4 +1,4 @@
-# Foundry Translate 0.19.1 — stručný návod
+# Foundry Translate 0.19.2 — stručný návod
 
 ## České rozhraní
 
@@ -142,7 +142,8 @@ Položky se změněným zdrojem vynechá a vypíše jejich seznam.
 
 ## Názvy přeložených dokumentů a odkazy
 
-Kopie postav a předmětů mají český název a příponu `[CS]`. Názvy obsažené
+Přeložené postavy, předměty a deníky mají název bez jazykové přípony.
+Jazyk a vazba na originál zůstávají uložené v metadatech. Názvy obsažené
 v glosáři převezmou schválený základní tvar přímo, bez dotazu na model.
 Překládají se také jména jejich vložených předmětů a názvy prototypů tokenů.
 Tyto názvy jsou součástí exportu a importu překladů.

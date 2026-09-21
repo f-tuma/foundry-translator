@@ -140,7 +140,7 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
   delete copy._stats;
   delete copy.folder;
   const names = await translateDocumentNames([copy.name], options);
-  copy.name = `${names.names[0]} [${options.settings.targetLanguage.toUpperCase()}]`;
+  copy.name = names.names[0]!;
 
   const fields = await translateHtmlFields({
     targets: options.systemHtmlFieldPaths.map((path) => ({ owner: copy.system, path })),

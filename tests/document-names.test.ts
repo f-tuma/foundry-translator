@@ -20,7 +20,7 @@ describe("document names and implicit labels", () => {
     const source = { name: actor.source, type: "npc", prototypeToken: { name: actor.source }, system: { health: 12 }, items: [{ _id: "sword", name: item.source, system: { damage: 4 } }, { _id: "attack", name: "Attack" }] };
     const original = structuredClone(source);
     const result = await translateActorData({ source, sourceUuid: actor.sourceUuid!, glossary: [actor, item], provider, settings, systemHtmlFieldPaths: [], itemHtmlFieldPaths: [] });
-    expect(result.data.name).toBe("Agraband Rychlý [CS]");
+    expect(result.data.name).toBe("Agraband Rychlý");
     expect(result.data.prototypeToken).toEqual({ name: "Agraband Rychlý" });
     expect(result.data.items).toEqual([{ _id: "sword", name: "Stříbrný Meč", system: { damage: 4 } }, { _id: "attack", name: "Útok" }]);
     expect(result.data.system.health).toBe(12);
@@ -29,7 +29,7 @@ describe("document names and implicit labels", () => {
   });
   it("uses canonical glossary names for standalone Items even without HTML fields", async () => {
     const result = await translateItemData({ source: { name: item.source, type: "weapon", system: { identifier: "silver-sword" } }, sourceUuid: item.sourceUuid!, glossary: [item], provider, settings, systemHtmlFieldPaths: [] });
-    expect(result.data.name).toBe("Stříbrný Meč [CS]");
+    expect(result.data.name).toBe("Stříbrný Meč");
     expect(result.data.system.identifier).toBe("silver-sword");
   });
   it("supplies source names for unlabeled UUIDs and embeds, preserving anchors and explicit labels", () => {

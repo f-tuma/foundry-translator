@@ -55,7 +55,7 @@ describe("Item translation", () => {
     expect(source).toEqual(original);
     expect(result.data._id).toBeUndefined();
     expect(result.data._stats).toBeUndefined();
-    expect(result.data.name).toBe("Emberbrand [CS]");
+    expect(result.data.name).toBe("Emberbrand");
     expect(result.data.system).toMatchObject({
       description: "<p>Čepel z uhlíků.</p>",
       damage: "2d6",

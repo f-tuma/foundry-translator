@@ -126,7 +126,7 @@ describe("Journal translation", () => {
     expect(source).toEqual(original);
     expect(translated.data._id).toBeUndefined();
     expect(translated.data._stats).toBeUndefined();
-    expect(translated.data.name).toBe("Pozvání [CS]");
+    expect(translated.data.name).toBe("Pozvání");
     expect(translated.data.categories).toEqual([
       {
         _id: "category-one",
@@ -208,7 +208,7 @@ describe("Journal translation", () => {
       onQualityFallback: qualityFallback,
     });
 
-    expect(translated.data.name).toBe("Průvodce [CS]");
+    expect(translated.data.name).toBe("Průvodce");
     expect(translated.data.pages[0]?.name).toBe("Přehled");
     expect(translated.data.pages[0]?.text?.content).toBe(
       "<p>The heroes enter the castle.</p><p>Vítejte doma.</p>",
