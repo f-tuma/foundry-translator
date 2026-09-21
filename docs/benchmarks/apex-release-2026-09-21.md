@@ -73,3 +73,14 @@ Do not commit adventure text or glossary context to the public repository.
 Deterministic release checks: typecheck, 307 tests, production build, metadata
 verification and diff whitespace checks pass. Three local-model tests are opt-in
 and skipped by ordinary CI; their language results are reported above.
+
+
+## Deployment verification
+
+GitHub release v0.18.0 was installed through Foundry Setup. The live glossary
+import saved 776 reviewed entries; a complete readback matched all portable
+fields with zero differences. All entries are active, allow inflection and
+are marked manually customized. APEX settings were saved and the browser's
+connection/test-translation check passed. The translation desk displays APEX
+and 776 active terms; the console has no new errors after the deployment.
+A private backup of the previous glossary was saved before import.

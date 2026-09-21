@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-21
-- Deployed version: `v0.17.0`. In development: `v0.18.0` on `codex/glossary-inflection`.
+- Deployed version: `v0.18.0`; PR #19 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,26 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-21, deployment completed: PR #19 squash-merged as `4be277f`; tag and
+  GitHub release v0.18.0 published successfully with ZIP and manifest. CI and
+  release workflow pass. Updated Foundry through Setup, relaunched Ember and
+  joined as Gamemaster. The old browser tab became unresponsive during startup;
+  a fresh tab loaded normally and the user confirmed the world was available.
+  Imported the jointly reviewed version-2 JSON through the glossary preview:
+  0 new / 776 changed, then "Saved 776 selected entries". Read back all 776:
+  every replacement, category, alias, enabled flag, mode and note matches the
+  approved file; all are enabled, inflect and customized. Current compendium
+  backup and readback JSON are stored privately in visualization outputs as
+  glossary-before-v018-2026-09-21.json and glossary-after-v018-2026-09-21.json.
+  Saved LM Studio model `hy-mt2-30b-a3b-apex` at localhost:1234/v1, English to
+  Czech. Replaced the contradictory preserve-all-names world profile with
+  guidance giving the reviewed glossary priority and preserving source meaning.
+  The browser connection/test translation passes. Desk confirms APEX and 776
+  active terms; no browser console errors after deployment. Large adventure
+  translation has not been started. Known quality limits remain as documented
+  in benchmarks/apex-release-2026-09-21.md (one source fallback on a 50-unit page).
+
 
 - 2026-09-21, APEX release preparation: user selected APEX and accepts minor
   grammar errors; explicitly requested GitHub release, Foundry update and import
