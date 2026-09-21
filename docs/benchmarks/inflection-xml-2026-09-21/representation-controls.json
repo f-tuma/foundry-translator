@@ -1,0 +1,86 @@
+[
+  {
+    "mode": "reference",
+    "source": "They fight against Delvers.",
+    "prompt": "Reference translations (Czech dictionary forms; inflect naturally in the sentence):\nDelvers translates to Permoníci\nTranslate the following text into Czech. Output only the translation without explanation.\nThey fight against Delvers.",
+    "output": "Bojují proti Permonícům.",
+    "durationMs": 209
+  },
+  {
+    "mode": "reference",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Reference translations (Czech dictionary forms; inflect naturally in the sentence):\nSpirit Beasts translates to Přízračné Šelmy\nTranslate the following text into Czech. Output only the translation without explanation.\nThe tracks belong to Spirit Beasts.",
+    "output": "Stopy patří Přízračným Šelmám.",
+    "durationMs": 239
+  },
+  {
+    "mode": "reference",
+    "source": "They return from Old Carinth.",
+    "prompt": "Reference translations (Czech dictionary forms; inflect naturally in the sentence):\nOld Carinth translates to Starý Carinth\nTranslate the following text into Czech. Output only the translation without explanation.\nThey return from Old Carinth.",
+    "output": "Vrací se ze Starého Carinthu.",
+    "durationMs": 160
+  },
+  {
+    "mode": "mixed",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following text into Czech. Output only the translation without explanation.\nThey fight against Permoníci.",
+    "output": "Bojují proti Permonícům.",
+    "durationMs": 159
+  },
+  {
+    "mode": "mixed",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following text into Czech. Output only the translation without explanation.\nThe tracks belong to Přízračné Šelmy.",
+    "output": "Skladby patří k Přízračným Šelmám.",
+    "durationMs": 255
+  },
+  {
+    "mode": "mixed",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following text into Czech. Output only the translation without explanation.\nThey return from Starý Carinth.",
+    "output": "Vrací se ze Starého Korintu.",
+    "durationMs": 340
+  },
+  {
+    "mode": "source-markers",
+    "source": "They fight against Delvers.",
+    "prompt": "Reference translations (Czech dictionary forms; inflect naturally in the sentence):\nDelvers translates to Permoníci\nTranslate the following text into Czech. Output only the translation without explanation. Keep both __FTG_ markers unchanged around the translated name.\nThey fight against __FTG_T_0000__Delvers__FTG_T_0000END__.",
+    "output": "Bojují proti __FTG_T_0000__Permoníci__FTG_T_0000END__.",
+    "durationMs": 370
+  },
+  {
+    "mode": "source-markers",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Reference translations (Czech dictionary forms; inflect naturally in the sentence):\nSpirit Beasts translates to Přízračné Šelmy\nTranslate the following text into Czech. Output only the translation without explanation. Keep both __FTG_ markers unchanged around the translated name.\nThe tracks belong to __FTG_T_0000__Spirit Beasts__FTG_T_0000END__.",
+    "output": "Stopy patří k __FTG_T_0000__Přízračné Šelmy__FTG_T_0000END__.",
+    "durationMs": 443
+  },
+  {
+    "mode": "source-markers",
+    "source": "They return from Old Carinth.",
+    "prompt": "Reference translations (Czech dictionary forms; inflect naturally in the sentence):\nOld Carinth translates to Starý Carinth\nTranslate the following text into Czech. Output only the translation without explanation. Keep both __FTG_ markers unchanged around the translated name.\nThey return from __FTG_T_0000__Old Carinth__FTG_T_0000END__.",
+    "output": "Vrací se z __FTG_T_0000__Starý Carinth__FTG_T_0000END__.",
+    "durationMs": 356
+  },
+  {
+    "mode": "czech-edit",
+    "source": "They fight against Delvers.",
+    "prompt": "Oprav gramatiku následující české věty. Zachovej její význam a slovní zásobu, pouze oprav pády a shodu. Vrať jen opravenou větu.\nBojují proti Permoníci.",
+    "output": "Bojují proti Permonice.",
+    "durationMs": 141
+  },
+  {
+    "mode": "czech-edit",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Oprav gramatiku následující české věty. Zachovej její význam a slovní zásobu, pouze oprav pády a shodu. Vrať jen opravenou větu.\nStopy patří Přízračné Šelmy.",
+    "output": "Stopy patří Přízračné šelmě.",
+    "durationMs": 201
+  },
+  {
+    "mode": "czech-edit",
+    "source": "They return from Old Carinth.",
+    "prompt": "Oprav gramatiku následující české věty. Zachovej její význam a slovní zásobu, pouze oprav pády a shodu. Vrať jen opravenou větu.\nVrací se z Starý Carinth.",
+    "output": "Vrací se ze Starého Carintie.",
+    "durationMs": 155
+  }
+]

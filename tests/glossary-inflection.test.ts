@@ -15,6 +15,7 @@ describe("Czech glossary forms", () => {
     ["Starý Carinth", "Starého Carinthu"], ["Starý Carinth", "Starém Carinthu"],
     ["Průlom Hlubiny", "Průlomu Hlubiny"], ["Permoníci", "Permoníkům"],
     ["Přízračné Šelmy", "Přízračných Šelem"], ["Kočka Casirská", "Kočce Casirské"],
+    ["Přízračné Šelmy", "Přízračným Šelmám"], ["Bílé Kočky", "Bílým Kočkám"],
     ["Rudý Běs", "Rudým Běsem"], ["Brackus Z Tetu", "Brackusem Z Tetu"],
     ["Stříbrný Paprsek", "Stříbrného Paprsku"], ["Bůh", "Boha"],
     ["Jorey Rychlý", "Joreyho Rychlého"], ["Dřímající Kobka", "Dřímající Kobky"],

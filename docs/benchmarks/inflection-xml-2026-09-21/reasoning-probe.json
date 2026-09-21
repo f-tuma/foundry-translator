@@ -1,0 +1,32 @@
+[
+  {
+    "model": "qwen/qwen3.8-27b",
+    "prompt": "Přelož následující anglický text do přirozené češtiny pro fantasy dobrodružství. Použij závazný glosář: Delvers = Permoníci; Spirit Beasts = Přízračné Šelmy; Old Carinth = Starý Carinth. Názvy skloňuj podle věty. Zachovej význam i jednotné/množné číslo. Vrať jen překlad.\n\nThey fight against Delvers. The tracks belong to Spirit Beasts. They return from Old Carinth.",
+    "reasoning": "low",
+    "output": "Bojují proti Permoníkům. Stop patří Přízračným Šelmám. Vrací se ze Starého Carinthu.",
+    "stats": {
+      "input_tokens": 156,
+      "total_output_tokens": 383,
+      "reasoning_output_tokens": 350,
+      "tokens_per_second": 12.466291653200948,
+      "time_to_first_token_seconds": 2.2270149999999997,
+      "model_load_time_seconds": 3.631
+    },
+    "durationMs": 36528
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "prompt": "Přelož následující anglický text do přirozené češtiny pro fantasy dobrodružství. Použij závazný glosář: Delvers = Permoníci; Spirit Beasts = Přízračné Šelmy; Old Carinth = Starý Carinth. Názvy skloňuj podle věty. Zachovej význam i jednotné/množné číslo. Vrať jen překlad.\n\nThey fight against Delvers. The tracks belong to Spirit Beasts. They return from Old Carinth.",
+    "reasoning": "on",
+    "output": "Bojují proti Permoníkům. Stopky patří Přízračným Šelmám. Vrací se ze Starého Carinthu.",
+    "stats": {
+      "input_tokens": 129,
+      "total_output_tokens": 683,
+      "reasoning_output_tokens": 646,
+      "tokens_per_second": 93.66166002520349,
+      "time_to_first_token_seconds": 0.19524100000000003,
+      "model_load_time_seconds": 2.33
+    },
+    "durationMs": 9820
+  }
+]

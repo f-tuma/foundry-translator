@@ -7,6 +7,15 @@ export interface TranslateRequest {
   format?: TranslationFormat;
   /** Optional terminology reference for context-aware LLM providers. */
   glossary?: readonly { source: string; replacement: string }[];
+  /** Only the protected occurrences in these texts, retaining their original wording. */
+  inflections?: readonly GlossaryInflectionReference[];
+}
+
+export interface GlossaryInflectionReference {
+  token: string;
+  endToken: string;
+  source: string;
+  replacement: string;
 }
 
 export interface TranslationResult {

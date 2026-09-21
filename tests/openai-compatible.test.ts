@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { translateUnits } from "../src/translation/unit-translator";
 
 import {
   OpenAiCompatibleProvider,
@@ -22,6 +23,30 @@ function eventStreamResponse(events: readonly unknown[]): Response {
 
 describe("OpenAiCompatibleProvider", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it("translates original glossary aliases through XML, retrying damaged markup before restoring Foundry syntax", async () => {
+    let calls = 0;
+    const requests: string[] = [];
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      const prompt = JSON.parse(String(init?.body)).messages[0].content as string;
+      requests.push(prompt);
+      const xml = prompt.slice(prompt.indexOf("<items>"));
+      const translated = xml.replace("Travel to", "Cestujte do").replace("Old Town", "Starého Carinthu");
+      return jsonResponse({ choices: [{ message: { content: ++calls === 1 ? translated.replace("</name>", "") : translated } }] });
+    });
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "hy-mt2-7b", fetchImplementation: fetchMock });
+    const fallback = vi.fn();
+    const result = await translateUnits({
+      units: [["Travel to @UUID[Scene.old]{Old Town}."]],
+      glossary: [{ source: "Old Carinth", replacement: "Starý Carinth", category: "location", aliases: ["Old Town"], mode: "inflect" }],
+      provider, settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" }, onQualityFallback: fallback,
+    });
+    expect(result).toEqual([["Cestujte do @UUID[Scene.old]{Starého Carinthu}."]]);
+    expect(calls).toBe(2);
+    expect(fallback).not.toHaveBeenCalled();
+    expect(requests[0]).toContain('"Old Town" = "Starý Carinth"');
+    expect(requests[0]).not.toContain("@UUID");
+    expect(requests[0]).not.toContain("__FTG_");
+  });
   it.each(["qwen-test", "hy-mt2-7b"])("instructs %s to inflect only paired approved names", async model => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({choices:[{message:{content:"Do __FTG_T_0000__Starého Carinthu__FTG_T_0000END__."}}]}));
     const provider = new OpenAiCompatibleProvider({baseUrl:"http://localhost:1234",model,fetchImplementation:fetchMock});

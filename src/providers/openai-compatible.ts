@@ -4,10 +4,11 @@ import type {
   TranslationProvider,
   TranslationResult,
 } from "./types";
+import { prepareInflectionXml } from "./inflection-xml";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 9;
+const PROMPT_REVISION = 10;
 const INFLECTION_INSTRUCTIONS = "Some __FTG_ markers form a pair: __FTG_NONCE_ID__Approved Czech Name__FTG_NONCE_IDEND__. The words inside each pair are an approved Czech glossary name, already translated. Keep BOTH markers unchanged and in place around that name. Use this exact vocabulary; only inflect its words to the grammatical case required by the surrounding Czech sentence. Do not rename, translate again, add or remove words inside a pair. For example: to __FTG_X_0000__Starý Carinth__FTG_X_0000END__ becomes do __FTG_X_0000__Starého Carinthu__FTG_X_0000END__. A standalone title keeps the canonical form. Adapt surrounding articles, prepositions, gender and agreement naturally. Fixed markers without an END partner remain opaque and unchanged.";
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
@@ -274,7 +275,26 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     sequentialFallback: boolean,
   ): Promise<void> {
     const only = pending[0];
-    if (pending.length === 1 && only) {
+    const xml = request.targetLanguage === "cs"
+      ? prepareInflectionXml(pending.map(({ text }) => text), request.inflections ?? []) : null;
+    if (xml) {
+      try {
+        const output = await this.#translateOne(xml.text, request, xml.instructions);
+        const translated = xml.restore(output);
+        if (translated) {
+          pending.forEach(({ index }, offset) => { results[index] = { translatedText: translated[offset]! }; });
+          return;
+        }
+      } catch (error) {
+        if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) throw error;
+      }
+      if (only && pending.length === 1) {
+        // The normal unit integrity checks retry this rejected result and report
+        // a visible source fallback if the model repeatedly damages the XML.
+        results[only.index] = { translatedText: "" };
+        return;
+      }
+    } else if (pending.length === 1 && only) {
       if (sequentialFallback) {
         this.#onMetrics?.({
           phase: "diagnostic",
@@ -287,24 +307,26 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     }
     if (!pending.length) return;
 
-    const boundaryTokens = createBatchTokens(pending.length);
-    try {
-      const translatedBatch = await this.#translateOne(
-        combineBatch(pending.map(({ text }) => text), boundaryTokens),
-        request,
-      );
-      const translated = splitBatch(translatedBatch, boundaryTokens);
-      if (translated) {
-        pending.forEach(({ index }, resultIndex) => {
-          results[index] = { translatedText: translated[resultIndex] ?? "" };
-        });
-        return;
-      }
-    } catch (error) {
-      // Provider/network errors still propagate. Only a completed but unusable
-      // generation is safe to retry as smaller independent batches.
-      if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
-        throw error;
+    if (!xml) {
+      const boundaryTokens = createBatchTokens(pending.length);
+      try {
+        const translatedBatch = await this.#translateOne(
+          combineBatch(pending.map(({ text }) => text), boundaryTokens),
+          request,
+        );
+        const translated = splitBatch(translatedBatch, boundaryTokens);
+        if (translated) {
+          pending.forEach(({ index }, resultIndex) => {
+            results[index] = { translatedText: translated[resultIndex] ?? "" };
+          });
+          return;
+        }
+      } catch (error) {
+        // Provider/network errors still propagate. Only a completed but unusable
+        // generation is safe to retry as smaller independent batches.
+        if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
+          throw error;
+        }
       }
     }
 
@@ -387,7 +409,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     return result.trim().slice(0, 6_000);
   }
 
-  async #translateOne(text: string, request: TranslateRequest): Promise<string> {
+  async #translateOne(text: string, request: TranslateRequest, xmlInstructions?: string): Promise<string> {
     const source = languageLabel(request.sourceLanguage);
     const target = languageLabel(request.targetLanguage);
     const inflection = request.targetLanguage === "cs" && /__FTG_[A-Z0-9]+_[A-Z0-9]+END__/iu.test(text)
@@ -397,8 +419,10 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       "Return only the translated text, without commentary, labels, or Markdown fences.",
       "Do not include the text_to_translate wrapper in the response.",
       "Translate directly; do not explain, analyze, or reason about the translation in the response.",
-      "Preserve every token beginning with __FTN_, __FTG_, __FTS_, or __FTB_ byte-for-byte, exactly once, and in the original order.",
-      "FTB tokens delimit independent translation items. Translate every item independently and never move words across an FTB boundary.",
+      ...(xmlInstructions ? [xmlInstructions] : [
+        "Preserve every token beginning with __FTN_, __FTG_, __FTS_, or __FTB_ byte-for-byte, exactly once, and in the original order.",
+        "FTB tokens delimit independent translation items. Translate every item independently and never move words across an FTB boundary.",
+      ]),
       "Preserve the meaning, tone, paragraph structure, and surrounding whitespace.",
       "Keep other proper names in their original spelling. Translate ordinary roles and game terms.",
       ...(inflection ? [inflection] : []),
@@ -447,7 +471,9 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
               // the user message. Its sampling defaults also avoid degenerate
               // greedy decoding on long delimiter-heavy batches.
               role: "user",
-              content: `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep other proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}${inflection ? `\n${inflection}` : ""}\n\n[Source Text]\n${text}`,
+              content: xmlInstructions
+                ? `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate from ${source} into ${target} for a fantasy roleplaying adventure. Translate party as družina and a check as ověření.\n${xmlInstructions}\n\n${text}`
+                : `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep other proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}${inflection ? `\n${inflection}` : ""}\n\n[Source Text]\n${text}`,
             }] : [
               { role: "system", content: system },
               { role: "user", content: `<text_to_translate>\n${text}\n</text_to_translate>` },

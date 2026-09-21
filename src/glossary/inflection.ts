@@ -3,7 +3,7 @@
  * Unrecognised irregular forms are retried by the normal translation pipeline.
  */
 const WORD = /[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*|\p{N}+/gu;
-const NOUN_ENDINGS = ["", "a", "u", "e", "ě", "i", "í", "o", "y", "ů", "em", "om", "ou", "ovi", "ové", "ům", "ami", "emi", "ách", "ích", "ech", "ama", "ma", "ím", "ata", "at", "aty", "atům", "atech"];
+const NOUN_ENDINGS = ["", "a", "u", "e", "ě", "i", "í", "o", "y", "ů", "em", "om", "ou", "ovi", "ové", "ům", "ám", "ami", "emi", "ách", "ích", "ech", "ama", "ma", "ím", "ata", "at", "aty", "atům", "atech"];
 const ADJECTIVE_ENDINGS = ["ý", "á", "é", "í", "ého", "ému", "ém", "ým", "ou", "ých", "ými", "ího", "ímu", "ím", "ích", "ími"];
 const CONSONANT = "bcčdďfghjklmnňpqrřsštťvwxzž";
 

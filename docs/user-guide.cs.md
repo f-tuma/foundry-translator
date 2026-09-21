@@ -21,6 +21,9 @@ skutečném Ember questu: přibližně 38 sekund, bez porušení ochranných zna
 Menší kvantizace nebo slabší počítač mohou výsledek i rychlost změnit.
 Samostatný test skloňování 21. 9. 2026 našel u Hy-MT2 i Qwen3.8 chyby v pádech;
 nové skloňování ve verzi 0.18.0 proto zatím není uvolněné k běžnému použití.
+Následná úprava předávání glosáře opravila některé chyby a zkrátila požadavky.
+Výsledky a další kandidáti jsou v [přehledu testů](benchmarks/inflection-xml-2026-09-21.md)
+a [aktuálním výběru modelů](benchmarks/local-models-2026-09-21.md).
 Qwen3.8 používá nativní API LM Studio s vypnutým reasoningem, aby samotné
 přemýšlení modelu nevyčerpalo čas pro překlad.
 

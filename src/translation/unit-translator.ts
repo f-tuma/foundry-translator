@@ -4,7 +4,7 @@ import {
   protectGlossaryTerms,
   restoreGlossaryTerms,
 } from "../glossary/protection";
-import type { TranslationProvider } from "../providers/types";
+import type { GlossaryInflectionReference, TranslationProvider } from "../providers/types";
 import type { ProviderId } from "../settings/settings";
 import type { TranslationCache, TranslationCacheEntry } from "./cache";
 import { sha256 } from "./hash";
@@ -147,7 +147,7 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 7,
+      schemaVersion: 8,
       segments,
       glossaryFingerprint,
       ...(providerIdentity ? { providerIdentity } : {}),
@@ -311,6 +311,7 @@ async function retrySuspiciousSegments(
           targetLanguage: settings.targetLanguage,
           format: "text",
           glossary,
+          inflections: inflectionReferences([preparedSegment]),
         });
         candidate = typeof retry?.translatedText === "string" ? retry.translatedText : "";
         problem = translationProblem(preparedSegment, candidate, settings);
@@ -408,6 +409,7 @@ async function translateSegmentsSeparately(
     targetLanguage: settings.targetLanguage,
     format: "text",
     glossary,
+    inflections: inflectionReferences(prepared.segments),
   });
   if (results.length !== translatable.length) {
     throw new Error("Překladač vrátil jiný počet HTML segmentů, než kolik dostal.");
@@ -418,6 +420,12 @@ async function translateSegmentsSeparately(
   return prepared.segments.map(({ protection }, index) =>
     translatedCores.get(index) ?? protection.text,
   );
+}
+
+function inflectionReferences(segments: readonly PreparedSegment[]): GlossaryInflectionReference[] {
+  return segments.flatMap(({ protection }) => protection.tokens.flatMap(token =>
+    token.endToken ? [{ ...token, endToken: token.endToken }] : [],
+  ));
 }
 
 function prepareSegment(
@@ -592,6 +600,7 @@ export async function translateUnits(
         targetLanguage: options.settings.targetLanguage,
         format: "text",
         glossary: options.glossary,
+        inflections: inflectionReferences(batch.flatMap(({ segments }) => segments)),
       });
 
       if (results.length !== batch.length) {

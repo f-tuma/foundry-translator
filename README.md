@@ -154,9 +154,13 @@ This requires Czech and an OpenAI-compatible instruction model. Chrome, Google
 and other target languages use the exact form; a translation-run warning explains
 that fallback. **Do not use** omits the entry entirely, including terminology hints.
 
-The model sees the canonical name inside paired glossary markers. Restoration
-checks every occurrence, marker integrity, word count, punctuation, Czech suffixes
-and common stem alternations; it restores the glossary's capitalization. This is
+Internally, names use paired glossary markers. The LLM receives the original
+source wording inside short XML elements, with only the relevant approved Czech
+terms listed separately. The XML adapter restores the original markers after
+validating IDs, hierarchy and opaque syntax. It allows natural reordering of
+whole names within plain prose, never across links or HTML segments. Restoration
+then checks every occurrence, word count, punctuation, Czech suffixes and common
+stem alternations; it restores the glossary's capitalization. This is
 a conservative guard against renaming, not a complete Czech morphology engine or
 a guarantee of correct grammar. Unsupported irregular forms trigger retries and
 the existing visible source-fragment fallback. Failed translations are not cached.
@@ -166,16 +170,20 @@ translation bundles. Version-2 JSON prevents older releases silently dropping mo
 Standalone units consisting of one glossary name (including a link label) keep
 the exact canonical form; inline name segments still use the surrounding sentence.
 
-**Release validation is not complete:** real LM Studio tests on 2026-09-21 found
-wrong Czech inflections and, with Qwen3.8, a reversed sentence meaning. Passing
-marker checks does not detect these grammar errors. The v0.18.0 work remains a
-draft; see the [model test results](docs/benchmarks/inflection-2026-09-21.md).
+**Release validation is not complete:** the XML representation improved specific
+failures and reduced token overhead, but real tests still find wrong inflections
+and occasional meaning errors. Passing structure checks does not detect every
+grammar error. The v0.18.0 work remains a draft; see the [updated model tests](docs/benchmarks/inflection-xml-2026-09-21.md)
+and [current model shortlist](docs/benchmarks/local-models-2026-09-21.md).
 
 To verify a local model through the production pipeline, run
 `LM_STUDIO_MODEL=hy-mt2-7b npm test -- tests/local-inflection.integration.test.ts`.
 Use the server's exact model ID; optional `LM_STUDIO_URL` and `LM_STUDIO_RESULT`
 set its address and the JSON result path. This integration check is opt-in and
 skipped by regular CI; unit tests alone do not establish a model's Czech quality.
+For synthetic multi-sentence paragraphs and inline references, use
+`tests/local-context.integration.test.ts`. Its assertions check structure; the
+printed translations still require a language review.
 
 ### Discover and edit names
 

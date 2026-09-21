@@ -1,0 +1,113 @@
+{
+  "model": "qwen/qwen3.8-27b",
+  "durationMs": 46742,
+  "metrics": [
+    {
+      "phase": "started",
+      "model": "qwen/qwen3.8-27b"
+    },
+    {
+      "phase": "completed",
+      "model": "qwen/qwen3.8-27b",
+      "finishReason": "stop",
+      "durationMs": 46723,
+      "inputTokens": 901,
+      "outputTokens": 507,
+      "reasoningTokens": 0,
+      "tokensPerSecond": 12.288670685920085
+    }
+  ],
+  "fallbacks": [],
+  "results": [
+    {
+      "source": "The party travels to Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "Družina cestuje do Starého Carinthu.",
+      "passed": true
+    },
+    {
+      "source": "They return from Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "Vrací se ze Starého Carinthu.",
+      "passed": true
+    },
+    {
+      "source": "The ruins lie in Old Carinth.",
+      "expected": "Starém Carinthu",
+      "translation": "Rozvaliny leží v Starém Carinthu.",
+      "passed": true
+    },
+    {
+      "source": "Speak with Brackus von Tet.",
+      "expected": "Brackusem Z Tetu",
+      "translation": "Mluvte s Brackusem Z Tetu.",
+      "passed": true
+    },
+    {
+      "source": "They fight against Delvers.",
+      "expected": "Permoníkům",
+      "translation": "Bojují proti Permoníkům.",
+      "passed": true
+    },
+    {
+      "source": "The tracks belong to Spirit Beasts.",
+      "expected": "Přízračným Šelmám",
+      "translation": "Stopám patří Přízračné Šelmy.",
+      "passed": false
+    },
+    {
+      "source": "They are afraid of the Abyssal Shear.",
+      "expected": "Průlomu Hlubiny",
+      "translation": "Bojí se Průlomu Hlubiny.",
+      "passed": true
+    },
+    {
+      "source": "Old Carinth",
+      "expected": "Starý Carinth",
+      "translation": "Starý Carinth",
+      "passed": true
+    },
+    {
+      "source": "Travel to @UUID[Scene.old]{Old Carinth}.",
+      "expected": "@UUID[Scene.old]{Starého Carinthu}",
+      "translation": "Cestujte do @UUID[Scene.old]{Starého Carinthu}.",
+      "passed": true
+    },
+    {
+      "source": "The party returns to Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "Družina se vrací do Starého Carinthu.",
+      "passed": true
+    },
+    {
+      "source": "They return from the Silver Tower.",
+      "expected": "Stříbrné Věže",
+      "translation": "Vrací se ze Stříbrné Věže.",
+      "passed": true
+    },
+    {
+      "source": "They speak with Forest Spirits.",
+      "expected": "Lesními Duchy",
+      "translation": "Mluví s Lesními Duchy.",
+      "passed": true
+    },
+    {
+      "source": "They fight against Deep Dwarves.",
+      "expected": "Hlubinným Trpaslíkům",
+      "translation": "Bojují proti Hlubinným Trpaslíkům.",
+      "passed": true
+    },
+    {
+      "source": "They are afraid of Black Fang.",
+      "expected": "Černého Tesáku",
+      "translation": "Bojí se Černého Tesáku.",
+      "passed": true
+    },
+    {
+      "source": "She plays with the Emerald Cat.",
+      "expected": "Smaragdovou Kočkou",
+      "translation": "Hraje si se Smaragdovou Kočkou.",
+      "passed": true
+    }
+  ]
+}

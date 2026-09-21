@@ -11,6 +11,36 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-21, follow-up: the user requested continued improvement and a fresh
+  model review. See docs/benchmarks/local-models-2026-09-21.md (primary sources).
+  Requested Google Gemma 4 26B-A4B QAT Q4_0, main file 14.4 GB, for the next
+  comparison. It was not yet in GET /v1/models at the last check. Other verified
+  candidates are Tencent Hy-MT2 30B-A3B Q4_K_M (18.2 GB) and Xiaomi MiLMMT-46-12B
+  v1.0 (August release). Qwen3.8-LiveTranslate is a speech API, not a verified
+  local GGUF replacement. Host GPU was rechecked: RTX 5070 Ti, 16,303 MiB.
+  Diagnostic controls showed ASCII markers/mixed-language source worsened some
+  sentences. Added an XML wire adapter for Czech inflection: original source
+  names and only current terminology are sent, with short name/item/segment/keep
+  IDs. All original FT tokens are reconstructed and validated as before. XML IDs,
+  hierarchy and opaque/segment order must match; whole name phrases can move
+  within one plain container with no opaque syntax, which permits natural Czech
+  word order without moving link labels. Malformed XML retries via existing batch
+  splitting and unit fallback. Added request occurrence metadata including exact
+  source aliases on the initial, retry and separate-segment paths. Cache schema 8,
+  prompt revision 10. Also fixed a guard bug: valid feminine dative plural -ám
+  (Přízračným Šelmám) was missing from allowed endings. No glossary choices changed.
+  Small production tests improved specific errors: Hy-MT2 now translated the
+  Spirit Beasts sentence correctly; Qwen produced correct Permoníkům. Hy-MT2
+  scored 13–14/15 expected substrings over XML iterations, Qwen 14/15 in its
+  XML probe. Counts are not full grammar scores; short-sentence language checks
+  still fail. Four full Hy-MT2 paragraphs passed structural checks after fixing
+  overly strict name order, with remaining Czech preposition/tense issues.
+  Qwen's four paragraphs also passed structural checks (36.3 s), but repeated
+  reversed ownership (Stopám patří Přízračné Šelmy) and wrong Permonícům.
+  See docs/benchmarks/inflection-xml-2026-09-21.md for raw evidence and limitations.
+  Unit suite: 288 passing, two opt-in model tests skipped; typecheck/build passed.
+  PR #19 stays draft. No deployment or live-world import/settings changes.
+
 - 2026-09-21: LM Studio is now available. Completed real production-pipeline
   checks on Hy-MT2 Q8_0 and Qwen3.8-27B Q4_K_M with MTP enabled on Qwen's
   loaded instance. CORS preflight from the Ember origin returned HTTP 200.
