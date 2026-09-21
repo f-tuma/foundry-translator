@@ -8,6 +8,7 @@ import type { GlossaryInflectionReference, TranslationProvider } from "../provid
 import type { ProviderId } from "../settings/settings";
 import type { TranslationCache, TranslationCacheEntry } from "./cache";
 import { sha256 } from "./hash";
+import { labelGlossaryReferences } from "./reference-labels";
 import {
   protectFoundrySyntax,
   restoreFoundrySyntax,
@@ -128,12 +129,13 @@ function glossarySnapshot(entries: readonly GlossaryEntry[]): string {
   return JSON.stringify(
     [...entries]
       .filter((entry) => entry.enabled !== false)
-      .map(({ source, replacement, category, aliases, mode }) => ({
+      .map(({ source, replacement, category, aliases, mode, sourceUuid }) => ({
         source,
         replacement,
         category,
         aliases: [...aliases].sort(),
         mode: mode ?? "fixed",
+        sourceUuid,
       }))
       .sort((left, right) => left.source.localeCompare(right.source)),
   );
@@ -147,7 +149,7 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 8,
+      schemaVersion: 9,
       segments,
       glossaryFingerprint,
       ...(providerIdentity ? { providerIdentity } : {}),
@@ -473,7 +475,7 @@ function prepareSegment(
   const withoutLeading = segment.slice(leading.length);
   const trailing = withoutLeading.match(/\s*$/u)?.[0] ?? "";
   const core = withoutLeading.slice(0, withoutLeading.length - trailing.length);
-  const syntax = protectFoundrySyntax(core, { nonce });
+  const syntax = protectFoundrySyntax(labelGlossaryReferences(core, glossary), { nonce });
   return {
     leading,
     trailing,

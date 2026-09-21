@@ -4,6 +4,11 @@ interface FoundryModuleRecord {
   version?: string;
 }
 
+declare const CONFIG: {
+  Actor?: { documentClass?: { prototype: object } };
+  Item?: { documentClass?: { prototype: object } };
+};
+
 interface FoundryGame {
   tooltip: {
     element: HTMLElement | null;

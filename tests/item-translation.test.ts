@@ -116,7 +116,7 @@ describe("Item translation", () => {
       onProgress: ({ completedFields }) => progress.push(completedFields),
     });
 
-    expect(requestSizes).toEqual([4, 1]);
+    expect(requestSizes).toEqual([1, 4, 1]);
     expect(progress).toEqual([1, 2, 3, 4, 5]);
     expect(result.translatedHtmlFields).toBe(5);
     expect(result.data.system.five).toBe("<p>Přeloženo: five field.</p>");

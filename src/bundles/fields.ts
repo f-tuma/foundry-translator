@@ -36,9 +36,12 @@ export function portableFields(document: PortableDocument, data = document.toObj
       }
     });
   } else {
+    fields.push({ path: ["name"], format: "text" });
     addSystem(document, data.system, ["system"]);
-    if (document.documentName === "Actor" && Array.isArray(data.items)) {
-      data.items.forEach((item: Record<string, unknown>, index) => {
+    if (document.documentName === "Actor") {
+      fields.push({ path: ["prototypeToken", "name"], format: "text" });
+      if (Array.isArray(data.items)) data.items.forEach((item: Record<string, unknown>, index) => {
+        fields.push({ path: ["items", index, "name"], format: "text" });
         addSystem(document.items?.contents.find((i) => i.id === item._id), item.system, ["items", index, "system"]);
       });
     }

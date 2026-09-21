@@ -151,7 +151,7 @@ describe("Actor translation", () => {
       onProgress: ({ completedFields }) => progress.push(completedFields),
     });
 
-    expect(requestSizes).toEqual([3]);
+    expect(requestSizes).toEqual([2, 3]);
     expect(progress).toEqual([1, 2, 3]);
     expect(result.data.system).toMatchObject({
       public: "<p>Přeloženo: Public biography.</p>",
