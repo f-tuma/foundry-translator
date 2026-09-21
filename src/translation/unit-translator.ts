@@ -147,7 +147,7 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 6,
+      schemaVersion: 7,
       segments,
       glossaryFingerprint,
       ...(providerIdentity ? { providerIdentity } : {}),
@@ -443,6 +443,30 @@ function prepareSegment(
   };
 }
 
+/** A whole unit containing only one name has no sentence context to inflect it.
+ * Inspect the whole unit so a name in a separate bold/link segment still inflects
+ * when its sentence lives in adjacent segments.
+ */
+function fixStandaloneGlossaryName(segments: readonly PreparedSegment[]): void {
+  const tokens = segments.flatMap(({ protection }) => protection.tokens);
+  const name = tokens[0];
+  if (tokens.length !== 1 || !name?.endToken) return;
+  const pair = `${name.token}${name.replacement}${name.endToken}`;
+  const context = segments.map(({ protection, syntax }) => {
+    let text = protection.text.replace(pair, "");
+    for (const { token } of syntax.tokens) text = text.replace(token, "");
+    return text;
+  }).join("").trim();
+  if (context) return;
+  for (const segment of segments) {
+    segment.protection = {
+      ...segment.protection,
+      text: segment.protection.text.replace(pair, name.token),
+      tokens: segment.protection.tokens.map(({ endToken: _endToken, ...fixed }) => fixed),
+    };
+  }
+}
+
 function requestBatches(
   misses: readonly PreparedUnit[],
   providerId: ProviderId,
@@ -543,6 +567,7 @@ export async function translateUnits(
         options.provider.supportsGlossaryInflection === true && options.settings.targetLanguage === "cs",
       ),
     );
+    fixStandaloneGlossaryName(preparedSegments);
     const inFlight = createInFlightTranslation();
     const prepared: PreparedUnit = {
       indices: [index],

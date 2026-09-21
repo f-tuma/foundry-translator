@@ -73,6 +73,17 @@ describe("inflection through translation units", () => {
     const result = await translateUnits({ units: [["Travel to @UUID[Scene.old]{Old Carinth}."]], glossary: [town], provider: p, settings });
     expect(result).toEqual([["Cestujte do @UUID[Scene.old]{Starého Carinthu}."]]);
   });
+  it("keeps standalone names and link labels canonical, but inflects names across HTML segments", async () => {
+    const p = model(text => text.replace("Travel to", "Cestujte do").replaceAll("Starý Carinth", "Starého Carinthu"));
+    const result = await translateUnits({ units: [
+      ["Old Carinth"], ["@UUID[Scene.old]{Old Carinth}"], [" ", "Old Town", " "],
+      ["Travel to ", "Old Carinth", "."],
+    ], glossary: [town], provider: p, settings });
+    expect(result).toEqual([
+      ["Starý Carinth"], ["@UUID[Scene.old]{Starý Carinth}"], [" ", "Starý Carinth", " "],
+      ["Cestujte do ", "Starého Carinthu", "."],
+    ]);
+  });
   it("retries a renamed term and never caches a failed translation", async () => {
     const onQualityFallback = vi.fn();
     const cache = new MemoryTranslationCache();

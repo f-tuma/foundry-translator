@@ -172,7 +172,7 @@ describe("OpenAiCompatibleProvider", () => {
     }));
   });
 
-  it("uses LM Studio native chat with reasoning disabled for Gemma 4", async () => {
+  it.each(["google/gemma-4-12b-qat", "qwen/qwen3.8-27b"])("uses LM Studio native chat with reasoning disabled for %s", async model => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
       output: [{ type: "message", content: "Vítejte v Emberu." }],
       stats: {
@@ -185,7 +185,7 @@ describe("OpenAiCompatibleProvider", () => {
     const metrics = vi.fn();
     const provider = new OpenAiCompatibleProvider({
       baseUrl: "http://localhost:1234/v1",
-      model: "google/gemma-4-12b-qat",
+      model,
       fetchImplementation: fetchMock,
       onMetrics: metrics,
     });

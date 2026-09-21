@@ -1,6 +1,6 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-09-20
+- Updated: 2026-09-21
 - Deployed version: `v0.17.0`. In development: `v0.18.0` on `codex/glossary-inflection`.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -10,6 +10,32 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-21: LM Studio is now available. Completed real production-pipeline
+  checks on Hy-MT2 Q8_0 and Qwen3.8-27B Q4_K_M with MTP enabled on Qwen's
+  loaded instance. CORS preflight from the Ember origin returned HTTP 200.
+  The opt-in Node integration test needed an injected native fetch with a
+  120-second timeout (Foundry fetchWithTimeout is unavailable in Node).
+  Hy-MT2 changed a standalone title to genitive; fixed by making a whole unit
+  consisting only of one glossary name opaque/canonical, including link labels.
+  Sentence context across HTML segments remains inflectable. Cache schema is 7.
+  Qwen's default xhigh reasoning timed out after 120 seconds; it now uses the
+  existing LM Studio native path with reasoning off (prompt revision 9).
+  Both fixes have regression tests. Structural checks passed in completed model
+  runs, but language quality did NOT: Hy-MT2 produced Permonícům and Stopy patří
+  k Přízračné Šelmy; Qwen produced Permonícům and reversed ownership in the
+  Spirit Beasts sentence. A more explicit prompt failed to improve Qwen and
+  worsened Hy-MT2, so it was discarded. The expanded 15-case Hy-MT2 run matched
+  13 expected name forms, but surrounding Czech also has preposition errors.
+  One test oracle was corrected: Hlubinní Trpaslíci → Hlubinným Trpaslíkům,
+  not Hlubinním. The captured model answer was already correct for this case.
+  See docs/benchmarks/inflection-2026-09-21.md and its captured JSON reports.
+  The draft PR #19 remains open. Do not describe 0.18.0 as ready for release:
+  real grammar checks fail even though unit tests and marker guards pass.
+  No live Foundry settings, glossary, installation or import were changed.
+  Next work should improve the inflection strategy, not weaken assertions or
+  add special-case replacements for benchmark names. The prepared all-inflect
+  776-name import remains a draft artifact until this is resolved.
 
 - 2026-09-20: user requested grammatical inflection before importing the reviewed
   Ember glossary. Added `mode: fixed | inflect` (missing = fixed); `enabled=false`

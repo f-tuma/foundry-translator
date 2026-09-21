@@ -19,6 +19,10 @@ Jeho zvláštní překladové zadání modul vybere automaticky. Srovnání na j
 skutečném Ember questu: přibližně 38 sekund, bez porušení ochranných značek.
 Čeština byla lepší než u testované Gemmy, ale stále vyžadovala místy úpravy.
 Menší kvantizace nebo slabší počítač mohou výsledek i rychlost změnit.
+Samostatný test skloňování 21. 9. 2026 našel u Hy-MT2 i Qwen3.8 chyby v pádech;
+nové skloňování ve verzi 0.18.0 proto zatím není uvolněné k běžnému použití.
+Qwen3.8 používá nativní API LM Studio s vypnutým reasoningem, aby samotné
+přemýšlení modelu nevyčerpalo čas pro překlad.
 
 ## Jedno kliknutí při čtení
 

@@ -7,7 +7,7 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 8;
+const PROMPT_REVISION = 9;
 const INFLECTION_INSTRUCTIONS = "Some __FTG_ markers form a pair: __FTG_NONCE_ID__Approved Czech Name__FTG_NONCE_IDEND__. The words inside each pair are an approved Czech glossary name, already translated. Keep BOTH markers unchanged and in place around that name. Use this exact vocabulary; only inflect its words to the grammatical case required by the surrounding Czech sentence. Do not rename, translate again, add or remove words inside a pair. For example: to __FTG_X_0000__Starý Carinth__FTG_X_0000END__ becomes do __FTG_X_0000__Starého Carinthu__FTG_X_0000END__. A standalone title keeps the canonical form. Adapt surrounding articles, prepositions, gender and agreement naturally. Fixed markers without an END partner remain opaque and unchanged.";
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
@@ -413,7 +413,9 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       // by unit-translator and are restored deterministically afterwards.
       // Repeating the entire glossary here only wastes input tokens.
     ].join(" ");
-    if (/\bgemma-4\b/iu.test(this.#model) && this.#lmStudioNativeAvailable !== false) {
+    // Qwen3.8 defaults to xhigh reasoning in LM Studio, which can exhaust the
+    // request timeout before returning a translation. Native chat can disable it.
+    if (/(?:\bgemma-4\b|\bqwen3\.8\b)/iu.test(this.#model) && this.#lmStudioNativeAvailable !== false) {
       const native = await this.#translateWithLmStudioNative(text, system);
       if (native !== null) return native;
     }

@@ -79,7 +79,7 @@ For Czech, the current tested candidate is **Tencent Hy-MT2 7B Q8_0**
 translation instruction format and sampling settings. On the test PC, one real
 Ember quest overview took about 38 seconds with zero structural fallbacks. Its
 Czech was better than Gemma 4 12B/E2B QAT in this sample, but still needs review.
-Gemma 4 uses LM Studio's native API with reasoning disabled. These are measured
+Gemma 4 and Qwen3.8 use LM Studio's native API with reasoning disabled. These are measured
 samples, not guarantees for every adventure. See the [Czech guide](docs/user-guide.cs.md).
 
 LLM translation can use an editable world profile containing setting, genre,
@@ -163,6 +163,13 @@ the existing visible source-fragment fallback. Failed translations are not cache
 Foundry UUIDs, commands and HTML boundaries retain their existing protection.
 Mode changes invalidate translation caches and are preserved by sync, imports and
 translation bundles. Version-2 JSON prevents older releases silently dropping modes.
+Standalone units consisting of one glossary name (including a link label) keep
+the exact canonical form; inline name segments still use the surrounding sentence.
+
+**Release validation is not complete:** real LM Studio tests on 2026-09-21 found
+wrong Czech inflections and, with Qwen3.8, a reversed sentence meaning. Passing
+marker checks does not detect these grammar errors. The v0.18.0 work remains a
+draft; see the [model test results](docs/benchmarks/inflection-2026-09-21.md).
 
 To verify a local model through the production pipeline, run
 `LM_STUDIO_MODEL=hy-mt2-7b npm test -- tests/local-inflection.integration.test.ts`.
