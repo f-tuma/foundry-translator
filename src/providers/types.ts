@@ -7,6 +7,15 @@ export interface TranslateRequest {
   format?: TranslationFormat;
   /** Optional terminology reference for context-aware LLM providers. */
   glossary?: readonly { source: string; replacement: string }[];
+  /** Only the protected occurrences in these texts, retaining their original wording. */
+  inflections?: readonly GlossaryInflectionReference[];
+}
+
+export interface GlossaryInflectionReference {
+  token: string;
+  endToken: string;
+  source: string;
+  replacement: string;
 }
 
 export interface TranslationResult {
@@ -31,8 +40,12 @@ export interface ProviderRequestMetrics {
 }
 
 export interface TranslationProvider {
+  /** Can follow instructions for inflected, bounded Czech glossary names. */
+  readonly supportsGlossaryInflection?: boolean;
   /** Distinguishes model/configuration-specific cache entries without including secrets. */
   readonly cacheIdentity?: string;
+  /** Optional diagnostics used to keep only rejected name forms exact on recovery. */
+  rejectedGlossaryTokens?(text: string, references: readonly GlossaryInflectionReference[]): readonly string[];
   translate(request: TranslateRequest): Promise<TranslationResult[]>;
   testConnection(targetLanguage: string): Promise<void>;
   prepare?(request: TranslateRequest): Promise<void>;

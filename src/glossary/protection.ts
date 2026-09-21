@@ -1,15 +1,18 @@
 import type { GlossaryEntry } from "./types";
+import { normalizeCzechGlossaryForm } from "./inflection";
 
 const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
 
 interface ProtectionCandidate {
   term: string;
   replacement: string;
+  inflect: boolean;
 }
 export interface GlossaryToken {
   token: string;
   source: string;
   replacement: string;
+  endToken?: string;
 }
 
 export interface GlossaryProtection {
@@ -23,6 +26,7 @@ export interface ProtectGlossaryOptions {
   nonce?: string;
   /** Already protected syntax is opaque and separates words, even without spaces. */
   opaqueTokens?: readonly string[];
+  allowInflection?: boolean;
 }
 
 export class GlossaryConflictError extends Error {
@@ -62,10 +66,10 @@ function collectCandidates(entries: Iterable<GlossaryEntry>): ProtectionCandidat
       if (!term || !replacement) continue;
 
       const existing = candidates.get(term);
-      if (existing && existing.replacement !== replacement) {
+      if (existing && (existing.replacement !== replacement || existing.inflect !== (entry.mode === "inflect"))) {
         throw new GlossaryConflictError(term);
       }
-      candidates.set(term, { term, replacement });
+      candidates.set(term, { term, replacement, inflect: entry.mode === "inflect" });
     }
   }
 
@@ -174,12 +178,14 @@ export function protectGlossaryTerms(
     }
 
     const token = `__FTG_${nonce}_${tokens.length.toString(36).toUpperCase().padStart(4, "0")}__`;
+    const endToken = candidate.inflect && options.allowInflection ? token.replace(/__$/u, "END__") : undefined;
     tokens.push({
       token,
       source: candidate.term,
       replacement: candidate.replacement,
+      ...(endToken ? { endToken } : {}),
     });
-    output.push(token);
+    output.push(endToken ? `${token}${candidate.replacement}${endToken}` : token);
     cursor += candidate.term.length;
   }
 
@@ -190,7 +196,7 @@ export function restoreGlossaryTerms(
   translatedText: string,
   protection: GlossaryProtection,
 ): string {
-  const knownTokens = new Set(protection.tokens.map(({ token }) => token.toUpperCase()));
+  const knownTokens = new Set(protection.tokens.flatMap(({ token, endToken }) => [token, ...(endToken ? [endToken] : [])]).map(token => token.toUpperCase()));
   const tokenPattern = new RegExp(
     `__FTG_${escapeRegExp(protection.nonce)}_[A-Z0-9]+__`,
     "giu",
@@ -203,13 +209,25 @@ export function restoreGlossaryTerms(
   }
 
   let restored = translatedText;
-  for (const { token, replacement } of protection.tokens) {
+  for (const { token, replacement, endToken } of protection.tokens) {
     const pattern = asciiTokenPattern(token);
     const count = [...restored.matchAll(pattern)].length;
     if (count !== 1) {
       throw new GlossaryIntegrityError(
         `Translation must contain glossary token ${token} exactly once; found ${count}.`,
       );
+    }
+    if (endToken) {
+      const start = [...restored.matchAll(asciiTokenPattern(token))][0]!.index;
+      const end = [...restored.matchAll(asciiTokenPattern(endToken))][0]?.index ?? -1;
+      if ([...restored.matchAll(asciiTokenPattern(endToken))].length !== 1 || end < start + token.length) {
+        throw new GlossaryIntegrityError("Translation lost or reordered an inflected glossary boundary.");
+      }
+      const inflected = normalizeCzechGlossaryForm(replacement, restored.slice(start + token.length, end));
+      if (inflected === null) throw new GlossaryIntegrityError(`Translation renamed the glossary term: ${replacement}`);
+      const whole = restored.slice(start, end + endToken.length);
+      restored = restoreTokenWithWordBoundaries(restored, whole, inflected, protection.opaqueTokens ?? []);
+      continue;
     }
     // Providers occasionally trim whitespace immediately next to a protected
     // token (for example `To__FTG...__dorazilo`). Restore a word boundary

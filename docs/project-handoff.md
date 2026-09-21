@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-09-20
-- Current implementation: `v0.17.0`; see the deployment and QA entries below.
+- Updated: 2026-09-21
+- Deployed version: `v0.17.0`. In development: `v0.18.0` on `codex/glossary-inflection`.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,152 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-21, APEX release preparation: user selected APEX and accepts minor
+  grammar errors; explicitly requested GitHub release, Foundry update and import
+  of the jointly reviewed 776-name version-2 glossary. APEX Czech now uses
+  JSON-schema constrained whole contextual units, host-side name matching and
+  link restoration, conditional full-sentence repair, and visible uncached
+  exact-name recovery before source fallback. Prompt revision 12; temperature 0.
+  Standard checks: 307 pass, 3 opt-in skipped, typecheck/build/metadata pass.
+  Final real 50-unit Ember page: 148.119 s, intact HTML/references, six exact-name
+  review warnings, one source fallback; strict no-source-fallback test fails.
+  Synthetic name sample 14/15 expected forms (Hlubinním instead of Hlubinným).
+  These remaining language limitations do not block the user-requested release;
+  do not claim perfect grammar or meaning. See benchmarks/apex-release-2026-09-21.md.
+  Private backup of 776 existing live entries saved in visualization outputs as
+  glossary-before-v018-2026-09-21.json. Reviewed import is the sibling task output
+  ember-glosar-cs-sklonovani-2026-09-20.json (776 enabled, inflect). Never publish
+  adventure exports/context in this public repository. Deployment/import status
+  is recorded in the newest entry above once completed.
+
+
+- 2026-09-21, whole-sentence repair: user supplied the dashboard/řídicí panel
+  agreement example and installed `hy-mt2-1.8b` (Tencent Q8_0, 1.91 GB) and
+  `hy-mt2-30b-a3b-apex` (alphaZimuth APEX-I-Nano, 12.45 GB / 11.59 GiB).
+  Actual protected 15-case runs failed: 1.8B 6/15 expected substrings and seven
+  source fallbacks (41.2 s); APEX 10/15 and five fallbacks (47.6 s including
+  loading). Exact XML probes confirmed APEX sometimes deletes name elements;
+  rejection is correct, so no parser guard was loosened. Production now uses
+  Tencent's top_p=1 for 30B-A3B, still 0.6 for 1.8B/7B; prompt revision 11.
+  Added scripts/benchmark-sentence-repair.mjs: nine synthetic cases, direct vs
+  generated-draft repair vs deliberately faulty/correct supplied drafts. Baseline
+  and refined source-first prompts tested on 1.8B, 7B and APEX. Czech instructions
+  mostly echoed on 1.8B; English variants were used for fair comparisons. Refined
+  prompt also uses temperature zero, so it is not a single-variable experiment.
+  Both 7B and APEX repaired the dashboard, gender/plural agreement and (after
+  refinement) reversed ownership; Permoníci, some prepositions and UUID labels
+  remain wrong. Second passes sometimes worsen already reasonable text. Refined
+  repair median about 0.27–0.29 s on 7B, 0.39 s on APEX; these are short warm
+  requests, not equivalent to protected full-pipeline throughput. Small 1.8B often
+  violates terminology/EXACT and is not selected. Keep 7B baseline and APEX for
+  comparison; automatic post-editing is NOT enabled. Details and raw evidence:
+  docs/benchmarks/sentence-repair-2026-09-21.md. Unit checks: 290 pass, two opt-in
+  tests skipped; typecheck, build and metadata pass. No live-world changes or
+  release. PR #19 draft and all-inflect import still require language validation.
+
+- 2026-09-21, MiLMMT follow-up: user installed MiLMMT-46-12B-v1.0-GGUF and
+  prefers a smaller model over a slow large one. LM Studio offers
+  `milmmt-46-12b-v1.0`, mradermacher Q4_K_S, 7,789,533,216 bytes, loaded context
+  8,192. Tested documented raw `/v1/completions` prompt and a chat comparison.
+  Four warm plain paragraphs took 2.81 s, four with terminology 2.78 s, but
+  terminology was ignored (Duchovním bestiím, Delverů, Karintu, von Tetem) and a
+  UUID label became a formatting escape. Eight additional glossary formats
+  (XML, mixed-language, HTML, few-shot and ASCII tokens) did not fix reliability.
+  This is not a timing comparison at equal functionality to the protected
+  production pipeline. See docs/benchmarks/milmmt-2026-09-21.md and its raw
+  evidence; rerun paragraphs with node scripts/benchmark-milmmt.mjs. Script
+  syntax check and all eight requests completed. No production changes or
+  live Foundry mutations. Keep Hy-MT2 7B as the smaller-model baseline, PR #19
+  draft, and larger model downloads optional. Do not automatically select
+  MiLMMT or describe ordinary-prose quality as a glossary success.
+
+- 2026-09-21, follow-up: the user requested continued improvement and a fresh
+  model review. See docs/benchmarks/local-models-2026-09-21.md (primary sources).
+  Requested Google Gemma 4 26B-A4B QAT Q4_0, main file 14.4 GB, for the next
+  comparison. It was not yet in GET /v1/models at the last check. Other verified
+  candidates are Tencent Hy-MT2 30B-A3B Q4_K_M (18.2 GB) and Xiaomi MiLMMT-46-12B
+  v1.0 (August release). Qwen3.8-LiveTranslate is a speech API, not a verified
+  local GGUF replacement. Host GPU was rechecked: RTX 5070 Ti, 16,303 MiB.
+  Diagnostic controls showed ASCII markers/mixed-language source worsened some
+  sentences. Added an XML wire adapter for Czech inflection: original source
+  names and only current terminology are sent, with short name/item/segment/keep
+  IDs. All original FT tokens are reconstructed and validated as before. XML IDs,
+  hierarchy and opaque/segment order must match; whole name phrases can move
+  within one plain container with no opaque syntax, which permits natural Czech
+  word order without moving link labels. Malformed XML retries via existing batch
+  splitting and unit fallback. Added request occurrence metadata including exact
+  source aliases on the initial, retry and separate-segment paths. Cache schema 8,
+  prompt revision 10. Also fixed a guard bug: valid feminine dative plural -ám
+  (Přízračným Šelmám) was missing from allowed endings. No glossary choices changed.
+  Small production tests improved specific errors: Hy-MT2 now translated the
+  Spirit Beasts sentence correctly; Qwen produced correct Permoníkům. Hy-MT2
+  scored 13–14/15 expected substrings over XML iterations, Qwen 14/15 in its
+  XML probe. Counts are not full grammar scores; short-sentence language checks
+  still fail. Four full Hy-MT2 paragraphs passed structural checks after fixing
+  overly strict name order, with remaining Czech preposition/tense issues.
+  Qwen's four paragraphs also passed structural checks (36.3 s), but repeated
+  reversed ownership (Stopám patří Přízračné Šelmy) and wrong Permonícům.
+  See docs/benchmarks/inflection-xml-2026-09-21.md for raw evidence and limitations.
+  Unit suite: 288 passing, two opt-in model tests skipped; typecheck/build passed.
+  PR #19 stays draft. No deployment or live-world import/settings changes.
+
+- 2026-09-21: LM Studio is now available. Completed real production-pipeline
+  checks on Hy-MT2 Q8_0 and Qwen3.8-27B Q4_K_M with MTP enabled on Qwen's
+  loaded instance. CORS preflight from the Ember origin returned HTTP 200.
+  The opt-in Node integration test needed an injected native fetch with a
+  120-second timeout (Foundry fetchWithTimeout is unavailable in Node).
+  Hy-MT2 changed a standalone title to genitive; fixed by making a whole unit
+  consisting only of one glossary name opaque/canonical, including link labels.
+  Sentence context across HTML segments remains inflectable. Cache schema is 7.
+  Qwen's default xhigh reasoning timed out after 120 seconds; it now uses the
+  existing LM Studio native path with reasoning off (prompt revision 9).
+  Both fixes have regression tests. Structural checks passed in completed model
+  runs, but language quality did NOT: Hy-MT2 produced Permonícům and Stopy patří
+  k Přízračné Šelmy; Qwen produced Permonícům and reversed ownership in the
+  Spirit Beasts sentence. A more explicit prompt failed to improve Qwen and
+  worsened Hy-MT2, so it was discarded. The expanded 15-case Hy-MT2 run matched
+  13 expected name forms, but surrounding Czech also has preposition errors.
+  One test oracle was corrected: Hlubinní Trpaslíci → Hlubinným Trpaslíkům,
+  not Hlubinním. The captured model answer was already correct for this case.
+  See docs/benchmarks/inflection-2026-09-21.md and its captured JSON reports.
+  The draft PR #19 remains open. Do not describe 0.18.0 as ready for release:
+  real grammar checks fail even though unit tests and marker guards pass.
+  No live Foundry settings, glossary, installation or import were changed.
+  Next work should improve the inflection strategy, not weaken assertions or
+  add special-case replacements for benchmark names. The prepared all-inflect
+  776-name import remains a draft artifact until this is resolved.
+
+- 2026-09-20: user requested grammatical inflection before importing the reviewed
+  Ember glossary. Added `mode: fixed | inflect` (missing = fixed); `enabled=false`
+  still means the entry is ignored. The editor now offers three named choices,
+  with explanations behind an info icon. Mode is persisted in compendium flags,
+  sync, stale-write fingerprints, import previews, CSV/JSON and adventure bundles.
+  Files/bundles with inflection use format version 2 so old releases reject them
+  rather than silently ignoring the behavior. Legacy version-1 JSON/CSV is accepted.
+  Czech OpenAI-compatible providers receive the chosen Czech name between paired
+  FTG markers and may change its case endings. Each occurrence is checked for
+  marker integrity, word count, punctuation and bounded Czech suffix/stem changes.
+  Capitalization follows the glossary, including internal apostrophes. This is a
+  conservative guard, not a full morphology analyser; irregular forms may fail
+  and grammar still depends on the model. Existing retries and visible source
+  fallbacks apply, and failed results are not cached. Chrome/Google/non-Czech use
+  exact forms with a run warning. Mode and prompt revisions invalidate caches.
+  Local CUA QA at 760/360 px: select/save inflection, select/save disabled, import
+  preview, explicit overwrite, immediate editor update and idempotent reimport
+  passed. The real 776-entry prepared import was also saved in the local mock
+  compendium and returned 776 unchanged entries; no console warnings/errors.
+  The live Foundry world and its glossary were not modified. Source exports and
+  the reviewed import stay outside the repository in the conversation directory.
+  JSON/CSV imports now enable all 776 reviewed names with `mode=inflect`, including
+  the 120 originally disabled terms, preserving all 522 chosen translations.
+  Actual local-model validation is still pending: localhost:1234 refused the
+  connection, including outside the sandbox. The user was asked to start LM Studio.
+  Run `LM_STUDIO_MODEL=hy-mt2-7b npm test -- tests/local-inflection.integration.test.ts`
+  (or the exact available model ID). `LM_STUDIO_RESULT=/tmp/result.json` records
+  ten real contextual examples through the production pipeline. This opt-in test
+  is skipped in normal CI. Do not report its language-quality checks as passed
+  until a real server run completes. Release/install have not been performed.
 
 - 2026-09-20: v0.17.0 follows the user's explicit switch to human-reviewed names.
   Removed the naming-model client, prompts, settings UI/registration and benchmark

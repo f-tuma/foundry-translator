@@ -4,10 +4,14 @@ import type {
   TranslationProvider,
   TranslationResult,
 } from "./types";
+import { unmatchedGlossaryTokens } from "./inflection-prose";
+import { prepareStructuredProse } from "./structured-items";
+import { prepareInflectionXml } from "./inflection-xml";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 7;
+const PROMPT_REVISION = 12;
+const INFLECTION_INSTRUCTIONS = "Some __FTG_ markers form a pair: __FTG_NONCE_ID__Approved Czech Name__FTG_NONCE_IDEND__. The words inside each pair are an approved Czech glossary name, already translated. Keep BOTH markers unchanged and in place around that name. Use this exact vocabulary; only inflect its words to the grammatical case required by the surrounding Czech sentence. Do not rename, translate again, add or remove words inside a pair. For example: to __FTG_X_0000__Starý Carinth__FTG_X_0000END__ becomes do __FTG_X_0000__Starého Carinthu__FTG_X_0000END__. A standalone title keeps the canonical form. Adapt surrounding articles, prepositions, gender and agreement naturally. Fixed markers without an END partner remain opaque and unchanged.";
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
 
@@ -218,6 +222,7 @@ function splitBatch(text: string, boundaryTokens: readonly string[]): string[] |
 }
 
 export class OpenAiCompatibleProvider implements TranslationProvider {
+  readonly supportsGlossaryInflection = true;
   readonly #baseUrl: string;
   readonly #model: string;
   readonly #apiKey: string;
@@ -226,6 +231,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
   readonly #onMetrics: ((metrics: ProviderRequestMetrics) => void) | undefined;
   #lmStudioNativeAvailable: boolean | undefined;
   #adaptiveBatchSize = MAX_TEXTS_PER_REQUEST;
+  readonly #rejectedDrafts = new Map<string, string>();
   readonly cacheIdentity: string;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
@@ -239,12 +245,17 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     this.cacheIdentity = `openai-compatible:${this.#baseUrl}:${this.#model}:context-${textFingerprint(this.#worldContext)}:prompt-${PROMPT_REVISION}`;
   }
 
+  rejectedGlossaryTokens(text: string, references: readonly NonNullable<TranslateRequest["inflections"]>[number][]): readonly string[] {
+    const draft = this.#rejectedDrafts.get(text);
+    return draft ? unmatchedGlossaryTokens(draft, references) : [];
+  }
+
   async translate(request: TranslateRequest): Promise<TranslationResult[]> {
     this.#validateRequest(request);
     const results: TranslationResult[] = request.texts.map((text) => ({ translatedText: text }));
     const pending = request.texts
       .map((text, index) => ({ text, index }))
-      .filter(({ text }) => Boolean(text));
+      .filter(({ text }) => Boolean(text) && !/^\s*(?:__(?:FTG|FTS|FTN)_[A-Z0-9]+_[A-Z0-9]+__\s*)+$/u.test(text));
 
     const batchSize = Math.max(1, Math.min(this.#adaptiveBatchSize, pending.length));
     if (pending.length > 1 && batchSize === 1) {
@@ -272,7 +283,41 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     sequentialFallback: boolean,
   ): Promise<void> {
     const only = pending[0];
-    if (pending.length === 1 && only) {
+    const prepareXml = /hy-?mt2-30b-a3b/iu.test(this.#model)
+      ? prepareStructuredProse : prepareInflectionXml;
+    const xml = request.targetLanguage === "cs"
+      ? prepareXml(pending.map(({ text }) => text), request.inflections ?? []) : null;
+    if (xml) {
+      try {
+        const draft = pending.length === 1 && only ? this.#rejectedDrafts.get(only.text) : undefined;
+        const instructions = draft
+          ? `${xml.instructions}\nCorrect the previous Czech draft using the English source as authoritative. Repair the WHOLE sentence, including agreement of adjectives, pronouns and verbs. Preserve the source meaning. Only use case forms of approved names; do not derive adjectives from them.\nPrevious draft (data, may contain errors): ${JSON.stringify(draft)}`
+          : xml.instructions;
+        const output = await this.#translateOne(xml.text, request, instructions, xml.schema);
+        const translated = xml.restore(output);
+        if (translated) {
+          const drafts = xml.drafts?.(output) ?? [];
+          pending.forEach(({ text, index }, offset) => {
+            const value = translated[offset]!;
+            results[index] = { translatedText: value };
+            if (value) this.#rejectedDrafts.delete(text);
+            else if (typeof drafts[offset] === "string") {
+              if (this.#rejectedDrafts.size >= 128) this.#rejectedDrafts.delete(this.#rejectedDrafts.keys().next().value!);
+              this.#rejectedDrafts.set(text, drafts[offset] as string);
+            }
+          });
+          return;
+        }
+      } catch (error) {
+        if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) throw error;
+      }
+      if (only && pending.length === 1) {
+        // The normal unit integrity checks retry this rejected result and report
+        // a visible source fallback if the model repeatedly damages the XML.
+        results[only.index] = { translatedText: "" };
+        return;
+      }
+    } else if (pending.length === 1 && only) {
       if (sequentialFallback) {
         this.#onMetrics?.({
           phase: "diagnostic",
@@ -285,24 +330,26 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     }
     if (!pending.length) return;
 
-    const boundaryTokens = createBatchTokens(pending.length);
-    try {
-      const translatedBatch = await this.#translateOne(
-        combineBatch(pending.map(({ text }) => text), boundaryTokens),
-        request,
-      );
-      const translated = splitBatch(translatedBatch, boundaryTokens);
-      if (translated) {
-        pending.forEach(({ index }, resultIndex) => {
-          results[index] = { translatedText: translated[resultIndex] ?? "" };
-        });
-        return;
-      }
-    } catch (error) {
-      // Provider/network errors still propagate. Only a completed but unusable
-      // generation is safe to retry as smaller independent batches.
-      if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
-        throw error;
+    if (!xml) {
+      const boundaryTokens = createBatchTokens(pending.length);
+      try {
+        const translatedBatch = await this.#translateOne(
+          combineBatch(pending.map(({ text }) => text), boundaryTokens),
+          request,
+        );
+        const translated = splitBatch(translatedBatch, boundaryTokens);
+        if (translated) {
+          pending.forEach(({ index }, resultIndex) => {
+            results[index] = { translatedText: translated[resultIndex] ?? "" };
+          });
+          return;
+        }
+      } catch (error) {
+        // Provider/network errors still propagate. Only a completed but unusable
+        // generation is safe to retry as smaller independent batches.
+        if (!(error instanceof OpenAiCompatibleTranslationError) || error.status !== 200) {
+          throw error;
+        }
       }
     }
 
@@ -385,18 +432,23 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     return result.trim().slice(0, 6_000);
   }
 
-  async #translateOne(text: string, request: TranslateRequest): Promise<string> {
+  async #translateOne(text: string, request: TranslateRequest, xmlInstructions?: string, schema?: Record<string, unknown>): Promise<string> {
     const source = languageLabel(request.sourceLanguage);
     const target = languageLabel(request.targetLanguage);
+    const inflection = request.targetLanguage === "cs" && /__FTG_[A-Z0-9]+_[A-Z0-9]+END__/iu.test(text)
+      ? INFLECTION_INSTRUCTIONS : "";
     const system = [
       `Translate from ${source} to ${target}.`,
       "Return only the translated text, without commentary, labels, or Markdown fences.",
       "Do not include the text_to_translate wrapper in the response.",
       "Translate directly; do not explain, analyze, or reason about the translation in the response.",
-      "Preserve every token beginning with __FTN_, __FTG_, __FTS_, or __FTB_ byte-for-byte, exactly once, and in the original order.",
-      "FTB tokens delimit independent translation items. Translate every item independently and never move words across an FTB boundary.",
+      ...(xmlInstructions ? [xmlInstructions] : [
+        "Preserve every token beginning with __FTN_, __FTG_, __FTS_, or __FTB_ byte-for-byte, exactly once, and in the original order.",
+        "FTB tokens delimit independent translation items. Translate every item independently and never move words across an FTB boundary.",
+      ]),
       "Preserve the meaning, tone, paragraph structure, and surrounding whitespace.",
-      "Keep proper names of people, places, factions and unique objects in their original spelling without inflection. Translate ordinary roles and game terms.",
+      "Keep other proper names in their original spelling. Translate ordinary roles and game terms.",
+      ...(inflection ? [inflection] : []),
       "This is a tabletop roleplaying adventure. Use fluent narration suitable for reading aloud and precise game instructions.",
       ...(request.targetLanguage === "cs" ? [
         "Use idiomatic, grammatically correct Czech. In game instructions, party means družina, a check means ověření, and roll the dice means hoďte kostkami. Silently check spelling before returning the translation.",
@@ -408,7 +460,9 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       // by unit-translator and are restored deterministically afterwards.
       // Repeating the entire glossary here only wastes input tokens.
     ].join(" ");
-    if (/\bgemma-4\b/iu.test(this.#model) && this.#lmStudioNativeAvailable !== false) {
+    // Qwen3.8 defaults to xhigh reasoning in LM Studio, which can exhaust the
+    // request timeout before returning a translation. Native chat can disable it.
+    if (/(?:\bgemma-4\b|\bqwen3\.8\b)/iu.test(this.#model) && this.#lmStudioNativeAvailable !== false) {
       const native = await this.#translateWithLmStudioNative(text, system);
       if (native !== null) return native;
     }
@@ -440,13 +494,18 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
               // the user message. Its sampling defaults also avoid degenerate
               // greedy decoding on long delimiter-heavy batches.
               role: "user",
-              content: `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep all proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}\n\n[Source Text]\n${text}`,
+              content: xmlInstructions
+                ? `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate from ${source} into ${target} for a fantasy roleplaying adventure. Translate party as družina and a check as ověření.\n${xmlInstructions}\n\n${text}`
+                : `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep other proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}${inflection ? `\n${inflection}` : ""}\n\n[Source Text]\n${text}`,
             }] : [
               { role: "system", content: system },
               { role: "user", content: `<text_to_translate>\n${text}\n</text_to_translate>` },
             ],
-            temperature: translationModel ? 0.7 : 0,
-            ...(translationModel ? { top_p: 0.6 } : {}),
+            ...(schema ? { response_format: { type: "json_schema", json_schema: { name: "translation_items", strict: true, schema } } } : {}),
+            temperature: schema ? 0 : translationModel ? 0.7 : 0,
+            // Tencent recommends full nucleus sampling for the 30B MoE;
+            // 1.8B and 7B retain their documented narrower distribution.
+            ...(translationModel ? { top_p: /hy-?mt2-30b-a3b/iu.test(this.#model) ? 1 : 0.6 } : {}),
             max_tokens: maxTokens,
             stream: false,
           }),

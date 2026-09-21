@@ -4,7 +4,7 @@ import {
   protectGlossaryTerms,
   restoreGlossaryTerms,
 } from "../glossary/protection";
-import type { TranslationProvider } from "../providers/types";
+import type { GlossaryInflectionReference, TranslationProvider } from "../providers/types";
 import type { ProviderId } from "../settings/settings";
 import type { TranslationCache, TranslationCacheEntry } from "./cache";
 import { sha256 } from "./hash";
@@ -62,7 +62,7 @@ export interface TranslateUnitsOptions {
 
 export interface TranslationQualityFallback {
   sourcePreview: string;
-  reason: "empty" | "integrity" | "provider" | "unchanged";
+  reason: "empty" | "integrity" | "provider" | "unchanged" | "fixed-glossary";
   detail: string;
   attempts: number;
   occurrences: number;
@@ -128,11 +128,12 @@ function glossarySnapshot(entries: readonly GlossaryEntry[]): string {
   return JSON.stringify(
     [...entries]
       .filter((entry) => entry.enabled !== false)
-      .map(({ source, replacement, category, aliases }) => ({
+      .map(({ source, replacement, category, aliases, mode }) => ({
         source,
         replacement,
         category,
         aliases: [...aliases].sort(),
+        mode: mode ?? "fixed",
       }))
       .sort((left, right) => left.source.localeCompare(right.source)),
   );
@@ -146,7 +147,7 @@ async function cacheKey(
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 5,
+      schemaVersion: 8,
       segments,
       glossaryFingerprint,
       ...(providerIdentity ? { providerIdentity } : {}),
@@ -310,6 +311,7 @@ async function retrySuspiciousSegments(
           targetLanguage: settings.targetLanguage,
           format: "text",
           glossary,
+          inflections: inflectionReferences([preparedSegment]),
         });
         candidate = typeof retry?.translatedText === "string" ? retry.translatedText : "";
         problem = translationProblem(preparedSegment, candidate, settings);
@@ -321,6 +323,41 @@ async function retrySuspiciousSegments(
             : "The retry translation of the fragment failed.",
         };
         break;
+      }
+    }
+    // A failed inflection should not unnecessarily discard a sound translation
+    // of the surrounding sentence. Try affected names first, then all exact names;
+    // keep all syntax/vocabulary checks and report the degraded mode explicitly.
+    if (problem && problem.reason !== "provider" && preparedSegment.protection.tokens.some(token => token.endToken)) {
+      const references = inflectionReferences([preparedSegment]);
+      const rejected = provider.rejectedGlossaryTokens?.(source, references) ?? [];
+      const recoverySets = [new Set(rejected.length ? rejected : references.map(reference => reference.token))];
+      if (rejected.length && rejected.length < references.length) recoverySets.push(new Set(references.map(reference => reference.token)));
+      for (const exactTokens of recoverySets) {
+        const fixed: PreparedSegment = { ...preparedSegment, protection: { ...preparedSegment.protection,
+          text: preparedSegment.protection.tokens.reduce((text, token) => token.endToken && exactTokens.has(token.token)
+            ? text.replace(token.token + token.replacement + token.endToken, token.token) : text, source),
+          tokens: preparedSegment.protection.tokens.map(token => exactTokens.has(token.token)
+            ? { token: token.token, source: token.source, replacement: token.replacement } : token),
+        } };
+        attempt += 1;
+        try {
+          const [retry] = await provider.translate({ texts: [fixed.protection.text], sourceLanguage: settings.sourceLanguage,
+            targetLanguage: settings.targetLanguage, format: "text", glossary, inflections: inflectionReferences([fixed]) });
+          const exact = retry?.translatedText ?? "";
+          if (!translationProblem(fixed, exact, settings)) {
+            candidate = preparedSegment.protection.tokens.reduce((text, token) => token.endToken && exactTokens.has(token.token)
+              ? text.replace(token.token, token.token + token.replacement + token.endToken) : text, exact);
+            problem = translationProblem(preparedSegment, candidate, settings);
+            if (!problem) {
+              usedFallback = true;
+              onQualityFallback?.({ sourcePreview: comparableText(source).slice(0, 100), reason: "fixed-glossary",
+                detail: "Inflection could not be validated. The sentence was translated with exact approved forms for the affected names; review its grammar.",
+                attempts: attempt, occurrences: prepared.indices.length });
+              break;
+            }
+          }
+        } catch { break; /* Keep the original diagnostic and safe source fallback. */ }
       }
     }
     if (problem) {
@@ -407,6 +444,7 @@ async function translateSegmentsSeparately(
     targetLanguage: settings.targetLanguage,
     format: "text",
     glossary,
+    inflections: inflectionReferences(prepared.segments),
   });
   if (results.length !== translatable.length) {
     throw new Error("Překladač vrátil jiný počet HTML segmentů, než kolik dostal.");
@@ -419,10 +457,17 @@ async function translateSegmentsSeparately(
   );
 }
 
+function inflectionReferences(segments: readonly PreparedSegment[]): GlossaryInflectionReference[] {
+  return segments.flatMap(({ protection }) => protection.tokens.flatMap(token =>
+    token.endToken ? [{ ...token, endToken: token.endToken }] : [],
+  ));
+}
+
 function prepareSegment(
   segment: string,
   glossary: readonly GlossaryEntry[],
   nonce: string,
+  allowInflection: boolean,
 ): PreparedSegment {
   const leading = segment.match(/^\s*/u)?.[0] ?? "";
   const withoutLeading = segment.slice(leading.length);
@@ -436,9 +481,33 @@ function prepareSegment(
     protection: protectGlossaryTerms(
       syntax.text,
       glossary,
-      { nonce, opaqueTokens: syntax.tokens.map(({ token }) => token) },
+      { nonce, opaqueTokens: syntax.tokens.map(({ token }) => token), allowInflection },
     ),
   };
+}
+
+/** A whole unit containing only one name has no sentence context to inflect it.
+ * Inspect the whole unit so a name in a separate bold/link segment still inflects
+ * when its sentence lives in adjacent segments.
+ */
+function fixStandaloneGlossaryName(segments: readonly PreparedSegment[]): void {
+  const tokens = segments.flatMap(({ protection }) => protection.tokens);
+  const name = tokens[0];
+  if (tokens.length !== 1 || !name?.endToken) return;
+  const pair = `${name.token}${name.replacement}${name.endToken}`;
+  const context = segments.map(({ protection, syntax }) => {
+    let text = protection.text.replace(pair, "");
+    for (const { token } of syntax.tokens) text = text.replace(token, "");
+    return text;
+  }).join("").trim();
+  if (context) return;
+  for (const segment of segments) {
+    segment.protection = {
+      ...segment.protection,
+      text: segment.protection.text.replace(pair, name.token),
+      tokens: segment.protection.tokens.map(({ endToken: _endToken, ...fixed }) => fixed),
+    };
+  }
 }
 
 function requestBatches(
@@ -538,8 +607,10 @@ export async function translateUnits(
         segment,
         options.glossary,
         `${nonce}${segmentIndex.toString(36)}`,
+        options.provider.supportsGlossaryInflection === true && options.settings.targetLanguage === "cs",
       ),
     );
+    fixStandaloneGlossaryName(preparedSegments);
     const inFlight = createInFlightTranslation();
     const prepared: PreparedUnit = {
       indices: [index],
@@ -564,6 +635,7 @@ export async function translateUnits(
         targetLanguage: options.settings.targetLanguage,
         format: "text",
         glossary: options.glossary,
+        inflections: inflectionReferences(batch.flatMap(({ segments }) => segments)),
       });
 
       if (results.length !== batch.length) {

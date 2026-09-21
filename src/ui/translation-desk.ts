@@ -36,7 +36,7 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }
   protected async _onRender(): Promise<void> {
     const open = (child: FoundryApplicationV2) => {
-      child.addEventListener("close", () => { if (this.element.isConnected) void this.render({ force: true }); }, { once: true });
+      child.addEventListener("close", () => { if (this.element?.isConnected) void this.render({ force: true }); }, { once: true });
       return child.render(true);
     };
     const actions: Record<string, () => unknown> = { settings: () => open(new TranslatorSettingsApplication()), glossary: () => open(new GlossaryApplication()),

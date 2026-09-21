@@ -1,0 +1,37 @@
+{
+  "model": "hy-mt2-7b",
+  "durationMs": 8580,
+  "fallbacks": [],
+  "results": [
+    {
+      "source": "Fresh paw prints cross the muddy path. The tracks belong to Spirit Beasts. The creatures are hiding in the forest, not inside the Silver Tower.",
+      "translation": "Na blátivé cestě jsou vidět čerstvé otisky tlap. Tyto stopy patří Přízračným Šelmám. Tyto bytosti se skrývají v lese, a ne uvnitř Stříbrné Věže.",
+      "segments": [
+        "Na blátivé cestě jsou vidět čerstvé otisky tlap. Tyto stopy patří Přízračným Šelmám. Tyto bytosti se skrývají v lese, a ne uvnitř Stříbrné Věže."
+      ]
+    },
+    {
+      "source": "Three guards defend the bridge against Delvers. They let the party pass without a fight. No one is injured.",
+      "translation": "Tři strážní brání most před Permoníky. Dovolí družině projít bez boje. Nikdo nebyl zraněn.",
+      "segments": [
+        "Tři strážní brání most před Permoníky. Dovolí družině projít bez boje. Nikdo nebyl zraněn."
+      ]
+    },
+    {
+      "source": "Speak with Brackus von Tet before leaving Old Carinth. He gives the party a silver key, but he does not travel with them.",
+      "translation": "Před odchodem z Starého Carinthu promluvte s Brackusem Z Tetu. Dá družině stříbrný klíč, ale s nimi necestuje.",
+      "segments": [
+        "Před odchodem z Starého Carinthu promluvte s Brackusem Z Tetu. Dá družině stříbrný klíč, ale s nimi necestuje."
+      ]
+    },
+    {
+      "source": "Before nightfall, the party returns to @UUID[Scene.old]{Old Carinth}. The road to the Silver Tower is closed. The guards will not open the gate until morning.",
+      "translation": "Před soumrakem se družina vrací do @UUID[Scene.old]{Starého Carinthu}. Cesta ke Stříbrné Věži je uzavřená. Stráže neotevřou bránu až do rána.",
+      "segments": [
+        "Před soumrakem se družina vrací do ",
+        "@UUID[Scene.old]{Starého Carinthu}",
+        ". Cesta ke Stříbrné Věži je uzavřená. Stráže neotevřou bránu až do rána."
+      ]
+    }
+  ]
+}

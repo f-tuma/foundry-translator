@@ -1,0 +1,418 @@
+[
+  {
+    "model": "hy-mt2-7b",
+    "mode": "plain",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\nThey fight against Delvers.",
+    "output": "Bojují proti Permonícům.",
+    "stats": {
+      "prompt_tokens": 44,
+      "completion_tokens": 13,
+      "total_tokens": 57,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 206
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "plain",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\nThe tracks belong to Spirit Beasts.",
+    "output": "Stopy patří Přízračným Šelmám.",
+    "stats": {
+      "prompt_tokens": 54,
+      "completion_tokens": 20,
+      "total_tokens": 74,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 233
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "plain",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\nThey return from Old Carinth.",
+    "output": "Vrací se ze Starého Carinthu.",
+    "stats": {
+      "prompt_tokens": 46,
+      "completion_tokens": 13,
+      "total_tokens": 59,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 158
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "xml",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\nThey fight against <name id=\"1\">Delvers</name>.",
+    "output": "Bojují proti <name id=\"1\">Permonícům</name>.",
+    "stats": {
+      "prompt_tokens": 66,
+      "completion_tokens": 21,
+      "total_tokens": 87,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 249
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "xml",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\nThe tracks belong to <name id=\"1\">Spirit Beasts</name>.",
+    "output": "Stopy patří <name id=\"1\">Přízračným Šelmám</name>.",
+    "stats": {
+      "prompt_tokens": 76,
+      "completion_tokens": 28,
+      "total_tokens": 104,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 321
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "xml",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\nThey return from <name id=\"1\">Old Carinth</name>.",
+    "output": "Vrací se ze <name id=\"1\">Starého Carinthu</name>.",
+    "stats": {
+      "prompt_tokens": 68,
+      "completion_tokens": 21,
+      "total_tokens": 89,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 247
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "json",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\n{\"translation\":\"They fight against Delvers.\"}",
+    "output": "{\"translation\":\"Bojují proti Permonícům.\"}",
+    "stats": {
+      "prompt_tokens": 62,
+      "completion_tokens": 17,
+      "total_tokens": 79,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 205
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "json",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\n{\"translation\":\"The tracks belong to Spirit Beasts.\"}",
+    "output": "{\"translation\":\"Stopy patří Přízračným Šelmám.\"}",
+    "stats": {
+      "prompt_tokens": 72,
+      "completion_tokens": 24,
+      "total_tokens": 96,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 276
+  },
+  {
+    "model": "hy-mt2-7b",
+    "mode": "json",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\n{\"translation\":\"They return from Old Carinth.\"}",
+    "output": "{\"translation\":\"Vrací se ze Starého Carintha.\"}",
+    "stats": {
+      "prompt_tokens": 64,
+      "completion_tokens": 17,
+      "total_tokens": 81,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "durationMs": 213
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "plain",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\nThey fight against Delvers.",
+    "output": "Bojují proti Permonicím.",
+    "stats": {
+      "input_tokens": 56,
+      "total_output_tokens": 10,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 89.51215873489483,
+      "time_to_first_token_seconds": 0.628698,
+      "model_load_time_seconds": 4.039
+    },
+    "durationMs": 4778
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "plain",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\nThe tracks belong to Spirit Beasts.",
+    "output": "Stopu nechávají Přízračné Šelmy.",
+    "stats": {
+      "input_tokens": 60,
+      "total_output_tokens": 13,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 92.13334766518742,
+      "time_to_first_token_seconds": 0.034478999999999996
+    },
+    "durationMs": 179
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "plain",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\nThey return from Old Carinth.",
+    "output": "Vrací se ze Starého Carinthu.",
+    "stats": {
+      "input_tokens": 58,
+      "total_output_tokens": 12,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 91.58347834050737,
+      "time_to_first_token_seconds": 0.034789
+    },
+    "durationMs": 171
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "xml",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\nThey fight against <name id=\"1\">Delvers</name>.",
+    "output": "They fight against <name id=\"1\">Permoníci</name>.",
+    "stats": {
+      "input_tokens": 78,
+      "total_output_tokens": 17,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 93.13968041447158,
+      "time_to_first_token_seconds": 0.048060000000000005
+    },
+    "durationMs": 234
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "xml",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\nThe tracks belong to <name id=\"1\">Spirit Beasts</name>.",
+    "output": "The tracks belong to <name id=\"1\">Přízračné Šelmy</name>.",
+    "stats": {
+      "input_tokens": 82,
+      "total_output_tokens": 22,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 93.22560596643876,
+      "time_to_first_token_seconds": 0.039377
+    },
+    "durationMs": 282
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "xml",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\nThey return from <name id=\"1\">Old Carinth</name>.",
+    "output": "They return from <name id=\"1\">Starému Carinthu</name>.",
+    "stats": {
+      "input_tokens": 80,
+      "total_output_tokens": 18,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 93.28255835647107,
+      "time_to_first_token_seconds": 0.038882
+    },
+    "durationMs": 240
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "json",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\n{\"translation\":\"They fight against Delvers.\"}",
+    "output": "{\"translation\":\"Bojují proti Permonicím.\"}",
+    "stats": {
+      "input_tokens": 74,
+      "total_output_tokens": 14,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 92.28825170555788,
+      "time_to_first_token_seconds": 0.047622
+    },
+    "durationMs": 209
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "json",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\n{\"translation\":\"The tracks belong to Spirit Beasts.\"}",
+    "output": "{\"translation\":\"Stopky patří Přízračným Šelmám.\"}",
+    "stats": {
+      "input_tokens": 78,
+      "total_output_tokens": 17,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 92.206265415735,
+      "time_to_first_token_seconds": 0.038542
+    },
+    "durationMs": 219
+  },
+  {
+    "model": "google/gemma-4-12b-qat",
+    "mode": "json",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\n{\"translation\":\"They return from Old Carinth.\"}",
+    "output": "{\"translation\":\"Vrací se ze Starého Carinthu.\"}",
+    "stats": {
+      "input_tokens": 76,
+      "total_output_tokens": 16,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 92.19988936013277,
+      "time_to_first_token_seconds": 0.038280999999999996
+    },
+    "durationMs": 218
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "plain",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\nThey fight against Delvers.",
+    "output": "Bojují proti Permonícům.",
+    "stats": {
+      "input_tokens": 55,
+      "total_output_tokens": 10,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 8.641905367295383,
+      "time_to_first_token_seconds": 0.771208,
+      "model_load_time_seconds": 2.83
+    },
+    "durationMs": 4650
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "plain",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\nThe tracks belong to Spirit Beasts.",
+    "output": "Stopa patří Přízračným Šelmám.",
+    "stats": {
+      "input_tokens": 61,
+      "total_output_tokens": 12,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 6.6480802459547945,
+      "time_to_first_token_seconds": 0.749261
+    },
+    "durationMs": 2457
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "plain",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following text from English to Czech. Return only the translated text. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\nThey return from Old Carinth.",
+    "output": "Vrací se ze Starého Carinthu.",
+    "stats": {
+      "input_tokens": 57,
+      "total_output_tokens": 12,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 14.220595041407789,
+      "time_to_first_token_seconds": 0.740665
+    },
+    "durationMs": 1570
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "xml",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\nThey fight against <name id=\"1\">Delvers</name>.",
+    "output": "Bojují proti <name id=\"1\">Permonícům</name>.",
+    "stats": {
+      "input_tokens": 77,
+      "total_output_tokens": 18,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 9.38547757450551,
+      "time_to_first_token_seconds": 0.743409
+    },
+    "durationMs": 2604
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "xml",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\nThe tracks belong to <name id=\"1\">Spirit Beasts</name>.",
+    "output": "Stopa patří <name id=\"1\">Přízračným Šelmám</name>.",
+    "stats": {
+      "input_tokens": 83,
+      "total_output_tokens": 21,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 9.576250897773521,
+      "time_to_first_token_seconds": 0.749911
+    },
+    "durationMs": 2890
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "xml",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following XML from English to Czech. Return only the translated XML. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\nThey return from <name id=\"1\">Old Carinth</name>.",
+    "output": "Vrací se ze <name id=\"1\">Starého Carinthu</name>.",
+    "stats": {
+      "input_tokens": 79,
+      "total_output_tokens": 20,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 14.574665242951998,
+      "time_to_first_token_seconds": 0.757582
+    },
+    "durationMs": 2112
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "json",
+    "source": "They fight against Delvers.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Delvers = Permoníci.\n\n{\"translation\":\"They fight against Delvers.\"}",
+    "output": "{\"translation\":\"Bojují proti Permonícům.\"}",
+    "stats": {
+      "input_tokens": 73,
+      "total_output_tokens": 14,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 9.429685374920664,
+      "time_to_first_token_seconds": 0.75889
+    },
+    "durationMs": 2192
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "json",
+    "source": "The tracks belong to Spirit Beasts.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Spirit Beasts = Přízračné Šelmy.\n\n{\"translation\":\"The tracks belong to Spirit Beasts.\"}",
+    "output": "{\"translation\":\"Stopa patří Přízračným Šelmám.\"}",
+    "stats": {
+      "input_tokens": 79,
+      "total_output_tokens": 16,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 8.042692757876878,
+      "time_to_first_token_seconds": 0.784323
+    },
+    "durationMs": 2658
+  },
+  {
+    "model": "qwen/qwen3.8-27b",
+    "mode": "json",
+    "source": "They return from Old Carinth.",
+    "prompt": "Translate the following JSON from English to Czech. Return only the translated JSON. Preserve all tags, attributes and keys unchanged; translate text values only. Use this approved Czech name and inflect it naturally in context: Old Carinth = Starý Carinth.\n\n{\"translation\":\"They return from Old Carinth.\"}",
+    "output": "{\"translation\":\"Vrací se ze Starého Carinthu.\"}",
+    "stats": {
+      "input_tokens": 75,
+      "total_output_tokens": 16,
+      "reasoning_output_tokens": 0,
+      "tokens_per_second": 14.1828145890104,
+      "time_to_first_token_seconds": 0.7799210000000001
+    },
+    "durationMs": 1893
+  }
+]

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { translateUnits } from "../src/translation/unit-translator";
 
 import {
   OpenAiCompatibleProvider,
@@ -22,6 +23,68 @@ function eventStreamResponse(events: readonly unknown[]): Response {
 
 describe("OpenAiCompatibleProvider", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it("translates original glossary aliases through XML, retrying damaged markup before restoring Foundry syntax", async () => {
+    let calls = 0;
+    const requests: string[] = [];
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      const prompt = JSON.parse(String(init?.body)).messages[0].content as string;
+      requests.push(prompt);
+      const xml = prompt.slice(prompt.indexOf("<items>"));
+      const translated = xml.replace("Travel to", "Cestujte do").replace("Old Town", "Starého Carinthu");
+      return jsonResponse({ choices: [{ message: { content: ++calls === 1 ? translated.replace("</name>", "") : translated } }] });
+    });
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "hy-mt2-7b", fetchImplementation: fetchMock });
+    const fallback = vi.fn();
+    const result = await translateUnits({
+      units: [["Travel to @UUID[Scene.old]{Old Town}."]],
+      glossary: [{ source: "Old Carinth", replacement: "Starý Carinth", category: "location", aliases: ["Old Town"], mode: "inflect" }],
+      provider, settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" }, onQualityFallback: fallback,
+    });
+    expect(result).toEqual([["Cestujte do @UUID[Scene.old]{Starého Carinthu}."]]);
+    expect(calls).toBe(2);
+    expect(fallback).not.toHaveBeenCalled();
+    expect(requests[0]).toContain('"Old Town" = "Starý Carinth"');
+    expect(requests[0]).not.toContain("@UUID");
+    expect(requests[0]).not.toContain("__FTG_");
+  });
+  it("retries only the rejected APEX item with its draft and authoritative source", async () => {
+    const payloads: { messages: { content: string }[] }[] = [];
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      const payload = JSON.parse(String(init?.body)); payloads.push(payload);
+      const output = payloads.length === 1 ? { i0: "Z Prahy.", i1: "Brána je zavřená." } : { i0: "Ze Starého Carinthu." };
+      return jsonResponse({ choices: [{ message: { content: JSON.stringify(output) }, finish_reason: "stop" }] });
+    });
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "hy-mt2-30b-a3b-apex", fetchImplementation: fetchMock });
+    const fallback = vi.fn();
+    const result = await translateUnits({ units: [["From @UUID[Scene.old]{Old Carinth}."], ["The gate is closed."]],
+      glossary: [{ source: "Old Carinth", replacement: "Starý Carinth", category: "location", aliases: [], mode: "inflect" }], provider,
+      settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" }, onQualityFallback: fallback });
+    expect(result).toEqual([["Ze @UUID[Scene.old]{Starého Carinthu}."], ["Brána je zavřená."]]);
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1]!.messages[0]!.content).toContain("Z Prahy.");
+    expect(payloads[1]!.messages[0]!.content).toContain("English source as authoritative");
+    expect(payloads[1]!.messages[0]!.content).not.toContain("The gate is closed");
+    expect(payloads[0]!.messages[0]!.content).not.toContain("Scene.old");
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
+  it("does not ask a model to generate standalone fixed names or opaque syntax", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "hy-mt2-30b-a3b-apex", fetchImplementation: fetchMock });
+    const result = await provider.translate({ texts: ["__FTG_T_0000__", "__FTS_T_0000____FTG_T_0000____FTS_T_0001__"], targetLanguage: "cs" });
+    expect(result.map(row => row.translatedText)).toEqual(["__FTG_T_0000__", "__FTS_T_0000____FTG_T_0000____FTS_T_0001__"]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["qwen-test", "hy-mt2-7b"])("instructs %s to inflect only paired approved names", async model => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({choices:[{message:{content:"Do __FTG_T_0000__Starého Carinthu__FTG_T_0000END__."}}]}));
+    const provider = new OpenAiCompatibleProvider({baseUrl:"http://localhost:1234",model,fetchImplementation:fetchMock});
+    expect(provider.supportsGlossaryInflection).toBe(true);
+    await provider.translate({texts:["To __FTG_T_0000__Starý Carinth__FTG_T_0000END__."],sourceLanguage:"en",targetLanguage:"cs"});
+    const content = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).messages.map((m:{content:string})=>m.content).join(" ");
+    expect(content).toContain("only inflect");
+    expect(content).toContain("Do not rename");
+  });
 
   it("sends context, model, and token without repeating the protected glossary", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
@@ -72,15 +135,21 @@ describe("OpenAiCompatibleProvider", () => {
     ]);
   });
 
-  it("uses Hy-MT's translation instruction format and sampling parameters", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ choices: [{ message: { content: "Družina vstoupí." }, finish_reason: "stop" }] }));
-    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "tencent/Hy-MT2-7B", worldContext: "Ember fantasy", fetchImplementation: fetchMock });
+  it.each([
+    ["tencent/Hy-MT2-7B", 0.6],
+    ["hy-mt2-1.8b", 0.6],
+    ["hy-mt2-30b-a3b-apex", 1],
+  ])("uses %s translation instructions and sampling parameters", async (model, topP) => {
+    const apex = /30b-a3b/.test(model);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ choices: [{ message: { content: apex ? JSON.stringify({ i0: "Družina vstoupí." }) : "Družina vstoupí." }, finish_reason: "stop" }] }));
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model, worldContext: "Ember fantasy", fetchImplementation: fetchMock });
     await expect(provider.translate({ texts: ["The party enters."], sourceLanguage: "en", targetLanguage: "cs" })).resolves.toEqual([{ translatedText: "Družina vstoupí." }]);
     const payload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-    expect(payload.messages).toEqual([{ role: "user", content: expect.stringContaining("[Source Text]\nThe party enters.") }]);
+    expect(payload.messages).toEqual([{ role: "user", content: expect.stringContaining(apex ? '{"i0":"The party enters."}' : "[Source Text]\nThe party enters.") }]);
     expect(payload.messages[0].content).toContain("from English into Czech");
     expect(payload.messages[0].content).toContain("Ember fantasy");
-    expect(payload).toMatchObject({ temperature: 0.7, top_p: 0.6 });
+    expect(payload).toMatchObject({ temperature: apex ? 0 : 0.7, top_p: topP });
+    if (apex) expect(payload.response_format.json_schema.schema.required).toEqual(["i0"]);
   });
 
   it("reports available models when the selected model is missing", async () => {
@@ -163,7 +232,7 @@ describe("OpenAiCompatibleProvider", () => {
     }));
   });
 
-  it("uses LM Studio native chat with reasoning disabled for Gemma 4", async () => {
+  it.each(["google/gemma-4-12b-qat", "qwen/qwen3.8-27b"])("uses LM Studio native chat with reasoning disabled for %s", async model => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
       output: [{ type: "message", content: "Vítejte v Emberu." }],
       stats: {
@@ -176,7 +245,7 @@ describe("OpenAiCompatibleProvider", () => {
     const metrics = vi.fn();
     const provider = new OpenAiCompatibleProvider({
       baseUrl: "http://localhost:1234/v1",
-      model: "google/gemma-4-12b-qat",
+      model,
       fetchImplementation: fetchMock,
       onMetrics: metrics,
     });

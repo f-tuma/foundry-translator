@@ -455,6 +455,10 @@ export class JournalTranslationService {
         preparation ?? Promise.resolve(),
       ]);
       throwIfCancelled(activeRunId);
+      if (glossary.some(entry => entry.enabled !== false && entry.mode === "inflect")
+        && (settings.targetLanguage !== "cs" || !provider.supportsGlossaryInflection)) {
+        ui.notifications.warn(game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.InflectionFallback"));
+      }
       activeTranslations.update(activeRunId, { state: "scanning", currentDocument: "" });
       const runtime: TranslationRuntime = {
         runId, rootUuid: sourceDocument.uuid,
@@ -986,7 +990,7 @@ export class JournalTranslationService {
         currentUnit: pageName,
       }),
       onQualityFallback: (fallback) => {
-        logger.warn("Translation quality fallback kept the original fragment.", fallback);
+        logger.warn("Translation quality fallback requires review.", fallback);
         activeTranslations.addIssue(runtime.runId, {
           type: "fallback",
           documentName: sourceDocument.name,

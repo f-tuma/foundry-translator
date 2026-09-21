@@ -1,0 +1,67 @@
+{
+  "model": "hy-mt2-7b",
+  "durationMs": 17291,
+  "fallbacks": [],
+  "results": [
+    {
+      "source": "The party travels to Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "Družina cestuje do Starého Carinthu. ",
+      "passed": true
+    },
+    {
+      "source": "They return from Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "Vrací se z Starého Carinthu. ",
+      "passed": true
+    },
+    {
+      "source": "The ruins lie in Old Carinth.",
+      "expected": "Starém Carinthu",
+      "translation": "Ruiny se nacházejí v Starém Carinthu. ",
+      "passed": true
+    },
+    {
+      "source": "Speak with Brackus von Tet.",
+      "expected": "Brackusem Z Tetu",
+      "translation": "Promluvte si s Brackusem Z Tetu. ",
+      "passed": true
+    },
+    {
+      "source": "They fight against Delvers.",
+      "expected": "Permoníkům",
+      "translation": "Bojují proti Permonícům. ",
+      "passed": false
+    },
+    {
+      "source": "The tracks belong to Spirit Beasts.",
+      "expected": "Přízračným Šelmám",
+      "translation": "Stopy patří k Přízračné Šelmy.",
+      "passed": false
+    },
+    {
+      "source": "They are afraid of the Abyssal Shear.",
+      "expected": "Průlomu Hlubiny",
+      "translation": "Bojí se Průlomu Hlubiny. ",
+      "passed": true
+    },
+    {
+      "source": "Old Carinth",
+      "expected": "Starý Carinth",
+      "translation": "Starého Carinthu",
+      "passed": false
+    },
+    {
+      "source": "Travel to @UUID[Scene.old]{Old Carinth}.",
+      "expected": "@UUID[Scene.old]{Starého Carinthu}",
+      "translation": "Cestujte do @UUID[Scene.old]{Starého Carinthu}. ",
+      "passed": true
+    },
+    {
+      "source": "The party returns to Old Carinth.",
+      "expected": "Starého Carinthu",
+      "translation": "Družina se vrací do Starého Carinthu. ",
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+[
+  {
+    "id": "official-plain",
+    "endpoint": "completions",
+    "prompt": "Translate this from English to Czech:\nEnglish: Fresh paw prints cross the muddy path. The tracks belong to Spirit Beasts. The creatures are hiding in the forest, not inside the Silver Tower.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 3026,
+    "output": "Čerstvé stopy po tlapách vedou přes bahnitou stezku. Jde o otisky duchovních bestií. Ta zvířata se totiž skrývají v lese a nikoli uvnitř Stříbrné věže.",
+    "usage": {
+      "prompt_tokens": 42,
+      "completion_tokens": 57,
+      "total_tokens": 99
+    },
+    "finishReason": "stop"
+  },
+  {
+    "id": "official-xml",
+    "endpoint": "completions",
+    "prompt": "Preserve all XML tags, IDs and hierarchy. Translate names using approved Czech dictionary forms and inflect them naturally: Delvers = Permoníci; Spirit Beasts = Přízračné Šelmy; Old Carinth = Starý Carinth. Return only the translated XML.\n\nTranslate this from English to Czech:\nEnglish: <items><item id=\"i0\">They fight against <name id=\"n0\">Delvers</name>.</item><item id=\"i1\">The tracks belong to <name id=\"n1\">Spirit Beasts</name>.</item><item id=\"i2\">They return from <name id=\"n2\">Old Carinth</name>.</item></items>\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 1144,
+    "output": "<items><item id=\"i0\">Bojují proti <name id=\"n0\">Delvers</name>.</item><item id=\"i1\">Stopy patří <name id=\"n1\">Spirit Beasts</name>.</item><item idI'm not going to be able to help you with that.\nNu voi putea să te ajut cu asta.",
+    "usage": {
+      "prompt_tokens": 147,
+      "completion_tokens": 79,
+      "total_tokens": 226
+    },
+    "finishReason": "stop"
+  },
+  {
+    "id": "chat-xml",
+    "endpoint": "chat/completions",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Preserve all XML tags, IDs and hierarchy. Translate names using approved Czech dictionary forms and inflect them naturally: Delvers = Permoníci; Spirit Beasts = Přízračné Šelmy; Old Carinth = Starý Carinth. Return only the translated XML."
+      },
+      {
+        "role": "user",
+        "content": "Translate this from English to Czech:\nEnglish: <items><item id=\"i0\">They fight against <name id=\"n0\">Delvers</name>.</item><item id=\"i1\">The tracks belong to <name id=\"n1\">Spirit Beasts</name>.</item><item id=\"i2\">They return from <name id=\"n2\">Old Carinth</name>.</item></items>\nCzech:"
+      }
+    ],
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 9539,
+    "output": "<items><item id=\"i0\">Bojují proti <name id=\"n0\">Delvers</name>.</item><item id=\"{{$}}\">${}</}\">${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${}</>${",
+    "usage": {
+      "prompt_tokens": 146,
+      "completion_tokens": 700,
+      "total_tokens": 846,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "finishReason": "length"
+  }
+]

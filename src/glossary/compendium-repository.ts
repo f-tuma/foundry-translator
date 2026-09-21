@@ -1,6 +1,6 @@
 import { MODULE_ID, MODULE_TITLE } from "../constants";
 import { organizeCompendiumPack } from "../storage/compendium-folder";
-import { GLOSSARY_SCHEMA_VERSION, isGlossaryCategory, readNamingDecision, type GlossaryDocumentFlag, type GlossaryEntry } from "./types";
+import { GLOSSARY_SCHEMA_VERSION, isGlossaryCategory, isGlossaryMode, readNamingDecision, type GlossaryDocumentFlag, type GlossaryEntry } from "./types";
 import { planGlossarySync } from "./sync";
 import { validateGlossary } from "./protection";
 import { discoverWorldGlossary } from "./discovery";
@@ -51,6 +51,7 @@ function readFlag(indexEntry: FoundryCompendiumIndexEntry): GlossaryEntry | null
     ...(naming ? { naming } : {}),
     ...(typeof flag.notes === "string" ? { notes: flag.notes } : {}),
     ...(typeof flag.enabled === "boolean" ? { enabled: flag.enabled } : {}),
+    ...(isGlossaryMode(flag.mode) ? { mode: flag.mode } : {}),
     ...(typeof flag.customized === "boolean" ? { customized: flag.customized } : {}),
     ...(typeof flag.sourceUuid === "string" ? { sourceUuid: flag.sourceUuid } : {}),
   };
@@ -66,6 +67,7 @@ function toFlag(entry: GlossaryEntry): GlossaryDocumentFlag {
     ...(entry.naming ? { naming: entry.naming } : {}),
     notes: entry.notes ?? "",
     ...(entry.enabled !== undefined ? { enabled: entry.enabled } : {}),
+    ...(entry.mode ? { mode: entry.mode } : {}),
     ...(entry.customized !== undefined ? { customized: entry.customized } : {}),
     ...(entry.sourceUuid ? { sourceUuid: entry.sourceUuid } : {}),
   };

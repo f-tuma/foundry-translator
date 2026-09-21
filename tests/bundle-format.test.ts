@@ -13,6 +13,12 @@ beforeEach(() => vi.stubGlobal("document", parseHTML("<html><body></body></html>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("portable translation format", () => {
+  it("preserves inflection in version 2 bundles and rejects invalid modes", () => {
+    const value=bundle();value.version=2;
+    value.glossary=[{source:"Old Carinth",replacement:"Starý Carinth",category:"location",aliases:[],mode:"inflect"}];
+    expect(parseTranslationBundle(JSON.stringify(value)).glossary[0]?.mode).toBe("inflect");
+    expect(()=>parseTranslationBundle(JSON.stringify({...value,glossary:[{...value.glossary[0],mode:"unknown"}]}))).toThrow("mode");
+  });
   it("roundtrips partial translations and strips unknown settings and record fields", () => {
     const input = { ...bundle(), apiKey: "secret", documents: bundle().documents.map((d) => ({ ...d, flags: { evil: true } })) };
     const parsed = parseTranslationBundle(JSON.stringify(input));

@@ -1,4 +1,4 @@
-# Foundry Translate 0.17.0 — stručný návod
+# Foundry Translate 0.18.0 — stručný návod
 
 ## První spuštění
 
@@ -14,11 +14,15 @@ V **Překladač a jazyk** vyberte OpenAI-compatible / LM Studio, adresu
 musí mít spuštěný server a povolené CORS. Použijte **Otestovat připojení** a
 uložte nastavení. Adresa a model jsou nastavením tohoto prohlížeče.
 
-Pro první test doporučujeme stažený `hy-mt2-7b` (Tencent Hy-MT2 7B Q8_0).
-Jeho zvláštní překladové zadání modul vybere automaticky. Srovnání na jednom
-skutečném Ember questu: přibližně 38 sekund, bez porušení ochranných značek.
-Čeština byla lepší než u testované Gemmy, ale stále vyžadovala místy úpravy.
-Menší kvantizace nebo slabší počítač mohou výsledek i rychlost změnit.
+Pro tento překlad je vybraný **Hy-MT2 30B-A3B APEX**. Na našem serveru má
+ID `hy-mt2-30b-a3b-apex`. Není potřeba další server ani XGrammar: LM Studio
+vynucuje JSON strukturu při generování. Modul předává souvislé věty, schválený
+glosář a kontext světa; názvy a odkazy následně kontroluje a obnovuje kód.
+
+Menší alternativou zůstává Hy-MT2 7B. Rychlost závisí na počítači a kvantizaci.
+Překlad není automatická jazyková korektura: drobná chybná koncovka může projít.
+Před vyprávěním zkontrolujte význam a seznam problémů. Výsledky zkoušek jsou
+v [ověření APEX](benchmarks/apex-release-2026-09-21.md).
 
 ## Jedno kliknutí při čtení
 
@@ -47,7 +51,22 @@ V glosáři lze hledat a filtrovat kategorie. Rozbalení položky nabízí:
 - pevný výstupní název nebo překlad;
 - alternativní zápisy oddělené středníkem;
 - kategorii;
-- zapnutí nebo vypnutí ochrany.
+- použití názvu: **Pevný tvar**, **Povolit skloňování**, nebo **Nepoužívat**.
+
+**Pevný tvar** vždy vloží přesný uložený název. **Povolit skloňování** dovolí
+modelu použít název v odpovídajícím pádu, například `Starý Carinth` →
+`do Starého Carinthu`. Funguje pro češtinu přes OpenAI-compatible / LM Studio.
+Model dostane český název přímo v kontextu věty. Modul kontroluje zachování
+slovního základu, počtu slov a ochranných značek. Jde o konzervativní kontrolu
+tvarů, nikoli úplný český morfologický slovník. Neobvyklý tvar může odmítnout.
+Po neúspěšných pokusech zkusí přeložit větu s přesnými schválenými tvary názvů.
+Takový úsek označí ke kontrole gramatiky a neuloží do mezipaměti. Teprve pokud
+neprojde ani tento pokus, ponechá původní úsek se schválenými názvy a uvede
+problém. Výsledek je potřeba jazykově zkontrolovat, zejména fantasy jména.
+
+Chrome, Google a jiné cílové jazyky použijí pevný tvar a při spuštění překladu
+na to upozorní. **Nepoužívat** znamená, že se heslo vůbec nepředá překladači,
+ani jako doporučení. Starší hesla bez uvedeného režimu zůstávají pevná.
 
 Ručně nastavené hodnoty mají přednost při další synchronizaci. Vypnutí
 položku nesmaže; pouze dovolí běžný překlad. Rozlišování velikosti písmen
@@ -81,10 +100,13 @@ náhledu soubor znovu vyberte. Před hromadnými úpravami si můžete uložit p
 JSON jako zálohu a případně jeho změny později importovat stejným postupem.
 
 CSV má povinné sloupce **source, replacement, category**. Volitelné jsou
-**aliases, enabled, notes, context, language**. Export používá UTF-8 s BOM,
+**aliases, enabled, notes, context, language, mode**. Export používá UTF-8 s BOM,
 čárky a uvozovky; import přijme také středníkový oddělovač.
 Prázdný překlad znamená zachování originálu. Aliasy jsou JSON seznam, například
 `["krátký název","jiný zápis"]`; enabled přijímá `true` nebo `false`.
+`mode` přijímá `fixed` nebo `inflect`; prázdná hodnota znamená `fixed`.
+`enabled=false` vypíná i heslo s `mode=inflect`. JSON obsahující skloňování má
+verzi formátu 2. Starší modul ho odmítne, aby skloňování neztratil bez upozornění.
 Kategorie: `character`, `location`, `faction`, `deity`, `item`, `lore`, `term`.
 Kontext slouží jen jako podklad a při importu se neukládá. Poznámky se ukládají
 a jsou dostupné také v detailu položky. Limit souboru je 5 MB / 20 000 položek.

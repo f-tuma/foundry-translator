@@ -61,7 +61,7 @@ export function renderTranslatorSettingsForm(
         </div>
         <div class="ft-field">
           <div class="ft-field__label"><label for="ft-openai-model">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.Model")}</label>${help("FOUNDRY_TRANSLATE.Settings.OpenAI.ModelHint", "FOUNDRY_TRANSLATE.Settings.OpenAI.Model")}</div>
-          <input id="ft-openai-model" name="openAiModel" type="text" spellcheck="false" autocomplete="off" placeholder="google/translategemma-12b-it">
+          <input id="ft-openai-model" name="openAiModel" type="text" spellcheck="false" autocomplete="off" placeholder="hy-mt2-30b-a3b-apex">
         </div>
         <div class="ft-field">
           <div class="ft-field__label"><label for="ft-openai-api-key">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKey")}</label>${help("FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKeyHint", "FOUNDRY_TRANSLATE.Settings.OpenAI.ApiKey")}</div>

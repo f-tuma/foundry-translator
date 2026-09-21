@@ -16,6 +16,7 @@ function sameEntry(left: GlossaryEntry, right: GlossaryEntry): boolean {
     left.replacement === right.replacement &&
     left.category === right.category &&
     left.enabled === right.enabled &&
+    (left.mode ?? "fixed") === (right.mode ?? "fixed") &&
     left.sourceUuid === right.sourceUuid
   );
 }

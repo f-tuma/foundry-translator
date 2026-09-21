@@ -6,6 +6,21 @@ beforeEach(() => vi.stubGlobal("game", { i18n: { localize: (key: string) => key 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("reviewed glossary files", () => {
+  it.each(["csv", "json"] as const)("preserves modes in %s and detects mode-only changes", format => {
+    const entries = [{ ...term("Old Carinth", "Starý Carinth"), mode: "inflect" as const }, { ...term("Unused"), enabled: false, mode: "inflect" as const }];
+    const raw = serializeGlossaryFile(entries, "cs", format);
+    if (format === "json") expect(JSON.parse(raw).version).toBe(2);
+    const file = parseGlossaryFile(raw, format, "cs");
+    expect(file.entries[0]?.mode).toBe("inflect");
+    expect(file.entries[1]).toMatchObject({enabled:false, mode:"inflect"});
+    const plan = planGlossaryImport([{...entries[0]!,mode:"fixed",customized:true}],file,"cs");
+    expect(plan[0]?.state).toBe("changed");
+    expect(planGlossaryImport(plan.map(row=>row.after),file,"cs").every(row=>row.state==="unchanged")).toBe(true);
+  });
+  it("rejects invalid modes and conflicting modes on a shared alias", () => {
+    expect(()=>parseGlossaryFile("source,replacement,category,mode\nA,A,term,automatic", "csv", "cs")).toThrow("InvalidFields");
+    expect(()=>parseGlossaryFile(serializeGlossaryFile([term("A"),{...term("B","A"),aliases:["A"],mode:"inflect"}],"cs","json"),"json","cs")).toThrow("AliasConflict");
+  });
   it.each(["json", "csv"] as const)("round trips %s, Unicode, quoting, multiline notes and disabled entries without internal data", (format) => {
     const entries = [{ ...term('The "Dawn", Tower', "Věž úsvitu"), id: "private", sourceUuid: "Scene.private", aliases: ["Old;Tower", "Tower, Old"], notes: 'First line\n"Second", line', enabled: false }];
     const raw = serializeGlossaryFile(entries, "cs", format, new Map([[entries[0]!.source, "Reference only"]]));

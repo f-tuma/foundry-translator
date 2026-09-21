@@ -1,0 +1,20 @@
+[
+  {
+    "mode": "lower",
+    "prompt": "Translate the following XML from English to Czech. Preserve all tags and attributes. Return only the translated XML. Use these approved translations, inflecting them naturally in context: Delvers = permoníci; Spirit Beasts = přízračné šelmy; Deep Dwarves = hlubinní trpaslíci; Old Carinth = starý Carinth. Capitalization will be handled separately.\n\n<items><item id=\"1\">They fight against <name id=\"1\">Delvers</name>.</item><item id=\"2\">The tracks belong to <name id=\"2\">Spirit Beasts</name>.</item><item id=\"3\">They fight against <name id=\"3\">Deep Dwarves</name>.</item><item id=\"4\">They return from <name id=\"4\">Old Carinth</name>.</item></items>",
+    "output": "<items><item id=\"1\">Bojují proti <name id=\"1\">permonícům</name>.</item><item id=\"2\">Stopy patří <name id=\"2\">přízračným šelmám</name>.</item><item id=\"3\">Bojují proti <name id=\"3\">hlubinním trpaslíkům</name>.</item><item id=\"4\">Vrací se ze <name id=\"4\">starého Carinthu</name>.</item></items>",
+    "durationMs": 1499
+  },
+  {
+    "mode": "lower-czech",
+    "prompt": "Přelož text uvnitř XML značek z angličtiny do přirozené češtiny pro fantasy dobrodružství. Zachovej přesně všechny značky a atributy. Vrať jen XML. Použij glosář a názvy správně skloňuj: Delvers = permoníci; Spirit Beasts = přízračné šelmy; Deep Dwarves = hlubinní trpaslíci; Old Carinth = starý Carinth.\n\n<items><item id=\"1\">They fight against <name id=\"1\">Delvers</name>.</item><item id=\"2\">The tracks belong to <name id=\"2\">Spirit Beasts</name>.</item><item id=\"3\">They fight against <name id=\"3\">Deep Dwarves</name>.</item><item id=\"4\">They return from <name id=\"4\">Old Carinth</name>.</item></items>",
+    "output": "<items><item id=\"1\">Bojují proti <name id=\"1\">permonícům</name>.</item><item id=\"2\">Stopy patří <name id=\"2\">přízračným šelmám</name>.</item><item id=\"3\">Bojují proti <name id=\"3\">hlubinním trpaslíkům</name>.</item><item id=\"4\">Vrací se ze <name id=\"4\">starého Carinthu</name>.</item></items>",
+    "durationMs": 1428
+  },
+  {
+    "mode": "lemma",
+    "prompt": "Translate the following XML from English to Czech. Preserve all tags and attributes. Return only the translated XML. Use these approved translations, inflecting them naturally in context: Delvers = permoníci (plural of permoník); Spirit Beasts = přízračné šelmy; Deep Dwarves = hlubinní trpaslíci (adjective hlubinný); Old Carinth = starý Carinth. Capitalization will be handled separately.\n\n<items><item id=\"1\">They fight against <name id=\"1\">Delvers</name>.</item><item id=\"2\">The tracks belong to <name id=\"2\">Spirit Beasts</name>.</item><item id=\"3\">They fight against <name id=\"3\">Deep Dwarves</name>.</item><item id=\"4\">They return from <name id=\"4\">Old Carinth</name>.</item></items>",
+    "output": "<items><item id=\"1\">Bojují proti <name id=\"1\">permonícům</name>.</item><item id=\"2\">Stopy patří <name id=\"2\">přízračným šelmám</name>.</item><item id=\"3\">Bojují proti <name id=\"3\">hlubinným trpaslíkům</name>.</item><item id=\"4\">Vrací se ze <name id=\"4\">starého Carinthu</name>.</item></items>",
+    "durationMs": 1433
+  }
+]
