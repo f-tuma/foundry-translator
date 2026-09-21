@@ -1012,7 +1012,7 @@
     "SoundPreviewP": "Po zapnutí najeďte kurzorem na okolní zvuk. Uslyšíte jej, jako by váš token stál na tomto místě.",
     "SoundSelect": "Vyberte ambientní zvuky.",
     "Spacebar": "Mezerník",
-    "TargetSelect": "Vyberte cíle.",
+    "TargetSelect": "Vybrat cíle",
     "TargetSelectP": "Zaměřte libovolné tokeny, které vidíte.",
     "TileBrowser": "Prohlížeč dlaždic.",
     "TilePlace": "Umístění dlaždice.",
@@ -2416,7 +2416,7 @@
     "CharSelect": "Vybrat Postavu",
     "CharSelected": "Vybraná Postava",
     "ConfigTitle": "Nastavení uživatele",
-    "FPS": "Počet snímků za sekundu",
+    "FPS": "FPS",
     "Kick": "Vykázat hráče",
     "LATENCY": "Latence",
     "List": "Seznam hráčů",
@@ -3900,7 +3900,7 @@
       "Modules": "Aktivní moduly"
     }
   },
-  "SIDEBAR.Search": "Vyhledávání {types}",
+  "SIDEBAR.Search": "Hledat: {types}",
   "SIDEBAR.SearchModeFull": "Hledání v celém textu",
   "SIDEBAR.SearchModeName": "Vyhledávání pouze podle názvu",
   "SIDEBAR.SortModeAlpha": "Seřazení abecedně",

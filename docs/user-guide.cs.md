@@ -1,4 +1,4 @@
-# Foundry Translate 0.19.0 — stručný návod
+# Foundry Translate 0.19.1 — stručný návod
 
 ## České rozhraní
 

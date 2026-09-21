@@ -2,7 +2,7 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.19.0** includes an adventure translation desk, an Ember-aware name
+Version **0.19.1** includes an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
 Chrome or LM Studio, with Google Cloud available as an optional provider.
 Generated text is structurally validated; language quality still depends on the
@@ -16,7 +16,7 @@ original names; it does not contact a naming model.
 
 ## Czech interface
 
-Version 0.19.0 adds Czech interface catalogs for Foundry v14, Crucible and Ember.
+Version 0.19.1 adds Czech interface catalogs for Foundry v14, Crucible and Ember.
 Choose **Čeština** under **Game Settings → Language Preference**, save and reload.
 The interface works without a running model. Adventure translation remains a
 separate action. See [coverage and maintenance](docs/czech-interface.md).

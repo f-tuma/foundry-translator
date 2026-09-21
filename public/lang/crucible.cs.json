@@ -55,7 +55,7 @@
     "DEFAULT_ACTIONS": {
       "Cast": {
         "Description": "Využijte magii k vytvoření díla zaklínadel.",
-        "Name": "Vyvolání kouzla"
+        "Name": "Seslat kouzlo"
       },
       "Defend": {
         "Description": "Soustředíte se na vyhýbání se zranění a posílíte svou fyzickou obranu. Do začátku svého příštího tahu získáte stav <strong>Střežený</strong>.",
@@ -705,7 +705,7 @@
       "ClearedDetailItem": "Odstraněn {type} z postavy {actor}.",
       "DecreaseAbility": "Snížení hodnoty vlastnosti",
       "DecreaseAbilitySpecific": "Snížení hodnoty {ability}",
-      "EditEngagement": "Úprava zapojení do akce",
+      "EditEngagement": "Upravit počet soupeřů",
       "EditMovement": "Úprava možností pohybu",
       "EditSize": "Úprava velikosti postavy",
       "IncreaseAbility": "Zvýšení hodnoty vlastnosti",
@@ -927,7 +927,7 @@
       "Capacity": "Nosnost",
       "Currency": "Měna",
       "CurrentCapacity": "Aktuální zatížení",
-      "CurrentEquipment": "Současný inventář",
+      "CurrentEquipment": "Vybavení",
       "FavoriteActions": "Oblíbené akce",
       "Knowledge": "Oblasti znalostí",
       "KnowledgeHint": "Získáte nové oblasti znalostí díky svému zázemí nebo úpravou vlastní postavy.",
@@ -1614,7 +1614,7 @@
     "Madness": "Práh povzbuzení",
     "MadnessShort": "Povzbuzení",
     "Parry": "Kryt",
-    "Physical": "Fyzické vlastnosti",
+    "Physical": "Fyzická obrana",
     "Reflex": "Reflex",
     "TOOLTIPS": {
       "Armor": "",
@@ -1850,7 +1850,7 @@
       "NotInvested": "Nenaladěno",
       "NotKnown": "Nevíme",
       "Parry": "Kryt {parry}",
-      "Range": "Dostřel {range}",
+      "Range": "Dosah {range}",
       "Stackable": "Lze hromadit",
       "Unequipped": "Nevyzbrojeno",
       "Unique": "Jedinečný"
