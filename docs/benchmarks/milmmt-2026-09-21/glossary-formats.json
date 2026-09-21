@@ -1,0 +1,114 @@
+[
+  {
+    "id": "plain-terminology-prefix",
+    "prompt": "Terminology: Delvers = Permoníci; Spirit Beasts = Přízračné Šelmy; Old Carinth = Starý Carinth. Use these Czech names, inflected to fit the sentence.\n\nTranslate this from English to Czech:\nEnglish: They fight against Delvers. The tracks belong to Spirit Beasts. They return from Old Carinth.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 503,
+    "output": "Bojují proti Delverům. Stopy patří Duchovným bestiím. Vracejí se ze Starého Karintu.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 76,
+      "completion_tokens": 29,
+      "total_tokens": 105
+    }
+  },
+  {
+    "id": "xml-single-reference",
+    "prompt": "Terminology: Delvers = Permoníci; Spirit Beasts = Přízračné Šelmy; Old Carinth = Starý Carinth. Use these Czech names, inflected to fit the sentence.\nKeep all XML tags unchanged.\n\nTranslate this from English to Czech:\nEnglish: The tracks belong to <name id=\"n0\">Spirit Beasts</name>.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 247,
+    "output": "Stopy patří <name id=\"n0\">\\Spirit Beasts\\</name>.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 79,
+      "completion_tokens": 16,
+      "total_tokens": 95
+    }
+  },
+  {
+    "id": "mixed-language-plain",
+    "prompt": "Translate this from English to Czech:\nEnglish: They fight against Permoníci. The tracks belong to Přízračné Šelmy. They return from Starý Carinth.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 437,
+    "output": "Bojují proti Permoňanům. Stopy patří Přízračným šelmám. Vracejí se ze Starého Korutanu.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 41,
+      "completion_tokens": 33,
+      "total_tokens": 74
+    }
+  },
+  {
+    "id": "mixed-language-xml",
+    "prompt": "Translate this from English to Czech:\nEnglish: The tracks belong to <name id=\"n0\">Přízračné Šelmy</name>.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 321,
+    "output": "Stopy patří k<name id=\"n0\">\\Přízračným šelmám\\</name>.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 35,
+      "completion_tokens": 23,
+      "total_tokens": 58
+    }
+  },
+  {
+    "id": "mixed-language-html",
+    "prompt": "Translate this from English to Czech:\nEnglish: They fight against <b>Permoníci</b>. The tracks belong to <b>Přízračné Šelmy</b>. They return from <b>Starý Carinth</b>.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 440,
+    "output": "Bojují proti Permoncům. Stopy patří Přízračným šelmám, které se vracejí ze Starého Korutanu.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 51,
+      "completion_tokens": 32,
+      "total_tokens": 83
+    }
+  },
+  {
+    "id": "few-shot-names",
+    "prompt": "Translate this from English to Czech:\nEnglish: Delvers\nCzech: Permoníci\n\nTranslate this from English to Czech:\nEnglish: Spirit Beasts\nCzech: Přízračné Šelmy\n\nTranslate this from English to Czech:\nEnglish: Old Carinth\nCzech: Starý Carinth\n\nTranslate this from English to Czech:\nEnglish: They fight against Delvers. The tracks belong to Spirit Beasts. They return from Old Carinth.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 401,
+    "output": "Bojují proti Delverům. Stopy patří Duchovním bestiím. Vracejí se ze Starého Karintu.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 97,
+      "completion_tokens": 29,
+      "total_tokens": 126
+    }
+  },
+  {
+    "id": "paired-ascii-mixed",
+    "prompt": "Translate this from English to Czech:\nEnglish: The tracks belong to __FTG_TEST_0000__Přízračné Šelmy__FTG_TEST_0000END__.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 499,
+    "output": "Stopy patří k souboru __FTG_TEST_0000__Přízračné šelmy__FTG_TEST_0000END__.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 48,
+      "completion_tokens": 38,
+      "total_tokens": 86
+    }
+  },
+  {
+    "id": "fixed-ascii-marker",
+    "prompt": "Translate this from English to Czech:\nEnglish: They return from __FTG_TEST_0000__.\nCzech:",
+    "model": "milmmt-46-12b-v1.0",
+    "status": 200,
+    "durationMs": 303,
+    "output": "Vracejí se z místa s názvem __FTG_TEST_0000__.",
+    "finishReason": "stop",
+    "usage": {
+      "prompt_tokens": 27,
+      "completion_tokens": 22,
+      "total_tokens": 49
+    }
+  }
+]

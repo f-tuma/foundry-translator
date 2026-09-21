@@ -1,0 +1,125 @@
+{
+  "model": "milmmt-46-12b-v1.0",
+  "createdAt": "2026-09-21T12:31:37.589Z",
+  "note": "Raw completion probes, not the production protection pipeline. Review names, grammar, meaning and syntax manually. Glossary-free timing is not directly comparable to protected translation.",
+  "source": "https://huggingface.co/xiaomi-research/MiLMMT-46-12B-v1.0",
+  "sampling": {
+    "temperature": 0,
+    "max_tokens": 700,
+    "stream": false
+  },
+  "results": [
+    {
+      "mode": "plain",
+      "source": "Fresh paw prints cross the muddy path. The tracks belong to Spirit Beasts. The creatures are hiding in the forest, not inside the Silver Tower.",
+      "prompt": "Translate this from English to Czech:\nEnglish: Fresh paw prints cross the muddy path. The tracks belong to Spirit Beasts. The creatures are hiding in the forest, not inside the Silver Tower.\nCzech:",
+      "status": 200,
+      "durationMs": 841,
+      "output": "Čerstvé stopy po tlapách vedou přes bahnitou stezku. Jde o otisky duchovních bestií. Ta zvířata se totiž skrývají v lese a nikoli uvnitř Stříbrné věže.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "completion_tokens": 57,
+        "total_tokens": 99
+      }
+    },
+    {
+      "mode": "plain",
+      "source": "Three guards defend the bridge against Delvers. They let the party pass without a fight. No one is injured.",
+      "prompt": "Translate this from English to Czech:\nEnglish: Three guards defend the bridge against Delvers. They let the party pass without a fight. No one is injured.\nCzech:",
+      "status": 200,
+      "durationMs": 505,
+      "output": "Tři strážci brání most před útokem Delverů. Nechají skupinu projít bez boje. Nikdo není zraněn.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 36,
+        "completion_tokens": 34,
+        "total_tokens": 70
+      }
+    },
+    {
+      "mode": "plain",
+      "source": "Speak with Brackus von Tet before leaving Old Carinth. He gives the party a silver key, but he does not travel with them.",
+      "prompt": "Translate this from English to Czech:\nEnglish: Speak with Brackus von Tet before leaving Old Carinth. He gives the party a silver key, but he does not travel with them.\nCzech:",
+      "status": 200,
+      "durationMs": 648,
+      "output": "Před odchodem ze Staré Korutě promluvte s Brackusem von Tetem. Ten skupině dá stříbrný klíč, ale nebude ji doprovázet na cestě.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 41,
+        "completion_tokens": 45,
+        "total_tokens": 86
+      }
+    },
+    {
+      "mode": "plain",
+      "source": "Before nightfall, the party returns to @UUID[Scene.old]{Old Carinth}. The road to the Silver Tower is closed. The guards will not open the gate until morning.",
+      "prompt": "Translate this from English to Czech:\nEnglish: Before nightfall, the party returns to @UUID[Scene.old]{Old Carinth}. The road to the Silver Tower is closed. The guards will not open the gate until morning.\nCzech:",
+      "status": 200,
+      "durationMs": 816,
+      "output": "Před setměním se skupina vrací do @UUID[Scene.old]{Staré Korintie}. Cesta ke Stříbrné věži je uzavřena. Strážní neotevřou bránu dříve než ráno.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 51,
+        "completion_tokens": 57,
+        "total_tokens": 108
+      }
+    },
+    {
+      "mode": "terminology",
+      "source": "Fresh paw prints cross the muddy path. The tracks belong to Spirit Beasts. The creatures are hiding in the forest, not inside the Silver Tower.",
+      "prompt": "Preserve Foundry @UUID references exactly. Use these approved Czech names, inflected naturally in context:\nSpirit Beasts = Přízračné Šelmy\nSilver Tower = Stříbrná Věž\n\nTranslate this from English to Czech:\nEnglish: Fresh paw prints cross the muddy path. The tracks belong to Spirit Beasts. The creatures are hiding in the forest, not inside the Silver Tower.\nCzech:",
+      "status": 200,
+      "durationMs": 793,
+      "output": "Čerstvé stopy po tlapách vedou přes zablácenou stezku. Stopy patří Duchovním bestiím. Ta stvoření se skrývají v lese, nikoli uvnitř Stříbrné věže.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 84,
+        "completion_tokens": 54,
+        "total_tokens": 138
+      }
+    },
+    {
+      "mode": "terminology",
+      "source": "Three guards defend the bridge against Delvers. They let the party pass without a fight. No one is injured.",
+      "prompt": "Preserve Foundry @UUID references exactly. Use these approved Czech names, inflected naturally in context:\nDelvers = Permoníci\n\nTranslate this from English to Czech:\nEnglish: Three guards defend the bridge against Delvers. They let the party pass without a fight. No one is injured.\nCzech:",
+      "status": 200,
+      "durationMs": 522,
+      "output": "Tři strážní brání most před útokem Delverů. Nechají skupinu projít bez boje. Nikdo není zraněn.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 65,
+        "completion_tokens": 34,
+        "total_tokens": 99
+      }
+    },
+    {
+      "mode": "terminology",
+      "source": "Speak with Brackus von Tet before leaving Old Carinth. He gives the party a silver key, but he does not travel with them.",
+      "prompt": "Preserve Foundry @UUID references exactly. Use these approved Czech names, inflected naturally in context:\nOld Carinth = Starý Carinth\nBrackus von Tet = Brackus Z Tetu\n\nTranslate this from English to Czech:\nEnglish: Speak with Brackus von Tet before leaving Old Carinth. He gives the party a silver key, but he does not travel with them.\nCzech:",
+      "status": 200,
+      "durationMs": 630,
+      "output": "Před odchodem ze Starého Karintu si promluvte s Brackusem von Tetem. Ten dává skupině stříbrný klíč, ale necestuje s nimi.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 83,
+        "completion_tokens": 42,
+        "total_tokens": 125
+      }
+    },
+    {
+      "mode": "terminology",
+      "source": "Before nightfall, the party returns to @UUID[Scene.old]{Old Carinth}. The road to the Silver Tower is closed. The guards will not open the gate until morning.",
+      "prompt": "Preserve Foundry @UUID references exactly. Use these approved Czech names, inflected naturally in context:\nOld Carinth = Starý Carinth\nSilver Tower = Stříbrná Věž\n\nTranslate this from English to Czech:\nEnglish: Before nightfall, the party returns to @UUID[Scene.old]{Old Carinth}. The road to the Silver Tower is closed. The guards will not open the gate until morning.\nCzech:",
+      "status": 200,
+      "durationMs": 839,
+      "output": "Před setměním se skupina vrací do @UUID[Scene.old]{\\cH00FFFF\\}. Cesta ke Stříbrné věži je uzavřena. Strážní neotevřou bránu dříve než ráno.",
+      "finishReason": "stop",
+      "usage": {
+        "prompt_tokens": 91,
+        "completion_tokens": 56,
+        "total_tokens": 147
+      }
+    }
+  ]
+}

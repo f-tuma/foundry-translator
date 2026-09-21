@@ -11,6 +11,22 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-21, MiLMMT follow-up: user installed MiLMMT-46-12B-v1.0-GGUF and
+  prefers a smaller model over a slow large one. LM Studio offers
+  `milmmt-46-12b-v1.0`, mradermacher Q4_K_S, 7,789,533,216 bytes, loaded context
+  8,192. Tested documented raw `/v1/completions` prompt and a chat comparison.
+  Four warm plain paragraphs took 2.81 s, four with terminology 2.78 s, but
+  terminology was ignored (Duchovním bestiím, Delverů, Karintu, von Tetem) and a
+  UUID label became a formatting escape. Eight additional glossary formats
+  (XML, mixed-language, HTML, few-shot and ASCII tokens) did not fix reliability.
+  This is not a timing comparison at equal functionality to the protected
+  production pipeline. See docs/benchmarks/milmmt-2026-09-21.md and its raw
+  evidence; rerun paragraphs with node scripts/benchmark-milmmt.mjs. Script
+  syntax check and all eight requests completed. No production changes or
+  live Foundry mutations. Keep Hy-MT2 7B as the smaller-model baseline, PR #19
+  draft, and larger model downloads optional. Do not automatically select
+  MiLMMT or describe ordinary-prose quality as a glossary success.
+
 - 2026-09-21, follow-up: the user requested continued improvement and a fresh
   model review. See docs/benchmarks/local-models-2026-09-21.md (primary sources).
   Requested Google Gemma 4 26B-A4B QAT Q4_0, main file 14.4 GB, for the next

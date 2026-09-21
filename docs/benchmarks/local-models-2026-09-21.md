@@ -7,16 +7,23 @@ nvidia-smi: RTX 5070 Ti, 16,303 MiB VRAM; RAM about 64 GB, Intel Ultra 7 265K.
 Model file size is not total runtime memory; context, buffers and other loaded
 models also consume VRAM.
 
+Follow-up: the user prefers smaller, faster models and installed MiLMMT 12B.
+Its Q4_K_S build was tested with the documented raw-completion prompt. Ordinary
+prose was fast, but it ignored approved glossary names and corrupted markup.
+See [the MiLMMT evaluation](milmmt-2026-09-21.md). Hy-MT2 7B remains the current
+smaller-model baseline. The larger candidates below are optional research
+alternatives, not required next downloads.
+
 | Candidate | Verified availability and fit | Decision |
 | --- | --- | --- |
-| Gemma 4 26B-A4B QAT Q4_0 | Official Google GGUF: main file 14.4 GB; larger family member than the tested 12B | First additional download requested; test quality before selecting it |
+| Gemma 4 26B-A4B QAT Q4_0 | Official Google GGUF: main file 14.4 GB; larger family member than the tested 12B | Previously requested, now optional given the smaller-model preference; not tested yet |
 | Hy-MT2 30B-A3B | Tencent translation specialist; official Q4_K_M 18.2 GB; Czech listed by publisher | Second candidate; exceeds this GPU's VRAM before context, needs partial RAM offload |
-| MiLMMT-46-12B v1.0 | Xiaomi's August 2026 post-training release, explicitly supports Czech; based on Gemma3-12B | Worth testing as a smaller translation specialist; custom prompt/template and community GGUF need validation |
+| MiLMMT-46-12B v1.0 | Xiaomi's August 2026 post-training release, explicitly supports Czech; based on Gemma3-12B | Tested community Q4_K_S: fast plain prose, unreliable glossary and markup; not selected |
 | Qwen3.8-27B | Current local LM Studio model, updated August 17; already installed Q4_K_M with MTP | Retest with improved input representation; initial inflection failures do not rule out other settings |
 | TranslateGemma 12B/27B | Google translation specialist with a dedicated language-code chat template | Secondary option; integration differs from generic chat, so not an immediate drop-in recommendation |
 | Qwen3.8-LiveTranslate | September 18 announcement, speech interpretation with a DashScope real-time API | Different deployment/task from local Foundry text translation; no local GGUF confirmed in reviewed sources |
 
-Download requested for the first comparison:
+Earlier Gemma download request (optional; smaller-model work can continue):
 
 - Repository: `google/gemma-4-26B-A4B-it-qat-q4_0-gguf`
 - Main file: `gemma-4-26B_q4_0-it.gguf` (14.4 GB)
