@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-21",
+  "catalogs": {
+    "core": {
+      "version": "14.368",
+      "strings": 3587,
+      "signature": "1e8f463470fb6a7067a43b50178cc9f97b72ddedef2565ac3ec36accfaa86f2c"
+    },
+    "crucible": {
+      "version": "0.11.0",
+      "strings": 1969,
+      "signature": "5dd5daf125f29d15c6bb5e8102e1de67563f90bb77c382b83190f0a5c1067a53"
+    },
+    "ember": {
+      "version": "0.6.2",
+      "strings": 503,
+      "signature": "1a79e45aba56109bcad7b7190c6a3732931fc872c2867ad7063e264263b0815e"
+    }
+  }
+}

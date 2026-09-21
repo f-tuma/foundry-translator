@@ -1,0 +1,2937 @@
+{
+  "ABILITIES": {
+    "Dexterity": "Obratnost",
+    "DexterityAbbr": "Obr",
+    "GROUPS": {
+      "Power": "Síla",
+      "Resilience": "Odolnost",
+      "Speed": "Rychlost"
+    },
+    "Intellect": "Intelekt",
+    "IntellectAbbr": "Int",
+    "Presence": "Přítomnost",
+    "PresenceAbbr": "Přt",
+    "Strength": "Síla",
+    "StrengthAbbr": "Sil",
+    "TOOLTIPS": {
+      "Dexterity": "<p>Obratnost je vlastnost fyzické rychlosti, která odráží hbitost a přesnost pohybů. Obratnost ovlivňuje <strong>Iniciativu</strong> při provádění akcí, složku <strong>Vyhýbání se zásahům</strong> v rámci Obrany, <strong>Odrážení útoků</strong> a také používání zbraní, jež jsou úměrně k hodnotě obratnosti.</p>",
+      "Intellect": "<p>Intelekt je mentální vlastnost, která odráží rychlost myšlení a schopnost rozhodovat se. Ovlivňuje <strong>Iniciativu</strong> při provádění akcí, <strong>obranu úhybnou</strong> a také velikost <strong>Soustředění</strong>.</p>",
+      "Presence": "<p>Přítomnost je mentální vlastnost popisující sílu osobnosti, odhodlání a sebedůvěru jedince. Ovlivňuje <strong>Obranu Vůle</strong> a velikost <strong>Soustředění</strong>. Každý bod této vlastnosti zvyšuje základní <strong>Morálku</strong> o 4 body.</p>",
+      "Strength": "<p>Síla je fyzická vlastnost, která popisuje sílu a mohutnost jedince. Ovlivňuje <strong>Obranu Odolnosti</strong>, nosnou <strong>KapacITU</strong> a používání zbraní, jež se odvíjí od úrovně této vlastnosti. Každý bod Síly navíc zvyšuje základní <strong>Zdraví</strong> o 2 body.</p>",
+      "Toughness": "<p>Odolnost je fyzická vlastnost, která popisuje odolnost organismu a schopnost překonávat obtíže. Ovlivňuje <strong>Obranu Odolnosti</strong>. Každý bod této vlastnosti zvyšuje základní <strong>Zdraví</strong> o 4 body.</p>",
+      "Wisdom": "<p>Moudrost je mentální vlastnost, která popisuje sílu přesvědčení, hloubku poznání a trpělivost jedince. Ovlivňuje <strong>Obranu Vůle</strong> a velikost <strong>Soustředění</strong>. Každý bod této vlastnosti zvyšuje základní <strong>Morálku</strong> o 2 body.</p>"
+    },
+    "Toughness": "Odolnost",
+    "ToughnessAbbr": "Od",
+    "Wisdom": "Moudrost",
+    "WisdomAbbr": "Mou"
+  },
+  "ACCESSORY": {
+    "CATEGORIES": {
+      "Clothing": "Oblečení",
+      "Jewelry": "Šperky",
+      "Other": "Jiné předměty",
+      "Trinket": "Malé předměty"
+    }
+  },
+  "ACTION": {
+    "ACTIONS": {
+      "AddFavorite": "Přidat do oblíbených",
+      "CreateRegionBehavior": "Vytvořit chování regionu",
+      "Delete": "Odstranit akci: {name}",
+      "DeleteConfirm": "Opravdu si přejete odstranit akci <strong>{name}</strong> z <strong>{parent}</strong> {type}?",
+      "DeleteRegionBehavior": "Odstranit chování regionu",
+      "DeleteRegionBehaviorConfirm": "Skutečně si přejete odstranit chování regionu pro tuto akci <strong>{action}</strong>?",
+      "EditRegionBehavior": "Upravit chování regionu",
+      "RemoveFavorite": "Odebrat z oblíbených"
+    },
+    "Action": "Akce",
+    "AffectsScope": "Vliv na {scope}",
+    "AllResult": "{existing} (všechny)",
+    "ChooseWeaponHint": "Můžete si vybrat, jakou zbraň využít pro tuto akci.",
+    "ChooseWeaponLabel": "Zbraň",
+    "Condition": "Stav",
+    "Confirmed": "Potvrzeno",
+    "DEFAULT_ACTIONS": {
+      "Cast": {
+        "Description": "Využijte magii k vytvoření díla zaklínadel.",
+        "Name": "Vyvolání kouzla"
+      },
+      "Defend": {
+        "Description": "Soustředíte se na vyhýbání se zranění a posílíte svou fyzickou obranu. Do začátku svého příštího tahu získáte stav <strong>Střežený</strong>.",
+        "Name": "Obrana"
+      },
+      "Delay": {
+        "Description": "Odkládáte svou akci na pozdější okamžik v tomto kole střetnutí. Zvolte iniciativu mezi 1 a hodnotou o jednu nižší, než je vaše současná iniciativa. Budete jednat podle této nové hodnoty; pokud jiní bojovníci mají stejnou hodnotu, budete jednat před nimi. Za jedno kolo můžete svůj tah odložit pouze jednou.",
+        "Name": "Odložení"
+      },
+      "Escape": {
+        "Description": "Osvobodíte se od stavu, který vás uvádí do stavu omezeného pohybu. Provedete <strong>ověření</strong> a zrušíte tento stav u každého vlivu, pokud váš hod překročí stanovenou obtížnost odstranění.",
+        "Name": "Osvobození"
+      },
+      "Fall": {
+        "Description": "Spadnete na povrch pod sebou. Pády z výšky 11–30 stop se vyhodnocují proti reflexu a způsobují tupé zranění zdraví. Pády z výšky přes 30 stop jsou závažným nebezpečím vyhodnocovaným proti tělesné odolnosti. Pokud bytost neodolá, skončí na zemi.",
+        "Name": "Pád",
+        "NameDistance": "Pád ({distance} stop)"
+      },
+      "Investiture": {
+        "Description": "Využijte čas mimo střetnutí k naladění se s vybavenými magickými předměty, díky čemuž nabydou stavu plně využitelného.",
+        "Name": "Naladění"
+      },
+      "Move": {
+        "Description": "Pohybujete se na určitou vzdálenost; k tomu spotřebujete množství akcí, jež závisí na vaší rychlosti a typu použitého pohybu.",
+        "Name": "Pohyb"
+      },
+      "ReactiveStrike": {
+        "Description": "Provedete útok, jakmile nepřítel opustí váš dosah, přičemž vy sami nejste plně zapojeni do boje.",
+        "Name": "Reaktivní úder"
+      },
+      "Recover": {
+        "Description": "Věnujte 10 minut mimo boj na zotavení se ze vyčerpání, čímž plně obnovíte <strong>zdraví</strong>, <strong>morálku</strong>, <strong>akce</strong> a <strong>soustředění</strong>. Veškeré stávající <strong>hrdinství</strong> se zruší a dočasné efekty s krátkou dobou trvání skončí. Tímto postupem neubývá <strong>zranění</strong> ani <strong>šílenství</strong>.",
+        "Name": "Zotavení"
+      },
+      "Reload": {
+        "Description": "Přebijete střelnou zbraň, jež vyžaduje čas na přebití.",
+        "Name": "Přebití zbraně"
+      },
+      "Rest": {
+        "Description": "Strávíte deset hodin klidným odpočinkem; během něj se najíte, vyspíte a ošetříte svá zranění i obnovíte vyčerpané zdroje. Tímto postupem dosáhnete všech výhod popsaných u <strong>zotavení</strong>; navíc hrdinové sníží nahromaděné <strong>zranění</strong> i <strong>šílenství</strong> o tolik, kolik mají svůj <strong>úroveň</strong>. Dočasné efekty s delším trváním rovněž skončí.",
+        "Name": "Odpočinek"
+      },
+      "Search": {
+        "Description": "<p>Pečlivě prozkoumejte své okolí, abyste odhalili to, co se snažili ostatní skrýt. Provádíte <strong>Ověření</strong>, při kterém hledáte skryté postavy, předměty či další tajemství.</p><p>V průběhu boje můžete touto akcí odhalit jedince ukryté díky <strong>Skrývání</strong> v dosahu 30 stop. Mimo boj pak strávíte minimálně 10 minut důkladným prozkoumáním dostupné oblasti, přičemž můžete objevit i skryté pasti, ukryté předměty a další tajemství prostředí.</p>",
+        "Name": "Prohledávání"
+      },
+      "Strike": {
+        "Description": "Zasáhněte jednu postavu či předmět pomocí vybavené zbraně.",
+        "Name": "Útok"
+      },
+      "ThrowWeapon": {
+        "Description": "Vrhněte svou blízkou bojovou zbraň na cíl v okolí. Zbraň se poté stává <strong>upuštěnou</strong>, a útok nese +2 <strong>nevýhody</strong>, pokud daná zbraň nemá vlastnost <strong>Vrhání</strong>.",
+        "Name": "Vrhání zbraně"
+      }
+    },
+    "DelayHint": "Vyberte iniciativu v rozmezí od 1 do {maximum}. Podrobnosti o tom, jak odložená iniciativa ovlivňuje rozhodování při remízách, naleznete v @UUID[Compendium.crucible.rules.JournalEntry.QhZgmBrdLAGwYy5c.JournalEntryPage.DPrsFbPo3tD7TJ5g]{Initiative and Turn Order}.",
+    "DelayLabel": "Odložená iniciativa",
+    "DelayTitle": "Odložení tahu",
+    "DragToHotbar": "Přetažením na lištu akcí vytvoříte pro tuto akci makro.",
+    "DurationRounds": "{value} k",
+    "DurationSeconds": "{value} s",
+    "DurationUntilEnded": "Až do ukončení",
+    "EFFECTS": {
+      "Add": "Přidat stavový efekt",
+      "Delete": "Odstranit stavový efekt"
+    },
+    "EFFECT_RESULT_TYPES": {
+      "All": "Všechny",
+      "Any": "Jakékoli",
+      "CriticalFailure": "Kritické selhání",
+      "CriticalSuccess": "Kritický úspěch",
+      "Custom": "Vlastní",
+      "Failure": "Selhání",
+      "Success": "Úspěch"
+    },
+    "EffectSpecific": "Efekt: {effect}",
+    "FIELDS": {
+      "actionHooks": {
+        "hint": "POZOR! Skripty akcí jsou POKROČILOU funkcí pro automatizaci herních mechanik. Chybné nastavení může mít závažné následky. Úpravy provádějte pouze tehdy, pokud této funkci rozumíte.",
+        "label": "Skripty akce"
+      },
+      "condition": {
+        "hint": "Doplňující text vysvětlující podmínky, za kterých lze danou akci provést.",
+        "label": "Podmínka spuštění"
+      },
+      "cost": {
+        "action": {
+          "hint": "Základní náklady této akce vyjádřené v bodech Akce.",
+          "label": "Akce"
+        },
+        "focus": {
+          "hint": "Základní náklady této akce vyjádřené ve stupních Soustředění.",
+          "label": "Soustředění"
+        },
+        "hands": {
+          "hint": "Počet rukou potřebných k provedení této akce.",
+          "label": "Požadovaný počet rukou"
+        },
+        "heroism": {
+          "hint": "Základní náklady této akce vyjádřené ve stupních Hrdinství.",
+          "label": "Hrdinství"
+        },
+        "hint": "Upravte náklady na provedení této akce v bodech Akce, Soustředění či Hrdinství.",
+        "label": "Náklady na akci",
+        "weapon": {
+          "hint": "Přičítat náklady na vybavenou zbraň k celkovým nákladům na tuto akci?",
+          "label": "Přidat náklady zbraně"
+        }
+      },
+      "description": {
+        "hint": "Popis toho, jak tato akce funguje z mechanického hlediska.",
+        "label": "Popis akce"
+      },
+      "effects": {
+        "element": {
+          "duration": {
+            "label": "Trvání"
+          },
+          "name": {
+            "label": "Název efektu"
+          },
+          "result": {
+            "all": {
+              "label": "Všechny"
+            },
+            "label": "Výsledek",
+            "type": {
+              "label": "Typ"
+            }
+          },
+          "scope": {
+            "label": "Rozsah efektu"
+          },
+          "statuses": {
+            "label": "Stavy"
+          }
+        }
+      },
+      "id": {
+        "hint": "Zadejte standardní alfanumerický identifikátor ve formátu camelCase pro tuto akci. Tento identifikátor musí být jedinečný mezi všemi akcemi v systému.",
+        "label": "Identifikátor"
+      },
+      "persistRegion": {
+        "hint": "Vytvoří trvalou oblast, na které lze volitelně nastavit předdefinované chování typu „Crucible Action“. Tato oblast bude existovat po celou dobu trvání efektu spojeného s touto akcí, nebo donekonečna, pokud žádný takový efekt není nastaven.",
+        "label": "Trvalá Oblast"
+      },
+      "range": {
+        "hint": "Určete minimální či maximální vzdálenost v stopách, na které lze tuto akci provádět.",
+        "label": "Dosah akce",
+        "maximum": {
+          "label": "Maximální hodnota"
+        },
+        "minimum": {
+          "label": "Minimální hodnota"
+        },
+        "weapon": {
+          "hint": "Rozsah této akce je určen účinným dosahem použité zbraně.",
+          "label": "Použít dosah zbraně"
+        }
+      },
+      "regionBehavior": {
+        "hint": "Chování oblasti, které ovlivňuje způsob fungování trvalé oblasti vytvořené touto akcí.",
+        "label": "Chování Oblasti"
+      },
+      "summon": {
+        "actorUuid": {
+          "hint": "Kterou konkrétní postavu má tato akce přivolat?",
+          "label": "Přivolaná Postava"
+        },
+        "combatant": {
+          "hint": "Má být přivolané stvoření zařazeno do probíhajícího střetnutí?",
+          "label": "Zařazení do Střetnutí"
+        },
+        "label": "Přivolání",
+        "permanent": {
+          "hint": "Má přivolaná bytost přetrvat, dokud nebude zabita?",
+          "label": "Trvalé Přivolání"
+        }
+      },
+      "tags": {
+        "hint": "Přidejte štítky, jež definují podmínky, chování a modifikátory této akce. Pořadí štítků má význam – později uvedené štítky mají přednost před dřívějšími, pokud upravují stejnou vlastnost akce.",
+        "label": "Štítky Akce"
+      },
+      "target": {
+        "label": "Cíl Akce",
+        "limit": {
+          "hint": "Má být účinek této akce omezen na maximální počet postav? Ve výchozím nastavení jsou ovlivněny všechny cíle.",
+          "label": "Maximální počet cílů"
+        },
+        "multiple": {
+          "hint": "Má se tato akce na každý cíl aplikovat vícekrát? Ve výchozím nastavení se akce na každém cíli provede jen jednou.",
+          "label": "Vícenásobné aplikace"
+        },
+        "number": {
+          "hint": "Kolik postav daného typu bude touto akcí ovlivněno?",
+          "label": "Počet cílů"
+        },
+        "scope": {
+          "hint": "Které cíle akce ovlivní podle jejich vztahu k původci?",
+          "label": "Rozsah působení"
+        },
+        "self": {
+          "hint": "Pokud to odpovídá nastavenému typu a rozsahu cílů, automaticky se jako cíl vybere i vlastní postava.",
+          "label": "Cílit na sebe samého"
+        },
+        "size": {
+          "hint": "U některých typů cílů lze dále upravit velikost v stopách.",
+          "label": "Velikost cíle"
+        },
+        "type": {
+          "hint": "Jaký typ či oblast bude touto akcí ovlivněn?",
+          "label": "Typ cíle"
+        }
+      }
+    },
+    "MaintainContent": "<p>Chcete věnovat {cost} jednotek soustředění na udržení účinku {effect}?</p>",
+    "MaintainTitle": "Udržet soustředění: {effect}",
+    "NoTargets": "Žádné cíle",
+    "Overview": "Přehled akcí",
+    "PlanMovement": "Naplánovat pohyb",
+    "PlanRegion": "Umístit oblast",
+    "PlannedMovement": "Pohyb naplánován",
+    "PlannedRegion": "Oblast umístěna",
+    "RemoveActor": "Odstranit postavu",
+    "RequestActorsHint": "Přetáhněte sem jednotlivé či skupiny postav, aby se mohly zúčastnit tohoto hodu.",
+    "RequestRollsSuffix": "{label}: Žádost o hody",
+    "RequestedActors": "Požadované postavy",
+    "RequiresMovement": "Před použitím této akce je nutné naplánovat trasu pohybu.",
+    "RequiresRegion": "Tuto akci lze provést až po vytvoření regionu.",
+    "SHEET": {
+      "Title": "Akce"
+    },
+    "SUMMARY": {
+      "Investiture": "Naladění",
+      "ItemDivested": "Naladění zrušeno",
+      "ItemInvested": "Naladěno"
+    },
+    "SkillCheck": "Ověření dovednosti {skill}",
+    "SkillCheckGeneric": "Ověření dovedností",
+    "StandardCheck": "Standardní ověření",
+    "TABS": {
+      "description": "Popis",
+      "effects": "Efekty",
+      "hooks": "Skripty",
+      "target": "Cíl",
+      "usage": "Použití"
+    },
+    "TAG": {
+      "Accurate": "Přesné",
+      "AccurateTooltip": "Tato akce je mimořádně přesná. Získáváte 2 dodatečné požehnání při jejím provedení.",
+      "AfterStrike": "Po útoku",
+      "AfterStrikeTooltip": "Tuto akci lze provést pouze ihned po běžném útoku, který nebyl kritickým neúspěchem.",
+      "Auditory": "Sluchové",
+      "AuditoryTooltip": "Pro provedení této akce musí cíle mít schopnost slyšet.",
+      "Brute": "Surové síly",
+      "BruteTooltip": "Tato akce využívá surovou sílu; vyžaduje zbraň, jejíž síla se odvíjí od síly.",
+      "Composed": "Složené kouzlo",
+      "ComposedTooltip": "Tato akce představuje složené kouzlo.",
+      "Consume": "Spotřeba",
+      "ConsumeTooltip": "Tato akce vyžaduje spotřebování určitého předmětu určeného k použití.",
+      "CostAction": "{action}A",
+      "CostFocus": "{focus}F",
+      "CostHand": {
+        "few": "{hands} ruce",
+        "many": "{hands} rukou",
+        "one": "{hands} ruka",
+        "other": "{hands} rukou",
+        "two": "{hands} ruce",
+        "zero": "{hands} rukou"
+      },
+      "CostHealth": "{health}HP",
+      "CostHeroism": "{heroism}H",
+      "CostMorale": "{morale}MP",
+      "CostTooltip": "Počet bodů akce či bodů soustředění potřebných k provedení této akce.",
+      "CostWeapon": "W",
+      "CostWeaponAction": "W{action}A",
+      "Deadly": "Smrtící",
+      "DeadlyTooltip": "Tato akce může způsobit obrovské množství zranění; násobitelem všech utrpěných škod se stává hodnota 1.",
+      "Difficult": "Obtížné",
+      "DifficultTooltip": "Tato akce je složitá či obtížná k provedení. Při jejím pokusu získáte 1 dodatečný nevýhodu.",
+      "Disarm": "Odzbrojení",
+      "DisarmTooltip": "Pokud se tato akce podaří, cíl přijde o svůj zbraňový předmět.",
+      "DualWield": "Boj dvěma zbraněmi",
+      "DualWieldTooltip": "Tato akce vyžaduje držení dvou zbraní nebo naprostou neozbrojenost k provedení.",
+      "Empowered": "Posílená",
+      "EmpoweredTooltip": "Tato akce je mocná a způsobuje dodatečné zranění; při úspěchu se počítá s bonusem +6 k poškození.",
+      "Finesse": "Preciznost",
+      "FinesseTooltip": "K provedení této akce je zapotřebí určité preciznosti. Musíte držet zbraň, jejíž síla roste s hodnotou obratnosti.",
+      "Flanking": "Obklíčení",
+      "FlankingTooltip": "Tuto akci lze provést pouze proti cíli, který je flankován nebo si ničeho nevšiml.",
+      "Generic": "Obecná",
+      "GenericTooltip": "Akce vykonávající běžný útok bez využití konkrétní kouzla či zbraně.",
+      "Harmless": "Neškodná",
+      "HarmlessTooltip": "Tato akce nevyvolává žádný škodlivý efekt; její násobitel poškození je roven nule.",
+      "Healing": "Léčení",
+      "HealingTooltip": "Touto akcí dochází k obnově sil, a to na základě ověření prahu zranění spojence.",
+      "IconicSpell": "Ikonické kouzlo",
+      "IconicSpellTooltip": "Jedná se o ikonické kouzlo, jehož osvojení přichází po plném zvládnutí všech souvisejících prvků.",
+      "Keen": "Přesnost",
+      "KeenTooltip": "Tato akce je velmi přesná; její prahová hodnota pro kritický zásah se snižuje o 2 a pravděpodobnost takového zásahu roste.",
+      "MainHand": "Hlavní ruka",
+      "MainHandTooltip": "Touto akcí využijete zbraň drženou v hlavní ruce k útoku.",
+      "Maintained": "Udržovaná",
+      "MaintainedTooltip": "Tuto akci lze udržovat; na začátku každého vašeho tahu se pak uplatní náklad soustředění.",
+      "Mechanical": "Mechanická",
+      "MechanicalTooltip": "K provedení této akce je nutné použít mechanickou zbraň.",
+      "Melee": "Na blízko",
+      "MeleeTooltip": "Tato akce vyžaduje, aby postava držela blízkou zbraň nebo byla bez zbraně.",
+      "Movement": "Pohyb",
+      "MovementBlink": "Teleportace",
+      "MovementBlinkTooltip": "Tato akce vyžaduje, aby postava během pohybu teleportovala.",
+      "MovementBurrow": "Prohrabávání se",
+      "MovementBurrowTooltip": "Tato akce vyžaduje, aby postava během pohybu prohrabávala se v zemi.",
+      "MovementClimb": "Šplhání",
+      "MovementClimbTooltip": "Tato akce vyžaduje, aby postava během pohybu šplhala.",
+      "MovementCrawl": "Plazení se",
+      "MovementCrawlTooltip": "Tato akce vyžaduje, aby postava během pohybu plazila se po zemi.",
+      "MovementFly": "Létání",
+      "MovementFlyTooltip": "Tato akce vyžaduje, aby postava během pohybu létala.",
+      "MovementJump": "Skákání",
+      "MovementJumpTooltip": "Tato akce vyžaduje, aby postava během pohybu skákala.",
+      "MovementStep": "Kroky",
+      "MovementStepTooltip": "Tato akce vyžaduje, aby postava při pohybu dělala opatrné kroky.",
+      "MovementSwim": "Plavání",
+      "MovementSwimTooltip": "Tato akce vyžaduje, aby postava během pohybu plavala.",
+      "MovementTooltip": "Touto akcí můžete pohnout postavou; navíc je možné provést volný pohyb za každé kolo s nižšími náklady na akční body.",
+      "MovementWalk": "Chůze",
+      "MovementWalkTooltip": "Tato akce vyžaduje, aby postava během pohybu chodila.",
+      "Natural": "Přirozený útok",
+      "NaturalTooltip": "Touto akcí se provádí útok používající přirozené zbraně postavy.",
+      "NonCombat": "Mimo boj",
+      "NonCombatTooltip": "Akce, které lze provádět pouze mimo střetnutí.",
+      "OffHand": "Vedlejší ruka",
+      "OffHandTooltip": "Touto akcí využijete zbraň drženou v mimoruční ruce k útoku.",
+      "OneHand": "Jednoruční",
+      "OneHandTooltip": "K provedení této akce je nutné držet jednoruční zbraň.",
+      "Projectile": "Střelba",
+      "ProjectileTooltip": "Pro tuto akci je zapotřebí použít střelnou zbraň.",
+      "Rallying": "Sjednocování",
+      "RallyingTooltip": "Touto akcí dochází k obnově sil, neboť se ověřuje prahová hodnota šílenství spojence.",
+      "Ranged": "Na dálku",
+      "RangedTooltip": "K provedení této akce je nutné použít vzdálenostní zbraň.",
+      "Reaction": "Reakce",
+      "ReactionTooltip": "Tuto akci lze provést jen během tahu jiné bytosti, pokud jsou splněny podmínky její aktivace.",
+      "Reload": "Přebití",
+      "ReloadTooltip": "Touto akcí dojde k přebití vzdálenostní zbraně vyžadující opětovné nabití.",
+      "Rest": "Po odpočinku",
+      "RestTooltip": "Tuto akci lze provést pouze ihned po potvrzení akce odpočinku; po každém takovém odpočinku může následovat jen jedna tato akce.",
+      "Severe": "Závažné",
+      "SevereTooltip": "Pokud má cíl této akce zdroje zranění a šílenství, pak tato akce poškodí tyto zdroje bez ohledu na zdraví či morálku.",
+      "Shield": "Štít",
+      "ShieldTooltip": "K provedení této akce je nutné držet štít.",
+      "Skill": "Dovednost",
+      "SkillTooltip": "Touto akcí se provádí cílené nebo protichůdné ověření dovednosti.",
+      "Spell": "Kouzlo",
+      "SpellTooltip": "Tato akce zahrnuje použití kouzel.",
+      "Subtle": "Nenápadné",
+      "SubtleTooltip": "Tuto akci je obvykle těžké si všimnout; umožňuje skrytí a neviditelnost.",
+      "Summon": "Přivolání",
+      "SummonTooltip": "Tato akce přivolává, vyvolává či jinak vytváří bojovníka, který se přidá ke střetnutí.",
+      "Talisman": "Talismán",
+      "TalismanTooltip": "K provedení této akce je nutné držet talismán jako zbraň.",
+      "TargetTooltip": "Typ cíle, vzdálenost a počet platící pro tuto akci.",
+      "Thrown": "Házené",
+      "ThrownTooltip": "Tato akce spočívá v útoku házenou zbraní.",
+      "TwoHanded": "Obouruční",
+      "TwoHandedTooltip": "K provedení této akce je nutné použít obouruční zbraň.",
+      "Unarmed": "Beze zbraně",
+      "UnarmedTooltip": "K provedení této akce musíte být zcela bez zbraně.",
+      "Unarmored": "Beze zbroje",
+      "UnarmoredTooltip": "K provedení této akce je nutné nemít na sobě žádnou zbroj.",
+      "Vocal": "Mluvení",
+      "VocalTooltip": "Pro tuto akci musí uživatel mluvit či jinak vydávat zvuky.",
+      "Weakened": "Oslabené",
+      "WeakenedTooltip": "Tato akce je slabší než běžné útoky a poskytuje bonus k zranění -6."
+    },
+    "TAGS": {
+      "Action": "Štítky akcí",
+      "Activation": "Štítky aktivace",
+      "Context": "Kontextové štítky",
+      "Target": "Štítky cílů",
+      "TargetLimit": "Limit {limit}"
+    },
+    "TAG_CATEGORIES": {
+      "Attack": "Útok",
+      "Context": "Kontext",
+      "Damage": "Zranění",
+      "Defenses": "Obrana",
+      "Modifiers": "Modifikátory",
+      "Movement": "Pohyb",
+      "Requirements": "Požadavky",
+      "Resources": "Zdroje",
+      "Scaling": "Škálování",
+      "Skills": "Dovednosti",
+      "Special": "Speciální",
+      "Spellcraft": "Kouzelnictví"
+    },
+    "TARGET_SCOPES": {
+      "All": "Všichni",
+      "Allies": "Spojenci",
+      "Enemies": "Nepřátelé",
+      "None": "Žádní",
+      "Self": "Sám sebe"
+    },
+    "TARGET_TYPES": {
+      "Aura": "Aura",
+      "Blast": "Výbuch",
+      "Cone": "Kužel",
+      "Fan": "Vějíř",
+      "Movement": "Pohyb",
+      "None": "Žádní",
+      "Pulse": "Impuls",
+      "Ray": "Paprsek",
+      "Self": "Sám sebe",
+      "Single": "Jednotlivec",
+      "Summon": "Přivolání",
+      "Wall": "Zeď"
+    },
+    "Targets": "Cíle",
+    "TemplateTargets": "Šablonové cíle",
+    "Unconfirmed": "Nepotvrzeno",
+    "UseAction": "Použít akci",
+    "WARNINGS": {
+      "AlreadyConfirmed": "Tato akce vůči vám již byla potvrzena a nelze na ni reagovat.",
+      "AuraNoToken": "Akci vycházející z vlastní postavy nelze použít bez jejího tokenu na scéně!",
+      "BadStatus": "Není možné provést {action}, když je nastaven stav {status}.",
+      "CannotAffordCost": "{name} nemá dostatek {resource} potřebných k provedení {action}!",
+      "CannotAffordHands": {
+        "few": "{name} musí mít {hands} volných rukou, aby mohl použít {action}!",
+        "many": "{name} musí mít {hands} volných rukou, aby mohl použít {action}!",
+        "one": "{name} musí mít {hands} jednu volnou ruku, aby mohl použít {action}!",
+        "other": "{name} musí mít {hands} volných rukou, aby mohl použít {action}!",
+        "two": "{name} musí mít {hands} volných rukou, aby mohl použít {action}!",
+        "zero": "{name} musí mít {hands} volných rukou, aby mohl použít {action}!"
+      },
+      "CannotAffordMove": "{name} nemá dostatek akcí na to, aby se přesunul na tuto vzdálenost – vyžaduje to {cost}A energie!",
+      "CannotHideEngaged": "Nelze se Skrýt, když je hráč zapojen do boje s nepřítelem.",
+      "CannotSpendAction": "{name} nemůže vynaložit akci, protože je momentálně v bezvědomí!",
+      "CannotSpendFocus": "{name} nemůže využít soustředění, jelikož se nachází ve stavu {status}!",
+      "CannotTargetSelf": "Nelze zaměřit tuto akci na samotného sebe!",
+      "CannotThrow": "Tuto zbraň nemůžete hodit.",
+      "CannotUse": "{name} nesplňuje požadavky pro provedení akce {action}.",
+      "CannotUseReason": "{name} nesplňuje požadavky pro provedení akce {action}: {reason}",
+      "CannotUseTagGeneric": "s tagem {tag}",
+      "DirectMovementOnly": "Pro tuto akci je nutná přímá cesta pohybu bez mezilehlých bodů.",
+      "GemConjuredFlameShoddy": "Křivě vyrobený krystal s konjurovaným plamenem nedokáže přivolat žádného elementála.",
+      "HideObservers": "Další pozorovatelé",
+      "IncorrectTargets": "Pro akci {action} můžete určit maximálně {number} cílů typu {type}!",
+      "InvalidTarget": "Je nutné pro akci {action} vybrat alespoň jeden cíl typu {type}!",
+      "InvalidTargetScope": "Tato postava není vhodným cílem pro akci {action}.",
+      "InvalidTargetsGeneric": "Pro tuto akci nejsou žádné platné cíle!",
+      "LastCriticallyMissed": "Akci {action} můžete provést pouze po běžném úderu, který neskončil kritickým neúspěchem.",
+      "LastNotMeleeCrit": "Akci {action} můžete provést ihned po úspěšném kritickém úderu v boji zblízka.",
+      "MaximumRange": "Vybraný cíl se nachází dále než na maximální vzdálenost {max} stop.",
+      "MinimumRange": "Vybraný cíl je blíže, než je minimální povolená vzdálenost {min} stop.",
+      "MinimumSize": "K provedení akce {action} musíte mít alespoň velikost {size}.",
+      "MisconfiguredSummon": "Pro akci {action} není správně nastaven cíl pro přivolání.",
+      "MissingSummonEffect": "Je nutné definovat data ActiveEffect, aby bylo možné sledovat dočasně přivolanou bytost v rámci akce \"{action}\".",
+      "MovementTooFar": "Plánovaná dráha pohybu přesahuje maximální povolený rozsah pro tuto akci.",
+      "MovementTooShort": "Plánovaná dráha pohybu neodpovídá minimálním požadavkům na vzdálenost stanoveným touto akcí.",
+      "MustFollowMainhandStrike": "Akci {action} můžete provést pouze po běžném úderu hlavní zbraní.",
+      "MustFollowMeleeDefense": "Akci {action} můžete provést až poté, co se ubráníte útoku v boji zblízka pomocí {defense}.",
+      "MustFollowMeleeKill": "Akci {action} můžete provést pouze po ochromení nepřítele během úderu v boji zblízka.",
+      "MustFollowRanged": "Akci {action} můžete provést pouze po útoku vzdálenostní zbraní.",
+      "MustFollowRest": "Akci {action} můžete provést ihned po ukončení odpočinku.",
+      "MustFollowStrike": "Akci {action} můžete provést až po provedení běžného útoku zbraní.",
+      "MustJoinParty": "Akci {action} můžete provést pouze jako členové družiny.",
+      "MustReactHit": "Akci {action} smíte provést jen v reakci na útok, který zasáhl cíl nebo minul vedle něj.",
+      "MustReactSingleTarget": "Akci {action} můžete provést pouze jako odpověď na akci zaměřenou na jediný cíl.",
+      "MustReactStrike": "Akci {action} smíte provést jen v reakci na útok zbraní.",
+      "MustReload": "K provedení této akce je nutné přebít vaši zbraň.",
+      "MustScaleDex": "Všechny zbraně použité při této akci musí být upraveny podle hodnoty obratnosti.",
+      "MustScaleStrength": "Všechny zbraně použité při této akci musí být upraveny podle síly.",
+      "MustTargetTarget": "Akci {action} lze provést jen na cíli, kterého se týkala poslední akce.",
+      "NoAbility": "Postava {actor} nemá žádnou hodnotu vlastnosti {ability}, a proto nemůže použít akci {action}.",
+      "NoConsumable": "Pro provedení akce „{action}“ není k dispozici žádný předmět k použití.",
+      "NoConsumableUses": "Předmět „{item}“ již nelze využít pro akci „{action}“, neboť vyčerpal všechny své možnosti použití.",
+      "NoLanternOil": "K rozsvícení lucerny je nutné mít v inventáři olej na lucernu.",
+      "NoReloadRequired": "Vaše zbraně nevyžadují přebití.",
+      "NoViewedScene": "Pro určení cílů této akce je zapotřebí vybrat nějakou scénu k prohlédnutí.",
+      "NonCombat": "Mimo bojový kontext nelze akci {action} použít.",
+      "NotFlanked": "Akce {action} vyžaduje obklíčený cíl. Cíl „{target}“ není obklíčen.",
+      "OncePerRound": "Akci {action} smíte provést jen jednou za každé kolo.",
+      "OncePerTurn": "Akci {action} můžete vykonat pouze jednou během jednoho tahu.",
+      "ReactionUnaware": "Při nevědomosti o okolí nelze využít žádnou reakci!",
+      "RequireTemplate": "Je nutné umístit měřicí šablonu, aby bylo možné určit oblast působení akce {action}.",
+      "RequiresAlchemistsToolkit": "K provedení této akce je zapotřebí mít v opasku vybavený sada pro alchymistu.",
+      "RequiresElementalCondition": "{target} nemá žádný elementární stav, který by tato akce mohla ovlivnit.",
+      "RequiresGesture": "Musíte znát Gesturu potřebnou k provedení této akce.",
+      "RequiresInflection": "Musíte znát Inflekci nezbytnou pro tuto akci.",
+      "RequiresMelee": "K provedení této akce je nutné mít vybavené zbraně určené k boji zblízka.",
+      "RequiresNatural": "Tato akce vyžaduje použití přirozené zbraně.",
+      "RequiresOffhand": "Pro provedení této akce je nutné mít vybavenou zbraň pro druhou ruku.",
+      "RequiresRanged": "K provedení této akce je potřeba mít vybavenou vzdálenostní zbraň.",
+      "RequiresRune": "Musíte znát Runu nezbytnou k tomuto postupu.",
+      "RequiresSlashingMelee": "{action} požaduje použití zbraně pro boj zblízka, která způsobuje sekánící zranění.",
+      "RequiresTalisman": "{action} vyžaduje využití zbraně typu Talisman.",
+      "RequiresTwoHanded": "K provedení této akce je nutné mít vybavenou dvouruční zbraň.",
+      "RestRecoverIncapacitated": "V stavu smrti či šílenství nemůžete odpočívat ani se uzdravovat.",
+      "Restrained": "Při omezeném pohybu není možné provádět tuto akci!",
+      "SPECIFIC": {
+        "DELAY": {
+          "AlreadyDelayed": "V tomto kole střetnutí už nemůžete svůj tah znovu odložit.",
+          "WrongTurn": "Akce Odložení lze využít pouze ve vašem vlastním tahu během boje."
+        },
+        "ESTOCADE": {
+          "RequiresOpening": "Estocade může být provedena jen na postavu, která je vystavena, ležící, zpomalená, ochromená či zbavená zbraně."
+        },
+        "REVIVE": {
+          "RequiresDead": "Oživení vyžaduje mrtvý cíl."
+        }
+      },
+      "Silenced": "Při stavu Umlčení nemůžete tuto akci provést.",
+      "TargetTooLarge": "Cíl \"{target}\" je příliš velký pro {action}.",
+      "UnimplementedTarget": "Automatizace pro typ cíle {type} u akce {name} zatím není k dispozici; musíte ručně vybrat vhodné tokeny.",
+      "WeaponDropped": "Vaše zbraň byla upuštěna – abyste mohli tuto akci provést, je nutné ji znovu zvednout.",
+      "WrongMovementToken": "Je třeba přesunout token, který bude danou akci vykonávat."
+    }
+  },
+  "ACTIONS": {
+    "AllIn": {
+      "CannotAfford": "{name} musí vynaložit 1 bod Hrdinství či 6 jednotek Gambitu, aby mohl jít All-In.",
+      "Marker": "All-In"
+    },
+    "AmplifyAffix": {
+      "Effect": "Zesílení afixu",
+      "Label": "Afix pro zesílení",
+      "NoAffixes": "Nemáte žádné vybavené afixy, které by šlo zesílit.",
+      "Required": "Musíte si vybrat afix k zesílení.",
+      "Title": "Zesílení afixu"
+    },
+    "Challenge": {
+      "Dominance": "Dominance"
+    },
+    "FieldStudy": {
+      "Effect": "Studium oblasti: {knowledge}",
+      "Label": "Předmět studia",
+      "Required": "Je nutné vybrat oblast vědění k prostudování.",
+      "Title": "Studium oblastí"
+    },
+    "Gambit": {
+      "AnteWon": "Gambit (+{count})",
+      "ChargeDescription": "Počet nábojů Gambitu, které lze využít místo <strong>Hrdinství</strong> při provedení akce „Vše na jednu kartu“.",
+      "Charges": "Gambit ({count})",
+      "LoadedDice": "Cinknuté kostky"
+    },
+    "Glide": {
+      "MustDescend": "Při sklouznutí musíte skončit v nižší výšce, než byla počáteční."
+    },
+    "Grapple": {
+      "AlreadyGrappled": "{name} je již spoután jinou bytostí.",
+      "AlreadyGrappling": "Již držíte spoutanou jinou bytost.",
+      "TooLarge": "{name} je příliš velký na to, abyste ho mohli spoutat."
+    },
+    "ImbueAffix": {
+      "AffixLabel": "Afix",
+      "Incompatible": "Tento afix nelze na zvolený předmět aplikovat.",
+      "InvalidAffix": "Je nutné vybrat platný afix k vložení do předmětu.",
+      "InvalidItem": "Musíte si vybrat fyzický předmět, který vlastníte a na který lze aplikovat kouzlení.",
+      "ItemLabel": "Předmět k očarování",
+      "NoCapacity": "Na tomto předmětu není žádné volné místo pro dané kouzlení.",
+      "Required": "Je nutné vybrat jak předmět, tak i afix.",
+      "TierTooHigh": "Tento afix nelze vložit na 1. stupeň.",
+      "Title": "Vkládání afixu"
+    },
+    "Swallow": {
+      "AlreadySwallowing": "Již právě polykáte jinou postavu."
+    },
+    "Throw": {
+      "NotGrappling": "Můžete házet pouze postavu, kterou držíte v sevření."
+    }
+  },
+  "ACTIVE_EFFECT": {
+    "ACTIONS": {
+      "Create": "Vytvořit efekt",
+      "Delete": "Odstranit efekt",
+      "Disable": "Zakázat efekt",
+      "Edit": "Upravit efekt",
+      "Enable": "Povolit efekt",
+      "New": "Nový efekt"
+    },
+    "CHANGE_TYPES": {
+      "scaleResource": "Měřítko zdroje"
+    },
+    "DURATION": {
+      "Combat": "Během střetnutí",
+      "Infinite": "∞",
+      "Rounds": "{value} k"
+    },
+    "STATUSES": {
+      "Asleep": "Spící",
+      "Bleeding": "Krvácející",
+      "Blind": "Slepý",
+      "Broken": "Poškozený",
+      "Burning": "Hořící",
+      "Burrowing": "Hrabe se",
+      "Confused": "Zmatený",
+      "Corroding": "Rozleptávaný",
+      "Dead": "Mrtvý",
+      "Deaf": "Ohluchlý",
+      "Decaying": "Rozkládající se",
+      "Diseased": "Nakažený nemocemi",
+      "Disoriented": "Dezorientovaný",
+      "Dominated": "Ovládnutý",
+      "Enraged": "Rozzuřený",
+      "Entropy": "Entropie",
+      "Exhausted": "Vyčerpaný",
+      "Exposed": "Vystavený nebezpečí",
+      "Falling": "Padající",
+      "Fear": "Vyděšený",
+      "Flanked": "Obklíčený",
+      "Flying": "Létající",
+      "Freezing": "Mrznoucí",
+      "Guarded": "Střežený",
+      "Hastened": "Zrychlený",
+      "Hexed": "Prokletý",
+      "Incapacitated": "Neschopný jednání",
+      "Insane": "Šílený",
+      "Inspired": "Inspirovaný",
+      "Invisible": "Neviditelný",
+      "Invulnerable": "Nezranitelný",
+      "Irradiated": "Ozářený",
+      "Limitless": "Bez hranic",
+      "Mending": "Opravování",
+      "Mute": "Umlčený",
+      "Overrun": "Přečíslený",
+      "Paralyzed": "Paralýza",
+      "Poisoned": "Otrava",
+      "Prone": "Ležení na zemi",
+      "Resolute": "Rozhodnost",
+      "Restrained": "Spoutání",
+      "Shocked": "Šokování",
+      "Slowed": "Zpomalení",
+      "Staggered": "Kymácení",
+      "Stunned": "Omámení",
+      "Suffocating": "Dušení",
+      "Unaware": "Nic netušící",
+      "Weakened": "Oslabení"
+    },
+    "WARNINGS": {
+      "ReferenceNotDeleted": "Mělo dojít k smazání „{name}“, avšak systém to neprovedl automaticky. Prosím, smažte jej ručně, pokud je to nutné."
+    }
+  },
+  "ACTOR": {
+    "ACTIONS": {
+      "AppliedDetailItem": "Přidán {type} {name} postavě {actor}.",
+      "ClearedDetailItem": "Odstraněn {type} z postavy {actor}.",
+      "DecreaseAbility": "Snížení hodnoty vlastnosti",
+      "DecreaseAbilitySpecific": "Snížení hodnoty {ability}",
+      "EditEngagement": "Úprava zapojení do akce",
+      "EditMovement": "Úprava možností pohybu",
+      "EditSize": "Úprava velikosti postavy",
+      "IncreaseAbility": "Zvýšení hodnoty vlastnosti",
+      "IncreaseAbilitySpecific": "Zvýšit {ability}",
+      "LevelUp": "Postoupit na vyšší úroveň!",
+      "ProficiencyFilterAll": "Zobrazit všechny zběhlosti",
+      "ProficiencyFilterTrained": "Zobrazit pouze trénované zběhlosti",
+      "ResetProficiency": "Vrátit všechny body zběhlosti",
+      "ResetProficiencyContent": "<p>Opravdu si přejete vrátit všechny rozdělené body zběhlosti? Výcvik získaný díky původu, zázemí či talentům zůstane zachován.</p>",
+      "ResetProficiencyTitle": "Vrácení bodů zběhlosti: {actor}",
+      "ResetTalents": "Resetovat všechny talenty",
+      "ResetTalentsContent": "<p>Opravdu si přejete resetovat všechny talenty?</p>",
+      "ResetTalentsTitle": "Resetování talentů: {actor}",
+      "ResolveProgress": "Přejít k dalšímu kroku postupu",
+      "RollCheck": "Ověření hodem",
+      "SyncActor": "Synchronizace z kompendia",
+      "SyncActorContent": "<p>Převezme se na tuto postavu všechny její talenty, původ, zázemí, taxonomie a archetyp podle aktuálních verzí v kompendiu.</p><p><strong>Veškeré vlastní úpravy těchto položek u postavy budou přepsány na výchozí hodnoty z kompendia.</strong> Všechny talenty, vybavení a kouzla, které již v pramenech nejsou uvedeny, budou odstraněny.</p>",
+      "SyncActorResult": "Synchronizace postavy {actor}: aktualizováno {synced} talentů, odstraněno {deleted}, přeaplikováno {details} detailních položek.",
+      "SyncActorTitle": "Synchronizace z kompendia: {actor}",
+      "SyncActorUnresolved": "Pro postavu {actor} nebylo v kompendiu nalezeno žádné záznamy pro {details}. Tyto položky tedy zůstaly beze změny.",
+      "TalentTreeClose": "Zavřít strom talentů",
+      "TalentTreeOpen": "Otevřít strom talentů",
+      "ToggleTree": "Přepnout strom talentů"
+    },
+    "ADVERSARY": {
+      "ACTIONS": {
+        "DecreaseLevel": "Snížit úroveň",
+        "IncreaseLevel": "Zvýšit úroveň"
+      },
+      "NoArchetype": "Žádný archetyp",
+      "NoTaxonomy": "Žádná taxonomie",
+      "THREAT_RANKS": {
+        "Boss": "Hlavní protivník",
+        "Elite": "Elitní",
+        "Minion": "Poskok",
+        "Normal": "Běžný"
+      },
+      "ThreatLevelSpecific": "Úroveň hrozby: {threat}"
+    },
+    "CREATION": {
+      "AbandonContent": "Chcete opustit proces tvorby postavy a zrušit všechny provedené změny?",
+      "AbandonTitle": "Opravdu chcete ukončit tvorbu postavy?",
+      "Complete": "Dokončit",
+      "CompleteHint": "Dokončit tvorbu",
+      "Completed": "Dokončeno",
+      "Equipment": "Vybavení",
+      "EquipmentAvailable": "Dostupné předměty",
+      "EquipmentCategory": "Kategorie",
+      "EquipmentFilterAll": "Vše",
+      "EquipmentHint": "Na levé straně si můžete prohlížet a vybírat předměty, které pak budou součástí vašeho počátečního inventáře.",
+      "EquipmentInsufficient": "Na {name} si nemůžete dovolit utratit peníze.",
+      "EquipmentRemaining": "Zbývající zlato",
+      "EquipmentSearch": "Vyhledávání předmětů",
+      "EquipmentStarting": "Počáteční vybavení",
+      "EquipmentType": "Typ předmětu",
+      "Exit": "Ukončit",
+      "ExitHint": "Ukončení tvorby postavy",
+      "NameRequired": "Pro dokončení tvorby je nutné zadat jméno postavy.",
+      "Restart": "Restartovat",
+      "RestartContent": "Opustit průběh tvorby postavy a začít znovu od začátku?",
+      "RestartHint": "Restartovat tvorbu",
+      "RestartTitle": "Chcete resetovat průběh tvorby postavy?",
+      "SpendAbilities": "Rozdělte 9 bodů mezi šest vlastností, přičemž na každou z nich lze přidělit až 3 body."
+    },
+    "Details": "Podrobnosti",
+    "DisarmedStatus": "Odzbrojení!",
+    "FIELDS": {
+      "abilities": {
+        "label": "Vlastnosti postavy"
+      },
+      "currency": {
+        "hint": "Množství peněz, které má tato postava k dispozici.",
+        "label": "Množství peněz"
+      },
+      "details": {
+        "biography": {
+          "age.label": "Věk",
+          "appearance": {
+            "hint": "Popis vzhledu této postavy; viditelný pro všechny s alespoň omezeným přístupem.",
+            "label": "Vzhled"
+          },
+          "height.label": "Výška",
+          "private": {
+            "hint": "Informace o této postavě, dostupné pouze držitelům oprávnění k jejímu zobrazení.",
+            "label": "Soukromé údaje o postavě"
+          },
+          "pronouns.label": "Zájmena",
+          "public": {
+            "hint": "Informace o této postavě, viditelné pro všechny s alespoň omezeným přístupem.",
+            "label": "Veřejné údaje o postavě"
+          },
+          "weight.label": "Hmotnost"
+        },
+        "languages": {
+          "label": "Známé jazyky"
+        }
+      },
+      "movement": {
+        "engagement": {
+          "base": "Základní počet soupeřů",
+          "hint": "Počet nepřátel, se kterými lze současně bojovat bez oslabení obrany.",
+          "label": "Počet soupeřů",
+          "labelShort": "Soupeři",
+          "tooltip": "Celkový počet protivníků, se kterými můžete současně bojovat, aniž byste byli zranitelnější. Hrdinové mají základ 1. Protivníci začínají na 1 a přičítají +1 za každé 2 body velikosti nad 4, zaokrouhleno nahoru.<br>Základní počet soupeřů + bonus k počtu soupeřů"
+        },
+        "engagementBonus": {
+          "hint": "Jedná se o dodatečný modifikátor k základnímu Engagement.",
+          "label": "Bonus k počtu soupeřů"
+        },
+        "size": {
+          "base": "Základní Velikost",
+          "label": "Velikost",
+          "tooltip": "Počet polí na mřížce, které tato postava obsazuje."
+        },
+        "sizeBonus": {
+          "hint": "Jedná se o dodatečný modifikátor k základní velikosti postavy určené podle jejího Původu či Taxonomie.",
+          "label": "Bonus k Velikosti"
+        },
+        "stride": {
+          "base": "Základní Rychlost pohybu",
+          "hint": "Vzdálenost pohybu za každý utracený akční bod.",
+          "label": "Rychlost pohybu",
+          "tooltip": "Akce pohybu vám umožňují urazit vzdálenost až rovnající se Vaší Rychlosti pohybu. Tento pohyb nelze přerušit; pokud urazíte menší vzdálenost, nezůstane žádný zbytkový úsek k následnému použití.<br>Základní Rychlost pohybu podle Původu/Taxonomie plus Bonus k této rychlosti"
+        },
+        "strideBonus": {
+          "hint": "Jedná se o dodatečný modifikátor ke Rychlosti pohybu postavy určené podle jejího Původu či Taxonomie.",
+          "label": "Bonus k Rychlosti pohybu"
+        }
+      },
+      "resistances": {
+        "bonus": {
+          "hint": "Jedná se o dodatečný modifikátor k základní Obraně postavy určené podle jejího Původu či Taxonomie.",
+          "label": "Bonus k odolnosti"
+        },
+        "immune": {
+          "hint": "Tato volba označuje, zda je daná postava imunní vůči tomuto typu zranění.",
+          "label": "Imunita"
+        },
+        "label": "Odolnosti"
+      }
+    },
+    "GROUP": {
+      "ACTIONS": {
+        "RemoveMember": "Odstranit člena"
+      },
+      "FIELDS": {
+        "advancement": {
+          "label": "Postupování",
+          "milestones": {
+            "element": {
+              "number.label": "Počet udělených bodů",
+              "reason.label": "Důvod udělení bodů",
+              "reason.placeholder": "Volitelný důvod pro udělení bodů."
+            },
+            "hint": "Záznam o milnících, kterých tato družina dosáhla.",
+            "label": "Dosáhnuté milníky"
+          }
+        },
+        "details": {
+          "biography": {
+            "private.label": "Soukromý životopis",
+            "public.label": "Veřejný životopis"
+          }
+        },
+        "members": {
+          "actor.label": "ID postavy",
+          "few": "Členové",
+          "label": "Členové družiny",
+          "many": "Členové",
+          "one": "Člen",
+          "other": "Členové",
+          "quantity.label": "Počet členů",
+          "two": "Členové",
+          "zero": "Členové"
+        },
+        "movement": {
+          "air.label": "Rychlost ve vzduchu",
+          "label": "Rychlost pohybu",
+          "land.label": "Rychlost na souši",
+          "pace.label": "Rychlost cestování",
+          "water.label": "Rychlost ve vodě"
+        }
+      },
+      "LABELS": {
+        "cyclePace": "Přepnout tempo",
+        "medianLevel": "Medián úrovní",
+        "recover": "Obnova výdrže",
+        "rest": "Odpočinek"
+      },
+      "REST": {
+        "Confirm": "Zahájit odpočinek",
+        "ContinuationHint": "Tento odpočinek navazuje na předchozí, který byl přerušen. Dosud uplynulo {hoursCompleted} hodin z celkových {hoursRequired}.",
+        "FIELDS": {
+          "allowInterruption": {
+            "hint": "Pokud je tato volba zaškrtnutá, může být tento odpočinek přerušen podle nastavených herních událostí.",
+            "label": "Povolit přerušení"
+          },
+          "hours": {
+            "hint": "Počet hodin, které uplynou v případě, že k žádnému přerušení nedojde.",
+            "label": "Hodiny odpočinku"
+          },
+          "participants": {
+            "hint": "Všechny vybrané postavy provedou akci odpočinku.",
+            "label": "Postavy odpočívající"
+          }
+        },
+        "Interrupted": "Po {hours} hodinách byl váš odpočinek přerušen!",
+        "Title": "Potvrdit skupinový odpočinek"
+      },
+      "WARNINGS": {
+        "NoAddSelf": "Nelze přidat vlastní skupinu!",
+        "NotWorldActor": "Je možné přidávat pouze postavy ze světa."
+      }
+    },
+    "KnowledgeSpecific": "Znalosti: {knowledge}",
+    "LABELS": {
+      "BackgroundKnowledgeTooltip": "Tyto oblasti znalostí jsou uděleny na základě vašeho zázemí.",
+      "BackgroundLanguageTooltip": "Tento jazyk je také součástí vašeho zázemí.",
+      "Capacity": "Nosnost",
+      "Currency": "Měna",
+      "CurrentCapacity": "Aktuální zatížení",
+      "CurrentEquipment": "Současný inventář",
+      "FavoriteActions": "Oblíbené akce",
+      "Knowledge": "Oblasti znalostí",
+      "KnowledgeHint": "Získáte nové oblasti znalostí díky svému zázemí nebo úpravou vlastní postavy.",
+      "KnowledgeHintAdversary": "Pomocí nastavení můžete přidělovat jednotlivé oblasti znalostí.",
+      "Languages": "Známé jazyky",
+      "LanguagesHint": "Díky svému zázemí nebo úpravou vlastní postavy získáte nové jazyky.",
+      "LanguagesHintAdversary": "Pomocí nastavení můžete přidělovat jednotlivé jazyky.",
+      "OverCapacity": "Přetížení"
+    },
+    "LanguageSpecific": "Jazyk: {language}",
+    "LevelSpecific": "Úroveň {level}",
+    "ProgressionRequirements": "Požadavky na postup v rozvoji",
+    "ResistanceSpecific": "Odolnost: {resistance}",
+    "SECTIONS": {
+      "ACCESSORY": {
+        "empty": "Vybírejte až {slots} předmětů z inventáře pomocí ikony štítu.",
+        "header": "Doplňky"
+      },
+      "ACTIVE": {
+        "header": "Aktivní schopnosti"
+      },
+      "ARMOR": {
+        "empty": "Vybírejte zbroj z inventáře pomocí ikony štítu.",
+        "header": "Zbroj"
+      },
+      "BACKPACK": {
+        "empty": "Přidejte předměty tak, že je vložíte z kompendií systému Crucible.",
+        "header": "Batoh"
+      },
+      "ICONIC": {
+        "empty": "Vybírejte ikonické kouzla prohlížením kompendia systému Crucible.",
+        "header": "Ikonická kouzla",
+        "none": "Nemáte žádné volné sloty pro ikonická kouzla."
+      },
+      "PASSIVE": {
+        "header": "Pasivní talenty"
+      },
+      "SIGNATURE": {
+        "header": "Výjimečné talenty"
+      },
+      "SPELL": {
+        "header": "Talenty kouzelnictví"
+      },
+      "TOOLBELT": {
+        "empty": "Vybírejte až {slots} nástroje či spotřební předměty z inventáře pomocí ikony štítu.",
+        "header": "Opasek s nástroji"
+      },
+      "WEAPON": {
+        "empty": "Vybírejte zbraně z inventáře pomocí ikony štítu.",
+        "header": "Zbraně"
+      }
+    },
+    "SHEET": {
+      "Abilities": "Vlastnosti",
+      "AbilityPoints": "Body vlastností",
+      "Defenses": "Obrana",
+      "HEADERS": {
+        "ActionsAttack": "Akce útoku",
+        "ActionsConsumable": "Akce s konzumovatelnými předměty",
+        "ActionsGeneral": "Obecné akce",
+        "ActionsMovement": "Akce pohybu",
+        "ActionsReaction": "Reakce",
+        "ActionsSpell": "Akce kouzelnictví",
+        "ActionsSummon": "Akce vyvolávání bytostí",
+        "EffectsDisabled": "Vypnuté efekty",
+        "EffectsPersistent": "Trvalé efekty",
+        "EffectsSuppressed": "Potlačené efekty",
+        "EffectsTemporary": "Dočasné efekty"
+      },
+      "PointsAvailable": "Dostupné",
+      "PointsGranted": "Zdokonalené",
+      "PointsSpent": "Využité",
+      "Resources": "Zdroje"
+    },
+    "SizeSpecific": "Velikost {size}",
+    "StrideSpecific": "Krok {stride}",
+    "TABS": {
+      "actions": "Akce",
+      "attributes": "Vlastnosti",
+      "biography": "Životopis postavy",
+      "effects": "Efekty",
+      "inventory": "Inventář",
+      "proficiency": "Zběhlost",
+      "spells": "Kouzla",
+      "talents": "Talenty"
+    },
+    "TrainingSpecific": "{training} {points}",
+    "VulnerabilitySpecific": "Zranitelnost: {vulnerability}",
+    "WARNINGS": {
+      "InsufficientCurrency": "Na odečtení {delta} {denom} nejsou dostatečné finanční prostředky.",
+      "MacroNoToken": "K použití tohoto makra je nutné mít ovládaný token.",
+      "NoAction": "Postava \"{actor}\" nemá akci \"{action}\".",
+      "NoAncestry": "Vyberte původ postavy.",
+      "NoBackground": "Zvolte zázemí pro postavu.",
+      "NoDragTalent": "Do družiny hrdinů lze talenty přidávat pouze prostřednictvím Stromu talentů.",
+      "OverspentAbility": "Bylo vynaloženo příliš mnoho bodů na vlastnosti.",
+      "OverspentProficiency": "Bylo vynaloženo příliš mnoho bodů na zběhlost.",
+      "OverspentTalent": "Bylo vybráno příliš mnoho talentů.",
+      "UnderspentAbility": "Využijte body na vlastnosti.",
+      "UnderspentProficiency": "Využijte body na zběhlost.",
+      "UnderspentTalent": "Využijte body na talenty."
+    }
+  },
+  "ADVANCEMENT": {
+    "ExpectedLevel": "Očekávaná úroveň",
+    "Important": "Důležité",
+    "Level": "Úroveň",
+    "MarkImportant": "Označit jako důležité",
+    "MarkNotImportant": "Označit jako nedůležité",
+    "MilestoneAward": "Udělení milníků",
+    "MilestoneTooltip": "{progress} z {required} milníků je potřeba k dosažení další úrovně.",
+    "Progress": "Průběh plnění milníků"
+  },
+  "AFFIX": {
+    "ConfigIdentity": "Identita afixu",
+    "ConfigTier": "Nastavení úrovně",
+    "CursedName": "Prokletý {name}",
+    "FIELDS": {
+      "adjective": {
+        "hint": "Volitelný přídavný výraz použitý při tvorbě názvu předmětu.",
+        "label": "Přídavné jméno"
+      },
+      "affixType": {
+        "hint": "Afixy mohou být buď prefixy, nebo suffixy.",
+        "label": "Typ afixu"
+      },
+      "identifier": {
+        "hint": "Jedinečný identifikátor tohoto afixu – maximálně 16 znaků; slouží k definování funkcí a určení ID afixu při přiřazení k předmětu.",
+        "label": "Identifikátor"
+      },
+      "itemTypes": {
+        "hint": "Na jaké typy předmětů lze tento afix použít. Pokud nejsou vybrány žádné konkrétní typy, je povoleno všechny typy předmětů.",
+        "label": "Typy předmětů"
+      },
+      "properties": {
+        "label": "Vlastnosti afixu"
+      },
+      "tier": {
+        "hint": "Povolený rozsah úrovní pro tento afix; každá úroveň spotřebuje jeden bod kapacity prefixu či suffixu.",
+        "label": "Úroveň",
+        "max": {
+          "label": "Maximální úroveň"
+        },
+        "min": {
+          "label": "Minimální úroveň"
+        },
+        "value": {
+          "hint": "Aktuální úroveň tohoto afixu přiřazená k danému předmětu.",
+          "label": "Úroveň afixu"
+        }
+      }
+    },
+    "PROPERTIES": {
+      "Cursed": "Prokletý"
+    },
+    "Prefixes": "Prefixy",
+    "Suffixes": "Suffixy",
+    "TierDisplay": "Úroveň {value} z celkových {max}",
+    "TierRestriction": "Rozsah úrovní",
+    "TypePrefix": "Prefix",
+    "TypeSuffix": "Přípona",
+    "WARNINGS": {
+      "CursedGamemasterOnly": "Pouze vypravěč může odstranit prokletou příponu z předmětu."
+    }
+  },
+  "ANCESTRY": {
+    "FIELDS": {
+      "abilities": {
+        "label": "Hodnoty vlastností",
+        "primary": {
+          "hint": "Vyberte hlavní hodnotu vlastnosti, která začíná na 3.",
+          "label": "Primární"
+        },
+        "secondary": {
+          "hint": "Vyberte vedlejší hodnotu vlastnosti, která začíná na 2.",
+          "label": "Sekundární"
+        }
+      },
+      "characteristics": {
+        "blooded.hint": "Určuje, zda tento původ disponuje nějakým druhem krve.",
+        "blooded.label": "Má krev",
+        "label": "Vlastnosti původu",
+        "temperature.hint": "Tělesná teplota tohoto původu – standardně je teplá.",
+        "temperature.label": "Tělesná teplota"
+      },
+      "description": {
+        "label": "Popis původu"
+      },
+      "identifier": {
+        "hint": "Jednoznačný identifikátor pro tento původ, použitelný v značkách, akcích či jiných prvcích rozhraní. Musí se jednat o alfanumerický řetězec bez mezer a speciálních znaků.",
+        "label": "Identifikátor"
+      },
+      "movement": {
+        "label": "Pohyb",
+        "size": {
+          "hint": "Velikost tohoto původu vyjádřená v počtu polí sítě.",
+          "label": "Velikost"
+        },
+        "stride": {
+          "hint": "Počáteční rychlost pohybu tohoto původu, rovněž vyjádřená v počtu polí sítě.",
+          "label": "Rychlost"
+        }
+      },
+      "resistances": {
+        "hint": "Při volbě jedné z možností – Odolnosti či Zranitelnosti – je nutné zvolit obojí.",
+        "label": "Odolnosti vůči zranění",
+        "resistance": {
+          "hint": "Biologická odolnost (+3) proti určitému typu zranění.",
+          "label": "Odolnost vůči zranění"
+        },
+        "vulnerability": {
+          "hint": "Biologický stavový efekt zranění – snížení odolnosti o 3 body vůči určitému typu zranění.",
+          "label": "Zranitelnost"
+        }
+      },
+      "talents": {
+        "hint": "Nastavte jeden či více talentů, které tato skupina postav automaticky získá.",
+        "label": "Rozvoj talentů"
+      },
+      "training": {
+        "hint": "Body výcviku získané zdarma z tohoto původu. Nestojí body zběhlosti a nelze je vrátit.",
+        "label": "Přidělená zběhlost"
+      },
+      "ui": {
+        "color": {
+          "hint": "Barva určená pro tuto skupinu postav, používaná v uživatelském rozhraní.",
+          "label": "Barva původu"
+        },
+        "icon": {
+          "hint": "Malý symbol sloužící k identifikaci této skupiny postav v uživatelském rozhraní.",
+          "label": "Ikona původu"
+        },
+        "label": "Uživatelské rozhraní"
+      }
+    },
+    "SECTIONS": {
+      "Traits": "Vlastnosti"
+    },
+    "SHEET": {
+      "Browse": "Procházet původy",
+      "Choose": "Vybrat původ",
+      "Clear": "Zrušit původ",
+      "Identity": "Identita",
+      "Physiology": "Fyziologie",
+      "TemperatureBlank": "Výchozí hodnota ({temperature})"
+    },
+    "WARNINGS": {
+      "Abilities": "Primární a sekundární vlastnosti dané skupiny postav nesmějí být totožné.",
+      "ResistancesBoth": "Při definování odolnosti či zranitelnosti je nutné nastavit obojí hodnoty.",
+      "ResistancesDifferent": "Zvolené hodnoty odolnosti a zranitelnosti pro danou skupinu postav nesmějí být stejné."
+    }
+  },
+  "ARCHETYPE": {
+    "FIELDS": {
+      "abilities": {
+        "hint": "Určete růst vlastností bytostí tohoto archetypu při postupu na vyšší úroveň. Rozdělte 12 bodů mezi všechny vlastnosti, každá smí mít hodnotu od nuly do 6. Protivníci získávají 1 bod vlastnosti za každou úroveň. Vlastnosti s vyšší hodnotou rostou častěji. Vlastnosti s nulovou hodnotou nikdy neporostou nad svou základní hodnotu.",
+        "label": "Rozvoj vlastností"
+      },
+      "equipment": {
+        "hint": "Nastavte předměty, jež tato skupina postav automaticky obdrží.",
+        "label": "Přidané vybavení"
+      },
+      "identifier": {
+        "hint": "Jedinečný identifikátor sloužící k odkazu na tento archetyp v značkách, akcích či jiných prvcích uživatelského rozhraní. Musí se jednat o alfanumerický řetězec bez mezer a speciálních znaků.",
+        "label": "Identifikátor"
+      },
+      "skills": {
+        "hint": "Nastavte sadu dovedností, jejichž stupeň zběhlosti se pro tento archetyp automaticky zvyšuje.",
+        "label": "Preferované dovednosti"
+      },
+      "spells": {
+        "hint": "Určete ikonické kouzla, která tomuto archetypu budou automaticky přidělována.",
+        "label": "Přidaná kouzla"
+      },
+      "talents": {
+        "hint": "Zadejte jeden či více talentů, jež tento archetyp získává bez nutnosti dalšího tréninku.",
+        "label": "Přidané talenty"
+      },
+      "training": {
+        "hint": "Body výcviku získané zdarma z tohoto archetypu. Nestojí body zběhlosti a nelze je vrátit.",
+        "label": "Automaticky přidaný trénink"
+      }
+    },
+    "SHEET": {
+      "Choose": "Vybrat archetyp",
+      "Clear": "Odstranit vybraný archetyp",
+      "RequiredComponents": "<p><strong>{spell}</strong> vyžaduje komponenty, které v současnosti tento archetyp neobsahuje. Chcete je automaticky přidat?</p>",
+      "Training": "Preferovaný trénink",
+      "TrainingAdd": "Přidat další stupeň zběhlosti",
+      "TrainingHint": "Protivníci tohoto archetypu rozdělují body výcviku podle těchto vah. Rozhodují poměry vah, nikoli jejich absolutní výše. Nulová váha nezíská žádné body, dokud nejsou plně vycvičeny všechny zběhlosti s nenulovou váhou; poté získá podíl ze zbývajících bodů.",
+      "TrainingRemove": "Odebrat stupeň zběhlosti",
+      "TrainingSpare": "Přidávají se pouze z bodů, které nelze využít pro již existující vážené dovednosti."
+    },
+    "WARNINGS": {
+      "InvalidAbilities": "Součet hodnot škálování vlastností musí být roven 12. Aktuálně je to {sum}.",
+      "InvalidSpells": "Na jednom archetypu nesmí existovat duplicitní kouzla.",
+      "NotEquipment": "Přidaný dokument musí představovat vybavení.",
+      "NotSpell": "Vkládaný dokument musí být ikonickým kouzlem."
+    }
+  },
+  "ARMOR": {
+    "CATEGORIES": {
+      "Heavy": "Těžká zbroj",
+      "Light": "Lehká zbroj",
+      "Medium": "Střední zbroj",
+      "Natural": "Přirozené",
+      "Unarmored": "Bez zbroje"
+    },
+    "FIELDS": {
+      "armor": {
+        "base": {
+          "label": "Základní hodnota zbroje"
+        },
+        "label": "Zbroj"
+      },
+      "properties": {
+        "label": "Vlastnosti zbroje"
+      }
+    },
+    "PROPERTIES": {
+      "Bulky": "Objemný",
+      "BulkyTooltip": "<strong>Objemná</strong> zbroj je těžkopádná na použití a přidává +2 Banes ke všem iniciativním hodům.",
+      "Natural": "Přirozené",
+      "NaturalTooltip": "Přirozená zbroj je součástí samotné postavy; obvykle ji nelze odložit.",
+      "Noisy": "Hlučný",
+      "NoisyTooltip": "<strong>Hlučná</strong> zbroj znemožňuje tiše se pohybovat."
+    },
+    "SHEET": {
+      "ArmorBonus": "Bonus k zbroji",
+      "Defenses": "Obranné vlastnosti zbroje",
+      "Dodge": "Úhybnost",
+      "DodgeBase": "Základní úhybnost",
+      "DodgeScaling": "Práh pro změnu hodnoty"
+    },
+    "SPECIFIC": {
+      "Unarmored": "Bez zbroje"
+    }
+  },
+  "ATTACK": {
+    "RESULT_TYPES": {
+      "Armor": "Zbroj",
+      "Block": "Blokování",
+      "CriticalHit": "Kritický zásah",
+      "Dodge": "Úhybnost",
+      "Glance": "Letmý zásah",
+      "Hit": "Zásah",
+      "Miss": "Minutí",
+      "Parry": "Kryt",
+      "Resist": "Odolnost"
+    }
+  },
+  "ATTRIBUTES": {
+    "Abilities": "Hodnoty vlastností",
+    "Pools": "Množství zdrojů",
+    "Resistances": "Odolnost proti zranění"
+  },
+  "AWARD": {
+    "Each": "každý",
+    "LABELS": {
+      "Award": "Udělit",
+      "Revoke": "Odebrat"
+    },
+    "MILESTONE": {
+      "Award": "Udělení ocenění za milníky",
+      "GroupAward": "Bylo uděleno {number} {label} skupině {name}, a také následujícím členům:",
+      "GroupRevoke": "Bylo odebráno {number} {label} od skupiny {name} a následujících členů:",
+      "Identifier": "Identifikátor",
+      "IdentifierHint": "Jedinečný identifikátor pro milníkové ocenění – musí být ve formě slugu (bez mezer či speciálních znaků).",
+      "Recipients": "Příjemci milníků",
+      "RecipientsHint": "Určete jednoho nebo více hrdinů, kteří budou oceněni za splnění milníku.",
+      "Revoke": "Zrušení udělení milníků",
+      "few": "Milníky",
+      "many": "Milníky",
+      "one": "Milník",
+      "other": "Milníky",
+      "two": "Milníky",
+      "zero": "Milníky"
+    },
+    "SUMMARIES": {
+      "Cost": "Náklady na {award}, zaplacené:",
+      "CostSplit": "Rozdělení nákladů na {award} mezi:",
+      "Reward": "{award} uděleno:",
+      "RewardSplit": "Rozdělení {award} mezi:",
+      "TABLE": {
+        "Formula": "Vzorec",
+        "Label": "Měna",
+        "Total": "Celková částka"
+      }
+    },
+    "TOOLTIPS": {
+      "Currency": "Udělit peníze",
+      "Milestone": "Udělit milníky"
+    },
+    "TitleCost": "Vyberte přispěvatele",
+    "TitleReward": "Vyberte příjemce",
+    "WARNINGS": {
+      "CannotAfford": "Následující postavy si nemohou dovolit zaplatit náklady tohoto obohacení: {actors}",
+      "CannotRevokeMilestone": "Na skupině \"{group}\" neexistuje žádný milník s identifikátorem \"{identifier}\".",
+      "DuplicateMilestone": "Milník s identifikátorem \"{identifier}\" již byl udělen na skupině \"{group}\".",
+      "InvalidMilestoneNumber": "Počet udělovaných milníků musí být kladné celé číslo.",
+      "InvalidTerms": "Nelze interpretovat {terms} jako platné podmínky pro odměny.",
+      "RequiresGM": "K využití funkcí Odměn je nutné mít oprávnění Vypravěče."
+    }
+  },
+  "BACKGROUND": {
+    "ERRORS": {
+      "Apply": "Zázemí lze přiřadit pouze postavě na úrovni 0, která dosud neutratila žádné body dovedností.",
+      "TalentTier": "Zázemí smí nabízet pouze počáteční talenty stupně 0."
+    },
+    "FIELDS": {
+      "description": {
+        "label": "Popis zázemí"
+      },
+      "identifier": {
+        "hint": "Jedinečný identifikátor tohoto zázemí používaný ve štítcích, akcích a dalších prvcích rozhraní. Musí být alfanumerický, bez mezer a zvláštních znaků.",
+        "label": "Identifikátor"
+      },
+      "knowledge": {
+        "hint": "Nastavte oblasti znalostí automaticky poskytované tímto zázemím. Obvykle jde o dvě oblasti.",
+        "label": "Oblasti znalostí"
+      },
+      "languages": {
+        "hint": "Nastavte Jazyky, které tento charakter zázemí automaticky poskytuje.",
+        "label": "Známé jazyky"
+      },
+      "talents": {
+        "hint": "Nastavte jeden nebo více talentů automaticky získaných z tohoto zázemí. Obvykle jsou to tři talenty.",
+        "label": "Získané talenty"
+      },
+      "training": {
+        "hint": "Zběhlosti, ve kterých toto zázemí uděluje po jednom bodu výcviku zdarma, bez utrácení bodů zběhlosti.",
+        "label": "Automaticky přidělené vzdělání"
+      },
+      "ui": {
+        "color": {
+          "hint": "Barva znázorňující toto zázemí v uživatelském rozhraní.",
+          "label": "Barva zázemí"
+        },
+        "icon": {
+          "hint": "Malá ikona znázorňující toto zázemí v uživatelském rozhraní.",
+          "label": "Ikona zázemí"
+        },
+        "label": "Uživatelské rozhraní"
+      }
+    },
+    "SHEET": {
+      "Browse": "Procházet zázemí",
+      "Choose": "Vybrat zázemí",
+      "Clear": "Zrušit zázemí",
+      "GrantWarning": "Přiděleno {count} z {expected}: {label}. Hrdinové s tímto zázemím začnou s menším množstvím, než bylo zamýšleno.",
+      "Grants": "Získáno ze zázemí",
+      "Identity": "Identita",
+      "TalentAdd": "Přidat talent",
+      "TalentDrop": "Přidejte talent k tomuto zázemí přetažením z kompendia talentů.",
+      "TalentRemove": "Odebrat talent"
+    }
+  },
+  "BASE_EFFECT": {
+    "Difficulty": "Náročnost {dc}",
+    "FIELDS": {
+      "dc": {
+        "hint": "Stanovte úroveň obtížnosti potřebnou k odstranění tohoto efektu, například pomocí magie. Pokud nelze tento efekt odstranit, ponechte pole prázdné.",
+        "label": "Úroveň obtížnosti pro odstranění"
+      },
+      "dot": {
+        "element": {
+          "amount": {
+            "hint": "Množství zranění či obnovy, jež má být aplikováno v každém kole.",
+            "label": "Množství"
+          },
+          "damageType": {
+            "label": "Typ zranění"
+          },
+          "resource": {
+            "hint": "Zdroj, na který se tato účinnost vztahuje při způsobování zranění či obnově.",
+            "label": "Zdroj"
+          },
+          "restoration": {
+            "label": "Obnova"
+          }
+        },
+        "label": "Postupné poškozování"
+      },
+      "maintenance": {
+        "cost": {
+          "label": "Náklady na udržování"
+        },
+        "hands": {
+          "hint": "Počet rukou využitých k udržení tohoto efektu – snižuje volný počet rukou pro použití zbraní či kouzel.",
+          "label": "Využité ruce"
+        },
+        "label": "Udržování"
+      },
+      "properties": {
+        "hint": "Charakteristiky popisující podstatu tohoto efektu.",
+        "label": "Vlastnosti"
+      },
+      "regions": {
+        "hint": "Oblasti závislé na tomto efektu.",
+        "label": "Oblasti"
+      },
+      "summons": {
+        "hint": "Přivolané tokeny závislé na tomto efektu.",
+        "label": "Přivolané bytosti"
+      }
+    },
+    "PROPERTIES": {
+      "Magical": "Magický",
+      "MagicalTooltip": "Tento efekt má magickou povahu; lze jej odstranit pomocí protimagických vlastností."
+    },
+    "SECTIONS": {
+      "General": "Obecné",
+      "Removal": "Odstranění"
+    },
+    "Suspended": "Pozastaveno"
+  },
+  "COMBAT": {
+    "Escalation": "Stupňování",
+    "HeroismPct": "Hrdinství {pct}%",
+    "HeroismTooltip": "Postup k dalšímu bodu hrdinství",
+    "INITIATIVE": {
+      "Combatant": "Postava",
+      "Result": "Výsledek",
+      "Round": "Iniciativa – Kolo {round}"
+    },
+    "SUMMARY": {
+      "EffectExpired": "Platnost skončila",
+      "EffectGained": "Získáno",
+      "EffectGainedDuration": "Získáno ({duration})",
+      "HeaderEnd": "{actor} – Konec tahu",
+      "HeaderStart": "{actor} – Začátek tahu",
+      "Maintaining": "{effect} (Stavový efekt se udržuje)",
+      "TableTitleEffects": "Změny stavových efektů",
+      "TableTitleResources": "Změny zdrojů"
+    },
+    "WARNINGS": {
+      "CannotChangeRound": "Pouze vypravěč může měnit pořadí kol ve střetnutí."
+    }
+  },
+  "CONSUMABLE": {
+    "CATEGORIES": {
+      "Ammunition": "Munice",
+      "Bomb": "Bomba",
+      "Flask": "Láhev",
+      "Kit": "Sada vybavení",
+      "Other": "Ostatní",
+      "Scroll": "Kouzelný svitek",
+      "Trap": "Past"
+    },
+    "FIELDS": {
+      "scroll": {
+        "gestures.label": "Gesta",
+        "hint": "Nastavte složky kouzel, o nichž tento kouzelný svitek dočasně poskytuje znalosti.",
+        "inflections.label": "Modifikace",
+        "label": "Kouzelný svitek",
+        "runes.label": "Runy"
+      },
+      "uses": {
+        "hint": "Nastavte omezený počet použití tohoto spotřebního předmětu, než dojde k jeho vyčerpání.",
+        "label": "Použití",
+        "max.label": "Maximální počet",
+        "value.label": "Hodnota"
+      }
+    },
+    "PROPERTIES": {
+      "Thrown": "Vrhnutí",
+      "ThrownTooltip": "Tento spotřební předmět je určen k vrhání."
+    },
+    "SCROLL": {
+      "ComponentBudget": "Toto pergamenové svitky může poskytnout až {budget} složek pro zaklínadla. Vyberte, jaké složky bude tato svitka obsahovat.",
+      "ComponentBudgetError": "Celkově lze u této svitky uvádět pouze {budget} složek pro zaklínadla, avšak bylo zadáno celkem {total} takových složek.",
+      "ConfigureTitle": "Nastavit kouzelný svitek: {name}",
+      "NoComponents": "Tato pergamenová svitka je prázdná a nelze ji přečíst.",
+      "ScrollName": "Svitek: {scroll}"
+    },
+    "USES": {
+      "Of": "z",
+      "TagMax": {
+        "few": "{value} použití",
+        "many": "{value} použití",
+        "one": "{value} Použití",
+        "other": "{value} použití",
+        "two": "{value} použití",
+        "zero": "{value} použití"
+      },
+      "TagPartial": {
+        "few": "{value}/{max} použití",
+        "many": "{value}/{max} použití",
+        "one": "{value}/{max} Použití",
+        "other": "{value}/{max} použití",
+        "two": "{value}/{max} použití",
+        "zero": "{value}/{max} použití"
+      }
+    }
+  },
+  "CONTROLS": {
+    "CrucibleForcedMovement": "Vynucený pohyb",
+    "VisualizeFlanking": "Zobrazit obklíčení"
+  },
+  "CRUCIBLE": {
+    "Base": "Základ",
+    "Bonus": "Bonus",
+    "Rules": "Pravidla Crucible",
+    "SHEETS": {
+      "Accessory": "List s prvky příslušenství v Crucible",
+      "ActionBehavior": "List s chováním akcí v Crucible",
+      "Adversary": "List s prvky nepřátel v Crucible",
+      "Affix": "List s afixy v Crucible",
+      "Ancestry": "List původu (Crucible)",
+      "Archetype": "List s archetypy v Crucible",
+      "Armor": "List se zbrojí v Crucible",
+      "Background": "List zázemí (Crucible)",
+      "Effect": "List se stavovými efekty v Crucible",
+      "Group": "List se skupinami v Crucible",
+      "Hero": "List s postavou hrdiny v Crucible",
+      "HeroCreation": "List pro tvorbu hrdiny v Crucible",
+      "Journal": "List deníku v Crucible",
+      "Schematic": "List se schématy v Crucible",
+      "Skill": "List s dovednostmi v Crucible",
+      "Spell": "List s kouzly v Crucible",
+      "Talent": "List s talenty v Crucible",
+      "Taxonomy": "Klasifikace prvků v Crucible",
+      "Tool": "Nástroj v Crucible",
+      "Weapon": "List zbraní v Crucible"
+    },
+    "Scaled": "Škálované",
+    "Scaling": "Škálování",
+    "Syncing": "Synchronizace talentů a kouzel"
+  },
+  "CURRENCY_DENOMINATIONS": {
+    "CP": {
+      "abbreviation": "CP",
+      "label": "Měděné mince"
+    },
+    "GP": {
+      "abbreviation": "GP",
+      "label": "Zlaté mince"
+    },
+    "PP": {
+      "abbreviation": "PP",
+      "label": "Platinové mince"
+    },
+    "SP": {
+      "abbreviation": "SP",
+      "label": "Stříbrné mince"
+    }
+  },
+  "DAMAGE": {
+    "Acid": "Kyselina",
+    "Bludgeoning": "Tupé zranění",
+    "Cold": "Chlad",
+    "Corruption": "Zkaženost",
+    "Damage": "Zranění",
+    "Electricity": "Elektřina",
+    "Elemental": "Elementární síly",
+    "Fire": "Oheň",
+    "Physical": "Fyzické zranění",
+    "Piercing": "Bodné zranění",
+    "Poison": "Jed",
+    "Psychic": "Psychické účinky",
+    "Radiant": "Zářivé zranění",
+    "Restoration": "Obnova zdraví",
+    "Slashing": "Řezné zranění",
+    "Spiritual": "Duchovní zranění",
+    "Void": "Prázdnota"
+  },
+  "DEFENSES": {
+    "Armor": "Zbroj",
+    "Block": "Blokování",
+    "Dodge": "Úhyb",
+    "FORMULAS": {
+      "Armor": "Základní hodnota zbroje + bonus kvality",
+      "Block": "Součet hodnot blokování všech vybavených zbraní",
+      "Dodge": "Základní hodnota vyhýbání se + max(Hodnota obratnosti - Skalování, 0) + kouzlené úpravy",
+      "Fortitude": "{base} + ((Síla + Moudrost) / 4)",
+      "Madness": "{base} + (Hodnota šílenství / 10)",
+      "Parry": "Součet hodnot vyhýbání se všech vybavených zbraní",
+      "Physical": "Součet hodnot zbroje, vyhýbání se, blokování a parry",
+      "Reflex": "{base} + ((Hodnota obratnosti + intelektu) / 4)",
+      "Willpower": "{base} + ((Hodnota odolnosti + charisma) / 4)",
+      "Wounds": "{base} + (Hodnota zranění / 10)"
+    },
+    "Fortitude": "Tělesná odolnost",
+    "Madness": "Práh povzbuzení",
+    "MadnessShort": "Povzbuzení",
+    "Parry": "Kryt",
+    "Physical": "Fyzické vlastnosti",
+    "Reflex": "Reflex",
+    "TOOLTIPS": {
+      "Armor": "",
+      "Block": "",
+      "Dodge": "",
+      "Fortitude": "",
+      "Madness": "",
+      "Parry": "",
+      "Physical": "",
+      "Reflex": "",
+      "Willpower": "",
+      "Wounds": ""
+    },
+    "Willpower": "Síla vůle",
+    "Wounds": "Práh léčení",
+    "WoundsShort": "Léčení"
+  },
+  "DETECTION_MODES": {
+    "Echolocation": "Echolokace",
+    "SenseCreature": "Vnímání tvorů",
+    "ThermalVision": "Termální vidění"
+  },
+  "DICE": {
+    "Ability": "Vlastnost",
+    "AbilityBonus": "Bonus k vlastnosti",
+    "Banes": {
+      "few": "Nevýhody",
+      "many": "Nevýhody",
+      "one": "Nevýhoda",
+      "other": "Nevýhody",
+      "two": "Nevýhody",
+      "zero": "Nevýhody"
+    },
+    "Boons": {
+      "few": "Výhody",
+      "many": "Výhody",
+      "one": "Výhoda",
+      "other": "Výhody",
+      "two": "Výhody",
+      "zero": "Výhody"
+    },
+    "CircumstanceBonus": "Bonus za dané okolnosti",
+    "Confirm": "Potvrdit",
+    "DC": "DC",
+    "DCAdditionalGroup": "{dcLabel}, skupina",
+    "DCAdditionalPassive": "{dcLabel}, pasivní efekt",
+    "DCSpecific": "DC {dc}",
+    "DCTargetSpecific": "{skill} DC cíl",
+    "DIFFICULTIES": {
+      "Challenging": "Náročné",
+      "Custom": "Vlastní obtížnost",
+      "Difficult": "Obtížné",
+      "Easy": "Snadné",
+      "Formidable": "Velmi náročné",
+      "Impossible": "Nemožné",
+      "Moderate": "Středně obtížné",
+      "Trivial": "Triviální"
+    },
+    "Damage": "Zranění",
+    "DamageBase": "Základní {type}",
+    "DamageBonus": "Akční bonus",
+    "DamageOverflow": "Překročená hodnota",
+    "DamageResistance": "Odolnost vůči zranění",
+    "DamageTotal": "Celkové zranění",
+    "DamageVulnerability": "Zranitelnost vůči zranění",
+    "DiceTotal": "Součet kostek",
+    "Enchantment": "Očarování",
+    "EnchantmentBonus": "Bonus za očarování",
+    "GROUP_CHECK": {
+      "AggregateDetail": "{required} Vyžadováno",
+      "DialogTitle": "Ověření {skill}: {name}",
+      "NoUserForActor": "Pro postavu {name} nebyl nalezen žádný aktivní uživatel.",
+      "RequiresGM": "Skupinová ověření může iniciovat pouze vypravěč.",
+      "Resend": "Znovu odeslat požadavek",
+      "ResetPending": "Vrátit do stavu čekání",
+      "RollOnBehalf": "Provést hod za někoho jiného",
+      "STATUSES": {
+        "Aborted": "Přerušeno",
+        "Complete": "Dokončeno",
+        "Pending": "Čeká se na vyřízení",
+        "Skipped": "Přeskočeno"
+      },
+      "Skip": "Přeskočit postavu",
+      "Title": "Skupinové ověření dovedností",
+      "TitleSpecific": "Skupinové ověření dovednosti {skill}"
+    },
+    "Healing": "Léčení",
+    "REQUESTS": {
+      "AddParty": "Přidat družinu",
+      "AnyActor": "Jakákoli postava",
+      "AnyActorHint": "Vyberte libovolné postavy ze světa.",
+      "ChooseTarget": "Vybrat cíl",
+      "ClearRequest": "Zrušit požadavek",
+      "GroupCheck": "Skupinové ověření",
+      "Request": "Požadavek",
+      "RequestRolls": "Žádat o hody",
+      "SpecificActors": "Konkrétní postavy",
+      "SpecificActorsHint": "Vyberte vhodné postavy podle situace."
+    },
+    "ReplayAnimation": "Přehrát animaci znovu",
+    "Reverse": "Obrátit pořadí",
+    "Roll": "Hod",
+    "RollTotal": "Celkový výsledek hodu",
+    "SKILLS": {
+      "AddSkill": "Přidat dovednost",
+      "CustomizeSkills": "Upravit seznam dovedností"
+    },
+    "SetDifficulty": "Nastavit úroveň obtížnosti",
+    "Skill": "Dovednost",
+    "SkillBonus": "Bonus k hodu dovednosti",
+    "UnknownScore": "???"
+  },
+  "HAZARD": {
+    "CONFIG": {
+      "Damage": "Typ zranění",
+      "Danger": "Úroveň nebezpečnosti",
+      "Defense": "Obrana cíle",
+      "Name": "Název",
+      "Tags": "Štítky akcí",
+      "Title": "Konfigurace nebezpečí"
+    },
+    "DefaultActor": "Prostředí",
+    "DefaultName": "Environmentální nebezpečí",
+    "Falling": "Pád",
+    "Hazard": "Nebezpečí",
+    "Parenthetical": "{label} ({tags})",
+    "Rank": "Nebezpečí {danger}",
+    "TARGETS": {
+      "Add": "Přidat cíl",
+      "Clear": "Vymazat všechny",
+      "Hint": "Sem můžete přetáhnout tokeny či postavy, nebo kliknutím na tlačítko družiny přidáte její členy.",
+      "Party": "Přidat družinu",
+      "Remove": "Odebrat cíl",
+      "Title": "Postižené cíle"
+    },
+    "TooltipDamage": "{rank} proti {defense} – způsobuje {damage} zranění u {resource}.",
+    "TooltipRestoration": "{rank} proti {defense} – obnovuje hodnotu {resource}.",
+    "TooltipTag": "{label}: {tooltip}",
+    "TooltipTags": "{tooltip} ({tags})",
+    "UseHazard": "Použít nebezpečí",
+    "WARNINGS": {
+      "GMOnly": "Konfiguraci a hody s nebezpečím může provádět pouze vypravěč."
+    },
+    "WindowTitle": "Nebezpečí: {name}"
+  },
+  "HOOKS": {
+    "NoModuleHooks": "Pro tento identifikátor nejsou registrovány žádné modulové háčky.",
+    "ToggleSource": "Přepnout zdroj"
+  },
+  "ITEM": {
+    "ACTIONS": {
+      "Create": "Vytvořit předmět",
+      "Delete": "Smazat předmět",
+      "Drop": "Upustit zbraň",
+      "DropDetail": "Upustit: {item}",
+      "Edit": "Upravit předmět",
+      "Equip": "Vybavit {typeLabel}",
+      "EquipDetail": "Vybavit: {item}",
+      "Read": "Přečtěte si {item}",
+      "Recover": "Sebrat {typeLabel}",
+      "RecoverAllContent": "Chcete vyzvednout všechny předměty, které postava {actor} upustila?",
+      "RecoverAllTitle": "Sebrat upuštěné předměty",
+      "RecoverDetail": "Sebrat upuštěný předmět: {item}",
+      "UnEquip": "Odložit {typeLabel}",
+      "UnEquipDetail": "Odložit: {item}"
+    },
+    "COMPOSED_NAME": {
+      "Prefix": "{prefixes} {name}",
+      "Suffix": "{name} z {suffixes}"
+    },
+    "EnchantmentLegendary": "Legendární",
+    "EnchantmentMajor": "Významné",
+    "EnchantmentMinor": "Menší význam",
+    "EnchantmentMundane": "Běžné",
+    "FIELDS": {
+      "actions": {
+        "label": "Akce s předměty"
+      },
+      "broken": {
+        "label": "Poškozeno"
+      },
+      "category": {
+        "label": "Kategorie"
+      },
+      "description": {
+        "private": {
+          "hint": "Toto je popis předmětu, který může vidět pouze vypravěč.",
+          "label": "Tajný popis"
+        },
+        "public": {
+          "hint": "Tento popis předmětu je dostupný pro všechny uživatele s oprávněním k pozorování.",
+          "label": "Veřejný popis"
+        }
+      },
+      "enchantment": {
+        "label": "Stupeň očarování"
+      },
+      "equipped": {
+        "label": "Vyzbrojeno"
+      },
+      "identifier": {
+        "hint": "Jedinečný identifikátor tohoto předmětu. Všechny kopie stejného předmětu mají tentýž identifikátor.",
+        "label": "Identifikátor"
+      },
+      "invested": {
+        "label": "Naladěno"
+      },
+      "price": {
+        "label": "Základní cena"
+      },
+      "properties": {
+        "label": "Vlastnosti předmětu"
+      },
+      "quality": {
+        "label": "Kvalita"
+      },
+      "quantity": {
+        "label": "Počet kusů"
+      },
+      "weight": {
+        "label": "Hmotnost"
+      }
+    },
+    "PROPERTIES": {
+      "Armor": "{armor} Zbroj",
+      "Block": "Blokování {block}",
+      "Damage": "{damage} Zranění",
+      "Defense": "{defense} Obrana",
+      "Depleted": "Vyčerpáno",
+      "Dodge": "Úhyb {dodge}",
+      "DodgeBase": "Úhyb {dodge}+",
+      "Investment": "Naladění",
+      "NotInvested": "Nenaladěno",
+      "NotKnown": "Nevíme",
+      "Parry": "Kryt {parry}",
+      "Range": "Dostřel {range}",
+      "Stackable": "Lze hromadit",
+      "Unequipped": "Nevyzbrojeno",
+      "Unique": "Jedinečný"
+    },
+    "QualityFine": "Kvalitní",
+    "QualityMasterwork": "Vynikající",
+    "QualityShoddy": "Podprůměrný",
+    "QualityStandard": "Standardní",
+    "QualitySuperior": "Skvělý",
+    "QuantityNone": "Žádné",
+    "RANDOMIZE": {
+      "BaseItem": "Základní předmět",
+      "Flavor": "Náhodně vybraný předmět: {type}",
+      "GMOnly": "Pouze vypravěč může generovat náhodné předměty.",
+      "Generate": "Vytvořit",
+      "ItemTypes": "Typy předmětů",
+      "PriceMax": "Maximální cena",
+      "PriceMin": "Minimální cena",
+      "Quality": "Úroveň kvality",
+      "QualityAny": "Jakákoli",
+      "Title": "Náhodně vybrat okouzlený předmět"
+    },
+    "SHEET": {
+      "Details": "Detaily předmětu",
+      "EnchantmentDerivedHint": "Úroveň okouzlení se určuje podle celkové úrovně všech afiků.",
+      "Equipment": "Detaily vybavení",
+      "EquipmentDrop": "Přidejte počáteční vybavení tak, že sem přetáhnete předměty.",
+      "EquipmentRemove": "Odstranit vybavení",
+      "EquipmentScale": "Automaticky upravovat kvalitu podle úrovně tvora",
+      "NoAffixCapacity": "Kvalita tohoto předmětu je příliš nízká na to, aby mohl nést afiky. Zvyšte ji alespoň na úroveň Kvalitní.",
+      "NoAffixCapacityTitle": "Nelze provést očarování",
+      "NoAffixes": "Chcete-li přidat afix, přetáhněte jej z kompendia Afixy sem.",
+      "ScaledPrice": "Upravená cena",
+      "SpellDrop": "Přidejte ikonický kouzlící předmět tak, že do tohoto prostoru přetáhnete položku Kouzlo.",
+      "SpellRemove": "Odstranit kouzlo",
+      "Spellcraft": "Kouzelnictví",
+      "TalentAdd": "Přidat talent",
+      "TalentConfiguration": "Nastavení talentů",
+      "TalentDrop": "Chcete-li přidat talent, přetáhněte položku Talent do tohoto prostoru.",
+      "TalentRemove": "Odstranit talent",
+      "TalentRequirementAdd": "Je nutná zběhlost",
+      "TalentRequirementRemove": "Zrušit požadavek",
+      "TalentRequirements": "Požadované zběhlosti",
+      "TalentRequirementsHint": "Aby bylo možné zakoupit tento talent, je třeba dosáhnout určitého stupně v každé z uvedených zběhlostí.",
+      "Training": "Výcvik",
+      "Type": "Typ vybavení",
+      "UniqueItemNoAffixes": "Tento předmět je jedinečný a nelze jej očarovat afixy. Jeho magické vlastnosti jsou určeny pomocí modulových háčků.",
+      "UniqueItemTitle": "Jedinečný předmět"
+    },
+    "TABS": {
+      "actions": "Akce",
+      "affixes": "Afixy",
+      "config": "Nastavení",
+      "description": "Popis",
+      "equipment": "Vybavení",
+      "hooks": "Skripty",
+      "secrets": "Tajemství",
+      "spells": "Kouzla",
+      "talents": "Talenty"
+    },
+    "WARNINGS": {
+      "CombineDifferent": "{item} nelze spojit s {target}, neboť se nejedná o identické předměty.",
+      "CombineEquipped": "{item} nelze vložit do hromady, když je právě vybaven na postavě.",
+      "CombineInvalidTarget": "{item} nelze spojit – cílový předmět musí být jiným předmětem patřícím téže postavě.",
+      "CombineQuantity": "Nelze sloučit {quantity} kusů {item}, které tvoří hromadu o celkovém počtu {available}.",
+      "CursedDivestment": "{name} je prokletý a nelze jej odstranit. Tuto akci může provést pouze vypravěč.",
+      "HookAlreadyExists": "Pro předmět {item} již existuje funkce určená k háčku \"{hook}\".",
+      "InvalidIdentifier": "Neplatná hodnota identifikátoru pro Crucible: „{id}“ – musí obsahovat pouze alfanumerické znaky bez mezer či speciálních znaků.",
+      "LootDropError": "Vytvoření předmětu kořisti „{name}“ se nezdařilo. Důvod: {reason}.",
+      "NotTalent": "Přetažený dokument musí být talent.",
+      "QualityReductionBlocked": "Nelze snížit kvalitu {name}, jelikož má přidružené afixy vyžadující aktuální kapacitu.",
+      "SplitQuantity": "Nelze rozdělit {quantity} jednotek z {item}, jenž tvoří hromadu o počtu {available}.",
+      "UniqueWithAffixes": "Nelze označit {name} za unikátní, neboť obsahuje afixy. Nejprve je nutné všechny afixy odstranit."
+    }
+  },
+  "KEYBINDINGS": {
+    "ConfirmAction": "Potvrdit akci",
+    "ConfirmActionHint": "V posledních 60 sekundách provedené akce budou potvrzeny v pořadí, v jakém byly vykonány."
+  },
+  "KNOWLEDGE": {
+    "Alchemy": "Alchymie",
+    "Ancients": "Prastaré bytosti",
+    "Artifacts": "Artefakty",
+    "Arts": "Umění",
+    "Beasts": "Zvířata",
+    "Celestials": "Nebešťané",
+    "Cosmology": "Kosmologie",
+    "Crafts": "Řemeslnictví",
+    "Crime": "Zločin",
+    "Dragons": "Draci",
+    "Elementals": "Elementálové",
+    "Fey": "Feyové",
+    "Fiends": "Běsové",
+    "Forensics": "Kriminalistika",
+    "Gods": "Božstva",
+    "Intrigue": "Intriky",
+    "Legends": "Legendy",
+    "Machines": "Stroje",
+    "Monsters": "Netvoři",
+    "Outsiders": "Mimosférické bytosti",
+    "Plants": "Rostliny",
+    "Politics": "Politika",
+    "Rituals": "Obřady",
+    "Seafaring": "Námořní plavba",
+    "Souls": "Duše",
+    "Subterranea": "Podzemí",
+    "Tracking": "Stopování",
+    "Trade": "Obchod",
+    "Undeath": "Nemrtvost",
+    "Warfare": "Válka",
+    "Weather": "Počasí"
+  },
+  "LANGUAGES": {
+    "Common": "Obecná řeč",
+    "Sign": "Znaková řeč"
+  },
+  "LANGUAGE_CATEGORIES": {
+    "Nonspoken": "Jazyky bez mluvení",
+    "Spoken": "Mluvené jazyky"
+  },
+  "LOOT": {
+    "CATEGORIES": {
+      "Ingredient": "Ingredience",
+      "Other": "Různé předměty",
+      "Treasure": "Poklady"
+    }
+  },
+  "REGION_BEHAVIORS": {
+    "ACTION": {
+      "ConfigTitle": "Akce v regionu: {action}",
+      "FIELDS": {
+        "action": {
+          "hint": "Tato akce může být provedena na jakémkoli tokenu, který spustí danou událost.",
+          "label": "Spuštěná akce"
+        },
+        "actor": {
+          "hint": "Postava zodpovědná za vytvoření tohoto chování. Právě tato postava provede příslušné akce.",
+          "label": "Původní postava"
+        },
+        "frequency": {
+          "hint": "Jak často může být daná akce aplikována na token, který spustil událost?",
+          "label": "Frekvence"
+        },
+        "origin": {
+          "hint": "Prvek určující existenci tohoto chování. Pokud je přítomen, stanovuje, jaké tokeny mohou danou akci skutečně provést na základě nastavení cílení původní akce.",
+          "label": "Původ"
+        }
+      },
+      "FREQUENCIES": {
+        "every": "Vždy",
+        "once": "Jednou",
+        "roundActor": "Jednou za kolo a na každou postavu"
+      },
+      "RegionConfiguration": "Konfigurace regionu",
+      "TABS": {
+        "action": "Akce",
+        "behavior": "Chování",
+        "effects": "Efekty"
+      }
+    },
+    "HAZARD": {
+      "FIELDS": {
+        "damageType": {
+          "label": "Typ zranění"
+        },
+        "danger": {
+          "label": "Úroveň nebezpečnosti"
+        },
+        "defenseType": {
+          "label": "Typ obrany"
+        },
+        "name": {
+          "label": "Název"
+        },
+        "promptGM": {
+          "hint": "Pokud je tato volba aktivní, vypravěč uvidí dialog s náhodnou tabulkou; jinak se nebezpečí automaticky hodí.",
+          "label": "Upozornění pro vypravěče"
+        },
+        "resource": {
+          "label": "Cílový zdroj"
+        },
+        "tags": {
+          "label": "Štítky nebezpečí"
+        }
+      }
+    }
+  },
+  "RESOURCES": {
+    "Action": "Akce",
+    "Focus": "Soustředění",
+    "Health": "Zdraví",
+    "Heroism": "Hrdinství",
+    "Madness": "Šílenství",
+    "Morale": "Morálka",
+    "TOOLTIPS": {
+      "Action": "6 + bonus k akci",
+      "Focus": "(Moudrost + Přítomnost + Intelekt) / 2",
+      "Health": "(6 &times; Úroveň) + (4 &times; Odolnost) + (2 &times; Síla)",
+      "Heroism": "Maximálně 3",
+      "Madness": "Morálka &times; 1,5",
+      "Morale": "(6 &times; Úroveň) + (4 &times; Přítomnost) + (2 &times; Moudrost)",
+      "Wounds": "Zdraví &times; 1,5"
+    },
+    "Wounds": "Zranění"
+  },
+  "RULER": {
+    "CannotAffordMove": "Nemůžete se přesunout o {distance} jednotek – to vyžaduje {action} bodů akce."
+  },
+  "SCENE": {
+    "WARNINGS": {
+      "MicrogridUnavailable": "Scéna \"{name}\" je nastavena na čtvercovou mřížku v stopách, avšak Crucible mikromřížka nelze použít. Vzdálenost mezi jednotkami musí být 5 stop (nyní {distance}) a velikost mřížky musí být násobkem 5 pixelů (nyní {size}px)."
+    }
+  },
+  "SCHEMATIC": {
+    "CATEGORIES": {
+      "Alchemy": "Alchymistický vzorec",
+      "Cooking": "Kuchařský recept",
+      "Enchanting": "Očarovací glyf",
+      "Fletching": "Návrh výroby šípů",
+      "Glyphweaving": "Arkánum tvorby glyfů",
+      "Jewelcraft": "Šperkařský nákres",
+      "Smithing": "Kovářský plán",
+      "Tailoring": "Krejčovský střih"
+    },
+    "FIELDS": {
+      "dc": {
+        "hint": "Určete hodnotu, kterou je nutné překročit při ověření dovednosti řemeslného řemesla, aby bylo možné tento schéma vyhotovit.",
+        "label": "Obtížnost Úkolu"
+      },
+      "hours": {
+        "hint": "Počet hodin potřebných k pokusu o výrobu tohoto předmětu.",
+        "label": "Hodiny"
+      },
+      "inputs": {
+        "element": {
+          "currency": {
+            "hint": "K vytvoření tohoto schéma může být zapotřebí určitá částka peněz, jež reprezentuje potřebné materiály nebo drobné suroviny, které nejsou explicitně uvedeny jako předměty.",
+            "label": "Měna"
+          },
+          "ingredients": {
+            "element": {
+              "consumed": {
+                "hint": "Jsou tyto suroviny během pokusu o výrobu spotřebovány?",
+                "label": "Spotřeba"
+              },
+              "item.label": "UUID Předmětu Suroviny",
+              "quality": {
+                "hint": "Minimální požadovaná kvalita této suroviny.",
+                "label": "Požadovaná Kvalita"
+              },
+              "quantity": {
+                "label": "Potřebné Množství"
+              }
+            },
+            "label": "Suroviny"
+          },
+          "mode.label": "Režim Kombinace"
+        },
+        "label": "Vstupy Schématu"
+      },
+      "mode.label": "Režim Kombinace",
+      "outputs": {
+        "element": {
+          "items.element.label": "UUID Vytvořeného Předmětu",
+          "mode": "Režim"
+        },
+        "label": "Výstupy Schématu"
+      }
+    },
+    "MODES": {
+      "All": "Vše",
+      "Any": "Jakékoli",
+      "Template": "Šablona"
+    },
+    "PROPERTIES": {
+      "Common": "Běžně známé"
+    },
+    "SHEET": {
+      "Components": "Složky",
+      "InputAdd": "Přidat skupinu vstupů",
+      "InputDrop": "Sem přetáhněte vstupní předmět",
+      "InputRemove": "Odebrat skupinu vstupů",
+      "Inputs": "Vstupy",
+      "ItemRemove": "Odebrat vstupní předmět",
+      "OutputAdd": "Přidat skupinu výstupů",
+      "OutputDrop": "Sem přetáhněte výsledný předmět",
+      "OutputRemove": "Odebrat skupinu výstupů",
+      "Outputs": "Výstupy"
+    }
+  },
+  "SETTINGS": {
+    "AutoConfirmAll": "Automaticky potvrďte všechny akce",
+    "AutoConfirmHint": "Tato volba umožňuje automatické potvrzování akcí v boji, které nezpůsobují zranění ani aktivují žádné stavové efekty. Tím se hra urychlí, avšak během testování herních scénářů se to nedoporučuje používat.",
+    "AutoConfirmName": "Automatické potvrzování akcí",
+    "AutoConfirmNone": "Žádné automatické potvrzování",
+    "AutoConfirmSelf": "Pouze akce zaměřené na vlastní postavu",
+    "COMPENDIUM_SOURCES": {
+      "affix": {
+        "hint": "Které balíčky budou sloužit jako zdroje pro přidávání afixů k předmětům prostřednictvím očarování.",
+        "label": "Zdroje afixů"
+      },
+      "ancestry": {
+        "hint": "Které balíčky poskytují původ postav při tvorbě nových postav.",
+        "label": "Zdroje původu"
+      },
+      "archetype": {
+        "hint": "Které balíčky budou sloužit jako zdroje pro archetypy protivníků.",
+        "label": "Zdroje archetypů"
+      },
+      "background": {
+        "hint": "Balíčky používané jako zdroje zázemí při tvorbě postavy.",
+        "label": "Zdroje zázemí"
+      },
+      "equipment": {
+        "hint": "Jaké balíčky poskytnou počáteční vybavení pro vytváření postav.",
+        "label": "Zdroje vybavení"
+      },
+      "hint": "Nastavte, ze kterých kompendijních balíčků bude možné čerpat při tvorbě postavy.",
+      "label": "Konfigurace zdrojů kompendia",
+      "name": "Zdroje kompendia",
+      "spell": {
+        "hint": "Jaké balíčky poskytnou ikonické kouzla pro využití při tvorbě postav.",
+        "label": "Zdroje kouzel"
+      },
+      "talent": {
+        "hint": "Jaké balíčky budou sloužit jako zdroje talentů pro rozvoj družiny.",
+        "label": "Zdroje talentů"
+      },
+      "taxonomy": {
+        "hint": "Jaké balíčky poskytnou taxonomie protivníků pro využití při tvorbě postav.",
+        "label": "Zdroje taxonomie"
+      }
+    },
+    "CruciblePartyHint": "Určete, která skupina postav bude hlavní družinou protagonistů.",
+    "CruciblePartyLabel": "Hlavní dobrodružná družina",
+    "EnableVFXHint": "Přepněte na zobrazování vizuálních efektů při potvrzení akcí.",
+    "EnableVFXName": "Povolit vizuální efekty akcí",
+    "FlexibleAncestryAbilitiesHint": "Po aktivaci mohou hrdinští hráči během tvorby postavy přiřadit bonusy k vlastnostem svého původu na libovolné dovednosti. Původ stále poskytuje základní bonusy +2 a +1; pouze přidělování těchto hodnot je flexibilní.",
+    "FlexibleAncestryAbilitiesName": "Flexibilní bonusy k vlastnostem podle původu"
+  },
+  "SKILL": {
+    "AcquiredRanks": "Získané stupně",
+    "CATEGORY": {
+      "EXPLORATION": {
+        "hint": "Dovednosti spojené s průzkumem popisují, jak dokážete procházet svět a čelit jeho výzvám.",
+        "label": "Průzkum"
+      },
+      "KNOWLEDGE": {
+        "hint": "Dovednosti vědomostní povahy odrážejí schopnost vaší postavy učit se a porozumět různým tématům.",
+        "label": "Vědomosti"
+      },
+      "SOCIAL": {
+        "hint": "Sociální dovednosti určují, jak vaše postava dokáže komunikovat s ostatními lidmi či skupinami.",
+        "label": "Sociální"
+      },
+      "TRADE": {
+        "hint": "Řemeslnické dovednosti odrážejí schopnost vaší postavy vytvářet předměty a vybavení.",
+        "label": "Řemesla"
+      }
+    },
+    "CantAfford": "Nemáte dostatek bodů k zvýšení této dovednosti. Další stupeň bude stát {cost} bodů a k dispozici máte pouze {points} bodů dovedností.",
+    "ChoosePath": "Předtím, než tuto dovednost dále rozvinete, musíte si vybrat specializaci.",
+    "Id": "ID dovednosti",
+    "Overview": "Přehled dovednosti",
+    "PageSheet": "Dovednost Crucible",
+    "PassiveSpecific": "Pasivní efekt: {passive}",
+    "PathId": "ID specializace",
+    "PathName": "Název specializace",
+    "PathOverview": "Přehled specializace",
+    "RANKS": {
+      "ADEPT": {
+        "hint": "Jste odborníkem v této oblasti a ovládáte veškeré základní i pokročilé aspekty dané dovednosti.",
+        "label": "Zdatný"
+      },
+      "APPRENTICE": {
+        "hint": "Tuto dovednost jste díky dlouhodobému cvičení dosáhla vysokého stupně ovládání.",
+        "label": "Učeň"
+      },
+      "MASTER": {
+        "hint": "V této oblasti patříte mezi nejlepší a vaše specializace je zcela dokonalá.",
+        "label": "Mistr"
+      },
+      "NOVICE": {
+        "hint": "Získali jste určitý formální výcvik či praktické zkušenosti v používání této dovednosti.",
+        "label": "Začátečník"
+      },
+      "SPECIALIST": {
+        "hint": "Vaše zběhlost v této oblasti se ještě více prohloubila díky specializaci, kterou ovládáte.",
+        "label": "Specialista"
+      },
+      "UNSPECIALIZED": {
+        "hint": "Pro tuto dovednost jste si dosud žádnou specializaci nevybrali.",
+        "label": "Nespecializovaný"
+      },
+      "UNTRAINED": {
+        "hint": "V této oblasti nemáte žádné formální školení. Jakékoli úspěchy při používání této dovednosti jsou výsledkem zdravého rozumu či náhody.",
+        "label": "Netrénovaný"
+      }
+    },
+    "Ranks": "Stupně dovedností",
+    "RollFlavor": "{name} provádí ověření {skill}.",
+    "RollTitle": "[{name}] Ověření dovednosti {skill}",
+    "SheetTitle": "[{actor}] Dovednost {skill}",
+    "SpecializationPathSelect": "Vybrat specializaci",
+    "SpecializationPathSpecific": "Specializační cesta: {path}",
+    "SpecializationPaths": "Specializační cesty",
+    "Summary": "Přehled dovedností",
+    "TooltipCheck": "[({v1} {a1} + {v2} {a2}) / 4] {skill} {rank} {enchantment} Enchantment",
+    "TooltipPassive": "12 + {score}",
+    "UnacquiredRanks": "Nepoznané stupně"
+  },
+  "SPELL": {
+    "COMPONENTS": {
+      "Gesture": "Somatické gesto",
+      "GestureNone": "Žádná somatická gesta nejsou známa.",
+      "GesturePl": "Somatická gesta",
+      "GestureSpecific": "Gesto: {gesture}",
+      "Inflection": "Metamagická modifikace",
+      "InflectionNone": "Nejsou známy žádné metamagické modifikace.",
+      "InflectionPl": "Metamagické modifikace",
+      "InflectionSpecific": "Modifikace: {inflection}",
+      "MissingGesture": "Žádné gesto",
+      "MissingInflection": "Žádná modifikace",
+      "MissingRune": "Žádná runa",
+      "Rune": "Magická runa",
+      "RuneNone": "Nejsou známy žádné magické runy.",
+      "RunePl": "Magické runy",
+      "RuneSpecific": "Runa: {rune}"
+    },
+    "COUNTERSPELL": {
+      "Detailed": "Protikouzlo ({details})",
+      "Name": "Protikouzlo",
+      "OpposingRune": "Protikouzlo: opačná runa",
+      "SameGesture": "Protikouzlo: stejné gesto",
+      "Tags": "Štítky protikouzla",
+      "TargetGesture": "Cílové gesto: {gesture}",
+      "TargetRune": "Cílová runa: {rune}",
+      "UseForActor": "Použijte protikouzlo pro: {actor}",
+      "WARNINGS": {
+        "BadTarget": "Protikouzlo lze použít jen na kouzelníka, který provedl poslední akci a ta musela být kouzlem.",
+        "CannotConfirm": "Nelze {change} protihod při hodu, pokud je cílové kouzlo již {state}",
+        "InvalidTerms": "Nepodařilo se rozpoznat {terms} jako platné prvky pro vytvoření protikouzla.",
+        "MissingComponents": "Zápis protikouzla musí obsahovat alespoň 1 runu a 1 gesto.",
+        "NoTalent": "Postava {actor} neovládá talent na tvorbu protikouzel.",
+        "NoUser": "Nebyl nalezen žádný hráč kromě vypravěče, jenž by mohl provést protikouzlení pro postavu {actor}."
+      }
+    },
+    "DamageType": "Typ zranění",
+    "FIELDS": {
+      "actions": {
+        "hint": "Přiřaďte akce, jež jsou dostupné pro postavy ovládající toto ikonické kouzlo.",
+        "label": "Získané akce"
+      },
+      "description": {
+        "label": "Popis kouzla"
+      },
+      "gestures": {
+        "hint": "Sada gest nutných k osvojení tohoto ikonického kouzla.",
+        "label": "Gesta"
+      },
+      "inflections": {
+        "hint": "Soubor dovedností, které je nutné ovládat k tomu, aby bylo možné naučit se tento ikonický kouzlo.",
+        "label": "Modifikace"
+      },
+      "runes": {
+        "hint": "Soubor run, jejichž znalost je nezbytná pro osvojení si tohoto ikonického kouzla.",
+        "label": "Runy"
+      }
+    },
+    "GESTURES": {
+      "Arrow": "Šíp",
+      "Aspect": "Aspekt",
+      "Aura": "Aura",
+      "Blast": "Výbuch",
+      "Cone": "Kužel",
+      "Conjure": "Přivolání",
+      "Create": "Tvorba",
+      "Fan": "Vějíř",
+      "Influence": "Ovlivnění",
+      "Pulse": "Pulzace",
+      "Ray": "Paprsek",
+      "Sense": "Vnímání",
+      "Step": "Krok",
+      "Strike": "Úder",
+      "Surge": "Vlna",
+      "Touch": "Dotek",
+      "Ward": "Ochrana"
+    },
+    "INFLECTIONS": {
+      "Compose": "Složit",
+      "ComposeAdj": "Složený",
+      "Determine": "Určit",
+      "DetermineAdj": "Rozhodný",
+      "Elude": "Vyhnout se",
+      "EludeAdj": "Vyhýbající se",
+      "Extend": "Prodloužit",
+      "ExtendAdj": "Prodloužený",
+      "Negate": "Zrušit",
+      "NegateAdj": "Zrušený",
+      "Pull": "Přitáhnout",
+      "PullAdj": "Přitažlivý",
+      "Push": "Odstrčit",
+      "PushAdj": "Odpudivý",
+      "Quicken": "Urychlit",
+      "QuickenAdj": "Urychlený",
+      "React": "Reagovat",
+      "ReactAdj": "Reagující",
+      "Reshape": "Změnit tvar",
+      "ReshapeAdj": "Přetvořený"
+    },
+    "Iconic": "Ikonické kouzlo",
+    "IconicPl": "Ikonická kouzla",
+    "NAMES": {
+      "CurseConductivity": "Prokletí vodivosti",
+      "CurseCowardice": "Prokletí zbabělosti",
+      "CurseFigments": "Prokletí fiktivních tvorů",
+      "CurseFlammability": "Prokletí hořlavosti",
+      "CurseFrostbite": "Prokletí mrazivého účinku",
+      "CurseLaceration": "Prokletí roztržení",
+      "CurseMortality": "Prokletí smrtelnosti",
+      "CurseNullification": "Prokletí zrušení vlivu",
+      "CurseParanoia": "Prokletí paranoie",
+      "CursePerforation": "Prokletí průstřelu",
+      "CursePorosity": "Prokletí propustnosti",
+      "CurseRadiance": "Prokletí záře",
+      "CurseShattering": "Prokletí rozbití",
+      "CurseToxicity": "Prokletí toxicity"
+    },
+    "NameFormatAdj": "{rune} {gesture}",
+    "NameFormatNoun": "{gesture} {rune}",
+    "RUNES": {
+      "Control": "Ovládání",
+      "ControlAdj": "Ovládající",
+      "Death": "Smrt",
+      "DeathAdj": "Smrtelný",
+      "Earth": "Země",
+      "EarthAdj": "Zemitý",
+      "Flame": "Plamen",
+      "FlameAdj": "Planoucí",
+      "Frost": "Mráz",
+      "FrostAdj": "Ledový",
+      "Illumination": "Osvětlení",
+      "IlluminationAdj": "Osvětlený",
+      "Illusion": "Iluze",
+      "IllusionAdj": "Iluzorní",
+      "Kinesis": "Kineze",
+      "KinesisAdj": "Kinetický",
+      "Life": "Život",
+      "LifeAdj": "Plný života",
+      "Oblivion": "Zapomnění",
+      "OblivionAdj": "Ničící",
+      "Soul": "Duše",
+      "SoulAdj": "S duší spjatý",
+      "Storm": "Bouře",
+      "StormAdj": "Voltaický"
+    },
+    "SHEET": {
+      "Knowledge": "Požadované znalosti"
+    },
+    "WARNINGS": {
+      "AuraRequiresCombat": "Aura může být seslána pouze během boje.",
+      "BindArmamentAlreadyBound": "Předmět je již připoután.",
+      "BindArmamentNoMainhand": "Není žádná zbraň v hlavní ruce.",
+      "CannotAffordHands": {
+        "few": "Pro seslání kouzla {action} je zapotřebí {hands} volných rukou.",
+        "many": "Pro seslání kouzla {action} je potřeba {hands} volných rukou.",
+        "one": "Pro seslání kouzla {action} stačí {hands} jediná volná ruka.",
+        "other": "Pro seslání kouzla {action} je nutné mít {hands} volné ruce.",
+        "two": "K seslání kouzla {action} je zapotřebí {hands} volných rukou.",
+        "zero": "Aby bylo možné seslat kouzlo {action}, musíte mít {hands} volné ruce."
+      },
+      "CannotUseNotComposed": "Nemůžete seslat kouzlo, které nebylo dosud plně sestaveno.",
+      "IconicAlreadyKnown": "Postava {actor} již zná ikonické kouzlo {spell}.",
+      "IconicNoSlots": "Postava {actor} nemá žádné volné sloty pro ikonická kouzla.",
+      "IconicNotSatisfied": "Postava {actor} nesplňuje požadavky na znalosti pro osvojení ikonického kouzla {spell}.",
+      "NotConfigured": "Toto ikonické kouzlo ještě není plně nastavené. Je třeba určit všechny tři složky kouzelnictví.",
+      "SorcererNoIconic": "Jako {talent} nemůžete sesílat ikonická kouzla."
+    }
+  },
+  "TALENT": {
+    "ACTIONS": {
+      "ActionAdd": "Přidat akci",
+      "ActionDelete": "Odstranit akci",
+      "ActionEdit": "Upravit akci",
+      "Delete": "Odstranit talent",
+      "Edit": "Upravit talent",
+      "HookAdd": "Přidat skript",
+      "HookDelete": "Odstranit skript",
+      "Purchase": "<p>Vynaložte 1 bod talentu na zakoupení <strong>{name}</strong>?</p>",
+      "PurchaseNode": "Chcete vynaložit bod talentu na vytvoření prázdného uzlu \"{node}\"?",
+      "PurchaseNodeReverse": "Chcete zrušit bod vynaložený na prázdný uzel \"{node}\"?",
+      "PurchaseNodeTitle": "Koupit nový uzel talentu?",
+      "PurchaseTitle": "Koupě talentu: {name}",
+      "Remove": "<p>Odstraníte talent <strong>{name}</strong>, čímž získáte zpět 1 bod talentu?</p>",
+      "RemoveTitle": "Odstranit talent: {name}",
+      "Reset": "Resetovat"
+    },
+    "Banned": "Zakázáno",
+    "Empty": "Prázdné",
+    "FIELDS": {
+      "actions": {
+        "hint": "Přiřaďte akce, které mohou využívat postavy s daným talentem.",
+        "label": "Dostupné akce"
+      },
+      "actorHooks": {
+        "hint": "Tato konfigurační stránka obsahuje pokročilé funkce určené k automatizaci efektů talentů. Nesprávná úprava zde může mít vážné následky. Provádějte změny pouze tehdy, když si jste svými znalostmi jisti.",
+        "label": "Připojené funkce"
+      },
+      "description": {
+        "label": "Popis talentu"
+      },
+      "iconicSpells": {
+        "hint": "Tento talent poskytuje určitý počet slotů pro ikonické kouzla.",
+        "label": "Ikonická kouzla"
+      },
+      "nodes": {
+        "hint": "Přiřaďte tento talent k jednomu či více uzlům v stromu talentů, aby bylo možné jej zakoupit.",
+        "label": "Uzly talentů"
+      },
+      "requirements": {
+        "training": {
+          "hint": "Úroveň zběhlosti, kterou musí postava již mít, než bude možné tento talent získat.",
+          "label": "Požadovaná zběhlost"
+        }
+      },
+      "spellcraft": {
+        "hint": "Získáním tohoto talentu se naučíte jednu součást kouzelnictví – runu, gesto či inflexi.",
+        "label": "Složka kouzelnictví"
+      },
+      "training": {
+        "hint": "Tento talent přidává jeden bod zběhlosti do zde uvedené oblasti, ať už byl zakoupen či udělen automaticky. Pokud tento talent nepřináší žádný pokrok, ponechte pole prázdné.",
+        "label": "Přidané body zběhlosti"
+      }
+    },
+    "GrantsSpells": "<strong>Ikonická kouzla:</strong> {name} získává {spells} slotů pro ikonická kouzla.",
+    "HOOKS": {
+      "GroupAction": "Využití akcí",
+      "GroupCombat": "Tahy ve střetnutích",
+      "GroupEquipment": "Příprava vybavení",
+      "GroupPreparation": "Příprava dat postav",
+      "GroupSpellcraft": "Příprava kouzelnictví",
+      "Register": "Registrace funkce"
+    },
+    "LABELS": {
+      "Points": {
+        "few": "Body",
+        "many": "Body",
+        "one": "Bod",
+        "other": "Body",
+        "two": "Body",
+        "zero": "Body"
+      },
+      "Talents": {
+        "few": "Talenty",
+        "many": "Talenty",
+        "one": "Talent",
+        "other": "Talenty",
+        "two": "Talenty",
+        "zero": "Talenty"
+      }
+    },
+    "Locked": "Zablokováno",
+    "NODES": {
+      "Attack": "Útok",
+      "Defense": "Obrana",
+      "Heal": "Léčení",
+      "Magic": "Magie",
+      "Melee": "Boj zblízka",
+      "Move": "Pohyb",
+      "Origin": "Původ",
+      "Ranged": "Střelba na dálku",
+      "Signature": "Charakteristický talent",
+      "Skill": "Dovednost",
+      "Spell": "Kouzelnictví",
+      "Utility": "Využití"
+    },
+    "NodeSpecific": "Uzel: {nodeType}",
+    "PointsAvailable": "Dostupné body",
+    "Prerequisites": "Požadavky",
+    "RANKS": {
+      "Expert": "Odborník",
+      "Master": "Mistr",
+      "Proficient": "Zběhlý",
+      "Trained": "Vycvičený",
+      "Untrained": "Nevyškolený"
+    },
+    "SignatureLimit": "Dosažen limit výjimečných talentů",
+    "SignatureNext": "Další bude k získání na úrovni {level}.",
+    "Tier": "Úroveň {tier}.",
+    "TrainingGrant": "{training} +1",
+    "WARNINGS": {
+      "AlreadyOwned": "Již vlastníte předmět {name}; nelze jej přidat podruhé.",
+      "Banned": "V tomto uzlu či na této úrovni si nemůžete zakoupit další Signature Talenty.",
+      "CannotAfford": "Nemáte dostatek bodů talentů k nákupu {name}, jehož cena je {cost} bodů.",
+      "CannotUse": "Tento talent nelze využít.",
+      "Inaccessible": "Nelze získat „{name}“, neboť jste dosud neodemkli daný uzel talentového stromu.",
+      "Locked": "Nesplňujete podmínky pro získání „{name}“; je zapotřebí {requires} {requirement}.",
+      "RequiresRuneGesture": "K použití Gesture musíte znát runu kouzelnictví.",
+      "RequiresRuneInflection": "K využití Inflection je nutné znát runu kouzelnictví.",
+      "SignatureLimit": "Na úrovni {level} již máte maximální povolený počet {max} Signature Talentů.",
+      "SignatureLimitNext": "Máte na úrovni {level} dosaženo limitu {max} pro Signature Talenty. Další bude k získání až na úrovni {next}."
+    }
+  },
+  "TAXONOMY": {
+    "CATEGORIES": {
+      "Beast": "Zvíře",
+      "Celestial": "Nebešťan",
+      "Construct": "Konstrukt",
+      "Dragon": "Drak",
+      "Elemental": "Elementál",
+      "ElementalEarth": "Zemský elementál",
+      "ElementalFire": "Ohnivý elementál",
+      "ElementalFrost": "Ledový elementál",
+      "ElementalStorm": "Bouřkový elementál",
+      "Fey": "Feyové",
+      "Fiend": "Běs",
+      "Giant": "Obr",
+      "Humanoid": "Humanoid",
+      "Monstrosity": "Netvor",
+      "Ooze": "Sliz",
+      "Outsider": "Mimosférická bytost",
+      "Plant": "Rostlina",
+      "Undead": "Nemrtvý"
+    },
+    "FIELDS": {
+      "abilities": {
+        "hint": "Určete počáteční hodnoty vlastností pro tvory podle této taxonomie. Rozdělte 12 bodů mezi všechny vlastnosti. Každá hodnota musí být v rozmezí od nuly do šesti. U nepřátel spadajících pod tuto taxonomii nelze žádnou vlastnost s hodnotou nula později změnit na kladnou číslici.",
+        "label": "Základní vlastnosti"
+      },
+      "category": {
+        "hint": "Kategorie tvorů, ke které tato taxonomie patří.",
+        "label": "Kategorie"
+      },
+      "characteristics": {
+        "blooded.hint": "Určuje, zda mají tvorové podle této taxonomie krev. Výchozí hodnota odpovídá příslušnosti vybrané kategorii tvorů.",
+        "blooded.label": "S krví",
+        "equipment.label": "Možnost použití vybavení",
+        "label": "Vlastnosti taxonomie",
+        "spells.label": "Schopnost sesílání kouzel",
+        "temperature.hint": "Tělesná teplota tvorů podle této taxonomie. Pokud se pole nevyplní, převezme se hodnota odpovídající vybrané kategorii tvorů.",
+        "temperature.label": "Tělesná teplota"
+      },
+      "equipment": {
+        "hint": "Nastavte vybavení, které budou mít tvorové podle této taxonomie automaticky k dispozici.",
+        "label": "Přidělené vybavení"
+      },
+      "identifier": {
+        "hint": "Jedinečný identifikátor sloužící k označení této taxonomie v zápisech, akcích či jiných prvcích rozhraní. Musí se jednat o alfanumerický řetězec bez mezer a speciálních znaků.",
+        "label": "Identifikátor"
+      },
+      "movement": {
+        "label": "Pohyb",
+        "size": {
+          "hint": "Velikost tohoto protivníka v jednotkách mřížky.",
+          "label": "Velikost"
+        },
+        "stride": {
+          "label": "Rozsah pohybu",
+          "tooltip": "Vzdálenost, kterou lze urazit za jeden bod akce."
+        }
+      },
+      "resistances": {
+        "hint": "Určete, jak se odolnosti a zranitelnosti tvorů podle této taxonomie mění s rostoucí úrovní. Přiřaďte hodnoty pro každý typ zranění v rozmezí od -3 (nejcitlivější) po +3 (nejodolnější). U typů zranění s nulovou hodnotou nedochází k žádné odolnosti ani zranitelnosti. Imunita na určitý typ zranění se vyjadřuje jako odolnost +4. Součet všech hodnot musí být roven nule.",
+        "immune": {
+          "hint": "Uveďte, zda je tvor podle této taxonomie imunní vůči danému typu zranění.",
+          "label": "Imunita na zranění"
+        },
+        "label": "Škálování odolnosti",
+        "value": {
+          "hint": "Hodnota odolnosti vůči tomuto typu zranění, v rozmezí od -3 (nejcitlivější) po +3 (nejodolnější). Hodnoty se mění s rostoucí úrovní tvorů podle této taxonomie.",
+          "label": "Hodnota škálování odolnosti"
+        }
+      }
+    },
+    "SHEET": {
+      "Choose": "Vybrat taxonomii",
+      "Clear": "Smazat taxonomii",
+      "Physiology": "Fyziologie",
+      "Stature": "Velikost těla v rámci taxonomie",
+      "TemperatureBlank": "Výchozí ({temperature})"
+    },
+    "WARNINGS": {
+      "EquipmentNotNatural": "Taxonomie \"{name}\" nemůže používat předměty, které nejsou označeny jako přirozené.",
+      "InvalidAbilities": "Součet počátečních hodnot vlastností musí být roven 12. Aktuálně je to {sum}.",
+      "InvalidResistances": "Součet všech hodnot škálování odolnosti musí být roven nule. Aktuálně je to {sum}."
+    }
+  },
+  "TEMPERATURE_TIERS": {
+    "Boiling": "Vařící teplota",
+    "Cool": "Chladná teplota",
+    "Gelid": "Ledová teplota",
+    "Neutral": "Neutrální teplota",
+    "Warm": "Teplá teplota"
+  },
+  "TOKEN": {
+    "LABELS": {
+      "Allies": "{allies} Spojenci",
+      "Attackers": "{attackers} Útočníci",
+      "Enemies": "{enemies} Nepřátelé",
+      "Engagement": "Počet soupeřů {engagement}",
+      "Flanked": "Obklíčeni {flanked}"
+    },
+    "MOVEMENT": {
+      "ACTIONS": {
+        "blink.label": "Přesunout se okamžitě",
+        "burrow": {
+          "description": "Procházení skrz zemi či měkký terén na vzdálenost až poloviny hodnoty atributu Pohyb za každou akci; lze projít pod zdmi i mezi ostatními tvory. Pouze bytosti s vlastností Tunnel mohou tuto metodu použít.",
+          "label": "Hrabání"
+        },
+        "climb": {
+          "description": "Vystoupání či sestup na povrch až do poloviny hodnoty atributu Pohyb za každou akci; pro tvory s vlastností Výstup se použije tato rychlost namísto poloviny jejich Pohybu.",
+          "label": "Výstup"
+        },
+        "crawl": {
+          "description": "Pohyb v lehu na vzdálenost až poloviny hodnoty atributu Pohyb za každou akci.",
+          "label": "Plazení se"
+        },
+        "displace.label": "Teleportace",
+        "fall": {
+          "description": "Volný pád směrem k pevné ploše; náklady na pohyb jsou vždy nulové.",
+          "label": "Pád"
+        },
+        "fast": {
+          "label": "Spěšně"
+        },
+        "fly": {
+          "description": "Let vzduchem až do vzdálenosti odpovídající hodnotě atributu Let za každou akci; pouze tvorové s vlastností Let mohou tuto metodu využít.",
+          "label": "Let"
+        },
+        "jump": {
+          "description": "Skokem překonat vzdálenost až poloviny hodnoty atributu Pohyb za každou akci.",
+          "label": "Skok"
+        },
+        "normal": {
+          "label": "Běžné"
+        },
+        "push": {
+          "description": "Vynucený posun vyvolaný vnějším faktorem, například odhození; náklady na pohyb jsou vždy nulové.",
+          "label": "Odstrčit"
+        },
+        "slow": {
+          "label": "Opatrně"
+        },
+        "step": {
+          "description": "Za jednu akci se opatrně přesuňte až o polovinu své rychlosti pohybu. Tento pohyb nevyvolává reakci na opuštění dosahu protivníka.",
+          "label": "Krok"
+        },
+        "swim": {
+          "description": "V rámci jedné akce se může postava pohnout vzdáleností až do výše poloviny hodnoty její vlastnosti Pohyb i ve vodě, která dosahuje alespoň úrovně pasu. Postavy s explicitně definovanou rychlostí Plavání pak mohou tuto rychlost použít namísto poloviny své hodnoty Pohyb.",
+          "label": "Plavání"
+        },
+        "walk": {
+          "description": "Při každé akci se postava může pohnout vzdáleností až rovnající se její hodnotě Pohyb.",
+          "label": "Chůze"
+        }
+      },
+      "COST": {
+        "Forced": "Vynucené",
+        "Impossible": "Nemožné"
+      }
+    }
+  },
+  "TOOL": {
+    "CATEGORIES": {
+      "Crafting": "Sada na řemeslnou výrobu",
+      "Implement": "Pomůcka"
+    },
+    "FIELDS": {
+      "skills": {
+        "hint": "Zde jsou uvedeny dovednosti, které vyžadují použití daného nástroje.",
+        "label": "Související dovednosti"
+      }
+    }
+  },
+  "TRAINING": {
+    "BREAKDOWN": {
+      "Bonus": "Bonus",
+      "Cap": "Maximální úroveň",
+      "Granted": "Přiděleno",
+      "Increases": "Zvyšuje se",
+      "Next": "Další stupeň ({rank})",
+      "Talents": "Talenty",
+      "Total": "Celkové množství"
+    },
+    "Decrease": "Znovu získat bod zběhlosti",
+    "GROUPS": {
+      "Equipment": "Zběhlost v používání vybavení",
+      "Exploration": "Dovednosti spojené s průzkumem",
+      "Knowledge": "Teoretické dovednosti",
+      "Social": "Sociální dovednosti",
+      "Spell": "Zběhlost v kouzlení",
+      "Trade": "Řemeslné dovednosti",
+      "Weapon": "Zběhlost s používáním zbraní"
+    },
+    "Increase": "Přidělte bod zběhlosti",
+    "LABELS": {
+      "alchemy": "Alchymie",
+      "arcana": "Tajemné umění",
+      "armor": "Boj ve zbroji",
+      "armorShort": "Zbroj",
+      "athletics": "Atletika",
+      "awareness": "Všímavost",
+      "cooking": "Vaření",
+      "deception": "Klamání",
+      "diplomacy": "Diplomacie",
+      "elemental": "Elementární kouzlení",
+      "elementalShort": "Elementární síly",
+      "enchanting": "Očarovávání předmětů",
+      "fletching": "Výroba šípů",
+      "glyphweaving": "Tvorba glyfů",
+      "heavy": "Těžké zbraně",
+      "heavyShort": "Těžké výzbroje",
+      "intimidation": "Zastrašování",
+      "jewelcraft": "Práce s drahokamy",
+      "light": "Lehké zbraně",
+      "lightShort": "Lehká výzbroj",
+      "mechanical": "Mechanické zbraně",
+      "mechanicalShort": "Mechanické",
+      "medicine": "Medicína",
+      "natural": "Přirozené zbraně",
+      "naturalShort": "Přirozené",
+      "performance": "Umělecké vystupování",
+      "physical": "Kinematická magie",
+      "physicalShort": "Kinematické",
+      "projectile": "Střelné zbraně",
+      "projectileShort": "Střelné",
+      "science": "Věda",
+      "shield": "Štítový boj",
+      "shieldShort": "Štít",
+      "simpleShort": "Jednoduché",
+      "smithing": "Kovářství",
+      "society": "Společnost",
+      "spiritual": "Duchovní magie",
+      "spiritualShort": "Duchovní",
+      "stealth": "Skrytost",
+      "tailoring": "Krejčovství",
+      "talisman": "Talismanové zbraně",
+      "talismanShort": "Talismán",
+      "unarmed": "Boj beze zbraní",
+      "unarmedShort": "Beze zbraní",
+      "wilderness": "Divočina"
+    },
+    "PassiveTooltip": "Vaše pasivní hodnocení pro toto školení."
+  },
+  "TRAVEL_PACES": {
+    "Fast": "Rychlé",
+    "Hidden": "Skryté",
+    "Normal": "Běžné",
+    "Reckless": "Bezohledné",
+    "Slow": "Opatrné"
+  },
+  "TYPES": {
+    "ActiveEffect": {
+      "affix": "Afix"
+    },
+    "Actor": {
+      "adversary": "Nepřítel",
+      "group": "Skupina",
+      "hero": "Hrdina"
+    },
+    "Item": {
+      "accessory": "Doplněk",
+      "ancestry": "Původ",
+      "archetype": "Archetyp",
+      "armor": "Zbroj",
+      "background": "Zázemí",
+      "consumable": "Jednorázový předmět",
+      "loot": "Kořist",
+      "schematic": "Výrobní návrh",
+      "spell": "Ikonické kouzlo",
+      "talent": "Talent",
+      "taxonomy": "Klasifikace",
+      "tool": "Nástroj",
+      "weapon": "Zbraň"
+    },
+    "JournalEntryPage": {
+      "skill": "Dovednosti v Crucible"
+    },
+    "RegionBehavior": {
+      "crucible.action": "Akce v Crucible",
+      "crucible.hazard": "Nebezpečí v Crucible"
+    }
+  },
+  "WALKTHROUGH": {
+    "AbilityPoints": "Využijte dostupné body vlastností k jejich zvýšení.",
+    "AddAncestry": "Z kompendia či panelu předmětů vyberte původ a pomocí přetažení ho přidejte.",
+    "AddBackground": "Vyberte zázemí z kompendia nebo panelu předmětů a přidejte ho přetažením.",
+    "ConfigureArchetype": "Nastavte pro tohoto protivníka odpovídající původ.",
+    "ConfigureTaxonomy": "Určete pro tohoto protivníka vhodnou taxonomii.",
+    "LevelOne": "Nastavte svou postavu na úroveň 1 a vydejte se na cestu!",
+    "LevelUp": "Udělali jste dostatek pokroků k přechodu na vyšší úroveň. Až budete připraveni, zvyšte si úroveň o jednu!",
+    "LevelZero": "Před povýšením postavy na úroveň 1 je nutné dokončit všechny kroky tvorby postavy.",
+    "LevelZeroIncomplete": "Dokud neukončíte veškeré kroky tvorby postavy, nemůžete přejít na úroveň 1!",
+    "NextLevel": "Postup směrem k dosažení další úrovně",
+    "SkillPoints": "Využijte dostupné body dovedností k jejich zvýšení.",
+    "TalentPoints": "Využijte dostupné body talentů k otevření Stromu talentů."
+  },
+  "WARNING": {
+    "AbilityCannotDecrease": "Tuto vlastnost již nelze dále snížit.",
+    "AbilityCannotIncrease": "Tuto vlastnost již nelze dále zvýšit.",
+    "AbilityRequireAncestry": "K nákupu dalšího navýšení vlastnosti je nutné nejprve přidělit původ.",
+    "CannotEquipActionCost": "Nemůžete vybavit zbraně, jelikož nemáte k dispozici žádné body akce.",
+    "CannotEquipInCombat": "Postava {actor} si v průběhu střetnutí nemůže přidělit či odebrat předmět {item}.",
+    "CannotEquipInvalidCategory": "Postava {actor} nemůže použít předmět {item} ve vyhrazeném slotu typu {type}.",
+    "CannotEquipSlotInUse": "Postava {actor} si nemůže přidělit předmět {item}, neboť požadovaný slot typu {type} je již obsazen.",
+    "CannotEquipTaxonomy": "Postava {actor} si nemůže přidělit předmět {item}, jelikož taxonomie \"{taxonomy}\" neumožňuje používání vybavení.",
+    "NoParty": "Je nutné mít nastavenou hlavní družinu pro tuto operaci.",
+    "SkillRequireAncestryBackground": "Než můžete nakupovat stupně dovedností, musíte přiřadit původ i zázemí.",
+    "TrainingCannotDecrease": "Tuto zběhlost již nelze dále snížit.",
+    "TrainingCannotIncrease": "Tuto zběhlost již nelze dále zvýšit."
+  },
+  "WEAPON": {
+    "CATEGORIES": {
+      "Balanced": "Vyvážené",
+      "CategoryHands": "{category} ({hands} rukou)",
+      "ShieldHeavy": "Těžký štít",
+      "ShieldLight": "Lehký štít"
+    },
+    "FIELDS": {
+      "damageType": {
+        "hint": "Zde nastavte typ zranění, které tato zbraň způsobuje.",
+        "label": "Typ Zranění"
+      },
+      "dropped": {
+        "hint": "Byla tato zbraň vymrštěna, odhozena či jinak upuštěna?",
+        "label": "Upuštěná Zbraň"
+      },
+      "loaded": {
+        "hint": "Pokud je nutné tuto zbraň nabíjet – zaznamenejte, zda je již nabitá.",
+        "label": "Nabitá"
+      },
+      "slot": {
+        "hint": "Určete, do kterého slotu vybavení se tato zbraň vkládá.",
+        "label": "Slot Vybavení"
+      }
+    },
+    "SHEET": {
+      "Equipment": "Detaily Zbraně",
+      "Type": "Typ Zbraně"
+    },
+    "SLOTS": {
+      "Either": "Libovolná Ruka",
+      "Mainhand": "Hlavní Ruka",
+      "Offhand": "Vedlejší Ruka",
+      "Twohand": "Oběma Rukama"
+    },
+    "SPECIFIC": {
+      "Unarmed": "Beze zbraně",
+      "VampireBite": "Kousnutí Upíra"
+    },
+    "TAGS": {
+      "Ambush": "Přepadení",
+      "AmbushTooltip": "Tento předmět se skvěle hodí k útoku dříve, než vaši protivníci stihnou zareagovat. Když zaútočíte na cíl, který je v pořadí iniciativy za vámi, získáte +1 výhodu.",
+      "Blocking": "Blokování",
+      "BlockingTooltip": "Tento předmět poskytuje bonus k vaší obraně proti blokování.",
+      "DamageTooltip": "Stručný popis útočných vlastností tohoto předmětu – vyjadřuje se jako bonus k útoku / bonus ke zranění / násobitel zranění.",
+      "Engaging": "Zapojení do boje",
+      "EngagingTooltip": "Předměty v této kategorii vám umožňují lépe čelit více nepřátelům; vaše zapojení do boje se zvyšuje o +1.",
+      "Intuitive": "Intuitivnost",
+      "IntuitiveTooltip": "S tímto předmětem si snadno poradíte i bez jakéhokoli výcviku. Při jeho používání máte navíc jeden bod zběhlosti.",
+      "Keen": "Vysoce účinný",
+      "KeenTooltip": "Tato zbraň je zvlášť smrtící při kritickém zásahu. DŮLEŽITÁ POZNÁMKA – vlastnost zatím není v testovací verzi implementována.",
+      "Natural": "Přirozený",
+      "NaturalTooltip": "Předměty přirozeného původu využívají výcvik určený pro předměty přirozeného typu. Nelze je odhodit.",
+      "Oversized": "Velký rozměr",
+      "OversizedTooltip": "Tento předmět má nadměrnou velikost či je jinak obtížné jej použít, což vám brání rychle jednat. Když ho držíte, zvyšuje se váš počet nevýhod u iniciativy o +2.",
+      "Parrying": "Odvracení útoků",
+      "ParryingTooltip": "Tento předmět poskytuje bonus k vaší schopnosti odvracet útoky.",
+      "Reach": "Dosah",
+      "ReachTooltip": "Tento předmět má nadstandardně velký dosah. Můžete provádět běžné útoky na dvojnásobnou vzdálenost.",
+      "Reliable": "Spolehlivost",
+      "ReliableTooltip": "Tato zbraň je spolehlivá a jen zřídka vede ke katastrofálním výsledkům. Její práh kritického selhání je snížen o 2, takže neúspěšné útoky méně často končí kritickým minutím.",
+      "Reload": "Přebití",
+      "ReloadTooltip": "K použití tohoto předmětu je nutné jej znovu nabít. Pokud není nabitý, každá akce s ním spojená stojí +1 bod aktivní akce.",
+      "Returning": "Vracející se",
+      "ReturningTooltip": "Tato zbraň se díky magii nebo svému mechanismu po vržení vrací do ruky. Použití akce Vrhání zbraně u ní nezpůsobí stav Upuštěná.",
+      "Thrown": "Házení",
+      "ThrownTooltip": "Tato zbraň je uzpůsobena k vrhání a neutrpí postih nevýhod, který se běžně vztahuje na akci Vrhání zbraně.",
+      "UntrainedTooltip": "Vaše postava není plně zběhlá v používání {training} zbraní, a proto při útoku utrpí penalizaci.",
+      "Versatile": "Všestrannost",
+      "VersatileTooltip": "Tuto zbraň lze držet jednou či dvěma rukama; přepínání mezi těmito způsoby držení nevyžaduje žádné akční body. V druhém způsobu držení se chová jako odpovídající typ zbraně: jednoruční verze se mění na větší dvouruční zbraň a dvouruční verze na menší jednoruční zbraň."
+    }
+  }
+}
