@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-21
-- Deployed version: `v0.18.1`; PR #20 merged, GitHub release published and installed in Foundry.
+- Deployed version: `v0.19.1`; PRs #21 and #22 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,34 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-21, Czech UI released and verified: PR #21 (`36c5a30`) shipped 0.19.0;
+  live QA corrections shipped as PR #22 (`adae5d9`), version 0.19.1. Both CI and
+  release workflows passed; downloaded 0.19.1 ZIP/manifest contain all five
+  language files. Installed through Foundry Setup and relaunched Ember. Runtime
+  ready=true, language=cs, version=0.19.1, glossary count=776. Native Setup,
+  navigation, an actual Crucible actor sheet and translation desk render in Czech.
+  All 6,059 catalog keys are covered, with 488 manual overrides. Full checks:
+  325 tests passed, 3 opt-in skipped; typecheck/build/release verification passed.
+  Desktop browser QA at 1855x1256 verified the repaired FPS, search, equipment,
+  physical defense, range and spell-casting labels without clipping or overlays.
+  No translation-module console errors; an unrelated password-manager extension
+  autofill error and existing Crucible/Ember content and environment warnings
+  were observed. Hard-coded calendar text (Day, Shard of Akon, Wind Direction)
+  remains English and is outside the catalog coverage. Source adventure names
+  and content remain unchanged; no mass translation was started.
+
+  User confirmed the server's default language is controlled through deployment
+  .env. The observed native provider value is `cs.foundry-translate`; use that
+  value in the deployment's language setting to persist Czech Setup across
+  restarts. Do not guess the environment variable name without checking the
+  deployment image. In-world user preference is separately set to Čeština.
+  APEX was reloaded successfully (full GPU, context 8192, parallel=1, 11.59 GiB)
+  as `hy-mt2-30b-a3b-apex`; localhost LM Studio server remains available.
+  Primary checkout is main. Earlier uncommitted UI draft is safely retained in
+  stash "Local Czech UI draft before switching to published 0.19.0"; that draft
+  is superseded by the released implementation. The translation desk is open
+  in the user's browser. Earlier entries below describe historical states.
 
 - 2026-09-21, Czech UI candidate 0.19.0: all 6,059 localization keys generated
   (core 3,587, Crucible 1,969, Ember 503), with 480 manually reviewed overrides.

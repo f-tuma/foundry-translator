@@ -21,6 +21,13 @@ do not override unrelated systems or inactive Ember installations.
 provider for Setup. English remains available in Foundry's language preference.
 No source Actor, Item, Journal, system or Ember package file is modified.
 
+For Czech Setup, select **Čeština – Foundry Translate** as the server's default
+language. Foundry stores this provider as `cs.foundry-translate`. Deployments
+that supply the language through an environment variable must use that value
+in their server configuration too; otherwise a restart can replace the choice
+made in Setup. The environment variable name depends on the deployment image.
+The user's in-world **Čeština** preference is a separate setting.
+
 ## Maintenance and validation
 
 The initial drafts were generated locally using Hy-MT2 30B-A3B APEX. Manual
