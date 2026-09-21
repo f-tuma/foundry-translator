@@ -11,6 +11,20 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-21, plain document names: PR #23 (`9fb1d0c`), tag v0.19.2, removes
+  the generated language suffix from Actor, Item and Journal names. Metadata and
+  UUID-based matching remain unchanged. Updated existing assertions; 325 tests
+  pass (3 opt-in skipped), typecheck/build/release verification pass. The user
+  deleted their earlier translated copies, so no migration was needed or added.
+  Browser readback showed only the glossary pack (776 entries) and no world
+  documents bearing module translation flags or `[CS]` names.
+
+  **Deployment preference changed:** publish new versions on GitHub and report
+  the release; the user will update Foundry themselves. Do not return to Setup,
+  stop the world or install releases unless newly asked. For 0.19.2 the world
+  had already returned to Setup before this preference arrived; no module update
+  was performed. Last agent-verified installed version remains 0.19.1.
+
 - 2026-09-21, Czech UI released and verified: PR #21 (`36c5a30`) shipped 0.19.0;
   live QA corrections shipped as PR #22 (`adae5d9`), version 0.19.1. Both CI and
   release workflows passed; downloaded 0.19.1 ZIP/manifest contain all five
