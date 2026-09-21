@@ -1,4 +1,12 @@
-# Foundry Translate 0.18.0 — stručný návod
+# Foundry Translate 0.19.0 — stručný návod
+
+## České rozhraní
+
+V **Nastavení hry → Preferovaný jazyk** vyber **Čeština**, ulož nastavení a
+obnov stránku. Přeložené rozhraní Foundry, Crucible a Emberu funguje i bez
+LM Studia. Jazyk rozhraní a cílový jazyk překladače jsou dvě samostatné volby.
+Obsah deníků, jména dokumentů a texty dalších modulů se tím automaticky nemění.
+
 
 ## První spuštění
 

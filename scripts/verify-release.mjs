@@ -15,6 +15,17 @@ const sourceVersion = constantsSource.match(/MODULE_VERSION = "([^"]+)"/)?.[1];
 
 const failures = [];
 
+for (const language of moduleJson.languages ?? []) {
+  try {
+    const original = await readFile(`public/${language.path}`, "utf8");
+    const built = await readFile(`dist/${language.path}`, "utf8");
+    if (built !== original) failures.push(`Language file ${language.path} differs from the source`);
+    if (!Object.keys(JSON.parse(built)).length) failures.push(`Language file ${language.path} is empty`);
+  } catch {
+    failures.push(`Language file ${language.path} is missing or invalid`);
+  }
+}
+
 if (moduleJson.version !== packageJson.version) {
   failures.push(`module.json version ${moduleJson.version} does not match package.json ${packageJson.version}`);
 }

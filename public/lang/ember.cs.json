@@ -1,0 +1,981 @@
+{
+  "ACTOR": {
+    "CONTROLS": {
+      "EmberFlags": "Nastavení postavy pro Ember",
+      "EmberRebuildBackground": "Znovu sestavit zázemí",
+      "EmberToken": "Dynamický token Emberu"
+    }
+  },
+  "DND5E": {
+    "ADVANCEMENT": {
+      "EmberKnowledge": {
+        "Configure": "Nastavit znalosti",
+        "Hint": "Získání znalostí podle původu.",
+        "Title": "Znalosti"
+      }
+    },
+    "REST": {
+      "Interrupted": "Dokončení přerušeného odpočinku: zbývá {hours} hodin."
+    },
+    "TRAVEL": {
+      "Exertion": {
+        "Prompt": "Družina cestuje už {hours} hodin a začíná být unavená."
+      }
+    }
+  },
+  "EMBER.ACTOR_FLAGS": {
+    "FIELDS": {
+      "character": {
+        "ancestry": {
+          "hint": "ID předmětu s původem nebo název původu v Emberu.",
+          "label": "Původ"
+        },
+        "culture": {
+          "hint": "ID předmětu s kulturou nebo název kultury v Emberu.",
+          "label": "Kultura"
+        },
+        "path": {
+          "hint": "Text popisující povolání či zázemí dané postavy.",
+          "label": "Cesta"
+        },
+        "pronouns": {
+          "label": "Zájmena"
+        }
+      },
+      "combatTheme": {
+        "hint": "Vyberte pro tuto bytost nebo postavu jiný hudební motiv boje, než je běžný pro její kategorii.",
+        "label": "Hudební motiv boje"
+      },
+      "disableDynamicToken": {
+        "hint": "Zabraňte Emberu v nahrazení tokenu dané postavy dynamickým tokenem. Využijte to u vlastních statických tokenů, POG tokenů či systému Dynamického kruhu tokenů ve Foundry.",
+        "label": "Zakázat dynamický token"
+      },
+      "discoverable": {
+        "character": "Postava",
+        "creature": "Bytost",
+        "hint": "Lze tuto postavu objevit v kodexu Emberu jako bytost nebo postavu?",
+        "label": "Objevitelná"
+      },
+      "portrait": {
+        "anchorX": {
+          "label": "X"
+        },
+        "anchorY": {
+          "label": "Y"
+        },
+        "artist": {
+          "label": "Jméno autora"
+        },
+        "flip": {
+          "hint": "Portréty mají směřovat dopředu nebo doleva. Pokud postava na portrétu hledí doprava, zaškrtnutím jej ve výjevech zrcadlově převrátíte.",
+          "label": "Převrátit vodorovně"
+        },
+        "height": {
+          "label": "Výška"
+        },
+        "width": {
+          "label": "Šířka"
+        }
+      },
+      "pronunciation": {
+        "hint": "Fonetický návod k výslovnosti jména této postavy.",
+        "label": "Výslovnost"
+      }
+    },
+    "SHEET": {
+      "CHARACTER": "Postava",
+      "COMBAT": "Boj",
+      "DISCOVERABLE": "Lze objevit",
+      "PORTRAIT": "Portrét",
+      "TOKEN": "Token"
+    }
+  },
+  "EMBER.ADVENTURE": {
+    "WARNINGS": {
+      "EVENT_ACTIVE": "Před importem dobrodružství je nutné ukončit či zrušit právě probíhající událost hry Ember.",
+      "IMPORT_REQUIRED": "Modul Ember je aktivní, avšak jeho obsah dosud nebyl importován. K pokračování je třeba importovat dobrodružství Ember.",
+      "IMPORT_UNDERWAY": "Probíhá import dobrodružství Ember, prosím vyčkejte. Po dokončení se hra automaticky znovu načte.",
+      "REIMPORT_REQUIRED": "Je nutné znovu importovat dobrodružství Ember, aby byly aplikovány důležité aktualizace v nové verzi {version}.",
+      "SETUP_FAILED": "Inicializace modulu Ember se nezdařila. Prosím nahlaste chybu z konzole prohlížeče týmu Ember, abychom mohli problém vyřešit."
+    }
+  },
+  "EMBER.ANCESTRY": {
+    "FIELDS": {
+      "color": {
+        "hint": "Barva sloužící jako designový prvek k znázornění tohoto původu v rozhraní tvorby postav.",
+        "label": "Barva v rozhraní"
+      },
+      "height": {
+        "hint": "Uveďte typickou výšku dospělých jedinců tohoto původu.",
+        "label": "Výška"
+      },
+      "icon": {
+        "hint": "Ikona používaná k reprezentaci tohoto původu v tvorbě postav i jinde.",
+        "label": "Ikona původu"
+      },
+      "item": {
+        "hint": "Předmět rasy ze systému D&D5E.",
+        "label": "Předmět rasy tohoto původu"
+      },
+      "lifespan": {
+        "hint": "Určete typickou délku života příslušníků tohoto původu.",
+        "label": "Délka života"
+      },
+      "origin": {
+        "hint": "Stručně popište kosmologický původ tohoto rodu. Pouze pro interní poznámky.",
+        "label": "Vznik rodu"
+      },
+      "portrait": {
+        "hint": "Portrét ukázkové postavy tohoto původu.",
+        "label": "Portrét"
+      },
+      "rarity": {
+        "hint": "Určete stupeň vzácnosti tohoto původu.",
+        "label": "Úroveň vzácnosti"
+      }
+    },
+    "SECTIONS": {
+      "gameplay": "Vlastnosti ovlivňující hru"
+    }
+  },
+  "EMBER.ATTUNEMENT": {
+    "Amount": "Množství",
+    "Attunement": "Sladění",
+    "BoostChangeType": "Zvýšení sladění",
+    "CurrentTooltip": "Získané body sladění",
+    "Identifier": "Identifikátor odměny",
+    "IdentifierHint": "Jedinečný řetězec označující tuto konkrétní odměnu sladění.",
+    "NextTooltip": "Potřeba pro další stupeň",
+    "Progress": "Průběh",
+    "ProgressionTitle": "Postup sladění",
+    "Rank": "Stupeň",
+    "Tab": "Sladění",
+    "Type": "Typ sladění"
+  },
+  "EMBER.BACKGROUND": {
+    "FIELDS": {
+      "cultureId": {
+        "hint": "Kulturní prostředí, jež tvoří polovinu zázemí této postavy.",
+        "label": "Kultura"
+      },
+      "pathId": {
+        "hint": "Profese či poslání, které doplňují zázemí a umožňují získávat zběhlost.",
+        "label": "Cesta"
+      }
+    },
+    "Rebuild": "Znovu sestavit zázemí"
+  },
+  "EMBER.BIOME": {
+    "FIELDS": {
+      "biomeId": {
+        "hint": "Povinný jedinečný identifikátor biomu. Musí přesně odpovídat identifikátoru v podkladových datech oblasti.",
+        "label": "ID biomu"
+      },
+      "creatures": {
+        "hint": "Pro vytvoření seznamu tvorů žijících v tomto biomu je možné zadat UUID postavy nebo použít funkci přetažení myší.",
+        "label": "Tvorové"
+      },
+      "events": {
+        "coefficients": {
+          "hint": "Zde lze nastavit koeficienty a váhy, které ovlivňují pravděpodobnost vzniku jednotlivých událostí v daném biomu.",
+          "label": "Koeficienty událostí"
+        }
+      },
+      "exposition": {
+        "hint": "Úvodní text určený k předčítání – poskytuje informace o tomto biomu při jeho prvním objevení. Tento text vidí jak vypravěč, tak i hráči.",
+        "label": "Nastavení prostředí"
+      },
+      "fillColor": {
+        "hint": "Barva znázorňující tento biom na mapě oblasti.",
+        "label": "Barva"
+      },
+      "overview": {
+        "hint": "Text popisující tento biom, určený pro hráče – může obsahovat více odstavců.",
+        "label": "Přehled biomu"
+      },
+      "regionId": {
+        "hint": "Určení konkrétní oblasti herního světa Ember, kde se tento biom nachází.",
+        "label": "ID regionu"
+      },
+      "scenes": {
+        "area": {
+          "hint": "Vyberte mapu oblasti znázorňující tento biom.",
+          "label": "Mapa oblasti"
+        },
+        "vista": {
+          "hint": "Vyberte výjev znázorňující tento biom.",
+          "label": "Výjev"
+        }
+      },
+      "sounds": {
+        "environment": {
+          "arrangements": {
+            "day": {
+              "label": "Den"
+            },
+            "night": {
+              "label": "Noc"
+            }
+          },
+          "soundscape": {
+            "hint": "Nastavte výchozí zvukovou kulisu a aranžmá pro zvuky prostředí v tomto biomu.",
+            "label": "Zvuková kulisa prostředí"
+          },
+          "surface": {
+            "hint": "ID materiálu povrchu používané pro zvuky cestování po mapě oblasti.",
+            "label": "Materiál povrchu"
+          }
+        },
+        "music": {
+          "arrangements": {
+            "day": {
+              "label": "Den"
+            },
+            "night": {
+              "label": "Noc"
+            },
+            "tension": {
+              "label": "Napětí"
+            }
+          },
+          "soundscape": {
+            "hint": "Upravte zvukovou kulisu a skladby určené pro hudbu ve daném biomu.",
+            "label": "Hudební kulisa"
+          }
+        }
+      },
+      "terrain": {
+        "hint": "Určete výchozí typ terénu pro jednotlivé hexagony v tomto biomu.",
+        "label": "Terén"
+      },
+      "visibility": {
+        "distance": {
+          "label": "Vzdálenost"
+        },
+        "limit": {
+          "hint": "Jak se omezuje vidění při setkání s hexagony tohoto biomu?",
+          "label": "Omezení"
+        }
+      }
+    },
+    "SECTIONS": {
+      "ambience": "Zvuky prostředí",
+      "basic": "Základní nastavení",
+      "events": "Pravděpodobnost událostí",
+      "music": "Hudba",
+      "related": "Související obsah",
+      "visibility": "Viditelnost"
+    }
+  },
+  "EMBER.CALENDAR": {
+    "ADVANCE": "Posunout čas",
+    "CODEX": "Kodex",
+    "COLLAPSE": "Sbalit kalendář",
+    "COSMOS": "Mapa Kosmosu",
+    "EXPAND": "Rozbalit kalendář",
+    "PARTY": "List družiny",
+    "REGION": "Mapa oblasti",
+    "REWIND": "Vrátit čas",
+    "SEASONS": {
+      "BLOOMING": "Rozkvět",
+      "GLEANING": "Dožínky",
+      "SEEDING": "Setba",
+      "STEADING": "Píle",
+      "STILLING": "Utišení",
+      "WITHERING": "Vadnutí"
+    },
+    "TIME_FORMAT_12": "12hodinový formát (např. 4:00pm)",
+    "TIME_FORMAT_24": "24hodinový formát (např. 16:00)",
+    "TRAVEL": {
+      "DaysHours": "{days} d {hours} h",
+      "Hexes": "Počet překročených hexů",
+      "Hours": "{hours} h",
+      "RestedAt": "Poslední odpočinek",
+      "SinceRest": "Od posledního odpočinku",
+      "Traveled": "Čas na cestě",
+      "Unknown": "Není zaznamenáno"
+    },
+    "WORLD": "Světová mapa"
+  },
+  "EMBER.CHAPTERS": {
+    "CHAPTER": "Kapitola {n}",
+    "LEVEL": "Úroveň {x}",
+    "LEVELS": "Úrovně {x}-{y}",
+    "LEVEL_PLUS": "Úroveň {x}+",
+    "PROLOGUE": "Prolog",
+    "UNASSIGNED": "Nepřiřazeno"
+  },
+  "EMBER.CHARACTER_CLASS": {
+    "FIELDS": {
+      "color": {
+        "hint": "Barva sloužící jako designový prvek pro znázornění této třídy v rozhraní tvorby postavy.",
+        "label": "Barva rozhraní"
+      },
+      "icon": {
+        "hint": "Ikona používaná k reprezentaci této třídy při tvorbě postavy i jinde.",
+        "label": "Ikona třídy"
+      },
+      "overview": {
+        "hint": "Stručný popis této třídy, zobrazovaný při tvorbě postavy.",
+        "label": "Přehled třídy"
+      }
+    }
+  },
+  "EMBER.CODEX": {
+    "BESTIARY": "Bestiář",
+    "CHARACTERS": "Postavy",
+    "DISCOVERED_COUNT": "Počet objevených položek",
+    "DISCOVERIES": "Objevené položky",
+    "DISCOVERY_RECORD": "Zaznamenat objevení",
+    "DISCOVERY_RESET": "Smazat záznam objevení",
+    "ENCOUNTERED": "Setkání: {name}, {time}.",
+    "ENCOUNTERED_LOCATION": "Setkání: {name}, {time}, {location}.",
+    "JOURNAL": "Deník",
+    "NOT_ENCOUNTERED": "Dosud bez setkání: {name}.",
+    "QUESTS": "Seznam úkolů",
+    "TABS": "Navigace mezi záložkami kodexu"
+  },
+  "EMBER.CONST": {
+    "TRAVEL": {
+      "fast": "Rychlé",
+      "hidden": "Skryté",
+      "normal": "Běžné",
+      "reckless": "Nerozvážné",
+      "slow": "Pomalé"
+    },
+    "VISIBILITY": {
+      "BACK": "Zadní strana",
+      "FRONT": "Přední strana",
+      "NONE": "Žádné"
+    }
+  },
+  "EMBER.CONTENT_CONFIG": {
+    "ALL_QUESTS": "Všechny úkoly",
+    "HINT": "Vyberte, které úkoly Emberu jsou aktivní. Ve výchozím nastavení jsou aktivní všechny. Jednotlivé úkoly můžete vypnout a hrát tak jen vybranou část kampaně.",
+    "MENU_HINT": "Vyberte úkoly povolené v této kampani. Vypnuté úkoly a jejich události se nebudou ve hře objevovat, dokud je znovu nepovolíte.",
+    "MENU_LABEL": "Nastavit obsah",
+    "MENU_NAME": "Aktivní herní obsah",
+    "RESET": "Obnovit výchozí",
+    "SAVE": "Uložit nastavení",
+    "TITLE": "Nastavení aktivního obsahu"
+  },
+  "EMBER.CONTROLS": {
+    "ClockToggle": "Přepnout světový čas",
+    "CycleSlice": "Přepnout výškovou úroveň",
+    "EventsHUD": "Přepnout panel událostí",
+    "HexHUD": "Přepnout panel hexů",
+    "InteractionToggle": "Interakce s objekty",
+    "SpawnsToggle": "Zobrazit oblasti výskytu",
+    "Teleport": "Teleportovat token",
+    "TerrainToggle": "Přepnout překryv terénu",
+    "VistaComposition": "Změnit kompozici",
+    "VistaConfig": "Nastavit výjev",
+    "WeatherToggle": "Přepnout překryv počasí"
+  },
+  "EMBER.COSMOS": {
+    "FIELDS": {
+      "color": {
+        "hint": "Barva znázorňující toto kosmologické sladění v rozhraní tvorby postavy.",
+        "label": "Barva rozhraní"
+      },
+      "icon": {
+        "hint": "Ikona znázorňující toto kosmologické sladění při tvorbě postavy i jinde.",
+        "label": "Ikona"
+      },
+      "item": {
+        "hint": "Předmět zázemí ze systému D&D5E.",
+        "label": "Předmět zázemí"
+      },
+      "portrait": {
+        "hint": "Obrázek sloužící k reprezentaci kosmologického prvku při tvorbě postavy i jinde.",
+        "label": "Portrét postavy"
+      }
+    },
+    "SECTIONS": {
+      "gameplay": "Integrace do hry"
+    }
+  },
+  "EMBER.CREATION": {
+    "MESSAGES": {
+      "CompleteAddParty": "{userName} dokončil vytvoření postavy {actorLink}! Máte zájem přidat ji do družiny?"
+    },
+    "TABS": "Navigace mezi kartami tvorby postavy"
+  },
+  "EMBER.CULTURE": {
+    "FIELDS": {
+      "color": {
+        "hint": "Barva používaná jako designový prvek k reprezentaci dané Kultury v rozhraní pro tvorbu postav.",
+        "label": "Barva rozhraní"
+      },
+      "icon": {
+        "hint": "Ikona sloužící k identifikaci dané Kultury při tvorbě postavy i jinde.",
+        "label": "Ikona Kultury"
+      },
+      "item": {
+        "hint": "Předmět zázemí ze systému D&D5E.",
+        "label": "Předmět kulturního zázemí"
+      }
+    }
+  },
+  "EMBER.DEITY": {
+    "FIELDS": {
+      "banner": {
+        "hint": "Banner obrazově znázorňující božstvo či materiály související s daným božstvem.",
+        "label": "Banner božstva"
+      },
+      "caption": {
+        "hint": "Volitelný popisek zobrazený pod bannerovým obrázkem.",
+        "label": "Popisek k banneru"
+      },
+      "category": {
+        "hint": "Určete kategorii v postranní liště, do které má být daná položka o božstvu zařazena.",
+        "label": "Kategorie"
+      },
+      "clerics": {
+        "hint": "Božské domény spojované s tímto božstvem, pokud existují. Kněží uctívající toto božstvo se obvykle věnují jedné z těchto domén.",
+        "label": "Božské domény"
+      },
+      "edict": {
+        "hint": "Jednou větou vyjádřete přikázání shrnující poslání nebo cíle tohoto božstva.",
+        "label": "Přikázání"
+      },
+      "followers": {
+        "hint": "Související postavy nebo bytosti, které patří mezi významné následovníky tohoto božstva.",
+        "label": "Významní následovníci"
+      },
+      "locations": {
+        "hint": "Místa ve světě, která mají významnou spojitost s tímto božstvem.",
+        "label": "Významná místa"
+      },
+      "organizations": {
+        "hint": "Organizace ve světě, které mají významnou spojitost s tímto božstvem.",
+        "label": "Související organizace"
+      },
+      "overview": {
+        "hint": "Uveďte stručný (2–3 věty) popis této božské bytosti – její úlohu ve vesmíru a hlavní principy víry.",
+        "label": "Přehled božstva"
+      },
+      "pronunciation": {
+        "hint": "Volitelné fonetické vyslovování jména této božské bytosti.",
+        "label": "Výslovnost"
+      },
+      "sorcerers": {
+        "hint": "Čarodějnické původy spojované s tímto božstvem, pokud existují. Čarodějové s těmito původy mohou svou moc připisovat tomuto božstvu.",
+        "label": "Čarodějnické původy"
+      },
+      "warlocks": {
+        "hint": "Černokněžnické pakty spojované s tímto božstvem, pokud existují. Černokněžníci, kteří od něj získali moc, následují jeden z těchto paktů.",
+        "label": "Černokněžnické pakty"
+      }
+    },
+    "SECTIONS": {
+      "basic": "Základní nastavení",
+      "related": "Související obsah"
+    }
+  },
+  "EMBER.DEVELOPMENT": {
+    "FIELDS": {
+      "development": {
+        "notes": {
+          "hint": "Zde lze uvést krátké poznámky o aktuálním stavu vývoje či plánovaných krocích. Je možné vkládat i odkazy.",
+          "label": "Poznámky k vývoji"
+        },
+        "secrets": {
+          "hint": "Další informace o tvorbě světa nebo jeho reáliích, které nejsou určeny ke zveřejnění hráčům ani vypravěčům.",
+          "label": "Tajné znalosti"
+        },
+        "status": {
+          "hint": "Zaznamenejte aktuální stav vývoje daného obsahu.",
+          "label": "Stav vývoje"
+        }
+      }
+    }
+  },
+  "EMBER.EVENT": {
+    "FIELDS": {
+      "biomes": {
+        "hint": "Nastavte výskyt této události ve všech hexech vybraných biomů.",
+        "label": "Biomy pro událost"
+      },
+      "coefficients": {
+        "hint": "Nastavte koeficienty a váhy, jež ovlivňují pravděpodobnost vyskytnutí této události. Jedná se o pokročilou konfiguraci – provádějte ji pouze s pochopením fungování systému určování pravděpodobnosti událostí.",
+        "label": "Koeficienty událostí"
+      },
+      "encounter": {
+        "hint": "Konfigurace střetnutí je pokročilou funkcí – měla by se provádět opatrně a po konzultaci s Andrewem.",
+        "label": "Konfigurace Střetnutí"
+      },
+      "eventId": {
+        "hint": "Jedinečný identifikátor události; podle konvence má mít alfanumerický tvar ve stylu camelCase a začínat malým písmenem. Například „myStandaloneEvent3“.",
+        "label": "ID Události"
+      },
+      "exposition": {
+        "hint": "Text k předčítání, jenž poskytuje vysvětlení dané události; je viditelný jak pro Vypravěče, tak i pro Hráče.",
+        "label": "Nastavení Scény"
+      },
+      "global": {
+        "hint": "Globální události mohou nastat v kterémkoli hexu světa.",
+        "label": "Globální"
+      },
+      "hexes": {
+        "hint": "Událost lze nastavit tak, aby proběhla pouze na určitých hexových souřadnicích.",
+        "label": "Konkrétní Hexy"
+      },
+      "locations": {
+        "hint": "Událost lze nastavit tak, aby se odehrávala v konkrétních místech světa.",
+        "label": "Místa Události"
+      },
+      "milestone": {
+        "hint": "Určete, zda dokončení této události úkolu uděluje bod milníku.",
+        "label": "Uděluje milník"
+      },
+      "overview": {
+        "hint": "Stručný úvod (1–2 věty) určený pouze pro Vypravěče; shrnuje, jaké děje se během této události odehrají.",
+        "label": "Přehled"
+      },
+      "prerequisite": {
+        "hint": "Definujte požadovaný stav nadřazených událostí, jež jsou nutné k odemknutí této události.",
+        "label": "Požadované Podmínky"
+      },
+      "regionId": {
+        "hint": "Určete oblast světa, v níž se tato událost odehrává.",
+        "label": "Oblast Světa"
+      },
+      "scene": {
+        "active": {
+          "id": {
+            "hint": "Při spuštění této události se aktivuje daná Scéna; pokud je pole prázdné, bude událost probíhat ve stávající Scéně.",
+            "label": "Aktivní scéna"
+          },
+          "level": {
+            "label": "Aktivní výšková úroveň"
+          }
+        },
+        "complete": {
+          "id": {
+            "hint": "Tato scéna se stane aktivní, jakmile bude daná událost dokončena. Pokud pole zůstane prázdné, aktivuje se ta scéna, která byla před začátkem události aktivní.",
+            "label": "Scéna po dokončení"
+          },
+          "level": {
+            "label": "Výšková úroveň po dokončení"
+          }
+        },
+        "hint": "Zde nastavíte, jaké scény mají být pro tuto událost použity.",
+        "label": "Aktivní scéna"
+      },
+      "summary": {
+        "hint": "Zadejte krátký záznam (1–3 věty), který se po dokončení události zapíše do deníku kampaně. Měl by být psán z pohledu celé družiny, například: „Na cestě jsme potkali podivného poutníka...“",
+        "label": "Shrnutí události"
+      },
+      "type": {
+        "hint": "Určete hlavní typ herní aktivity této události. V současnosti lze vybrat jen jeden typ, ale v budoucnu bude možné označit více typů.",
+        "label": "Typ události"
+      },
+      "unique": {
+        "hint": "Jedinečné události se odehrají pouze jednou; jinak může k jejich opakování dojít.",
+        "label": "Jedinečná"
+      }
+    },
+    "MESSAGES": {
+      "CHANGE_OUTCOME": "<p>Opravdu chcete {action} výsledek <strong>{label}</strong>?</p>",
+      "CHANGE_RESET": "resetovat",
+      "CHANGE_SELECT": "vybrat"
+    },
+    "SECTIONS": {
+      "activation": "Aktivace události",
+      "basic": "Základní nastavení",
+      "location": "Místo konání události",
+      "probability": "Pravděpodobnost vyskytnutí události"
+    },
+    "WARNINGS": {
+      "NotRegistered": "Událost s ID „{eventId}“ dosud nebyla registrována jako aktivní herní událost. Je to buď proto, že byla právě vytvořena, anebo patří k záznamu deníku, který není považován za zdroj samostatných událostí. Aktualizace stránky (klávesa F5) může tento problém vyřešit."
+    }
+  },
+  "EMBER.EVENTS.Active": "Aktivní",
+  "EMBER.EVENTS.Available": "Nezahájená",
+  "EMBER.EVENTS.Completed": "Dokončená",
+  "EMBER.EVENTS.Milestone": "Uděluje milník",
+  "EMBER.EVENTS.NoExposition": "Pro tuto událost nebyl definován žádný text popisu!",
+  "EMBER.EVENTS.NoOverview": "Pro tuto událost nebyl definován žádný přehledový text!",
+  "EMBER.EVENTS.NoSummary": "Pro tuto událost nebyl definován žádný text shrnutí v deníku!",
+  "EMBER.EVENTS.QuestEvent": "Událost úkolu",
+  "EMBER.EVENTS.Repeating": "Opakující se",
+  "EMBER.EVENTS.StandaloneEvent": "Samostatná událost",
+  "EMBER.EVENTS.Undiscovered": "Neobjevená",
+  "EMBER.EmberStorylineLegend.StateAll": "Všechny události",
+  "EMBER.EmberStorylineLegend.StateNone": "Skryté",
+  "EMBER.EmberStorylineLegend.StateOpen": "Otevřené události",
+  "EMBER.EmberStorylineLegend.Title": "Příběhové linie",
+  "EMBER.EventActionBegin": "Zahájit událost",
+  "EMBER.EventActionCancel": "Zrušit událost",
+  "EMBER.EventActionComplete": "Dokončit událost",
+  "EMBER.EventActionDecline": "Odmítnout událost",
+  "EMBER.EventActionDiscoveryComplete": "Dokončit objev",
+  "EMBER.EventActionDiscoveryDecline": "Odmítnout objev",
+  "EMBER.EventActionReroll": "Navrhnout alternativu",
+  "EMBER.EventTagCombat": "Bojová událost",
+  "EMBER.EventTagExploration": "Průzkumná událost",
+  "EMBER.EventTagGlobal": "Globální událost",
+  "EMBER.EventTagSocial": "Společenská událost",
+  "EMBER.EventTagUnique": "Jedinečná událost",
+  "EMBER.JOURNAL_ENTRY_PAGE": {
+    "TABS": {
+      "config": "Konfigurace",
+      "content": "Obsah",
+      "development": "Vývoj",
+      "hooks": "Připojené funkce",
+      "outcomes": "Výsledky",
+      "secondary": "Sekundární nastavení"
+    }
+  },
+  "EMBER.JournalEventPageSheet": "Ember: události v příběhu",
+  "EMBER.JournalEventPageSheetConfig": "Konfigurace událostí",
+  "EMBER.JournalEventPageSheetContent": "Obsah stránky",
+  "EMBER.JournalEventPageSheetOutcomes": "Možné výsledky volby",
+  "EMBER.LOCATION": {
+    "FIELDS": {
+      "creatures": {
+        "hint": "Nastavte bytosti obývající toto místo zadáním UUID postavy nebo přetažením.",
+        "label": "Bytosti"
+      },
+      "discoveryHexes": {
+        "hint": "Další hexy, ze kterých lze toto místo objevit, kromě hexů, na kterých samo leží.",
+        "label": "Hexy umožňující objevení"
+      },
+      "events": {
+        "coefficients": {
+          "hint": "Zde nastavujete koeficienty a váhy, jež ovlivňují pravděpodobnost výskytu událostí na tomto místě.",
+          "label": "Koeficienty událostí"
+        }
+      },
+      "exposition": {
+        "hint": "Text určený k předčítání – poskytuje informace o daném místě při jeho prvním objevení. Tento text vidí jak vypravěč, tak i hráči.",
+        "label": "Nastavení prostředí"
+      },
+      "hexes": {
+        "hint": "Zde určujete konkrétní hexy, na nichž se toto místo nachází.",
+        "label": "Výběr hexů"
+      },
+      "locationId": {
+        "hint": "Jedinečný identifikátor daného místa – podle zvyklosti by měl být alfanumerický, psán ve stylu camelCase a začínat malým písmenem. Například „myCustomLocation4“.",
+        "label": "Identifikátor místa"
+      },
+      "overview": {
+        "hint": "Text popisující dané místo – určený pro hráče; může obsahovat více odstavců.",
+        "label": "Popis místa"
+      },
+      "regionId": {
+        "hint": "Nastavte, v jakém regionu herního světa Ember se tato lokace nachází.",
+        "label": "ID regionu"
+      },
+      "scenes": {
+        "area": {
+          "hint": "Určete mapu oblasti, která bude reprezentovat tuto lokalitu.",
+          "label": "Mapa oblasti"
+        },
+        "vista": {
+          "hint": "Vyberte výjev znázorňující toto místo.",
+          "label": "Výjev"
+        }
+      },
+      "sounds": {
+        "environment": {
+          "arrangements": {
+            "day": {
+              "label": "Den"
+            },
+            "night": {
+              "label": "Noc"
+            }
+          },
+          "neighbors": {
+            "hint": "Když se nacházíte v této lokalitě na mapě regionu, mají být zařazeny vrstvy prostředí z okolních hexů?",
+            "label": "Okolní hexy"
+          },
+          "soundscape": {
+            "hint": "Nastavte výchozí zvukovou kulisu a aranžmá pro zvuky prostředí na tomto místě.",
+            "label": "Zvuková kulisa prostředí"
+          }
+        },
+        "music": {
+          "arrangements": {
+            "day": {
+              "label": "Den"
+            },
+            "night": {
+              "label": "Noc"
+            },
+            "tension": {
+              "label": "Napětí"
+            }
+          },
+          "soundscape": {
+            "hint": "Nastavte zvukovou kulisu a uspořádání pro hudbu v této lokalitě.",
+            "label": "Hudební kulisa"
+          }
+        }
+      },
+      "terrain": {
+        "hint": "Určete typ terénu hexů v této lokalitě.",
+        "label": "Terén"
+      },
+      "visibility": {
+        "distance": {
+          "label": "Vzdálenost"
+        },
+        "limit": {
+          "hint": "Jakým způsobem je omezeno vidění u hexů v této lokalitě?",
+          "label": "Omezení"
+        }
+      }
+    },
+    "SECTIONS": {
+      "ambience": "Zvuky prostředí",
+      "basic": "Základní nastavení",
+      "events": "Pravděpodobnost vyskytnutí události",
+      "music": "Hudba",
+      "related": "Související obsah",
+      "visibility": "Viditelnost"
+    }
+  },
+  "EMBER.LORE": {
+    "FIELDS": {
+      "banner": {
+        "caption": {
+          "hint": "Volitelný popisek pod obrázkem v záhlaví.",
+          "label": "Popisek obrázku v záhlaví"
+        },
+        "img": {
+          "hint": "Obrázek zobrazovaný v záhlaví stránky tohoto tématu.",
+          "label": "Obrázek v záhlaví"
+        }
+      },
+      "characters": {
+        "hint": "Postavy související s tímto tématem.",
+        "label": "Související Postavy"
+      },
+      "concepts": {
+        "hint": "Související koncepty (záznamy v deníku), jež jsou s tímto tématem spojeny.",
+        "label": "Související Koncepty"
+      },
+      "content": {
+        "gamemaster": {
+          "hint": "Doplňující informace o tomto tématu, dostupné pouze pro uživatele – Vypravěče.",
+          "label": "Informace Pouze pro Vypravěče"
+        },
+        "overview": {
+          "hint": "Stručný přehled (2–3 věty) tohoto tématu, shrnující jeho obsah.",
+          "label": "Přehled Tématu"
+        }
+      },
+      "identifier": {
+        "hint": "Jedinečný identifikátor použitý pro dané téma lore.",
+        "label": "Identifikátor Tématu"
+      },
+      "pronunciation": {
+        "hint": "Volitelná fonetická výslovnost názvu tohoto tématu.",
+        "label": "Výslovnost"
+      },
+      "subtitle": {
+        "hint": "Druhotný název, přezdívka či epiteton používané k označení tohoto tématu.",
+        "label": "Druhotný Název"
+      }
+    },
+    "SECTIONS": {
+      "basic": "Základní nastavení",
+      "related": "Související obsah"
+    }
+  },
+  "EMBER.MILESTONE": {
+    "Award": {
+      "NewLevel": "Tento milník povýšil družinu na úroveň {level}!",
+      "Warning": "Pro identifikátor '{id}' již byl udělen milník."
+    },
+    "CanLevel": "Tato postava může zvýšit svou úroveň.",
+    "Dialog": {
+      "Identifier": {
+        "Error": "Je nutné zadat jedinečný identifikátor.",
+        "Hint": "Jedinečný řetězec označující tuto událost milníku.",
+        "Label": "Identifikátor",
+        "Placeholder": "uniqueMilestoneIdentifier"
+      },
+      "Legend": "Body",
+      "Points": {
+        "Label": "Udělení"
+      },
+      "Submit": {
+        "Award": "Udělit",
+        "Revoke": "Odebrat"
+      },
+      "Title": {
+        "Award": "Udělit milníky",
+        "Revoke": "Odebrat milníky"
+      }
+    },
+    "Points": {
+      "Label": "Body milníků"
+    },
+    "Revoke": {
+      "Warning": "Pokus o zrušení uděleného milníku pro neexistující událost '{id}' selhal."
+    }
+  },
+  "EMBER.MOON.PHASES": {
+    "FULL": "Úplněk",
+    "NONE": "Neaktivní",
+    "WANING": "Ubývající",
+    "WAXING": "Dorůstající"
+  },
+  "EMBER.ManagerTabChoices": "Volby",
+  "EMBER.ManagerTabDiscoveries": "Objevy",
+  "EMBER.ManagerTabEvents": "Události",
+  "EMBER.ManagerTabFactions": "Frakce",
+  "EMBER.ManagerTabObjectives": "Cíle",
+  "EMBER.ManagerTitle": "Správce kampaně Ember",
+  "EMBER.MovementMiles": "V rámci Ember je nutné uvést rychlost pohybu družiny v mílích.",
+  "EMBER.ORGANIZATION": {
+    "FIELDS": {
+      "banner": {
+        "hint": "Volitelný obrázek znázorňující tuto organizaci.",
+        "label": "Bannerový obrázek"
+      },
+      "caption": {
+        "hint": "Volitelný popisek zobrazující se pod bannerovým obrázkem.",
+        "label": "Popisek k banneru"
+      },
+      "characters": {
+        "hint": "Postavy související s touto organizací.",
+        "label": "Postavy"
+      },
+      "color": {
+        "hint": "Barva využívaná jako designový prvek pro tuto organizaci.",
+        "label": "UI barva"
+      },
+      "icon": {
+        "hint": "Ikona sloužící k reprezentaci této organizace.",
+        "label": "Ikona organizace"
+      },
+      "locations": {
+        "hint": "Související místa (stránky místopisu) spojená s touto organizací.",
+        "label": "Místa"
+      },
+      "overview": {
+        "hint": "Stručný popis (2–3 věty) této organizace, který objasňuje její úlohu a historii.",
+        "label": "Přehled organizace"
+      },
+      "pronunciation": {
+        "hint": "Volitelná fonetická výslovnost názvu této organizace.",
+        "label": "Výslovnost"
+      }
+    }
+  },
+  "EMBER.QUEST": {
+    "FIELDS": {
+      "chapter": {
+        "hint": "Určete kapitolu kampaně, do které tento úkol patří.",
+        "label": "Kapitola kampaně"
+      },
+      "color": {
+        "hint": "Vyberte barvu znázorňující tento úkol v legendě mapy oblasti a správci kampaně.",
+        "label": "Barva úkolu"
+      },
+      "overview": {
+        "hint": "Jedním odstavcem shrňte hlavní herní prvky a témata úkolu. Přehled je viditelný pouze vypravěči.",
+        "label": "Stručný přehled"
+      },
+      "questId": {
+        "hint": "Povinný jedinečný identifikátor úkolu. Má být alfanumerický, ve stylu camelCase a začínat malým písmenem. Například \"specialQuest3\".",
+        "label": "ID úkolu"
+      },
+      "regionId": {
+        "hint": "Vyberte oblast herního světa, se kterou tento úkol především souvisí.",
+        "label": "ID oblasti"
+      }
+    },
+    "SECTIONS": {
+      "basic": "Základní nastavení"
+    }
+  },
+  "EMBER.REGION": {
+    "MOVEMENT": {
+      "Impossible": "Nemožné",
+      "Mile": {
+        "one": "Míle",
+        "other": "mil"
+      },
+      "Unknown": "Neznámé"
+    }
+  },
+  "EMBER.ReadaloudSendToChat": "Odeslat do chatu",
+  "EMBER.SHEETS": {
+    "GazetteerSheet": "Místopis Emberu",
+    "JournalEntrySheet": "Záznam deníku Ember",
+    "QuestSheet": "List úkolu Emberu",
+    "TextSheet": "Text Ember"
+  },
+  "EMBER.SUN.PHASES": {
+    "DAWN": "Úsvit",
+    "DAY": "Den",
+    "DUSK": "Soumrak",
+    "NIGHT": "Noc"
+  },
+  "EMBER.SoundscapeMoodCalm": "Klid",
+  "EMBER.SoundscapeMoodCombat": "Boj",
+  "EMBER.SoundscapeMoodTension": "Napětí",
+  "EMBER.ThermalVision": "Termální vidění",
+  "EMBER.VISTA": {
+    "COMPOSITIONS": {
+      "core": "Základní kompozice",
+      "custom": "Vlastní kompozice",
+      "template": "Šablony kompozic"
+    },
+    "TABS": {
+      "placements": "Prvky",
+      "scene": "Scéna",
+      "vignettes": "Efekty"
+    }
+  },
+  "SPELL.INFLECTIONS": {
+    "Abyss": "Hlubina",
+    "AbyssAdj": "Hlubinný",
+    "Akon": "Akon",
+    "AkonAdj": "Akonský",
+    "Aura": "Aura",
+    "AuraAdj": "Aurský",
+    "Cora": "Cora",
+    "CoraAdj": "Coranský",
+    "Glyphspeak": "Glyphspeak",
+    "GlyphspeakAdj": "Glyphspeakový",
+    "Heart": "Srdce",
+    "HeartAdj": "Emberitský",
+    "Luxarum": "Luxarum",
+    "LuxarumAdj": "Luxaranský",
+    "Mayis": "Mayis",
+    "MayisAdj": "Mayijský",
+    "Orbis": "Orbis",
+    "OrbisAdj": "Orbijský",
+    "Primordis": "Primordis",
+    "PrimordisAdj": "Primordijní",
+    "Ragen": "Ragen",
+    "RagenAdj": "Ragenský",
+    "Signara": "Signara",
+    "SignaraAdj": "Signarský"
+  },
+  "TABLE.ACTIONS.Draw": "Výsledek",
+  "TYPES.JournalEntryPage.ember.ancestry": "Původ (Ember)",
+  "TYPES.JournalEntryPage.ember.biome": "Biom (Ember)",
+  "TYPES.JournalEntryPage.ember.characterClass": "Povolání (Ember)",
+  "TYPES.JournalEntryPage.ember.cosmos": "Kosmos (Ember)",
+  "TYPES.JournalEntryPage.ember.culture": "Kultura (Ember)",
+  "TYPES.JournalEntryPage.ember.deity": "Božstvo (Ember)",
+  "TYPES.JournalEntryPage.ember.location": "Místo (Ember)",
+  "TYPES.JournalEntryPage.ember.lore": "Reálie (Ember)",
+  "TYPES.JournalEntryPage.ember.organization": "Organizace (Ember)",
+  "TYPES.JournalEntryPage.ember.quest": "Přehled úkolu (Ember)",
+  "TYPES.JournalEntryPage.ember.questEvent": "Událost úkolu (Ember)",
+  "TYPES.JournalEntryPage.ember.questFlowchart": "Schéma úkolu (Ember)",
+  "TYPES.JournalEntryPage.ember.standaloneEvent": "Samostatná událost (Ember)",
+  "TYPES.RegionBehavior.ember.areaEffect": "Plošný efekt",
+  "TYPES.RegionBehavior.ember.footstepSurface": "Povrch pro zvuky kroků",
+  "TYPES.RegionBehavior.ember.suppressEnvironmentFilter": "Potlačit filtr prostředí",
+  "TYPES.RegionBehavior.ember.trapTrigger": "Spouštěč pasti"
+}

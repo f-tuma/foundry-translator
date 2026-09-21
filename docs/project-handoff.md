@@ -11,6 +11,17 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-21, Czech UI candidate 0.19.0: all 6,059 localization keys generated
+  (core 3,587, Crucible 1,969, Ember 503), with 480 manually reviewed overrides.
+  Native manifest language paths include system/module filters and coreTranslation.
+  Key/format/empty-value contracts and override retention tests pass. English
+  dictionaries and resumable checkpoints remain private in visualization
+  ui-localization. No generator remains running. APEX now runs fully on the GPU
+  at context 8192, parallel=1; no user apps were closed. Initial standard checks
+  pass 325 tests (3 opt-in skipped). Release and rendered Czech validation pending.
+  See docs/czech-interface.md for workflow and language-quality limitations.
+
+
 - 2026-09-21, v0.18.1 deployed: PR #20 squash-merged as `7e88d72`; release
   workflow succeeded and ZIP/manifest are published. Updated the existing module
   through Foundry Setup, launched Ember and joined as Gamemaster. Live ready=true,
