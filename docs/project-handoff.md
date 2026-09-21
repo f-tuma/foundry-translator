@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-21
-- Deployed version: `v0.18.0`; PR #19 merged, GitHub release published and installed in Foundry.
+- Deployed version: `v0.18.1`; PR #20 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -10,6 +10,34 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-21, v0.18.1 deployed: PR #20 squash-merged as `7e88d72`; release
+  workflow succeeded and ZIP/manifest are published. Updated the existing module
+  through Foundry Setup, launched Ember and joined as Gamemaster. Live ready=true,
+  module version=0.18.1, glossary count=776. Real enriched actor and item cards now
+  show translated headings AND link text with original UUIDs. Translation desk
+  opens normally. Browser startup was slow; paused local UI generation and
+  unloaded APEX while verifying. The world subsequently loaded completely.
+  No source document or glossary edits; no adventure translation run started.
+  The only new console error was Foundry's warning about the automation viewport
+  being 1280x720, below its recommended minimum height. Existing Crucible/Ember
+  content warnings remain unrelated to this change.
+
+  Full Czech UI is NOT in v0.18.1 and is NOT finished. Work remains in the primary
+  checkout on `codex/document-names-and-czech-ui`: native manifest language entries,
+  generator, format/key contracts and manual terminology overrides. 337/503 Ember
+  strings had checkpointed before the pause. Generation resumed sequentially for
+  Ember, Crucible and core, with the reviewed glossary and durable private
+  checkpoints in the visualization `ui-localization` directory. Logs:
+  /tmp/foundry-ui-ember-resume.log, /tmp/foundry-ui-crucible.log,
+  /tmp/foundry-ui-core.log. Last exec session: 25998. APEX is loaded with context
+  8192, parallel=1 and GPU offload=0.4. GPU 0.5 failed KV allocation while the
+  user's game was running; do not close their applications. The user has a pending
+  optional question about freeing GPU memory. No automatic publish/install is
+  attached to the generator. Review all formatting fallback cases, semantic
+  terminology and rendered UI; then run the full suite and ship the Czech UI.
+  Current standard release checks passed 320 tests (3 opt-in skipped).
+
 
 - 2026-09-21, current branch `codex/document-names-and-czech-ui` (not deployed):
   fixed Actor/Item, embedded item and prototype-token name translation. Canonical
