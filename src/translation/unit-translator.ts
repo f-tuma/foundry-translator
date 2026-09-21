@@ -62,7 +62,7 @@ export interface TranslateUnitsOptions {
 
 export interface TranslationQualityFallback {
   sourcePreview: string;
-  reason: "empty" | "integrity" | "provider" | "unchanged";
+  reason: "empty" | "integrity" | "provider" | "unchanged" | "fixed-glossary";
   detail: string;
   attempts: number;
   occurrences: number;
@@ -323,6 +323,41 @@ async function retrySuspiciousSegments(
             : "The retry translation of the fragment failed.",
         };
         break;
+      }
+    }
+    // A failed inflection should not unnecessarily discard a sound translation
+    // of the surrounding sentence. Try affected names first, then all exact names;
+    // keep all syntax/vocabulary checks and report the degraded mode explicitly.
+    if (problem && problem.reason !== "provider" && preparedSegment.protection.tokens.some(token => token.endToken)) {
+      const references = inflectionReferences([preparedSegment]);
+      const rejected = provider.rejectedGlossaryTokens?.(source, references) ?? [];
+      const recoverySets = [new Set(rejected.length ? rejected : references.map(reference => reference.token))];
+      if (rejected.length && rejected.length < references.length) recoverySets.push(new Set(references.map(reference => reference.token)));
+      for (const exactTokens of recoverySets) {
+        const fixed: PreparedSegment = { ...preparedSegment, protection: { ...preparedSegment.protection,
+          text: preparedSegment.protection.tokens.reduce((text, token) => token.endToken && exactTokens.has(token.token)
+            ? text.replace(token.token + token.replacement + token.endToken, token.token) : text, source),
+          tokens: preparedSegment.protection.tokens.map(token => exactTokens.has(token.token)
+            ? { token: token.token, source: token.source, replacement: token.replacement } : token),
+        } };
+        attempt += 1;
+        try {
+          const [retry] = await provider.translate({ texts: [fixed.protection.text], sourceLanguage: settings.sourceLanguage,
+            targetLanguage: settings.targetLanguage, format: "text", glossary, inflections: inflectionReferences([fixed]) });
+          const exact = retry?.translatedText ?? "";
+          if (!translationProblem(fixed, exact, settings)) {
+            candidate = preparedSegment.protection.tokens.reduce((text, token) => token.endToken && exactTokens.has(token.token)
+              ? text.replace(token.token, token.token + token.replacement + token.endToken) : text, exact);
+            problem = translationProblem(preparedSegment, candidate, settings);
+            if (!problem) {
+              usedFallback = true;
+              onQualityFallback?.({ sourcePreview: comparableText(source).slice(0, 100), reason: "fixed-glossary",
+                detail: "Inflection could not be validated. The sentence was translated with exact approved forms for the affected names; review its grammar.",
+                attempts: attempt, occurrences: prepared.indices.length });
+              break;
+            }
+          }
+        } catch { break; /* Keep the original diagnostic and safe source fallback. */ }
       }
     }
     if (problem) {

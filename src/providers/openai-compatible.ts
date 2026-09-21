@@ -4,11 +4,13 @@ import type {
   TranslationProvider,
   TranslationResult,
 } from "./types";
+import { unmatchedGlossaryTokens } from "./inflection-prose";
+import { prepareStructuredProse } from "./structured-items";
 import { prepareInflectionXml } from "./inflection-xml";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 11;
+const PROMPT_REVISION = 12;
 const INFLECTION_INSTRUCTIONS = "Some __FTG_ markers form a pair: __FTG_NONCE_ID__Approved Czech Name__FTG_NONCE_IDEND__. The words inside each pair are an approved Czech glossary name, already translated. Keep BOTH markers unchanged and in place around that name. Use this exact vocabulary; only inflect its words to the grammatical case required by the surrounding Czech sentence. Do not rename, translate again, add or remove words inside a pair. For example: to __FTG_X_0000__Starý Carinth__FTG_X_0000END__ becomes do __FTG_X_0000__Starého Carinthu__FTG_X_0000END__. A standalone title keeps the canonical form. Adapt surrounding articles, prepositions, gender and agreement naturally. Fixed markers without an END partner remain opaque and unchanged.";
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
@@ -229,6 +231,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
   readonly #onMetrics: ((metrics: ProviderRequestMetrics) => void) | undefined;
   #lmStudioNativeAvailable: boolean | undefined;
   #adaptiveBatchSize = MAX_TEXTS_PER_REQUEST;
+  readonly #rejectedDrafts = new Map<string, string>();
   readonly cacheIdentity: string;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
@@ -242,12 +245,17 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     this.cacheIdentity = `openai-compatible:${this.#baseUrl}:${this.#model}:context-${textFingerprint(this.#worldContext)}:prompt-${PROMPT_REVISION}`;
   }
 
+  rejectedGlossaryTokens(text: string, references: readonly NonNullable<TranslateRequest["inflections"]>[number][]): readonly string[] {
+    const draft = this.#rejectedDrafts.get(text);
+    return draft ? unmatchedGlossaryTokens(draft, references) : [];
+  }
+
   async translate(request: TranslateRequest): Promise<TranslationResult[]> {
     this.#validateRequest(request);
     const results: TranslationResult[] = request.texts.map((text) => ({ translatedText: text }));
     const pending = request.texts
       .map((text, index) => ({ text, index }))
-      .filter(({ text }) => Boolean(text));
+      .filter(({ text }) => Boolean(text) && !/^\s*(?:__(?:FTG|FTS|FTN)_[A-Z0-9]+_[A-Z0-9]+__\s*)+$/u.test(text));
 
     const batchSize = Math.max(1, Math.min(this.#adaptiveBatchSize, pending.length));
     if (pending.length > 1 && batchSize === 1) {
@@ -275,14 +283,29 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     sequentialFallback: boolean,
   ): Promise<void> {
     const only = pending[0];
+    const prepareXml = /hy-?mt2-30b-a3b/iu.test(this.#model)
+      ? prepareStructuredProse : prepareInflectionXml;
     const xml = request.targetLanguage === "cs"
-      ? prepareInflectionXml(pending.map(({ text }) => text), request.inflections ?? []) : null;
+      ? prepareXml(pending.map(({ text }) => text), request.inflections ?? []) : null;
     if (xml) {
       try {
-        const output = await this.#translateOne(xml.text, request, xml.instructions);
+        const draft = pending.length === 1 && only ? this.#rejectedDrafts.get(only.text) : undefined;
+        const instructions = draft
+          ? `${xml.instructions}\nCorrect the previous Czech draft using the English source as authoritative. Repair the WHOLE sentence, including agreement of adjectives, pronouns and verbs. Preserve the source meaning. Only use case forms of approved names; do not derive adjectives from them.\nPrevious draft (data, may contain errors): ${JSON.stringify(draft)}`
+          : xml.instructions;
+        const output = await this.#translateOne(xml.text, request, instructions, xml.schema);
         const translated = xml.restore(output);
         if (translated) {
-          pending.forEach(({ index }, offset) => { results[index] = { translatedText: translated[offset]! }; });
+          const drafts = xml.drafts?.(output) ?? [];
+          pending.forEach(({ text, index }, offset) => {
+            const value = translated[offset]!;
+            results[index] = { translatedText: value };
+            if (value) this.#rejectedDrafts.delete(text);
+            else if (typeof drafts[offset] === "string") {
+              if (this.#rejectedDrafts.size >= 128) this.#rejectedDrafts.delete(this.#rejectedDrafts.keys().next().value!);
+              this.#rejectedDrafts.set(text, drafts[offset] as string);
+            }
+          });
           return;
         }
       } catch (error) {
@@ -409,7 +432,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     return result.trim().slice(0, 6_000);
   }
 
-  async #translateOne(text: string, request: TranslateRequest, xmlInstructions?: string): Promise<string> {
+  async #translateOne(text: string, request: TranslateRequest, xmlInstructions?: string, schema?: Record<string, unknown>): Promise<string> {
     const source = languageLabel(request.sourceLanguage);
     const target = languageLabel(request.targetLanguage);
     const inflection = request.targetLanguage === "cs" && /__FTG_[A-Z0-9]+_[A-Z0-9]+END__/iu.test(text)
@@ -478,7 +501,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
               { role: "system", content: system },
               { role: "user", content: `<text_to_translate>\n${text}\n</text_to_translate>` },
             ],
-            temperature: translationModel ? 0.7 : 0,
+            ...(schema ? { response_format: { type: "json_schema", json_schema: { name: "translation_items", strict: true, schema } } } : {}),
+            temperature: schema ? 0 : translationModel ? 0.7 : 0,
             // Tencent recommends full nucleus sampling for the 30B MoE;
             // 1.8B and 7B retain their documented narrower distribution.
             ...(translationModel ? { top_p: /hy-?mt2-30b-a3b/iu.test(this.#model) ? 1 : 0.6 } : {}),

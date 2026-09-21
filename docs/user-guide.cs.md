@@ -14,18 +14,15 @@ V **Překladač a jazyk** vyberte OpenAI-compatible / LM Studio, adresu
 musí mít spuštěný server a povolené CORS. Použijte **Otestovat připojení** a
 uložte nastavení. Adresa a model jsou nastavením tohoto prohlížeče.
 
-Pro první test doporučujeme stažený `hy-mt2-7b` (Tencent Hy-MT2 7B Q8_0).
-Jeho zvláštní překladové zadání modul vybere automaticky. Srovnání na jednom
-skutečném Ember questu: přibližně 38 sekund, bez porušení ochranných značek.
-Čeština byla lepší než u testované Gemmy, ale stále vyžadovala místy úpravy.
-Menší kvantizace nebo slabší počítač mohou výsledek i rychlost změnit.
-Samostatný test skloňování 21. 9. 2026 našel u Hy-MT2 i Qwen3.8 chyby v pádech;
-nové skloňování ve verzi 0.18.0 proto zatím není uvolněné k běžnému použití.
-Následná úprava předávání glosáře opravila některé chyby a zkrátila požadavky.
-Výsledky a další kandidáti jsou v [přehledu testů](benchmarks/inflection-xml-2026-09-21.md)
-a [aktuálním výběru modelů](benchmarks/local-models-2026-09-21.md).
-Qwen3.8 používá nativní API LM Studio s vypnutým reasoningem, aby samotné
-přemýšlení modelu nevyčerpalo čas pro překlad.
+Pro tento překlad je vybraný **Hy-MT2 30B-A3B APEX**. Na našem serveru má
+ID `hy-mt2-30b-a3b-apex`. Není potřeba další server ani XGrammar: LM Studio
+vynucuje JSON strukturu při generování. Modul předává souvislé věty, schválený
+glosář a kontext světa; názvy a odkazy následně kontroluje a obnovuje kód.
+
+Menší alternativou zůstává Hy-MT2 7B. Rychlost závisí na počítači a kvantizaci.
+Překlad není automatická jazyková korektura: drobná chybná koncovka může projít.
+Před vyprávěním zkontrolujte význam a seznam problémů. Výsledky zkoušek jsou
+v [ověření APEX](benchmarks/apex-release-2026-09-21.md).
 
 ## Jedno kliknutí při čtení
 
@@ -61,9 +58,11 @@ modelu použít název v odpovídajícím pádu, například `Starý Carinth` �
 `do Starého Carinthu`. Funguje pro češtinu přes OpenAI-compatible / LM Studio.
 Model dostane český název přímo v kontextu věty. Modul kontroluje zachování
 slovního základu, počtu slov a ochranných značek. Jde o konzervativní kontrolu
-tvarů, nikoli úplný český morfologický slovník. Neobvyklý tvar může odmítnout;
-neúspěšný opakovaný překlad se zobrazí mezi problémy překladu. Výsledek je potřeba
-jazykově zkontrolovat, zejména nepravidelná fantasy jména.
+tvarů, nikoli úplný český morfologický slovník. Neobvyklý tvar může odmítnout.
+Po neúspěšných pokusech zkusí přeložit větu s přesnými schválenými tvary názvů.
+Takový úsek označí ke kontrole gramatiky a neuloží do mezipaměti. Teprve pokud
+neprojde ani tento pokus, ponechá původní úsek se schválenými názvy a uvede
+problém. Výsledek je potřeba jazykově zkontrolovat, zejména fantasy jména.
 
 Chrome, Google a jiné cílové jazyky použijí pevný tvar a při spuštění překladu
 na to upozorní. **Nepoužívat** znamená, že se heslo vůbec nepředá překladači,

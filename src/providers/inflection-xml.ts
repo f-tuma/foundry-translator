@@ -19,14 +19,16 @@ interface Boundary {
 export interface InflectionXml {
   text: string;
   instructions: string;
+  schema?: Record<string, unknown>;
+  drafts?(output: string): string[];
   restore(output: string): string[] | null;
 }
 
-function escapeXml(text: string): string {
+export function escapeXml(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-function unescapeXml(text: string): string {
+export function unescapeXml(text: string): string {
   if (/[<>]|&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[\da-f]+;)/iu.test(text)) throw new Error("Invalid XML text");
   return text.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/giu, (_, entity: string) => {
     const known: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
@@ -47,10 +49,11 @@ function unescapeXml(text: string): string {
 export function prepareInflectionXml(
   texts: readonly string[],
   references: readonly GlossaryInflectionReference[],
+  allowWithoutNames = false,
 ): InflectionXml | null {
   const names = new Map(references.map(reference => [reference.token, reference]));
   const nameTokens = new Set(references.flatMap(({ token, endToken }) => [token, endToken]));
-  if (!references.some(({ token }) => texts.some(text => text.includes(token)))) return null;
+  if (!allowWithoutNames && !references.some(({ token }) => texts.some(text => text.includes(token)))) return null;
   const boundaries: Boundary[] = [];
   const terminology = new Set<string>();
   let nextId = 0;

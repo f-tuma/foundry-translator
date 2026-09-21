@@ -36,6 +36,11 @@ function wordForm(original: string, candidate: string): boolean {
   for (const root of roots) for (const variant of stemVariants(root)) {
     if (variant.length >= 2 && NOUN_ENDINGS.some(ending => variant + ending === form)) return true;
   }
+  // Hard adjectives in masculine animate plural: cindaričtí/cindarických,
+  // městští/městských. These are case forms, not newly derived vocabulary.
+  for (const [plural, stem] of [["čtí", "ck"], ["ští", "sk"]] as const) {
+    if (base.endsWith(plural) && ADJECTIVE_ENDINGS.some(ending => base.slice(0, -plural.length) + stem + ending === form)) return true;
+  }
   if (/[ýáéí]$/u.test(base)) {
     const root = base.slice(0, -1);
     if (ADJECTIVE_ENDINGS.some(ending => root + ending === form)) return true;

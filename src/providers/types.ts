@@ -44,6 +44,8 @@ export interface TranslationProvider {
   readonly supportsGlossaryInflection?: boolean;
   /** Distinguishes model/configuration-specific cache entries without including secrets. */
   readonly cacheIdentity?: string;
+  /** Optional diagnostics used to keep only rejected name forms exact on recovery. */
+  rejectedGlossaryTokens?(text: string, references: readonly GlossaryInflectionReference[]): readonly string[];
   translate(request: TranslateRequest): Promise<TranslationResult[]>;
   testConnection(targetLanguage: string): Promise<void>;
   prepare?(request: TranslateRequest): Promise<void>;

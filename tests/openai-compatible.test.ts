@@ -47,6 +47,35 @@ describe("OpenAiCompatibleProvider", () => {
     expect(requests[0]).not.toContain("@UUID");
     expect(requests[0]).not.toContain("__FTG_");
   });
+  it("retries only the rejected APEX item with its draft and authoritative source", async () => {
+    const payloads: { messages: { content: string }[] }[] = [];
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      const payload = JSON.parse(String(init?.body)); payloads.push(payload);
+      const output = payloads.length === 1 ? { i0: "Z Prahy.", i1: "Brána je zavřená." } : { i0: "Ze Starého Carinthu." };
+      return jsonResponse({ choices: [{ message: { content: JSON.stringify(output) }, finish_reason: "stop" }] });
+    });
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "hy-mt2-30b-a3b-apex", fetchImplementation: fetchMock });
+    const fallback = vi.fn();
+    const result = await translateUnits({ units: [["From @UUID[Scene.old]{Old Carinth}."], ["The gate is closed."]],
+      glossary: [{ source: "Old Carinth", replacement: "Starý Carinth", category: "location", aliases: [], mode: "inflect" }], provider,
+      settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" }, onQualityFallback: fallback });
+    expect(result).toEqual([["Ze @UUID[Scene.old]{Starého Carinthu}."], ["Brána je zavřená."]]);
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1]!.messages[0]!.content).toContain("Z Prahy.");
+    expect(payloads[1]!.messages[0]!.content).toContain("English source as authoritative");
+    expect(payloads[1]!.messages[0]!.content).not.toContain("The gate is closed");
+    expect(payloads[0]!.messages[0]!.content).not.toContain("Scene.old");
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
+  it("does not ask a model to generate standalone fixed names or opaque syntax", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model: "hy-mt2-30b-a3b-apex", fetchImplementation: fetchMock });
+    const result = await provider.translate({ texts: ["__FTG_T_0000__", "__FTS_T_0000____FTG_T_0000____FTS_T_0001__"], targetLanguage: "cs" });
+    expect(result.map(row => row.translatedText)).toEqual(["__FTG_T_0000__", "__FTS_T_0000____FTG_T_0000____FTS_T_0001__"]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it.each(["qwen-test", "hy-mt2-7b"])("instructs %s to inflect only paired approved names", async model => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({choices:[{message:{content:"Do __FTG_T_0000__Starého Carinthu__FTG_T_0000END__."}}]}));
     const provider = new OpenAiCompatibleProvider({baseUrl:"http://localhost:1234",model,fetchImplementation:fetchMock});
@@ -111,14 +140,16 @@ describe("OpenAiCompatibleProvider", () => {
     ["hy-mt2-1.8b", 0.6],
     ["hy-mt2-30b-a3b-apex", 1],
   ])("uses %s translation instructions and sampling parameters", async (model, topP) => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ choices: [{ message: { content: "Družina vstoupí." }, finish_reason: "stop" }] }));
+    const apex = /30b-a3b/.test(model);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ choices: [{ message: { content: apex ? JSON.stringify({ i0: "Družina vstoupí." }) : "Družina vstoupí." }, finish_reason: "stop" }] }));
     const provider = new OpenAiCompatibleProvider({ baseUrl: "http://localhost:1234", model, worldContext: "Ember fantasy", fetchImplementation: fetchMock });
     await expect(provider.translate({ texts: ["The party enters."], sourceLanguage: "en", targetLanguage: "cs" })).resolves.toEqual([{ translatedText: "Družina vstoupí." }]);
     const payload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-    expect(payload.messages).toEqual([{ role: "user", content: expect.stringContaining("[Source Text]\nThe party enters.") }]);
+    expect(payload.messages).toEqual([{ role: "user", content: expect.stringContaining(apex ? '{"i0":"The party enters."}' : "[Source Text]\nThe party enters.") }]);
     expect(payload.messages[0].content).toContain("from English into Czech");
     expect(payload.messages[0].content).toContain("Ember fantasy");
-    expect(payload).toMatchObject({ temperature: 0.7, top_p: topP });
+    expect(payload).toMatchObject({ temperature: apex ? 0 : 0.7, top_p: topP });
+    if (apex) expect(payload.response_format.json_schema.schema.required).toEqual(["i0"]);
   });
 
   it("reports available models when the selected model is missing", async () => {

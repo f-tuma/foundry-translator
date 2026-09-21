@@ -74,13 +74,13 @@ local server. Enter either the server root (for example
 for another machine on the LAN, serve on the local network. The address, model,
 and token are client-scoped.
 
-For Czech, the current tested candidate is **Tencent Hy-MT2 7B Q8_0**
-(`hy-mt2-7b` in the test server). The provider automatically uses its documented
-translation instruction format and sampling settings. On the test PC, one real
-Ember quest overview took about 38 seconds with zero structural fallbacks. Its
-Czech was better than Gemma 4 12B/E2B QAT in this sample, but still needs review.
-Gemma 4 and Qwen3.8 use LM Studio's native API with reasoning disabled. These are measured
-samples, not guarantees for every adventure. See the [Czech guide](docs/user-guide.cs.md).
+For Czech on the current test PC, use **Hy-MT2 30B-A3B APEX** with the
+server ID `hy-mt2-30b-a3b-apex`. Its Czech path uses grammar-constrained JSON
+items, whole-sentence context and checked glossary forms. APEX's structured
+translation uses temperature 0; other Hy-MT models retain their sampling defaults.
+Hy-MT2 7B remains a smaller alternative, with a different protected XML path.
+Gemma 4 and Qwen3.8 use LM Studio's native API with reasoning disabled.
+See the [Czech guide](docs/user-guide.cs.md) and [APEX validation](docs/benchmarks/apex-release-2026-09-21.md).
 
 LLM translation can use an editable world profile containing setting, genre,
 tone, lore, and translation preferences. **Suggest profile from world** builds a
@@ -154,30 +154,35 @@ This requires Czech and an OpenAI-compatible instruction model. Chrome, Google
 and other target languages use the exact form; a translation-run warning explains
 that fallback. **Do not use** omits the entry entirely, including terminology hints.
 
-Internally, names use paired glossary markers. The LLM receives the original
-source wording inside short XML elements, with only the relevant approved Czech
-terms listed separately. The XML adapter restores the original markers after
-validating IDs, hierarchy and opaque syntax. It allows natural reordering of
-whole names within plain prose, never across links or HTML segments. Restoration
-then checks every occurrence, word count, punctuation, Czech suffixes and common
-stem alternations; it restores the glossary's capitalization. This is
-a conservative guard against renaming, not a complete Czech morphology engine or
-a guarantee of correct grammar. Unsupported irregular forms trigger retries and
-the existing visible source-fragment fallback. Failed translations are not cached.
+Internally, names use paired glossary markers. APEX receives complete contextual
+units as JSON string values with only relevant approved dictionary forms.
+The server grammar constrains the object keys, value types and item count.
+Code locates every approved name form and reattaches adjacent protected link
+syntax. Missing, duplicate, overlapping or renamed terms are rejected; opaque
+syntax and HTML segment boundaries are validated separately. Other models use
+short XML elements around original names. Both paths feed the same protection
+checks and restore the glossary's capitalization.
+
+These are vocabulary and structure guards, not a complete Czech morphology
+engine or a guarantee of correct meaning. A wrong grammatical ending can pass;
+an unsupported irregular form can be rejected. Failed items alone are retried
+with the original sentence and rejected draft. If inflection still fails, the
+translator tries exact approved forms for the affected names, then all names
+in the fragment. This recovery is visibly flagged for grammar review and is
+not cached. If even that fails validation, the original fragment is retained
+with approved glossary forms and a visible issue.
 Foundry UUIDs, commands and HTML boundaries retain their existing protection.
 Mode changes invalidate translation caches and are preserved by sync, imports and
 translation bundles. Version-2 JSON prevents older releases silently dropping modes.
 Standalone units consisting of one glossary name (including a link label) keep
 the exact canonical form; inline name segments still use the surrounding sentence.
 
-**Release validation is not complete:** the XML representation improved specific
-failures and reduced token overhead, but real tests still find wrong inflections
-and occasional meaning errors. Passing structure checks does not detect every
-grammar error. The v0.18.0 work remains a draft; see the [updated model tests](docs/benchmarks/inflection-xml-2026-09-21.md)
-and [current model shortlist](docs/benchmarks/local-models-2026-09-21.md).
+The release prioritizes preserved meaning, consistent approved names and intact
+references. Minor language errors still need editorial review. See the measured
+results and limits in [APEX validation](docs/benchmarks/apex-release-2026-09-21.md).
 
 To verify a local model through the production pipeline, run
-`LM_STUDIO_MODEL=hy-mt2-7b npm test -- tests/local-inflection.integration.test.ts`.
+`LM_STUDIO_MODEL=hy-mt2-30b-a3b-apex npm test -- tests/local-inflection.integration.test.ts`.
 Use the server's exact model ID; optional `LM_STUDIO_URL` and `LM_STUDIO_RESULT`
 set its address and the JSON result path. This integration check is opt-in and
 skipped by regular CI; unit tests alone do not establish a model's Czech quality.

@@ -11,6 +11,25 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-21, APEX release preparation: user selected APEX and accepts minor
+  grammar errors; explicitly requested GitHub release, Foundry update and import
+  of the jointly reviewed 776-name version-2 glossary. APEX Czech now uses
+  JSON-schema constrained whole contextual units, host-side name matching and
+  link restoration, conditional full-sentence repair, and visible uncached
+  exact-name recovery before source fallback. Prompt revision 12; temperature 0.
+  Standard checks: 307 pass, 3 opt-in skipped, typecheck/build/metadata pass.
+  Final real 50-unit Ember page: 148.119 s, intact HTML/references, six exact-name
+  review warnings, one source fallback; strict no-source-fallback test fails.
+  Synthetic name sample 14/15 expected forms (Hlubinním instead of Hlubinným).
+  These remaining language limitations do not block the user-requested release;
+  do not claim perfect grammar or meaning. See benchmarks/apex-release-2026-09-21.md.
+  Private backup of 776 existing live entries saved in visualization outputs as
+  glossary-before-v018-2026-09-21.json. Reviewed import is the sibling task output
+  ember-glosar-cs-sklonovani-2026-09-20.json (776 enabled, inflect). Never publish
+  adventure exports/context in this public repository. Deployment/import status
+  is recorded in the newest entry above once completed.
+
+
 - 2026-09-21, whole-sentence repair: user supplied the dashboard/řídicí panel
   agreement example and installed `hy-mt2-1.8b` (Tencent Q8_0, 1.91 GB) and
   `hy-mt2-30b-a3b-apex` (alphaZimuth APEX-I-Nano, 12.45 GB / 11.59 GiB).

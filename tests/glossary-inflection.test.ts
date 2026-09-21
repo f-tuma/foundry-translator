@@ -19,6 +19,7 @@ describe("Czech glossary forms", () => {
     ["Rudý Běs", "Rudým Běsem"], ["Brackus Z Tetu", "Brackusem Z Tetu"],
     ["Stříbrný Paprsek", "Stříbrného Paprsku"], ["Bůh", "Boha"],
     ["Jorey Rychlý", "Joreyho Rychlého"], ["Dřímající Kobka", "Dřímající Kobky"],
+    ["Cindaričtí Mudrci", "Cindarických Mudrců"], ["Městští Strážní", "Městským Strážním"],
     ["Ku'arta", "Ku'arty"], ["Město a Hrad", "Města a Hradu"],
   ])("accepts %s → %s", (base, form) => expect(normalizeCzechGlossaryForm(base, form)).toBe(form));
 
@@ -85,16 +86,39 @@ describe("inflection through translation units", () => {
       ["Cestujte do ", "Starého Carinthu", "."],
     ]);
   });
-  it("retries a renamed term and never caches a failed translation", async () => {
+  it("uses exact approved forms after failed inflection and never caches the degraded result", async () => {
     const onQualityFallback = vi.fn();
     const cache = new MemoryTranslationCache();
     const p = model(text => text.replace("Travel to", "Cestujte do").replace("Starý Carinth", "Nového Města"));
     const options = { units: [["Travel to Old Carinth."]], glossary: [town], provider: p, settings, cache, onQualityFallback };
-    expect(await translateUnits(options)).toEqual([["Travel to Starý Carinth."]]);
-    expect(p.translate).toHaveBeenCalledTimes(3);
-    expect(onQualityFallback).toHaveBeenCalledWith(expect.objectContaining({reason: "integrity"}));
+    expect(await translateUnits(options)).toEqual([["Cestujte do Starý Carinth."]]);
+    expect(p.translate).toHaveBeenCalledTimes(4);
+    expect(onQualityFallback).toHaveBeenCalledWith(expect.objectContaining({reason: "fixed-glossary", attempts: 4}));
     await translateUnits(options);
-    expect(p.translate).toHaveBeenCalledTimes(6);
+    expect(p.translate).toHaveBeenCalledTimes(8);
+  });
+  it("keeps the source and reports an issue if even exact-name recovery damages a link", async () => {
+    const onQualityFallback = vi.fn();
+    const p = model(() => "Poškozený překlad bez ochranných značek.");
+    const result = await translateUnits({ units: [["Travel to @UUID[Scene.old]{Old Carinth}."]], glossary: [town], provider: p, settings, onQualityFallback });
+    expect(result).toEqual([["Travel to @UUID[Scene.old]{Starý Carinth}."]]);
+    expect(p.translate).toHaveBeenCalledTimes(4);
+    expect(onQualityFallback).toHaveBeenCalledWith(expect.objectContaining({ reason: "integrity", attempts: 4 }));
+  });
+  it.each([false, true])("recovers selected names, with all-exact recovery when needed: %s", async (failSelective) => {
+    const beasts: GlossaryEntry = { source: "Spirit Beasts", replacement: "Přízračné Šelmy", category: "lore", aliases: [], mode: "inflect" };
+    const onQualityFallback = vi.fn();
+    const p = model(text => {
+      const translated = text.replace("Travel to", "Cestujte do").replace("with", "s")
+        .replace("Starý Carinth", "Nového Města");
+      return translated.replace("Přízračné Šelmy", failSelective ? "Jinými Zvířaty" : "Přízračnými Šelmami");
+    });
+    p.rejectedGlossaryTokens = (_text, references) => references.filter(ref => ref.source === town.source).map(ref => ref.token);
+    const result = await translateUnits({ units: [["Travel to @UUID[Scene.old]{Old Carinth} with Spirit Beasts."]],
+      glossary: [town, beasts], provider: p, settings, onQualityFallback });
+    expect(result).toEqual([[`Cestujte do @UUID[Scene.old]{Starý Carinth} s ${failSelective ? "Přízračné Šelmy" : "Přízračnými Šelmami"}.`]]);
+    expect(p.translate).toHaveBeenCalledTimes(failSelective ? 5 : 4);
+    expect(onQualityFallback).toHaveBeenCalledWith(expect.objectContaining({ reason: "fixed-glossary", attempts: failSelective ? 5 : 4 }));
   });
   it("invalidates cached translations when the glossary mode changes", async () => {
     const p = model(text => text.replace("Travel to", "Cestujte do").replace("Starý Carinth", "Starého Carinthu"));

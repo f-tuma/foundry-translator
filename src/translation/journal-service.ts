@@ -990,7 +990,7 @@ export class JournalTranslationService {
         currentUnit: pageName,
       }),
       onQualityFallback: (fallback) => {
-        logger.warn("Translation quality fallback kept the original fragment.", fallback);
+        logger.warn("Translation quality fallback requires review.", fallback);
         activeTranslations.addIssue(runtime.runId, {
           type: "fallback",
           documentName: sourceDocument.name,
