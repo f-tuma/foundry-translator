@@ -11,6 +11,36 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-09-21, current branch `codex/document-names-and-czech-ui` (not deployed):
+  fixed Actor/Item, embedded item and prototype-token name translation. Canonical
+  whole glossary names bypass the model. Implicit UUID/Embed labels now use
+  sourceUuid glossary metadata; cache schema 9, Actor/Item revision 6 and Journal
+  revision 11. Crucible 0.11 ignores explicit embed labels in its own actor/item
+  renderers; a narrow DOM adapter preserves them without modifying sources or
+  UUIDs. Verified real Agraband Swift actor and A Farewell Note item through
+  Foundry TextEditor enrichment, with temporary wrappers restored afterwards.
+  Portable bundles now carry these names and permit added plain reference labels
+  while rejecting altered UUIDs/options/commands. 320 deterministic tests pass,
+  three opt-in skipped; typecheck passes. UI localization is still in progress,
+  so the full suite includes an unfinished catalog-coverage check and is NOT
+  release-ready yet. Live instance remains v0.18.0, with no document mutations.
+  User confirmed Czech for ALL Foundry + Ember UI. Private en catalogs captured:
+  core 14.368 (3587 strings), Crucible 0.11.0 (1969), Ember 0.6.2 (503).
+  Use native manifest language paths (system/module filters), NOT i18nInit:
+  Foundry localizes schema labels before that hook. coreTranslation=true allows
+  selection as server language too. Generation utility and contracts are WIP.
+  LM Studio server was off; restarted via the existing Flatpak CLI on localhost
+  with the previously approved CORS setting. APEX full GPU load failed because
+  a game uses GPU memory. Loaded APEX at 45% GPU, 8192 context; about 6 output
+  tokens/sec. User has been asked whether they can free GPU memory. CLI lives
+  inside Flatpak ai.lmstudio.lm-studio at ~/.lmstudio/bin/lms; use flatpak ps to
+  obtain its running instance. Do not close the user's game or other apps.
+  UI generation uses flat JSON string values; nested context/text objects caused
+  degenerate output and were rejected. Checkpoints remain private in /tmp.
+  Review semantic quality and glossary consistency (Attunement = Sladění) before
+  release; format checks alone are insufficient.
+
+
 - 2026-09-21, deployment completed: PR #19 squash-merged as `4be277f`; tag and
   GitHub release v0.18.0 published successfully with ZIP and manifest. CI and
   release workflow pass. Updated Foundry through Setup, relaunched Ember and

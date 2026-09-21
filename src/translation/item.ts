@@ -1,4 +1,5 @@
 import { providerFingerprint } from "./provider-fingerprint";
+import { translateDocumentNames } from "./document-names";
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
@@ -14,7 +15,7 @@ import {
 } from "./unit-translator";
 
 export const ITEM_TRANSLATION_SCHEMA_VERSION = 1;
-export const ITEM_TRANSLATION_ENGINE_REVISION = 5;
+export const ITEM_TRANSLATION_ENGINE_REVISION = 6;
 
 export interface ItemData extends Record<string, unknown> {
   _id?: string;
@@ -138,9 +139,10 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
   delete copy._id;
   delete copy._stats;
   delete copy.folder;
-  copy.name = `${copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
+  const names = await translateDocumentNames([copy.name], options);
+  copy.name = `${names.names[0]} [${options.settings.targetLanguage.toUpperCase()}]`;
 
-  const { translatedHtmlFields, fallbackTextSegments } = await translateHtmlFields({
+  const fields = await translateHtmlFields({
     targets: options.systemHtmlFieldPaths.map((path) => ({ owner: copy.system, path })),
     glossary: options.glossary,
     provider: options.provider,
@@ -158,6 +160,8 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
       fieldPath: target.path,
     }),
   });
+  const translatedHtmlFields = fields.translatedHtmlFields;
+  const fallbackTextSegments = fields.fallbackTextSegments + names.fallbacks;
 
   const sourceHash = await itemSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);

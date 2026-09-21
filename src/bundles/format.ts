@@ -121,7 +121,13 @@ function htmlStructure(value: string): string {
 /** Import prose only: reject changes to markup, URLs, UUIDs, rolls and macros. */
 export function assertPortableText(source: string, translation: string, format: FieldFormat): void {
   requireValue(!/__FT[NGS]_/iu.test(translation), "unrestored protection token.");
-  const syntax = (text: string) => JSON.stringify(protectFoundrySyntax(text, { nonce: "BUNDLE" }).tokens.map((t) => t.source));
+  const syntax = (text: string) => {
+    // An implicit document name may gain a translated display label. Compare
+    // its UUID/options unchanged, and never hide commands inside a new label.
+    const references = text.replace(/(@(?:UUID|Embed)\[[^\]\r\n]*\])\{([^}\r\n]*)\}/giu,
+      (expression, reference: string, label: string) => /@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(label) ? expression : reference);
+    return JSON.stringify(protectFoundrySyntax(references, { nonce: "BUNDLE" }).tokens.map((t) => t.source));
+  };
   requireValue(syntax(source) === syntax(translation), "Foundry references or commands were changed.");
   if (format === "html" || format === "text") requireValue(htmlStructure(source) === htmlStructure(translation), "HTML structure or attributes were changed.");
   if (format === "markdown") {

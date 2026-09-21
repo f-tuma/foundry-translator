@@ -1,4 +1,5 @@
 import { providerFingerprint } from "./provider-fingerprint";
+import { translateDocumentNames } from "./document-names";
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
@@ -17,7 +18,7 @@ import {
 } from "./unit-translator";
 
 export const ACTOR_TRANSLATION_SCHEMA_VERSION = 1;
-export const ACTOR_TRANSLATION_ENGINE_REVISION = 5;
+export const ACTOR_TRANSLATION_ENGINE_REVISION = 6;
 
 export interface ActorItemData extends Record<string, unknown> {
   _id?: string;
@@ -128,6 +129,7 @@ function sourceSnapshot(source: ActorData): string {
     type: source.type,
     system: source.system,
     items: source.items,
+    prototypeTokenName: (source.prototypeToken as { name?: unknown } | undefined)?.name,
   });
 }
 
@@ -152,7 +154,13 @@ export async function translateActorData(options: TranslateActorOptions): Promis
   delete copy._id;
   delete copy._stats;
   delete copy.folder;
-  copy.name = `${copy.name} [${options.settings.targetLanguage.toUpperCase()}]`;
+  const namedItems = (copy.items ?? []).filter((item): item is ActorItemData & { name: string } => typeof item.name === "string" && !!item.name.trim());
+  const prototype = copy.prototypeToken as { name?: unknown } | undefined;
+  const tokenName = typeof prototype?.name === "string" && prototype.name.trim() ? prototype.name : undefined;
+  const names = await translateDocumentNames([copy.name, ...namedItems.map(item => item.name), ...(tokenName ? [tokenName] : [])], options);
+  copy.name = `${names.names[0]} [${options.settings.targetLanguage.toUpperCase()}]`;
+  namedItems.forEach((item, index) => { item.name = names.names[index + 1]!; });
+  if (prototype && tokenName) prototype.name = names.names.at(-1)!;
   for (const item of copy.items ?? []) delete item._stats;
 
   const targets: HtmlFieldTranslationTarget[] = options.systemHtmlFieldPaths.map((path) => ({
@@ -169,7 +177,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
     }));
   });
 
-  const { translatedHtmlFields, fallbackTextSegments } = await translateHtmlFields({
+  const fields = await translateHtmlFields({
     targets,
     glossary: options.glossary,
     provider: options.provider,
@@ -188,6 +196,8 @@ export async function translateActorData(options: TranslateActorOptions): Promis
       ...(target.itemName ? { itemName: target.itemName } : {}),
     }),
   });
+  const translatedHtmlFields = fields.translatedHtmlFields;
+  const fallbackTextSegments = fields.fallbackTextSegments + names.fallbacks;
 
   const sourceHash = await actorSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);

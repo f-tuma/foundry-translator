@@ -131,3 +131,18 @@ ID v jiném světě zatím nepáruje podle názvu.
 
 Export nevkládá API klíče, adresu serveru, obrázky ani celé původní dokumenty.
 Položky se změněným zdrojem vynechá a vypíše jejich seznam.
+
+## Názvy přeložených dokumentů a odkazy
+
+Kopie postav a předmětů mají český název a příponu `[CS]`. Názvy obsažené
+v glosáři převezmou schválený základní tvar přímo, bez dotazu na model.
+Překládají se také jména jejich vložených předmětů a názvy prototypů tokenů.
+Tyto názvy jsou součástí exportu a importu překladů.
+
+Odkazy bez vlastního popisku dostanou název podle hesla se shodným zdrojovým UUID
+v glosáři. Ve větě se může skloňovat; samostatný název zůstává v základním tvaru.
+Již zadané popisky se překládají běžnou cestou. Crucible zachová český popisek
+i na vložených kartách postav a předmětů. Cíl odkazu, ID a herní hodnoty se nemění.
+
+Starší uložené překlady je pro doplnění názvů potřeba přeložit znovu. Modul pozná
+starou verzi překladového postupu; ručně upravené kopie nadále chrání před přepsáním.
