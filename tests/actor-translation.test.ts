@@ -74,7 +74,7 @@ describe("Actor translation", () => {
 
     expect(source).toEqual(original);
     expect(result.data._id).toBeUndefined();
-    expect(result.data.name).toBe("Vinarith [CS]");
+    expect(result.data.name).toBe("Vinarith");
     expect(result.data.system).toMatchObject({
       details: { biography: {
         public: "<p>Ostražitý učenec.</p>",
