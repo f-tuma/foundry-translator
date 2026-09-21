@@ -424,7 +424,12 @@
     "BACKGROUND.SHEET.TalentDrop": "Přidejte talent k tomuto zázemí přetažením z kompendia talentů.",
     "SETTINGS.COMPENDIUM_SOURCES.background.hint": "Balíčky používané jako zdroje zázemí při tvorbě postavy.",
     "WALKTHROUGH.AddBackground": "Vyberte zázemí z kompendia nebo panelu předmětů a přidejte ho přetažením.",
-    "WARNING.SkillRequireAncestryBackground": "Než můžete nakupovat stupně dovedností, musíte přiřadit původ i zázemí."
+    "WARNING.SkillRequireAncestryBackground": "Než můžete nakupovat stupně dovedností, musíte přiřadit původ i zázemí.",
+    "DEFENSES.Physical": "Fyzická obrana",
+    "ACTOR.LABELS.CurrentEquipment": "Vybavení",
+    "ITEM.PROPERTIES.Range": "Dosah {range}",
+    "ACTION.DEFAULT_ACTIONS.Cast.Name": "Seslat kouzlo",
+    "ACTOR.ACTIONS.EditEngagement": "Upravit počet soupeřů"
   },
   "core": {
     "DOCUMENT.Combatant": "Účastník střetnutí",
@@ -483,6 +488,9 @@
     "PERMISSION.QueryUserHint": "Umožňuje uživatelům s touto rolí posílat dotazy ostatním uživatelům.",
     "PERMISSION.ItemCreateHint": "Umožňuje uživatelům s touto rolí vytvářet nové předměty ve světě.",
     "SETUP.BACKUPS.BackupBeforeRestoreHint": "Zálohujte současný stav tohoto balíčku, aby bylo možné vrátit i tuto obnovu.",
-    "JOURNAL.ShowBadPermissions": "Hráčům můžete ukazovat pouze záznamy deníku nebo stránky, které vlastníte."
+    "JOURNAL.ShowBadPermissions": "Hráčům můžete ukazovat pouze záznamy deníku nebo stránky, které vlastníte.",
+    "PLAYERS.FPS": "FPS",
+    "SIDEBAR.Search": "Hledat: {types}",
+    "CONTROLS.TargetSelect": "Vybrat cíle"
   }
 }
