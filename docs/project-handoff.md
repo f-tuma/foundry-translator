@@ -1,6 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-22
+- Latest GitHub release: `v0.20.0` (PR #24, squash `7529d03`); production installation is now user-managed.
 - Deployed version: `v0.19.1`; PRs #21 and #22 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,7 +12,7 @@ and the recommended implementation order.
 
 ## Current work log
 
-- 2026-09-22, safe pause/resume release candidate 0.20.0: pause waits for a
+- 2026-09-22, safe pause/resume released as 0.20.0 (PR #24): pause waits for a
   committed page/field batch; continue keeps the same run/settings. Cancellation
   wakes paused jobs. One job per browser. Saved compatible journal pages are
   reused directly after a reload, even without unit cache; Actor/Item fields
@@ -42,7 +43,10 @@ and the recommended implementation order.
   its configuration/license. Original local data and remote world are unchanged.
   See docs/laya-assessment.md: installed ggmlc Laya model fails to load in LM Studio;
   no accuracy result or quality integration is claimed. Publish to GitHub;
-  the user installs the production update themselves.
+  the user installs the production update themselves. CI and release workflows
+  passed; downloaded manifest and ZIP match 0.20.0 and contain the referenced
+  assets. The temporary QA browser adapter was removed by closing its tab; our
+  private Foundry server shut down cleanly and released localhost:30000.
 
 - 2026-09-21, plain document names: PR #23 (`9fb1d0c`), tag v0.19.2, removes
   the generated language suffix from Actor, Item and Journal names. Metadata and
