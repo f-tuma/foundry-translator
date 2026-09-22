@@ -176,3 +176,16 @@ Ručně opravené překlady si nejprve exportujte. Originály se nemění.
 Referenční sada rozlišuje zásadní chyby významu (negace, podmínky, čísla,
 kdo komu co dělá), glosář, přidání či vynechání informace a menší jazykové chyby.
 Automatická kontrola odkazů a JSON sama správnost významu nepotvrzuje.
+
+## Propojení událostí Emberu (0.22.0)
+
+Přeložená stránka události používá stejnou původní událost a její herní stav.
+Spuštění, výběr výsledku a dokončení probíhá přes běžné ovládání Emberu.
+Opakované otevření překladu nezakládá další událost ani nespouští její herní akce.
+Propojení poznáte podle krátké zprávy nad stránkou; vysvětlení je v tooltipu.
+
+Pokud chybí originál, nesouhlasí ID nebo se změnila pravidla události, stránka
+zablokuje ovládání a nabídne originál. Pravidla upravujte v originálu. Překlady
+zůstávají samostatnými dokumenty; přeložená postava nenahrazuje živou postavu
+na scéně a nesynchronizuje její životy. Některá automaticky otevřená okna a
+texty generované přímo Emberem mohou stále zobrazit originál.

@@ -8,6 +8,7 @@ import { registerTranslatedLinkNavigation } from "./translation/translated-link-
 import { registerTranslationDesk } from "./ui/translation-desk";
 import { organizeExistingStoragePacks } from "./storage/compendium-folder";
 import { registerCrucibleEmbedLabels } from "./translation/crucible-embed-labels";
+import { registerEmberRuntimeBridge } from "./translation/ember-runtime-bridge";
 
 let ready = false;
 
@@ -31,6 +32,7 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
   ready = true;
   registerCrucibleEmbedLabels();
+  registerEmberRuntimeBridge();
   registerTranslatedLinkNavigation();
   void organizeExistingStoragePacks().catch((error) => {
     logger.error("Translation compendia could not be organized.", error);

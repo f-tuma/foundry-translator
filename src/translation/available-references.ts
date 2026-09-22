@@ -14,12 +14,15 @@ export async function availableDocumentReferences(data: unknown, language: strin
     { pack: ITEM_TRANSLATIONS_PACK_ID, path: ITEM_TRANSLATION_FLAG_PATH, kind: "Item", read: readItemTranslationFlag },
   ];
   const roots = new Map<string, string>();
+  const ambiguous = new Set<string>();
   for (const spec of specs) {
     const pack = game.packs.get(spec.pack);
     if (!pack) continue;
     for (const entry of (await pack.getIndex({ fields: [spec.path] })).values()) {
       const flag = spec.read(entry.flags);
-      if (flag?.targetLanguage === language) roots.set(flag.sourceUuid, `Compendium.${pack.collection}.${spec.kind}.${entry._id}`);
+      if (flag?.targetLanguage !== language || ambiguous.has(flag.sourceUuid)) continue;
+      if (roots.has(flag.sourceUuid)) { roots.delete(flag.sourceUuid); ambiguous.add(flag.sourceUuid); }
+      else roots.set(flag.sourceUuid, `Compendium.${pack.collection}.${spec.kind}.${entry._id}`);
     }
   }
   const keys = [...roots.keys()].sort((a, b) => b.length - a.length);

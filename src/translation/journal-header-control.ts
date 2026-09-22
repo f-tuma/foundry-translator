@@ -231,11 +231,12 @@ export async function addShowTranslationHeaderButton(
   if (!pack) return;
   const targetLanguage = getTranslatorSettings().targetLanguage;
   const index = await pack.getIndex({ fields: [TRANSLATION_FLAG_PATH] });
-  const entry = [...index.values()].find((candidate) => {
+  const matches = [...index.values()].filter((candidate) => {
     const flag = readJournalTranslationFlag(candidate.flags);
     return flag?.sourceUuid === journal.uuid && flag.targetLanguage === targetLanguage;
   });
-  if (!entry) return;
+  if (matches.length !== 1) return;
+  const entry = matches[0]!;
   if (!frame.header.isConnected || frame.header.querySelector(".ft-journal-show-translation")) {
     return;
   }
@@ -248,7 +249,10 @@ export async function addShowTranslationHeaderButton(
   button.setAttribute("aria-label", label);
   button.addEventListener("click", () => {
     void pack.getDocument(entry._id).then((translated) => {
-      if (translated) return showDocument(application, translated as FoundryJournalDocument);
+      const identity = readJournalTranslationFlag(translated?.flags);
+      if (translated && identity?.sourceUuid === journal.uuid && identity.targetLanguage === targetLanguage) {
+        return showDocument(application, translated as FoundryJournalDocument);
+      }
       return undefined;
     });
   });

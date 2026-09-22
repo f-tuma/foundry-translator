@@ -2,7 +2,7 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.21.0** adds bounded passage context and an OpenAI-only connection.
+Version **0.22.0** adds bounded passage context and an OpenAI-only connection.
 It includes safe pause/continue, protected saved translations,
 an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through

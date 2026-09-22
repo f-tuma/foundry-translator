@@ -1105,3 +1105,7 @@
   color: var(--ft-color-text); background: var(--ft-color-surface-raised); cursor: pointer;
 }
 .ft-glossary-files .ft-button:disabled { opacity: .5; cursor: default; }
+
+.ft-ember-bridge { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .5rem .75rem; margin-bottom: .75rem; font-size: .85rem; }
+.ft-ember-bridge span { flex: 1 1 15rem; }
+.ft-ember-bridge button { flex: 0 1 auto; width: auto; height: auto; white-space: normal; }
