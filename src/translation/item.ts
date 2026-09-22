@@ -64,6 +64,7 @@ export interface TranslateItemOptions {
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
+  beforeBatch?: () => Promise<void>;
   onProgress?: (progress: ItemTranslationProgress) => void;
   onQualityFallback?: (fallback: TranslationQualityFallback) => void;
 }
@@ -143,6 +144,7 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
   copy.name = names.names[0]!;
 
   const fields = await translateHtmlFields({
+    ...(options.beforeBatch ? { beforeBatch: options.beforeBatch } : {}),
     targets: options.systemHtmlFieldPaths.map((path) => ({ owner: copy.system, path })),
     glossary: options.glossary,
     provider: options.provider,

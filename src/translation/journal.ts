@@ -64,6 +64,7 @@ export interface TranslateJournalOptions {
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
+  beforeBatch?: () => Promise<void>;
   systemHtmlFieldPaths?: readonly (readonly HtmlFieldPath[])[];
   systemTextFieldPaths?: readonly (readonly HtmlFieldPath[])[];
   /** Translate only these pages; the rest stay source copies and the flag records a partial translation. */
@@ -527,6 +528,7 @@ export async function translateJournalData(
     }
   }
   for (let start = 0; start < pageWork.length; start += pageBatchSize) {
+    await options.beforeBatch?.();
     const batch = pageWork.slice(start, start + pageBatchSize);
     const includesMetadata = deferMetadata && start === 0;
     const targets: TranslationTarget[] = includesMetadata ? [...metadataTargets] : [];

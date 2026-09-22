@@ -1027,10 +1027,12 @@
   color: var(--ft-color-danger);
 }
 
+.ft-active-translations__run[data-state="paused"] .ft-active-translations__state,
 .ft-active-translations__run[data-state="cancelled"] .ft-active-translations__state {
   color: var(--ft-color-warning);
 }
 
+.ft-active-translations__run[data-state="paused"] .ft-progress__fill,
 .ft-active-translations__run[data-state="cancelled"] .ft-progress__fill {
   background: var(--ft-color-warning);
 }

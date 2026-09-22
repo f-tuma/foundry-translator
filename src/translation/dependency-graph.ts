@@ -16,6 +16,7 @@ export interface TraverseDependencyGraphOptions<TNode> {
   key(node: TNode): string;
   dependencies(node: TNode): Promise<readonly TNode[]> | readonly TNode[];
   process(node: TNode): Promise<void> | void;
+  shouldAbort?: (error: unknown) => boolean;
   onCycle?: (from: TNode, to: TNode) => void;
 }
 
@@ -49,7 +50,7 @@ export async function traverseDependencyGraph<TNode>(
     } catch (error) {
       states.set(key, "failed");
       failures.push({ node, error });
-      if (key === rootKey) throw error;
+      if (key === rootKey || options.shouldAbort?.(error)) throw error;
     }
   };
 

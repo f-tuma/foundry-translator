@@ -1,3 +1,4 @@
+import { assertTranslationWriteGuard, type TranslationWriteGuard } from "./write-guard";
 import { MODULE_ID, MODULE_TITLE } from "../constants";
 import { organizeCompendiumPack } from "../storage/compendium-folder";
 import { readItemTranslationFlag, type ItemData, type ItemTranslationFlag } from "./item";
@@ -40,7 +41,7 @@ async function ensurePack(): Promise<FoundryCompendiumCollection> {
 
 export class CompendiumItemTranslationRepository {
   #pack?: Promise<FoundryCompendiumCollection>;
-  #index?: Promise<Map<string, string>>;
+  #index: Promise<Map<string, string>> | undefined;
 
   async find(sourceUuid: string, targetLanguage: string): Promise<FoundryItemWorldDocument | null> {
     const pack = await this.#getPack();
@@ -49,14 +50,16 @@ export class CompendiumItemTranslationRepository {
     return id ? (await pack.getDocument(id) as FoundryItemWorldDocument | undefined) ?? null : null;
   }
 
-  async save(data: ItemData): Promise<FoundryItemWorldDocument> {
+  async save(data: ItemData, guard?: TranslationWriteGuard | null): Promise<FoundryItemWorldDocument> {
     const flag = readItemTranslationFlag(data.flags);
     if (!flag) throw new Error("Přeložený Item nemá platná metadata.");
     const pack = await this.#getPack();
     if (pack.locked) throw new Error("Compendium s přeloženými Itemy je zamčené.");
+    if (guard !== undefined) this.#index = undefined;
     const index = await this.#getIndex(pack);
     const key = translationKey(flag.sourceUuid, flag.targetLanguage);
     const existingId = index.get(key);
+    await assertTranslationWriteGuard(existingId ? (await pack.getDocument(existingId)) ?? null : null, guard);
     if (existingId) {
       await foundry.documents.Item.implementation.updateDocuments(
         [{ ...data, _id: existingId }],

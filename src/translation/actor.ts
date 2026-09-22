@@ -77,6 +77,7 @@ export interface TranslateActorOptions {
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
+  beforeBatch?: () => Promise<void>;
   onProgress?: (progress: ActorTranslationProgress) => void;
   onQualityFallback?: (fallback: TranslationQualityFallback) => void;
 }
@@ -179,6 +180,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
 
   const fields = await translateHtmlFields({
     targets,
+    ...(options.beforeBatch ? { beforeBatch: options.beforeBatch } : {}),
     glossary: options.glossary,
     provider: options.provider,
     settings: options.settings,

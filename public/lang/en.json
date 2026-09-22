@@ -302,5 +302,17 @@
   "FOUNDRY_TRANSLATE.Glossary.Status.Cancelled": "Synchronization cancelled; saved names are kept.",
   "FOUNDRY_TRANSLATE.Glossary.Status.Progress": "Collecting names: {completed}/{total}",
   "FOUNDRY_TRANSLATE.Glossary.Files.Reviewed": "Manually approved",
-  "FOUNDRY_TRANSLATE.Glossary.Files.NotReviewed": "Not manually approved"
+  "FOUNDRY_TRANSLATE.Glossary.Files.NotReviewed": "Not manually approved",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Pause": "Pause",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Resume": "Continue",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Pausing": "Saving before pause",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Paused": "Paused",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.PauseTip": "Pause waits for the current batch to finish and be saved. Continue keeps the same settings. After a browser reload, start the same journal again: compatible completed pages and cached parts are reused. Changes to the source, glossary or provider block automatic continuation.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.OutputChanged": "The saved translation changed or was removed during this run. Nothing was overwritten; completed batches remain saved. Review the existing copy before continuing.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.AlreadyRunning": "A translation is already running or paused in this browser. Continue or cancel it in Active translations before starting another.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.IncompatibleExisting": "The source, glossary, provider settings or translation engine differs from the saved copy. Automatic replacement is blocked. Export and review that copy first; remove it only if you want to regenerate it.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnsafeExisting": "The existing copy contains leaked model instructions. It was preserved for review; automatic replacement is blocked.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.ManualEditsProtected": "Manual edits or an unverifiable legacy copy were preserved. Its content and links were not rewritten.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.EditedPartial": "The unfinished copy has manual edits or no verifiable fingerprint. Automatic continuation would risk overwriting them, so it was stopped. Export and review the copy first.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.CheckingExisting": "Checking saved translations"
 }

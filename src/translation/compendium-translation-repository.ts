@@ -1,3 +1,4 @@
+import { assertTranslationWriteGuard, type TranslationWriteGuard } from "./write-guard";
 import { MODULE_ID, MODULE_TITLE } from "../constants";
 import { organizeCompendiumPack } from "../storage/compendium-folder";
 import {
@@ -47,7 +48,7 @@ async function ensureTranslationsPack(): Promise<FoundryCompendiumCollection> {
 
 export class CompendiumJournalTranslationRepository {
   #pack?: Promise<FoundryCompendiumCollection>;
-  #index?: Promise<Map<string, string>>;
+  #index: Promise<Map<string, string>> | undefined;
 
   async find(
     sourceUuid: string,
@@ -59,15 +60,17 @@ export class CompendiumJournalTranslationRepository {
     return id ? (await pack.getDocument(id)) ?? null : null;
   }
 
-  async save(data: JournalData): Promise<FoundryJournalDocument> {
+  async save(data: JournalData, guard?: TranslationWriteGuard | null): Promise<FoundryJournalDocument> {
     const flag = readJournalTranslationFlag(data.flags);
     if (!flag) throw new Error("Přeložený deník nemá platná metadata.");
     const pack = await this.#getPack();
     if (pack.locked) throw new Error("Compendium s překlady je zamčené.");
 
+    if (guard !== undefined) this.#index = undefined;
     const index = await this.#getTranslationIndex(pack);
     const key = translationKey(flag.sourceUuid, flag.targetLanguage);
     const existingId = index.get(key);
+    await assertTranslationWriteGuard(existingId ? (await pack.getDocument(existingId)) ?? null : null, guard);
     if (existingId) {
       await foundry.documents.JournalEntry.implementation.updateDocuments(
         [{ ...data, _id: existingId }],
