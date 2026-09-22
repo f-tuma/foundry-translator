@@ -2,10 +2,11 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.20.0** includes safe pause/continue, protected saved translations,
+Version **0.21.0** adds bounded passage context and an OpenAI-only connection.
+It includes safe pause/continue, protected saved translations,
 an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
-Chrome or LM Studio, with Google Cloud available as an optional provider.
+LM Studio or another OpenAI-compatible API.
 Generated text is structurally validated; language quality still depends on the
 chosen model. The source adventure remains unchanged.
 
@@ -27,7 +28,7 @@ separate action. See [coverage and maintenance](docs/czech-interface.md).
 ## Quick start
 
 1. Open **Adventure translation** under the left **Journal Notes** controls, in the Journal sidebar, or in Module Settings.
-2. Open **Translator and language**, choose a provider, test the connection and save.
+2. Open **Translator and language**, enter the API address and model ID, test the connection and save.
 3. Open a Journal page and click **Translate this page** in its header.
 4. Use **Show original** to switch back without losing the current page.
 
@@ -67,15 +68,9 @@ The first expression should return `true`. The API object should report
 As Game Master open **Configure Settings → Module Settings → Foundry Translate**
 and select **Configure translator**.
 
-**Chrome Local Translator** is the default for new worlds. It requires desktop
-Chrome 138 or newer, downloads the selected language pack on first use, and then
-translates on-device without an API key, character quota, or sending adventure
-text to a translation service. Automatic source-language detection also runs in
-the browser.
-
-**Google Cloud Translation Basic v2** remains available as an optional provider.
-Its API key is a client-scoped setting: it stays in the current browser and is not
-stored in the world or shared with players.
+The only active provider is **OpenAI-compatible API**. Older Chrome/Google
+settings are ignored, and their credentials are never reused as API tokens.
+Existing imported translations still retain their historical provider metadata.
 
 **OpenAI-compatible / LM Studio** connects directly from the GM browser to a
 local server. Enter either the server root (for example
@@ -114,8 +109,7 @@ TranslateGemma-compatible LM Studio prompt template. The world-profile generator
 requires a general instruction model.
 
 The provider test performs one short English-to-Czech translation. For an LLM it
-first verifies the exact configured model ID. Google Cloud requires a project
-with billing and the Cloud Translation API enabled.
+first verifies the exact configured model ID.
 
 ## Protected name glossary
 
@@ -160,8 +154,7 @@ the separate adventure-bundle import continues to preserve local choices.
 
 Choose **Allow inflection** in a glossary row to retain its approved vocabulary
 while allowing case endings, for example `Starý Carinth` → `do Starého Carinthu`.
-This requires Czech and an OpenAI-compatible instruction model. Chrome, Google
-and other target languages use the exact form; a translation-run warning explains
+This requires Czech and an OpenAI-compatible instruction model. Other target languages use the exact form; a translation-run warning explains
 that fallback. **Do not use** omits the entry entirely, including terminology hints.
 
 Internally, names use paired glossary markers. APEX receives complete contextual
@@ -274,12 +267,17 @@ structure, link destinations, fenced and inline code, frontmatter, and reference
 definitions stay byte-for-byte unchanged; both the editable Markdown source and
 its stored rendered HTML are translated.
 
-Chrome Local Translator first receives each protected logical block as a whole,
-so it can use paragraph-level context across inline markup and fixed glossary
-terms. The contextual result is accepted only when every structural, glossary,
-and Foundry-syntax token survives byte-for-byte and in its original order. If
-Chrome changes any token, the module automatically falls back to translating
-isolated text fragments instead of risking damaged content.
+Each narrative unit receives bounded original-source context: document/page titles,
+field identity and neighbouring prose. Context is labelled as data, never appended
+to the translated text, and participates in cache identity and request budgets.
+HTML attributes cannot become prose context. Glossary rules retain precedence.
+APEX sends contextual passages separately to reduce cross-passage word-sense and
+speaker leakage; sentences within a passage are still translated together.
+
+The [reference quality evaluation](docs/benchmarks/context-quality-2026-09-22.md)
+compares the same pipeline with and without context. Meaning must be reviewed
+separately from structural integrity; passing JSON/link checks does not certify
+that a translation is semantically correct.
 
 Before the first request, the module scans the complete dependency graph
 without writing anything and reports the total number of documents and
@@ -351,18 +349,6 @@ Requires Node.js 22 or newer.
 npm ci
 npm run check
 ```
-
-For a real Chrome Translator diagnostic against a running local Foundry, use:
-
-```bash
-npm run diagnose:chrome
-```
-
-The diagnostic launches the installed Chromium/Chrome directly and connects over
-DevTools. This intentionally avoids automation defaults which disable Chromium's
-component updater and can produce a false TranslateKit failure. `FOUNDRY_URL`,
-`CHROMIUM_PATH`, `CHROMIUM_PROFILE`, `SOURCE_LANGUAGE`, and `TARGET_LANGUAGE` can
-be overridden through environment variables.
 
 The production module is generated in `dist/`. A release tag such as `v0.9.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes

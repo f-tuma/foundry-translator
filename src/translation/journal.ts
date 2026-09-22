@@ -1,3 +1,5 @@
+import { normalizePassageContext, passageContexts } from "./passage-context";
+import type { PassageContext } from "../providers/types";
 import { providerFingerprint } from "./provider-fingerprint";
 import { MODULE_ID } from "../constants";
 import type { GlossaryEntry } from "../glossary/types";
@@ -16,7 +18,7 @@ import {
 } from "./unit-translator";
 
 export const TRANSLATION_SCHEMA_VERSION = 1;
-export const TRANSLATION_ENGINE_REVISION = 11;
+export const TRANSLATION_ENGINE_REVISION = 12;
 const HTML_FORMAT = 1;
 const MARKDOWN_FORMAT = 2;
 
@@ -231,6 +233,7 @@ export function mergePartialJournalTranslation(
 }
 
 interface TranslationTarget {
+  context?: PassageContext | undefined;
   segments: readonly string[];
   translatedSegments?: readonly string[];
   apply(segments: readonly string[]): void;
@@ -265,6 +268,7 @@ async function translateTargets(
 ): Promise<void> {
   const translatedUnits = await translateUnits({
     units: targets.map(({ segments }) => segments),
+    contexts: targets.map(({ context }) => context),
     glossary: options.glossary,
     provider: options.provider,
     settings: options.settings,
@@ -413,10 +417,12 @@ export async function translateJournalData(
     delete page._stats;
     if (selectedPageIds && (!page._id || !selectedPageIds.has(page._id))) continue;
     const sourcePageName = page.name;
+    const metadata = { documentTitle: options.source.name, sectionTitle: sourcePageName };
     const targets: TranslationTarget[] = [];
     const structuredTargets: StructuredTranslationTarget[] = [];
     targets.push({
       segments: [page.name],
+      context: normalizePassageContext(metadata),
       apply: ([translatedName]) => {
         page.name = translatedName ?? page.name;
       },
@@ -424,12 +430,12 @@ export async function translateJournalData(
 
     let translatedPage = false;
     let skippedPage = false;
-    const queueHtml = (content: string, apply: (translated: string) => void): void => {
+    const queueHtml = (content: string, apply: (translated: string) => void, field?: string): void => {
       const plan = planHtmlTranslation(content, options.ownerDocument);
       if (!plan.units.length) return;
       const start = targets.length;
-      for (const segments of plan.units) {
-        targets.push({ segments, apply: () => undefined });
+      for (const [index, segments] of plan.units.entries()) {
+        targets.push({ segments, context: normalizePassageContext({ ...plan.contexts[index], ...metadata, ...(field ? { field } : {}) }), apply: () => undefined });
       }
       structuredTargets.push({
         start,
@@ -443,8 +449,9 @@ export async function translateJournalData(
       const plan = planMarkdownTranslation(markdown);
       if (!plan.units.length) return;
       const start = targets.length;
-      for (const segments of plan.units) {
-        targets.push({ segments, apply: () => undefined });
+      const contexts = passageContexts(plan.units, metadata);
+      for (const [index, segments] of plan.units.entries()) {
+        targets.push({ segments, context: contexts[index], apply: () => undefined });
       }
       structuredTargets.push({
         start,
@@ -494,13 +501,13 @@ export async function translateJournalData(
         if (!writePath(page.system, path, translated)) {
           throw new Error(`Nepodařilo se zapsat vlastní HTML pole Journalu: ${path.join(".")}`);
         }
-      });
+      }, path.join("."));
     }
 
     for (const path of options.systemTextFieldPaths?.[pageIndex] ?? []) {
       const text = readPath(page.system, path);
       if (typeof text !== "string" || !text.trim()) continue;
-      targets.push({ segments: [text], apply: ([translated]) => {
+      targets.push({ segments: [text], context: normalizePassageContext({ ...metadata, field: path.join(".") }), apply: ([translated]) => {
         if (translated !== undefined && !writePath(page.system, path, translated)) {
           throw new Error(`Cannot update Ember text field: ${path.join(".")}`);
         }

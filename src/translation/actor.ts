@@ -18,7 +18,7 @@ import {
 } from "./unit-translator";
 
 export const ACTOR_TRANSLATION_SCHEMA_VERSION = 1;
-export const ACTOR_TRANSLATION_ENGINE_REVISION = 6;
+export const ACTOR_TRANSLATION_ENGINE_REVISION = 7;
 
 export interface ActorItemData extends Record<string, unknown> {
   _id?: string;
@@ -174,7 +174,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
     paths.forEach((path) => targets.push({
       owner: item.system,
       path,
-      ...(item.name ? { itemName: item.name } : {}),
+      ...(options.source.items?.[itemIndex]?.name ? { itemName: options.source.items[itemIndex]!.name! } : {}),
     }));
   });
 
@@ -184,6 +184,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
     glossary: options.glossary,
     provider: options.provider,
     settings: options.settings,
+    documentTitle: options.source.name,
     documentLabel: "Actoru",
     ...(options.cache ? { cache: options.cache } : {}),
     ...(options.ownerDocument ? { ownerDocument: options.ownerDocument } : {}),

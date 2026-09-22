@@ -72,7 +72,7 @@ Takový úsek označí ke kontrole gramatiky a neuloží do mezipaměti. Teprve 
 neprojde ani tento pokus, ponechá původní úsek se schválenými názvy a uvede
 problém. Výsledek je potřeba jazykově zkontrolovat, zejména fantasy jména.
 
-Chrome, Google a jiné cílové jazyky použijí pevný tvar a při spuštění překladu
+Jiné cílové jazyky použijí pevný tvar a při spuštění překladu
 na to upozorní. **Nepoužívat** znamená, že se heslo vůbec nepředá překladači,
 ani jako doporučení. Starší hesla bez uvedeného režimu zůstávají pevná.
 
@@ -155,3 +155,24 @@ i na vložených kartách postav a předmětů. Cíl odkazu, ID a herní hodnoty
 
 Starší uložené překlady je pro doplnění názvů potřeba přeložit znovu. Modul pozná
 starou verzi překladového postupu; ručně upravené kopie nadále chrání před přepsáním.
+
+## Okolní kontext a kontrola kvality (0.21.0)
+
+Připojení nyní používá pouze OpenAI kompatibilní API. Adresa a ID modelu pro
+LM Studio zůstávají stejné; Google API a překlad v prohlížeči nejsou v nabídce.
+Při přechodu ze starého poskytovatele nastavte adresu a model a otestujte spojení.
+
+Model dostává kromě překládaného odstavce také krátké okolní úryvky z originálu
+a názvy dokumentu a stránky. Pomáhá to rozlišit význam slov a rod mluvčího.
+Okolní kontext se nepřidává do výstupu a nesmí přebít schválený glosář.
+APEX překládá tyto pasáže odděleně, aby nemíchal mluvčí a význam slov mezi nimi.
+Věty uvnitř jednoho odstavce zůstávají společně.
+
+Změna kontextu má vlastní klíč mezipaměti. Kopii ze staršího
+překladového enginu bezpečná kontrola odmítne přepsat; nový běh vyžaduje
+odstranění příslušné staré přeložené kopie, pokud ji už nepotřebujete.
+Ručně opravené překlady si nejprve exportujte. Originály se nemění.
+
+Referenční sada rozlišuje zásadní chyby významu (negace, podmínky, čísla,
+kdo komu co dělá), glosář, přidání či vynechání informace a menší jazykové chyby.
+Automatická kontrola odkazů a JSON sama správnost významu nepotvrzuje.

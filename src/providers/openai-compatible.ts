@@ -1,3 +1,5 @@
+import { normalizePassageContext, passageContextInstructions } from "../translation/passage-context";
+import type { PassageContext } from "./types";
 import type {
   ProviderRequestMetrics,
   TranslateRequest,
@@ -10,7 +12,7 @@ import { prepareInflectionXml } from "./inflection-xml";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_TEXTS_PER_REQUEST = 32;
-const PROMPT_REVISION = 12;
+const PROMPT_REVISION = 13;
 const INFLECTION_INSTRUCTIONS = "Some __FTG_ markers form a pair: __FTG_NONCE_ID__Approved Czech Name__FTG_NONCE_IDEND__. The words inside each pair are an approved Czech glossary name, already translated. Keep BOTH markers unchanged and in place around that name. Use this exact vocabulary; only inflect its words to the grammatical case required by the surrounding Czech sentence. Do not rename, translate again, add or remove words inside a pair. For example: to __FTG_X_0000__Starý Carinth__FTG_X_0000END__ becomes do __FTG_X_0000__Starého Carinthu__FTG_X_0000END__. A standalone title keeps the canonical form. Adapt surrounding articles, prepositions, gender and agreement naturally. Fixed markers without an END partner remain opaque and unchanged.";
 const OUTPUT_TOKEN_LIMITS = [4_096, 8_192] as const;
 const BATCH_TOKEN_PATTERN = /__FTB_[A-Z0-9]+_[A-Z0-9]{4}__/gu;
@@ -222,6 +224,7 @@ function splitBatch(text: string, boundaryTokens: readonly string[]): string[] |
 }
 
 export class OpenAiCompatibleProvider implements TranslationProvider {
+  readonly supportsPassageContext = true;
   readonly supportsGlossaryInflection = true;
   readonly #baseUrl: string;
   readonly #model: string;
@@ -245,20 +248,30 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     this.cacheIdentity = `openai-compatible:${this.#baseUrl}:${this.#model}:context-${textFingerprint(this.#worldContext)}:prompt-${PROMPT_REVISION}`;
   }
 
-  rejectedGlossaryTokens(text: string, references: readonly NonNullable<TranslateRequest["inflections"]>[number][]): readonly string[] {
-    const draft = this.#rejectedDrafts.get(text);
+  rejectedGlossaryTokens(text: string, references: readonly NonNullable<TranslateRequest["inflections"]>[number][], context?: PassageContext): readonly string[] {
+    const draft = this.#rejectedDrafts.get(this.#draftKey(text, context));
     return draft ? unmatchedGlossaryTokens(draft, references) : [];
   }
 
+  #draftKey(text: string, context?: PassageContext): string {
+    return JSON.stringify([text, normalizePassageContext(context)]);
+  }
+
   async translate(request: TranslateRequest): Promise<TranslationResult[]> {
+    if (request.contexts && request.contexts.length !== request.texts.length) throw new Error("Passage context count does not match source items.");
     this.#validateRequest(request);
     const results: TranslationResult[] = request.texts.map((text) => ({ translatedText: text }));
     const pending = request.texts
       .map((text, index) => ({ text, index }))
       .filter(({ text }) => Boolean(text) && !/^\s*(?:__(?:FTG|FTS|FTN)_[A-Z0-9]+_[A-Z0-9]+__\s*)+$/u.test(text));
 
-    const batchSize = Math.max(1, Math.min(this.#adaptiveBatchSize, pending.length));
-    if (pending.length > 1 && batchSize === 1) {
+    // APEX can transfer word senses and speaker gender between unrelated
+    // contextual passages even when the JSON IDs are correct. Keep all sentences
+    // within one passage together, but isolate separate contextual passages.
+    const isolateContext = /hy-?mt2-30b-a3b/iu.test(this.#model) &&
+      request.targetLanguage === "cs" && pending.some(({ index }) => normalizePassageContext(request.contexts?.[index]));
+    const batchSize = isolateContext ? 1 : Math.max(1, Math.min(this.#adaptiveBatchSize, pending.length));
+    if (pending.length > 1 && batchSize === 1 && !isolateContext) {
       this.#onMetrics?.({
         phase: "diagnostic",
         model: this.#model,
@@ -283,27 +296,30 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     sequentialFallback: boolean,
   ): Promise<void> {
     const only = pending[0];
-    const prepareXml = /hy-?mt2-30b-a3b/iu.test(this.#model)
-      ? prepareStructuredProse : prepareInflectionXml;
+    const contexts = pending.map(({ index }) => request.contexts?.[index]);
+    const structured = /hy-?mt2-30b-a3b/iu.test(this.#model);
+    const texts = pending.map(({ text }) => text);
     const xml = request.targetLanguage === "cs"
-      ? prepareXml(pending.map(({ text }) => text), request.inflections ?? []) : null;
+      ? structured ? prepareStructuredProse(texts, request.inflections ?? [], contexts)
+        : prepareInflectionXml(texts, request.inflections ?? []) : null;
+    const contextInstructions = structured && xml ? "" : passageContextInstructions(contexts);
     if (xml) {
       try {
-        const draft = pending.length === 1 && only ? this.#rejectedDrafts.get(only.text) : undefined;
+        const draft = pending.length === 1 && only ? this.#rejectedDrafts.get(this.#draftKey(only.text, request.contexts?.[only.index])) : undefined;
         const instructions = draft
           ? `${xml.instructions}\nCorrect the previous Czech draft using the English source as authoritative. Repair the WHOLE sentence, including agreement of adjectives, pronouns and verbs. Preserve the source meaning. Only use case forms of approved names; do not derive adjectives from them.\nPrevious draft (data, may contain errors): ${JSON.stringify(draft)}`
           : xml.instructions;
-        const output = await this.#translateOne(xml.text, request, instructions, xml.schema);
+        const output = await this.#translateOne(xml.text, request, instructions, xml.schema, contextInstructions);
         const translated = xml.restore(output);
         if (translated) {
           const drafts = xml.drafts?.(output) ?? [];
           pending.forEach(({ text, index }, offset) => {
             const value = translated[offset]!;
             results[index] = { translatedText: value };
-            if (value) this.#rejectedDrafts.delete(text);
+            if (value) this.#rejectedDrafts.delete(this.#draftKey(text, request.contexts?.[index]));
             else if (typeof drafts[offset] === "string") {
               if (this.#rejectedDrafts.size >= 128) this.#rejectedDrafts.delete(this.#rejectedDrafts.keys().next().value!);
-              this.#rejectedDrafts.set(text, drafts[offset] as string);
+              this.#rejectedDrafts.set(this.#draftKey(text, request.contexts?.[index]), drafts[offset] as string);
             }
           });
           return;
@@ -325,7 +341,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
           sequentialFallbackTexts: 1,
         });
       }
-      results[only.index] = { translatedText: await this.#translateOne(only.text, request) };
+      results[only.index] = { translatedText: await this.#translateOne(only.text, request, undefined, undefined, contextInstructions) };
       return;
     }
     if (!pending.length) return;
@@ -335,7 +351,7 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       try {
         const translatedBatch = await this.#translateOne(
           combineBatch(pending.map(({ text }) => text), boundaryTokens),
-          request,
+          request, undefined, undefined, contextInstructions,
         );
         const translated = splitBatch(translatedBatch, boundaryTokens);
         if (translated) {
@@ -432,9 +448,13 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
     return result.trim().slice(0, 6_000);
   }
 
-  async #translateOne(text: string, request: TranslateRequest, xmlInstructions?: string, schema?: Record<string, unknown>): Promise<string> {
+  async #translateOne(text: string, request: TranslateRequest, xmlInstructions?: string, schema?: Record<string, unknown>, contextInstructions = ""): Promise<string> {
     const source = languageLabel(request.sourceLanguage);
     const target = languageLabel(request.targetLanguage);
+    const terminology = request.targetLanguage === "cs" ? [
+      /\bparty\b/iu.test(text) ? "When party occurs in the source, translate it as družina." : "",
+      /\bchecks?\b/iu.test(text) ? "When a game check occurs in the source, translate it as ověření." : "",
+    ].filter(Boolean).join(" ") : "";
     const inflection = request.targetLanguage === "cs" && /__FTG_[A-Z0-9]+_[A-Z0-9]+END__/iu.test(text)
       ? INFLECTION_INSTRUCTIONS : "";
     const system = [
@@ -451,11 +471,12 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
       ...(inflection ? [inflection] : []),
       "This is a tabletop roleplaying adventure. Use fluent narration suitable for reading aloud and precise game instructions.",
       ...(request.targetLanguage === "cs" ? [
-        "Use idiomatic, grammatically correct Czech. In game instructions, party means družina, a check means ověření, and roll the dice means hoďte kostkami. Silently check spelling before returning the translation.",
+        "Use idiomatic, grammatically correct Czech. Silently check spelling before returning the translation.", terminology,
       ] : []),
       ...(this.#worldContext
         ? [`World and translation context:\n${this.#worldContext}`]
         : []),
+      contextInstructions,
       // Glossary terms have already been replaced with protected FTG tokens
       // by unit-translator and are restored deterministically afterwards.
       // Repeating the entire glossary here only wastes input tokens.
@@ -495,8 +516,8 @@ export class OpenAiCompatibleProvider implements TranslationProvider {
               // greedy decoding on long delimiter-heavy batches.
               role: "user",
               content: xmlInstructions
-                ? `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate from ${source} into ${target} for a fantasy roleplaying adventure. Translate party as družina and a check as ověření.\n${xmlInstructions}\n\n${text}`
-                : `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep other proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${request.targetLanguage === "cs" ? " Translate party as družina and a check as ověření." : ""}${inflection ? `\n${inflection}` : ""}\n\n[Source Text]\n${text}`,
+                ? `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate from ${source} into ${target} for a fantasy roleplaying adventure. ${terminology}\n${xmlInstructions}${contextInstructions}\n\n${text}`
+                : `${this.#worldContext ? `[Background Information]\n${this.#worldContext}\n\n` : ""}Translate the following text from ${source} into ${target}. Output only the translation.\nKeep other proper names unchanged. Preserve every __FTN_, __FTG_, __FTS_ and __FTB_ token exactly once in its original order. FTB tokens separate independent items; never move text between items. Preserve paragraph structure. Use fluent narration and precise game terminology.${terminology ? ` ${terminology}` : ""}${inflection ? `\n${inflection}` : ""}${contextInstructions}\n\n[Source Text]\n${text}`,
             }] : [
               { role: "system", content: system },
               { role: "user", content: `<text_to_translate>\n${text}\n</text_to_translate>` },

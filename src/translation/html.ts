@@ -1,3 +1,6 @@
+import { passageContexts } from "./passage-context";
+import type { PassageContext } from "../providers/types";
+
 const BLOCK_SELECTOR = [
   "address",
   "article",
@@ -39,6 +42,7 @@ export const MAX_HTML_UNIT_CHARACTERS = 3_200;
 
 export interface HtmlTranslationPlan {
   units: readonly (readonly string[])[];
+  contexts: readonly (PassageContext | undefined)[];
   apply(translatedUnits: readonly (readonly string[])[]): string;
 }
 
@@ -61,12 +65,14 @@ function isExcluded(node: Text): boolean {
 
 interface TranslationValue {
   source: string;
+  node?: Node;
   apply(translated: string): void;
 }
 
 function textValue(node: Text): TranslationValue {
   return {
     source: node.data,
+    node,
     apply: (translated) => {
       node.data = translated;
     },
@@ -175,11 +181,18 @@ export function planHtmlTranslation(
     const value = textValue(node);
     if (hasTranslatableText([value])) groups.push([value]);
   }
-  for (const value of attributeValues(template.content)) groups.push([value]);
-  const plannedUnits = planBoundedUnits(groups);
+  // Remaining inline text can precede/follow a leaf block. Keep source reading
+  // order so a neighbouring paragraph never comes from the wrong section.
+  const order = new Map(textDescendants(template.content as unknown as Element).map((node, index) => [node as Node, index]));
+  groups.sort((left, right) => (order.get(left[0]?.node!) ?? 0) - (order.get(right[0]?.node!) ?? 0));
+  const prose = planBoundedUnits(groups);
+  const contexts = passageContexts(prose.map(unit => unit.map(value => value.source)));
+  const attributes = attributeValues(template.content).map(value => [value]);
+  const plannedUnits = [...prose, ...planBoundedUnits(attributes)];
 
   return {
     units: plannedUnits.map((unit) => unit.map(({ source }) => source)),
+    contexts: plannedUnits.map((_unit, index) => contexts[index]),
     apply(translatedUnits) {
       if (translatedUnits.length !== plannedUnits.length) {
         throw new Error("Počet přeložených HTML bloků neodpovídá zdroji.");

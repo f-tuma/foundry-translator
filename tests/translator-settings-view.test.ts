@@ -3,13 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   renderTranslatorSettingsForm,
-  updateProviderFields,
 } from "../src/settings/translator-settings-view";
 
 describe("translator settings view", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("renders and toggles the OpenAI-compatible world-context editor", () => {
+  it("renders only the OpenAI-compatible connection and world-context editor", () => {
     const window = parseHTML("<html><body></body></html>");
     vi.stubGlobal("document", window.document);
     vi.stubGlobal("HTMLSelectElement", class {});
@@ -19,7 +18,6 @@ describe("translator settings view", () => {
 
     const form = renderTranslatorSettingsForm({
       provider: "openai-compatible",
-      apiKey: "",
       openAiBaseUrl: "http://192.168.10.183:1234",
       openAiModel: "google/gemma-4-12b-qat",
       openAiApiKey: "",
@@ -36,7 +34,7 @@ describe("translator settings view", () => {
     expect(form.querySelector("[data-action='generate-world-context']")).not.toBeNull();
     expect(form.querySelector<HTMLElement>(".ft-settings__local-model")?.hidden).toBe(false);
 
-    updateProviderFields(form, "chrome-local");
-    expect(form.querySelector<HTMLElement>(".ft-settings__local-model")?.hidden).toBe(true);
+    expect(form.querySelector("[name=provider],[name=apiKey],[data-provider-only]")).toBeNull();
+    expect(form.textContent).not.toMatch(/Google Cloud|Chrome/);
   });
 });
