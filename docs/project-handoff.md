@@ -1,6 +1,6 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-09-21
+- Updated: 2026-09-22
 - Deployed version: `v0.19.1`; PRs #21 and #22 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -10,6 +10,39 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-22, safe pause/resume release candidate 0.20.0: pause waits for a
+  committed page/field batch; continue keeps the same run/settings. Cancellation
+  wakes paused jobs. One job per browser. Saved compatible journal pages are
+  reused directly after a reload, even without unit cache; Actor/Item fields
+  retain the existing durable cache. Incompatible source/glossary/provider/engine
+  copies block regeneration. Complete manual corrections are reused; edited
+  partial copies stop for review. Optimistic write guards cover content and
+  metadata changes, deletion/replacement and competing creation. Final link
+  repair is guarded and never rewrites manually edited output. This is not a
+  cross-client atomic lock: keep translations in one GM browser tab.
+
+  Deterministic suite: 348 passing tests, 3 opt-in skips, including 23 new pause,
+  conflict and continuation cases and a four-page LM Studio batch. Local browser
+  QA on Foundry 14.368, Crucible 0.11.0, Ember 0.6.2 at localhost:30000 and
+  1855x1256: pause/continue, committed-output hash, interruption during page 2,
+  reload/restart reusing page 1 unchanged with requests only for pages 2/3,
+  manual correction retained with zero model calls, changed-source conflict
+  preserving the saved copy byte-for-byte. Synthetic delayed/blocked Translator
+  adapter isolated persistence/control tests from model quality. Real APEX
+  translation quality was not re-benchmarked. The interface rendered without
+  overlapping controls; existing Ember/Crucible content warnings and the
+  deliberately triggered TranslationConflictError are explained. Local page
+  loading occasionally delayed browser automation; the tested flows completed.
+
+  The user supplied ~/Apps/FoundryVTT and ~/.local/share/FoundryVTT. Tests use a
+  separate private copy under the task visualization directory (foundry-local-qa),
+  Node 24.13.1, a Unix socket and loopback-only proxy. Three QA journals and their
+  synthetic translations remain only in that private copy. Never publish it or
+  its configuration/license. Original local data and remote world are unchanged.
+  See docs/laya-assessment.md: installed ggmlc Laya model fails to load in LM Studio;
+  no accuracy result or quality integration is claimed. Publish to GitHub;
+  the user installs the production update themselves.
 
 - 2026-09-21, plain document names: PR #23 (`9fb1d0c`), tag v0.19.2, removes
   the generated language suffix from Actor, Item and Journal names. Metadata and

@@ -2,7 +2,8 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.19.2** includes an adventure translation desk, an Ember-aware name
+Version **0.20.0** includes safe pause/continue, protected saved translations,
+an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
 Chrome or LM Studio, with Google Cloud available as an optional provider.
 Generated text is structurally validated; language quality still depends on the
@@ -227,12 +228,10 @@ translation updates it. During translation, exact glossary matches are
 replaced by unique integrity tokens and restored as the stored replacement; if
 a provider loses, duplicates, or changes a token, the translation is rejected
 instead of returning a corrupted name. Translations remember the glossary they
-were made with, so after a glossary change a re-run updates the stored copy
-instead of reusing it. Model, prompt, world-profile and source-language changes
-also invalidate document reuse. Refreshing one page preserves other translated
-pages but marks older glossary/model coverage as partial. If the source book
-itself changed, refresh the whole book first; a page refresh will explain this
-instead of replacing the other pages with English.
+were made with. A source, glossary, model, prompt, world-profile or source-language
+change blocks automatic continuation of an incompatible saved copy. Review and
+export that copy before deliberately removing it to generate a replacement.
+The module never silently replaces it with a new model's output.
 
 The glossary window also contains a review queue for suggestions learned from
 manual corrections to translated Journal pages. A suggestion shows editable
@@ -240,9 +239,10 @@ source and replacement columns and must be explicitly accepted or rejected;
 the module never adds it to the glossary automatically. If the source phrase
 cannot be inferred safely, it is left blank and must be supplied before the
 suggestion can be accepted. Newly generated Journal, Actor, and Item copies also
-carry an output fingerprint. A detected correction invalidates document-level
-reuse so the next run regenerates that copy; the correction itself remains
-useful as a glossary suggestion after explicit review.
+carry an output fingerprint. A compatible completed copy with manual corrections
+is reused without rewriting it. An edited unfinished copy is preserved and
+automatic continuation stops for review. The correction can also become a
+glossary suggestion after explicit review.
 
 ## Translate a Journal Entry
 
@@ -289,10 +289,22 @@ provides a global overview of every running translation with a progress bar,
 totals, the current document, and an estimate of the remaining time. When a
 run has issues — quality fallbacks, unresolved references, or failed
 dependencies — a **Copy log** button copies a plain-text debug log with every
-issue, its reason, and a source preview. A running translation can be
-cancelled from the overview: it stops after the part that is currently being
-translated, everything completed stays in the cache and compendia, and the
-next run resumes from that point.
+issue, its reason, and a source preview. **Pause** finishes and saves the current
+batch, then waits. **Continue** resumes that same run and configuration. With LM
+Studio, a journal batch can contain four pages, so pausing is not instantaneous.
+Paused time is excluded from the time estimate. **Cancel** also works while paused
+and retains saved progress. Only one translation job runs in a browser at a time.
+
+The run itself lives in the browser. After reloading or closing the tab, start the
+same source journal again with the same settings: compatible saved journal pages
+are reused directly, and cached text avoids repeating completed Actor/Item fields.
+An unfinished model request may need to run again. Wait for **Paused** before
+closing when possible. Edits, deletion or replacement of the target detected
+before a save stop the run instead of overwriting intervening work.
+
+These are optimistic checks, not a server transaction or a cross-browser lock.
+Run translations from one GM tab; simultaneous writes from separate clients still
+have a narrow race window. Export important reviewed translations as a backup.
 
 Empty, structurally damaged, and suspicious unchanged results are retried up to
 three times and are never written to cache. Intentionally preserved glossary
@@ -306,9 +318,8 @@ source changes during translation, the stale result is rejected instead of
 being saved. A single full translation per source Journal and target
 language is stored in `Foundry Translate — Translations`, outside the world
 Journal sidebar. Opening the translated Journal provides a **Show original**
-action. Its source UUID and hash allow an unchanged translation to be reused and
-a changed source to update the same stored document instead of creating a
-duplicate.
+action. Its source UUID and hash allow an unchanged translation to be reused
+under the same document ID. Incompatible saved copies are preserved for review.
 
 Linked Journal Entries, Actors, and Items are translated recursively. Shared
 dependencies are processed only once, cycles are handled without deadlocks, and

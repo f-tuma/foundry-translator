@@ -1,3 +1,4 @@
+import { captureTranslationWriteGuard, TranslationConflictError } from "./write-guard";
 import { GlossarySyncCancelledError } from "../glossary/types";
 import { providerFingerprint } from "./provider-fingerprint";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
@@ -6,6 +7,7 @@ import { createTranslationProvider } from "../providers/factory";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
 import { getTranslatorSettings } from "../settings/settings";
 import {
+  ACTOR_TRANSLATION_ENGINE_REVISION,
   actorSourceHash,
   canReuseActorTranslation,
   readActorTranslationFlag,
@@ -15,6 +17,7 @@ import {
 } from "./actor";
 import { activeTranslations, type TranslationPlan } from "./active-translations";
 import {
+  ITEM_TRANSLATION_ENGINE_REVISION,
   canReuseItemTranslation,
   itemSourceHash,
   readItemTranslationFlag,
@@ -35,6 +38,7 @@ import {
   type DocumentReferenceReplacement,
 } from "./document-dependencies";
 import {
+  TRANSLATION_ENGINE_REVISION,
   canReuseJournalPageTranslation,
   canReuseJournalTranslation,
   journalSourceHash,
@@ -75,6 +79,14 @@ export class TranslationCancelledError extends Error {
     super("Překlad byl zrušen. Hotové části zůstávají uložené a další spuštění na ně naváže.");
     this.name = "TranslationCancelledError";
   }
+}
+
+let translationInProgress = false;
+
+async function checkpointControl(runId: number): Promise<void> {
+  throwIfCancelled(runId);
+  await activeTranslations.waitUntilResumed(runId);
+  throwIfCancelled(runId);
 }
 
 function throwIfCancelled(runId: number): void {
@@ -420,6 +432,16 @@ export class JournalTranslationService {
     sourceDocument: FoundryJournalWorldDocument,
     scope: TranslationScope,
   ): Promise<JournalTranslationResult> {
+    if (translationInProgress) throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.AlreadyRunning"));
+    translationInProgress = true;
+    try { return await this.#runExclusive(sourceDocument, scope); }
+    finally { translationInProgress = false; }
+  }
+
+  async #runExclusive(
+    sourceDocument: FoundryJournalWorldDocument,
+    scope: TranslationScope,
+  ): Promise<JournalTranslationResult> {
     if (!game.user?.isGM) throw new Error("Deník může překládat pouze Game Master.");
 
     const settings = getTranslatorSettings();
@@ -454,7 +476,7 @@ export class JournalTranslationService {
         }),
         preparation ?? Promise.resolve(),
       ]);
-      throwIfCancelled(activeRunId);
+      await checkpointControl(activeRunId);
       if (glossary.some(entry => entry.enabled !== false && entry.mode === "inflect")
         && (settings.targetLanguage !== "cs" || !provider.supportsGlossaryInflection)) {
         ui.notifications.warn(game.i18n.localize("FOUNDRY_TRANSLATE.Glossary.InflectionFallback"));
@@ -543,6 +565,7 @@ export class JournalTranslationService {
             fieldPath[0] === "pages" && selectedIndexes.has(fieldPath[1] as number));
         }
         for (const reference of references) {
+          await checkpointControl(runId);
           // Relative references (`.pageId`, `.pageId#anchor`) inside a page are
           // written relative to that page, so the page must be the anchor;
           // the whole entry only works for explicit two-part relative UUIDs.
@@ -621,8 +644,9 @@ export class JournalTranslationService {
       root: sourceDocument as GraphSourceDocument,
       key: (document) => document.uuid,
       dependencies: resolveNodeDependencies,
-      process: (document) => {
-        throwIfCancelled(runId);
+      shouldAbort: error => error instanceof TranslationCancelledError,
+      process: async (document) => {
+        await checkpointControl(runId);
         nodeFor(document).units = document.uuid === sourceDocument.uuid && scope.rootPageIds
           ? scope.rootPageIds.length
           : documentTranslationUnits(document);
@@ -638,9 +662,8 @@ export class JournalTranslationService {
     activeTranslations.update(runId, { state: "translating", plan });
     this.#onPlan?.(plan);
 
-    const existingAtStart = await this.#repairExistingLinks(
+    const existingAtStart = await this.#findExistingTranslations(
       scan.completed,
-      nodes,
       runtime,
       runId,
     );
@@ -670,7 +693,7 @@ export class JournalTranslationService {
       key: (document) => document.uuid,
       dependencies: resolveNodeDependencies,
       process: async (document) => {
-        throwIfCancelled(runId);
+        await checkpointControl(runId);
         const node = nodeFor(document);
         const existingDependency = scope.rootPageIds && document.uuid !== sourceDocument.uuid
           ? existingAtStart.get(document.uuid)
@@ -701,7 +724,9 @@ export class JournalTranslationService {
           completedUnits: overall.completedUnits,
           completedDocuments: overall.completedDocuments,
         });
+        await checkpointControl(runId);
       },
+      shouldAbort: error => error instanceof TranslationCancelledError || error instanceof TranslationConflictError,
       onCycle: (from, to) => {
         logger.info("Journal dependency cycle detected and safely deferred.", {
           from: from.uuid,
@@ -724,8 +749,13 @@ export class JournalTranslationService {
     }
 
     for (const document of graph.completed) {
+      await checkpointControl(runId);
       const node = nodes.get(document.uuid);
       if (!node?.result) continue;
+      const savedFlag = readJournalTranslationFlag(node.result.data.flags) ?? readActorTranslationFlag(node.result.data.flags) ?? readItemTranslationFlag(node.result.data.flags);
+      if (!savedFlag?.outputHash || await hasManualOutputEdits(node.result.data, savedFlag.outputHash)) continue;
+      // Compare against the snapshot produced by the service, not a live mutable document.
+      const guard = await captureTranslationWriteGuard({ id: node.result.document.id, toObject: () => node.result!.data });
       const replacements: DocumentReferenceReplacement[] = [];
       if (scope.dependencyDepthLimit === 0) {
         replacements.push(...await availableDocumentReferences(node.result.data, runtime.settings.targetLanguage));
@@ -753,21 +783,21 @@ export class JournalTranslationService {
         if (flag) await assertJournalSourceUnchanged(document, flag.sourceHash);
         await stampJournalOutputHash(journalData);
         node.result.data = journalData;
-        node.result.document = await runtime.translations.save(journalData);
+        node.result.document = await runtime.translations.save(journalData, guard);
       } else if (isActorDocument(document)) {
         const actorData = rewritten as ActorData;
         const flag = readActorTranslationFlag(actorData.flags);
         if (flag) await assertActorSourceUnchanged(document, flag.sourceHash);
         await stampActorOutputHash(actorData);
         node.result.data = actorData;
-        node.result.document = await runtime.actorTranslations.save(actorData);
+        node.result.document = await runtime.actorTranslations.save(actorData, guard);
       } else {
         const itemData = rewritten as ItemData;
         const flag = readItemTranslationFlag(itemData.flags);
         if (flag) await assertItemSourceUnchanged(document, flag.sourceHash);
         await stampItemOutputHash(itemData);
         node.result.data = itemData;
-        node.result.document = await runtime.itemTranslations.save(itemData);
+        node.result.document = await runtime.itemTranslations.save(itemData, guard);
       }
     }
 
@@ -788,14 +818,13 @@ export class JournalTranslationService {
     };
   }
 
-  async #repairExistingLinks(
+  async #findExistingTranslations(
     documents: readonly GraphSourceDocument[],
-    nodes: ReadonlyMap<string, JournalGraphNode>,
     runtime: TranslationRuntime,
     runId: number,
   ): Promise<Map<string, GraphTranslatedDocument>> {
     activeTranslations.update(runId, {
-      currentDocument: "Repairing links in existing translations",
+      currentDocument: game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.CheckingExisting"),
       currentUnit: "",
     });
     const existingEntries = await Promise.all(documents.map(async (document) => {
@@ -818,7 +847,7 @@ export class JournalTranslationService {
         );
       }
       if (translated && containsTranslationPromptLeak(translated.toObject())) {
-        logger.warn("Existing translation contains leaked provider instructions and will be regenerated.", {
+        logger.warn("Existing translation contains leaked provider instructions; automatic reuse is blocked.", {
           sourceUuid,
           translatedUuid: translated.uuid,
         });
@@ -831,70 +860,30 @@ export class JournalTranslationService {
         (entry): entry is readonly [string, GraphTranslatedDocument] => Boolean(entry[1]),
       ),
     );
-    let repairedDocuments = 0;
-
-    for (const sourceDocument of documents) {
-      throwIfCancelled(runId);
-      const existing = existingBySource.get(sourceDocument.uuid);
-      const node = nodes.get(sourceDocument.uuid);
-      if (!existing || !node?.dependencies.length) continue;
-      const replacements: DocumentReferenceReplacement[] = [];
-      for (const dependency of node.dependencies) {
-        const translatedDependency = existingBySource.get(dependency.root.uuid);
-        if (!translatedDependency) continue;
-        const translatedUuid = await usableTranslatedDocumentReferenceUuid(
-          dependency.resolved,
-          dependency.root,
-          translatedDependency,
-          dependency.reference.sourceUuid,
-        );
-        if (translatedUuid) {
-          replacements.push({ sourceUuid: dependency.reference.sourceUuid, translatedUuid });
-        }
-      }
-      if (!replacements.length) continue;
-
-      const existingData = existing.toObject() as GraphData;
-      const rewritten = rewriteDocumentReferences(existingData, replacements);
-      if (JSON.stringify(rewritten) === JSON.stringify(existingData)) continue;
-
-      let saved: GraphTranslatedDocument;
-      if (isJournalDocument(sourceDocument)) {
-        const journalData = rewritten as JournalData;
-        const flag = readJournalTranslationFlag(existingData.flags);
-        const manuallyEdited = flag
-          ? await hasManualOutputEdits(existingData, flag.outputHash)
-          : false;
-        if (!manuallyEdited) await stampJournalOutputHash(journalData);
-        saved = await runtime.translations.save(journalData);
-      } else if (isActorDocument(sourceDocument)) {
-        const actorData = rewritten as ActorData;
-        const flag = readActorTranslationFlag(existingData.flags);
-        const manuallyEdited = flag
-          ? await hasManualOutputEdits(existingData, flag.outputHash)
-          : false;
-        if (!manuallyEdited) await stampActorOutputHash(actorData);
-        saved = await runtime.actorTranslations.save(actorData);
-      } else {
-        const itemData = rewritten as ItemData;
-        const flag = readItemTranslationFlag(existingData.flags);
-        const manuallyEdited = flag
-          ? await hasManualOutputEdits(existingData, flag.outputHash)
-          : false;
-        if (!manuallyEdited) await stampItemOutputHash(itemData);
-        saved = await runtime.itemTranslations.save(itemData);
-      }
-      existingBySource.set(sourceDocument.uuid, saved);
-      repairedDocuments += 1;
-      if (sourceDocument.uuid === runtime.rootUuid && saved.uuid) {
-        activeTranslations.update(runId, { translatedDocumentUuid: saved.uuid });
-      }
-    }
-    logger.info("Existing translation link preflight finished.", {
-      existingDocuments: existingBySource.size,
-      repairedDocuments,
-    });
     return existingBySource;
+  }
+
+  async #checkExisting(
+    data: GraphData | undefined,
+    flag: { sourceHash: string; engineRevision: number; glossaryFingerprint?: string; providerFingerprint?: string; outputHash?: string } | null,
+    sourceHash: string,
+    revision: number,
+    runtime: TranslationRuntime,
+  ): Promise<boolean> {
+    if (!data || !flag) return false;
+    if (flag.sourceHash !== sourceHash || flag.engineRevision !== revision ||
+        flag.glossaryFingerprint !== runtime.glossaryHash || flag.providerFingerprint !== runtime.providerHash) {
+      throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.IncompatibleExisting"));
+    }
+    if (containsTranslationPromptLeak(data)) {
+      throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnsafeExisting"));
+    }
+    const edited = !flag.outputHash || await hasManualOutputEdits(data, flag.outputHash);
+    if (edited) activeTranslations.addIssue(runtime.runId, {
+      type: "protected", documentName: data.name,
+      detail: game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.ManualEditsProtected"),
+    });
+    return edited;
   }
 
   async #translateOne(
@@ -930,17 +919,16 @@ export class JournalTranslationService {
     );
     const existingFlag = existing ? readJournalTranslationFlag(existing.flags) : null;
     const existingData = existing?.toObject() as JournalData | undefined;
-    if (pageIds && existingFlag && existingFlag.sourceHash !== sourceHash) {
-      throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.StalePageRefresh"));
+    if (existing?.uuid && sourceDocument.uuid === runtime.rootUuid) {
+      activeTranslations.update(runtime.runId, { translatedDocumentUuid: existing.uuid });
     }
-    const manuallyEdited = existingData && existingFlag
-      ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
-      : false;
+    let guard = await captureTranslationWriteGuard(existing);
+    const manuallyEdited = await this.#checkExisting(existingData, existingFlag, sourceHash, TRANSLATION_ENGINE_REVISION, runtime);
     const reusable = existing && existingFlag && (pageIds
       ? pageIds.every((pageId) =>
           canReuseJournalPageTranslation(existingFlag, sourceHash, pageId, runtime.glossaryHash, runtime.providerHash))
       : canReuseJournalTranslation(existingFlag, sourceHash, runtime.glossaryHash, runtime.providerHash));
-    if (existing && existingFlag && reusable && !manuallyEdited) {
+    if (existing && existingFlag && reusable) {
       return {
         data: existing.toObject() as JournalData,
         translatedTextPages: existingFlag.translatedTextPages,
@@ -953,6 +941,12 @@ export class JournalTranslationService {
         dependencyWarnings: [],
       };
     }
+    if (manuallyEdited) throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.EditedPartial"));
+    const requestedPageIds = pageIds ?? source.pages.map(page => page._id).filter((id): id is string => Boolean(id));
+    const remainingPageIds = existingFlag
+      ? requestedPageIds.filter(id => !canReuseJournalPageTranslation(existingFlag, sourceHash, id, runtime.glossaryHash, runtime.providerHash))
+      : pageIds;
+    const resumedPages = remainingPageIds ? requestedPageIds.length - remainingPageIds.length : 0;
     const saveTranslatedData = async (
       data: JournalData,
       mergeInitialPartial: boolean,
@@ -962,13 +956,14 @@ export class JournalTranslationService {
         ? mergePartialJournalTranslation(existingData, data)
         : data;
       await stampJournalOutputHash(savedData);
-      const document = await runtime.translations.save(savedData);
+      const document = await runtime.translations.save(savedData, guard);
+      guard = await captureTranslationWriteGuard(document);
       if (sourceDocument.uuid === runtime.rootUuid && document.uuid) {
         activeTranslations.update(runtime.runId, {
           translatedDocumentUuid: document.uuid,
         });
       }
-      return { data: savedData, document };
+      return { data: document.toObject() as JournalData, document };
     };
 
     const translated = await translateJournalData({
@@ -984,7 +979,8 @@ export class JournalTranslationService {
       cache: runtime.cache,
       systemHtmlFieldPaths: systemHtmlFieldPaths(sourceDocument, source),
       systemTextFieldPaths: systemTextFieldPaths(sourceDocument, source),
-      ...(pageIds ? { pageIds } : {}),
+      ...(remainingPageIds ? { pageIds: remainingPageIds } : {}),
+      beforeBatch: () => checkpointControl(runtime.runId),
       onPageStart: (pageName) => activeTranslations.update(runtime.runId, {
         currentDocument: sourceDocument.name,
         currentUnit: pageName,
@@ -1006,10 +1002,12 @@ export class JournalTranslationService {
       },
       onProgress: (progress: JournalTranslationProgress) => onProgress({
         ...progress,
+        completedPages: progress.completedPages + resumedPages,
+        totalPages: requestedPageIds.length,
         documentName: sourceDocument.name,
       }),
     });
-    if (pageIds && existingData && existingFlag) {
+    if (existingData && existingFlag) {
       translated.data = mergePartialJournalTranslation(
         existingData,
         translated.data,
@@ -1017,6 +1015,10 @@ export class JournalTranslationService {
     }
     const saved = await saveTranslatedData(translated.data, false);
     translated.data = saved.data;
+    const savedFlag = readJournalTranslationFlag(saved.data.flags)!;
+    translated.translatedTextPages = savedFlag.translatedTextPages;
+    translated.skippedTextPages = savedFlag.skippedTextPages;
+    translated.fallbackTextSegments = savedFlag.fallbackTextSegments;
     return {
       ...translated,
       document: saved.document,
@@ -1040,10 +1042,9 @@ export class JournalTranslationService {
     );
     const existingFlag = existing ? readActorTranslationFlag(existing.flags) : null;
     const existingData = existing?.toObject() as ActorData | undefined;
-    const manuallyEdited = existingData && existingFlag
-      ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
-      : false;
-    if (existing && existingFlag && !manuallyEdited &&
+    const guard = await captureTranslationWriteGuard(existing);
+    await this.#checkExisting(existingData, existingFlag, sourceHash, ACTOR_TRANSLATION_ENGINE_REVISION, runtime);
+    if (existing && existingFlag &&
       canReuseActorTranslation(existingFlag, sourceHash, runtime.glossaryHash, runtime.providerHash)) {
       return {
         data: existing.toObject() as ActorData,
@@ -1066,6 +1067,7 @@ export class JournalTranslationService {
       systemHtmlFieldPaths: paths.system,
       itemHtmlFieldPaths: paths.items,
       cache: runtime.cache,
+      beforeBatch: () => checkpointControl(runtime.runId),
       onQualityFallback: (fallback) => {
         logger.warn("Actor translation quality fallback kept the original fragment.", fallback);
         activeTranslations.addIssue(runtime.runId, {
@@ -1091,8 +1093,8 @@ export class JournalTranslationService {
     });
     await assertActorSourceUnchanged(sourceDocument, sourceHash);
     await stampActorOutputHash(translated.data);
-    const document = await runtime.actorTranslations.save(translated.data);
-    return { ...translated, document, reused: false };
+    const document = await runtime.actorTranslations.save(translated.data, guard);
+    return { ...translated, data: document.toObject() as GraphData, document, reused: false };
   }
 
   async #translateItemOne(
@@ -1108,10 +1110,9 @@ export class JournalTranslationService {
     );
     const existingFlag = existing ? readItemTranslationFlag(existing.flags) : null;
     const existingData = existing?.toObject() as ItemData | undefined;
-    const manuallyEdited = existingData && existingFlag
-      ? await hasManualOutputEdits(existingData, existingFlag.outputHash)
-      : false;
-    if (existing && existingFlag && !manuallyEdited &&
+    const guard = await captureTranslationWriteGuard(existing);
+    await this.#checkExisting(existingData, existingFlag, sourceHash, ITEM_TRANSLATION_ENGINE_REVISION, runtime);
+    if (existing && existingFlag &&
       canReuseItemTranslation(existingFlag, sourceHash, runtime.glossaryHash, runtime.providerHash)) {
       return {
         data: existing.toObject() as ItemData,
@@ -1132,6 +1133,7 @@ export class JournalTranslationService {
       },
       systemHtmlFieldPaths: itemHtmlFieldPaths(sourceDocument, source),
       cache: runtime.cache,
+      beforeBatch: () => checkpointControl(runtime.runId),
       onQualityFallback: (fallback) => {
         logger.warn("Item translation quality fallback kept the original fragment.", fallback);
         activeTranslations.addIssue(runtime.runId, {
@@ -1157,7 +1159,7 @@ export class JournalTranslationService {
     });
     await assertItemSourceUnchanged(sourceDocument, sourceHash);
     await stampItemOutputHash(translated.data);
-    const document = await runtime.itemTranslations.save(translated.data);
-    return { ...translated, document, reused: false };
+    const document = await runtime.itemTranslations.save(translated.data, guard);
+    return { ...translated, data: document.toObject() as GraphData, document, reused: false };
   }
 }

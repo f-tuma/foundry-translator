@@ -1,3 +1,4 @@
+import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
 import { MODULE_VERSION } from "../constants";
 import {
   activeTranslations,
@@ -35,11 +36,14 @@ function formatTokenSpeed(run: ActiveTranslationRun): string {
 }
 
 function renderRun(run: ActiveTranslationRun, now: number): string {
-  const displayState = run.state === "done" && run.issues.length
+  const paused = run.pausedAt !== undefined;
+  const displayState = paused ? "paused" : run.state === "done" && run.issues.length
     ? "done-with-issues"
     : run.state;
   const stateKey = run.cancelRequested && run.finishedAt === undefined
     ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.Cancelling"
+    : paused ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.Paused"
+    : run.pauseRequested ? "FOUNDRY_TRANSLATE.ActiveTranslations.State.Pausing"
     : {
         glossary: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Glossary",
         scanning: "FOUNDRY_TRANSLATE.ActiveTranslations.State.Scanning",
@@ -129,6 +133,12 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         <span>${localize("FOUNDRY_TRANSLATE.ActiveTranslations.Cancel")}</span>
       </button>`
     : "";
+  const pause = run.finishedAt === undefined && !run.cancelRequested
+    ? `<button type="button" class="ft-button ft-button--secondary" data-run-${run.pauseRequested ? "resume" : "pause"}="${run.id}">
+        <i class="fa-solid fa-${run.pauseRequested ? "play" : "pause"}" aria-hidden="true"></i>
+        <span>${localize(`FOUNDRY_TRANSLATE.ActiveTranslations.${run.pauseRequested ? "Resume" : "Pause"}`)}</span>
+      </button>${renderHelpTooltip(localize("FOUNDRY_TRANSLATE.ActiveTranslations.PauseTip"), localize("FOUNDRY_TRANSLATE.ActiveTranslations.Pause"))}`
+    : "";
   const openTranslation = run.translatedDocumentUuid
     ? `<button type="button" class="ft-button ft-button--secondary ft-active-translations__open" data-run-open="${run.id}">
         <i class="fa-solid fa-book-open" aria-hidden="true"></i>
@@ -155,7 +165,7 @@ function renderRun(run: ActiveTranslationRun, now: number): string {
         ${providerMetrics}
         ${run.error ? `<span class="ft-active-translations__error">${escapeHtml(run.error)}</span>` : ""}
         ${current ? `<span class="ft-active-translations__current">${current}</span>` : ""}
-        <div class="ft-active-translations__actions">${openTranslation}${cancel}${copyLog}${remove}</div>
+        <div class="ft-active-translations__actions">${openTranslation}${pause}${cancel}${copyLog}${remove}</div>
       </div>
     </li>
   `;
@@ -215,6 +225,7 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
   }
 
   protected _onRender(): void {
+    activateHelpTooltips(this.element);
     this.#unsubscribe ??= activeTranslations.subscribe(() => void this.render());
     this.#ticker ??= setInterval(() => {
       if (activeTranslations.list().some(({ providerRequestActive }) => providerRequestActive)) {
@@ -229,6 +240,12 @@ export class ActiveTranslationsApplication extends foundry.applications.api.Appl
           ui.notifications.info(localize("FOUNDRY_TRANSLATE.ActiveTranslations.LogCopied"));
         });
       });
+    }
+    for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-pause]")) {
+      button.addEventListener("click", () => activeTranslations.requestPause(Number(button.dataset.runPause)));
+    }
+    for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-resume]")) {
+      button.addEventListener("click", () => activeTranslations.resume(Number(button.dataset.runResume)));
     }
     for (const button of this.element.querySelectorAll<HTMLButtonElement>("[data-run-cancel]")) {
       button.addEventListener("click", () => {

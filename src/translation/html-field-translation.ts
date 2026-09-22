@@ -35,6 +35,7 @@ export interface TranslateHtmlFieldsOptions {
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
+  beforeBatch?: () => Promise<void>;
   onProgress?: (
     target: HtmlFieldTranslationTarget,
     completedFields: number,
@@ -75,6 +76,7 @@ export async function translateHtmlFields(
   let fallbackTextSegments = 0;
   const batchSize = fieldBatchSize(options.settings.providerId);
   for (let start = 0; start < prepared.length; start += batchSize) {
+    await options.beforeBatch?.();
     const batch = prepared.slice(start, start + batchSize);
     const units = batch.flatMap(({ units }) => units);
     const translated = await translateUnits({

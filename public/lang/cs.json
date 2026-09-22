@@ -302,5 +302,17 @@
   "FOUNDRY_TRANSLATE.Glossary.Status.Cancelled": "Synchronizace zrušena; uložené názvy zůstávají.",
   "FOUNDRY_TRANSLATE.Glossary.Status.Progress": "Načítání názvů: {completed}/{total}",
   "FOUNDRY_TRANSLATE.Glossary.Files.Reviewed": "Ručně schváleno",
-  "FOUNDRY_TRANSLATE.Glossary.Files.NotReviewed": "Ručně neschváleno"
+  "FOUNDRY_TRANSLATE.Glossary.Files.NotReviewed": "Ručně neschváleno",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Pause": "Pozastavit",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.Resume": "Pokračovat",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Pausing": "Ukládání před pozastavením",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.State.Paused": "Pozastaveno",
+  "FOUNDRY_TRANSLATE.ActiveTranslations.PauseTip": "Pauza počká na dokončení a uložení probíhající dávky. Pokračovat zachová stejné nastavení. Po obnovení prohlížeče znovu spusťte stejný deník: hotové kompatibilní stránky a uložené části se použijí znovu. Změna originálu, glosáře nebo překladače automatické pokračování zastaví.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.OutputChanged": "Uložený překlad se během běhu změnil nebo byl odstraněn. Nic se nepřepsalo; hotové dávky zůstávají uložené. Před pokračováním zkontrolujte existující kopii.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.AlreadyRunning": "V tomto prohlížeči už běží nebo je pozastavený překlad. Nejdříve ho dokončete nebo zrušte v Průběhu překladů.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.IncompatibleExisting": "Originál, glosář, nastavení překladače nebo verze překladového postupu se liší od uložené kopie. Automatické přepsání je zastavené. Nejdříve kopii exportujte a zkontrolujte; odstraňte ji pouze tehdy, chcete-li nový překlad.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnsafeExisting": "Existující kopie obsahuje uniklé instrukce modelu. Zůstala zachovaná ke kontrole; automatické přepsání je zastavené.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.ManualEditsProtected": "Ruční úpravy nebo neověřitelná starší kopie zůstaly zachované. Obsah ani odkazy se nepřepsaly.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.EditedPartial": "Rozpracovaná kopie má ruční úpravy nebo nemá ověřitelný otisk. Automatické pokračování by je mohlo přepsat, proto se zastavilo. Nejdříve kopii exportujte a zkontrolujte.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.CheckingExisting": "Kontrola uložených překladů"
 }

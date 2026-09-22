@@ -12,7 +12,7 @@ export type ActiveTranslationState =
   | "cancelled";
 
 export interface TranslationRunIssue {
-  type: "fallback" | "unresolved" | "unsupported" | "failed";
+  type: "fallback" | "unresolved" | "unsupported" | "failed" | "protected";
   documentName?: string;
   documentType?: string;
   sourceUuid?: string;
@@ -46,6 +46,9 @@ export interface ActiveTranslationRun {
   droppedIssues?: number;
   /** Set by the UI; the service stops at the next safe point. */
   cancelRequested?: boolean;
+  pauseRequested?: boolean;
+  pausedAt?: number;
+  pausedDurationMs?: number;
   providerModel?: string;
   providerRequestCount?: number;
   providerRequestActive?: boolean;
@@ -74,6 +77,7 @@ export class ActiveTranslationRegistry {
   #listeners = new Set<() => void>();
   #nextId = 1;
   readonly #now: () => number;
+  #pauseWaiters = new Map<number, Set<() => void>>();
 
   constructor(now: () => number = () => Date.now()) {
     this.#now = now;
@@ -174,6 +178,7 @@ export class ActiveTranslationRegistry {
   finish(id: number, error?: string): void {
     const run = this.#runs.get(id);
     if (!run || run.finishedAt !== undefined) return;
+    this.resume(id);
     run.finishedAt = this.#now();
     run.state = error === undefined ? "done" : "error";
     if (error !== undefined) run.error = error;
@@ -184,7 +189,42 @@ export class ActiveTranslationRegistry {
     const run = this.#runs.get(id);
     if (!run || run.finishedAt !== undefined || run.cancelRequested) return;
     run.cancelRequested = true;
+    this.resume(id);
     this.#notify();
+  }
+
+  requestPause(id: number): void {
+    const run = this.#runs.get(id);
+    if (!run || run.finishedAt !== undefined || run.cancelRequested) return;
+    run.pauseRequested = true;
+    this.#notify();
+  }
+
+  resume(id: number): void {
+    const run = this.#runs.get(id);
+    if (!run || (!run.pauseRequested && run.pausedAt === undefined && !this.#pauseWaiters.has(id))) return;
+    if (run.pausedAt !== undefined) {
+      run.pausedDurationMs = (run.pausedDurationMs ?? 0) + this.#now() - run.pausedAt;
+    }
+    delete run.pausedAt;
+    delete run.pauseRequested;
+    const waiters = this.#pauseWaiters.get(id);
+    this.#pauseWaiters.delete(id);
+    for (const resolve of waiters ?? []) resolve();
+    this.#notify();
+  }
+
+  /** Call only after the current batch has been durably saved. */
+  async waitUntilResumed(id: number): Promise<void> {
+    const run = this.#runs.get(id);
+    if (!run?.pauseRequested || run.cancelRequested || run.finishedAt !== undefined) return;
+    run.pausedAt ??= this.#now();
+    await new Promise<void>((resolve) => {
+      const waiters = this.#pauseWaiters.get(id) ?? new Set();
+      waiters.add(resolve);
+      this.#pauseWaiters.set(id, waiters);
+      this.#notify();
+    });
   }
 
   removeFinished(id: number): boolean {
@@ -213,6 +253,7 @@ export class ActiveTranslationRegistry {
   finishCancelled(id: number): void {
     const run = this.#runs.get(id);
     if (!run || run.finishedAt !== undefined) return;
+    this.resume(id);
     run.finishedAt = this.#now();
     run.state = "cancelled";
     this.#notify();
@@ -238,6 +279,8 @@ function issueDescription(issue: TranslationRunIssue): string | null {
       return "The reference could not be resolved; it stays pointing at the source.";
     case "unsupported":
       return `Recursive translation of ${issue.documentType ?? "this"} documents is not supported yet; the reference stays at the source.`;
+    case "protected":
+      return issue.detail ?? "Manual edits were preserved.";
     case "failed":
       return issue.detail ??
         "The dependent document failed to translate; its references stay at the source.";
@@ -248,7 +291,7 @@ function issueDescription(issue: TranslationRunIssue): string | null {
 
 /** Builds a plain-text, copy-friendly debug log for a translation run. */
 export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): string {
-  const loggedState = run.state === "done" && run.issues.length
+  const loggedState = run.pausedAt !== undefined ? "paused" : run.pauseRequested ? "pausing" : run.state === "done" && run.issues.length
     ? "done-with-issues"
     : run.state;
   const lines: string[] = [
@@ -304,10 +347,10 @@ export function formatRunLog(run: ActiveTranslationRun, moduleVersion: string): 
 }
 
 export function estimateRemainingMs(run: ActiveTranslationRun, now: number): number | null {
-  if (!run.plan || run.completedUnits <= 0 || run.finishedAt !== undefined) return null;
+  if (!run.plan || run.completedUnits <= 0 || run.finishedAt !== undefined || run.pauseRequested) return null;
   const remainingUnits = run.plan.totalUnits - run.completedUnits;
   if (remainingUnits <= 0) return null;
-  return ((now - run.startedAt) / run.completedUnits) * remainingUnits;
+  return ((now - run.startedAt - (run.pausedDurationMs ?? 0)) / run.completedUnits) * remainingUnits;
 }
 
 export const activeTranslations = new ActiveTranslationRegistry();
