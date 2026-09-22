@@ -129,9 +129,11 @@ export function translateOutcomeLabels(root: HTMLElement, outcomes: unknown): vo
     const label = input.closest("label");
     if (!label) continue;
     const texts = [...label.childNodes].filter(node => node.nodeType === 3);
-    const text = texts[0] ?? root.ownerDocument.createTextNode("");
+    // Ember's template has leading indentation before the checkbox. Preserve
+    // the visible label's position after the control, not that whitespace slot.
+    const text = texts.find(node => node.textContent?.trim()) ?? root.ownerDocument.createTextNode("");
     text.textContent = ` ${matches[0].label}.`;
-    for (const extra of texts.slice(1)) extra.remove();
+    for (const extra of texts) if (extra !== text) extra.remove();
     if (!text.parentNode) label.append(text);
   }
 }

@@ -63,6 +63,8 @@ A missing embedded page is not silently replaced by a different page.
 
 ## Verification and boundaries
 
+397 automated tests pass; typecheck, build and release metadata checks pass.
+
 Automated tests cover round trips, languages, actors/items, duplicate/cyclic/stale
 mappings, source removal, model replacement, mechanics changes, original method
 pass-through, repeated setup, DOM labels and blocked stale controls.
@@ -75,6 +77,11 @@ Repeated initialize/reinitialize calls on the translation preserved the event
 identity, registry count, source pointer and existing outcomes. A copy of a real
 quest/event also retained the identical runtime object and did not change quest
 labels, pointers or game state when initialized repeatedly.
+
+After a private server restart, the copy rebound to the completed event and its
+selected outcome. Changing only the copy's uniqueness rule in memory removed
+the binding and disabled controls without changing the source state. The
+original-event button opened the correct source page.
 
 This does not make an imported translated Actor a live replacement for a world
 Actor, synchronize tokens/HP, or globally redirect macros. Native automatic

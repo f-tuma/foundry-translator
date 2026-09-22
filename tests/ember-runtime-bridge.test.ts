@@ -83,7 +83,7 @@ describe("Ember translated event identity", () => {
 it("localizes outcome labels idempotently without touching IDs, listeners or event state", async () => {
   const { parseHTML } = await import("linkedom");
   const { translateOutcomeLabels } = await import("../src/translation/ember-runtime-bridge");
-  const { document } = parseHTML('<html><body><label><input class="event-outcome-checkbox" value="choice" checked><span class="icon"></span> Accept.</label></body></html>');
+  const { document } = parseHTML('<html><body><label>  <input class="event-outcome-checkbox" value="choice" checked><span class="icon"></span> Accept.</label></body></html>');
   const input = document.querySelector("input")!;
   const handler = vi.fn(); input.addEventListener("change", handler);
   const outcomes = [{ id: "choice", label: "Přijmout <Dopis>" }];
@@ -93,6 +93,7 @@ it("localizes outcome labels idempotently without touching IDs, listeners or eve
   expect(document.querySelector("input")).toBe(input);
   expect(input.value).toBe("choice"); expect(input.hasAttribute("checked")).toBe(true);
   expect(document.querySelector("span.icon")).not.toBeNull();
+  expect(input.parentElement!.lastChild!.textContent).toBe(" Přijmout <Dopis>.");
   expect(document.body.textContent).toContain("Přijmout <Dopis>");
   expect(document.querySelector("Dopis")).toBeNull();
   input.dispatchEvent(new document.defaultView!.Event("change")); expect(handler).toHaveBeenCalledTimes(1);

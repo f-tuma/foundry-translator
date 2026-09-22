@@ -9,6 +9,7 @@ import {
 } from "./compendium-translation-repository";
 import { readJournalTranslationFlag, type JournalTranslationProgress } from "./journal";
 import { JournalTranslationService, TranslationCancelledError } from "./journal-service";
+import { openTranslationReference } from "./translated-link-navigation";
 
 interface JournalEntrySheetApplication {
   entry?: FoundryJournalDocument;
@@ -236,7 +237,6 @@ export async function addShowTranslationHeaderButton(
     return flag?.sourceUuid === journal.uuid && flag.targetLanguage === targetLanguage;
   });
   if (matches.length !== 1) return;
-  const entry = matches[0]!;
   if (!frame.header.isConnected || frame.header.querySelector(".ft-journal-show-translation")) {
     return;
   }
@@ -248,12 +248,14 @@ export async function addShowTranslationHeaderButton(
   button.title = label;
   button.setAttribute("aria-label", label);
   button.addEventListener("click", () => {
-    void pack.getDocument(entry._id).then((translated) => {
-      const identity = readJournalTranslationFlag(translated?.flags);
-      if (translated && identity?.sourceUuid === journal.uuid && identity.targetLanguage === targetLanguage) {
-        return showDocument(application, translated as FoundryJournalDocument);
-      }
-      return undefined;
+    const pageId = activePageId(application);
+    const uuid = `${journal.uuid}${pageId ? `.JournalEntryPage.${pageId}` : ""}`;
+    void openTranslationReference(uuid, { view: "translation" }).then(async opened => {
+      if (opened) await application.close?.();
+      else ui.notifications.warn(localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference"));
+    }).catch(error => {
+      logger.warn("Stored translation could not be opened.", { uuid, error });
+      ui.notifications.warn(localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference"));
     });
   });
   const translateButton = frame.header.querySelector(".ft-journal-translate-header");

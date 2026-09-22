@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-22
-- Latest verified GitHub release: `v0.21.0` (PR #25, squash `bc9e7e4`); 0.22.0 runtime-identity candidate is described below. Production installation is user-managed.
+- Current code/release metadata: `v0.22.0`; verify publication in GitHub Releases. Prior release `v0.21.0` was PR #25 (`bc9e7e4`). Production installation is user-managed.
 - Deployed version: `v0.19.1`; PRs #21 and #22 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -12,7 +12,7 @@ and the recommended implementation order.
 
 ## Current work log
 
-- 2026-09-22, Ember runtime identity (0.22.0 candidate): user requested
+- 2026-09-22, Ember runtime identity (0.22.0): user requested
   programmatic, idempotent bidirectional UUID mapping. Added a read-only public
   resolver and explicit original/translation opening API, duplicate/cycle/stale
   mapping rejection, and narrow idempotent content-link interception. Ember
@@ -34,7 +34,10 @@ and the recommended implementation order.
   72cIhjbtY6NVvS4n (real quest sample) exist only in foundry-local-qa.
   Native automatic event opening can still show the original; actors/tokens and
   combat automation are not globally remapped. No whole-campaign certification.
-  Production and the user's original local Foundry data are untouched.
+  Production and the user's original local Foundry data are untouched. Final
+  0.22.0 runtime confirmed after restart: completed synthetic state/outcome
+  persisted and rebound; a controlled in-memory rules mismatch disabled controls
+  without state change; original-event button opened the correct source page.
 
 
 - 2026-09-22, safe pause/resume released as 0.20.0 (PR #24): pause waits for a

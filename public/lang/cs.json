@@ -299,5 +299,6 @@
   "FOUNDRY_TRANSLATE.EmberBridge.Connected": "Propojeno s původní událostí",
   "FOUNDRY_TRANSLATE.EmberBridge.Unavailable": "Překlad nelze bezpečně propojit s původní událostí. Herní ovládání je zablokované; použijte originál.",
   "FOUNDRY_TRANSLATE.EmberBridge.OpenSource": "Otevřít původní událost",
-  "FOUNDRY_TRANSLATE.EmberBridge.Explanation": "Přeložený pohled používá původní událost a její živý herní stav. Pravidla události upravujte v originálu."
+  "FOUNDRY_TRANSLATE.EmberBridge.Explanation": "Přeložený pohled používá původní událost a její živý herní stav. Pravidla události upravujte v originálu.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference": "Překlad této stránky nelze jednoznačně dohledat. Původní dokument zůstal otevřený."
 }
