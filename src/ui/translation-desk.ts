@@ -29,7 +29,7 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
       </div>
       <footer class="ft-settings__actions"><button type="button" class="ft-button ft-button--secondary" data-desk-action="active">${t("Active")}</button><button type="button" class="ft-button ft-button--primary" data-desk-action="journal">${t("Journal")}</button></footer>`;
     root.querySelector("[data-desk-language]")!.textContent = settings.targetLanguage.toUpperCase();
-    root.querySelector("[data-desk-provider]")!.textContent = settings.provider === "chrome-local" ? "Chrome · " + t("Local") : settings.provider === "openai-compatible" ? "LM Studio · " + (settings.openAiModel || t("NotConfigured")) : "Google Cloud";
+    root.querySelector("[data-desk-provider]")!.textContent = "OpenAI API · " + (settings.openAiModel || t("NotConfigured"));
     activateHelpTooltips(root);
     return root;
   }

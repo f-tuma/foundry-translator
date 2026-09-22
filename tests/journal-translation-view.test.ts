@@ -22,7 +22,6 @@ describe("Journal translation view", () => {
       ],
       settings: {
         provider: "chrome-local",
-        apiKey: "",
         openAiBaseUrl: "http://localhost:1234/v1",
         openAiModel: "",
         openAiApiKey: "",
@@ -46,7 +45,6 @@ describe("Journal translation view", () => {
       journals: [],
       settings: {
         provider: "chrome-local",
-        apiKey: "",
         openAiBaseUrl: "http://localhost:1234/v1",
         openAiModel: "",
         openAiApiKey: "",

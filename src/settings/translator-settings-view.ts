@@ -1,14 +1,8 @@
 import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
-import type { ProviderId, TranslatorSettings } from "./settings";
+import type { TranslatorSettings } from "./settings";
 
 function localize(key: string): string {
   return game.i18n.localize(key);
-}
-
-export function updateProviderFields(form: HTMLFormElement, provider: ProviderId): void {
-  for (const element of form.querySelectorAll<HTMLElement>("[data-provider-only]")) {
-    element.hidden = element.dataset.providerOnly !== provider;
-  }
 }
 
 const help = (key: string, topic: string) => renderHelpTooltip(localize(key), localize(topic));
@@ -31,30 +25,13 @@ export function renderTranslatorSettingsForm(
 
     <div class="ft-settings__fields">
       <div class="ft-field">
-        <div class="ft-field__label"><label for="ft-provider">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Name")}</label>
-          <span data-provider-only="chrome-local">${help("FOUNDRY_TRANSLATE.Settings.Provider.ChromeHint", "FOUNDRY_TRANSLATE.Settings.Provider.Name")}</span>
-          <span data-provider-only="openai-compatible">${help("FOUNDRY_TRANSLATE.Settings.Provider.OpenAIHint", "FOUNDRY_TRANSLATE.Settings.Provider.Name")}</span>
+        <div class="ft-field__label"><span>${localize("FOUNDRY_TRANSLATE.Settings.Provider.Name")}</span>
+          ${help("FOUNDRY_TRANSLATE.Settings.Provider.OpenAIHint", "FOUNDRY_TRANSLATE.Settings.Provider.Name")}
         </div>
-        <select id="ft-provider" name="provider">
-          <option value="chrome-local">${localize("FOUNDRY_TRANSLATE.Settings.Provider.Chrome")}</option>
-          <option value="openai-compatible">${localize("FOUNDRY_TRANSLATE.Settings.Provider.OpenAI")}</option>
-          <option value="google-cloud-basic">Google Cloud Translation — Basic v2</option>
-        </select>
-        <p class="ft-field__hint" data-provider-only="google-cloud-basic">${localize("FOUNDRY_TRANSLATE.Settings.Provider.GoogleHint")}</p>
+        <strong>${localize("FOUNDRY_TRANSLATE.Settings.Provider.OpenAI")}</strong>
       </div>
 
-      <div class="ft-field" data-provider-only="google-cloud-basic">
-        <div class="ft-field__label"><label for="ft-api-key">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Name")}</label>${help("FOUNDRY_TRANSLATE.Settings.ApiKey.Hint", "FOUNDRY_TRANSLATE.Settings.ApiKey.Name")}</div>
-        <div class="ft-secret-input">
-          <input id="ft-api-key" name="apiKey" type="password" spellcheck="false" autocomplete="off">
-          <button type="button" data-action="toggle-key" aria-pressed="false" title="${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Show")}">
-            <i class="fa-solid fa-eye" aria-hidden="true"></i>
-            <span class="sr-only">${localize("FOUNDRY_TRANSLATE.Settings.ApiKey.Show")}</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="ft-settings__local-model" data-provider-only="openai-compatible">
+      <div class="ft-settings__local-model">
         <div class="ft-field">
           <div class="ft-field__label"><label for="ft-openai-base-url">${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrl")}</label>${help("FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrlHint", "FOUNDRY_TRANSLATE.Settings.OpenAI.BaseUrl")}</div>
           <input id="ft-openai-base-url" name="openAiBaseUrl" type="url" spellcheck="false" autocomplete="off" placeholder="http://localhost:1234">
@@ -109,17 +86,7 @@ export function renderTranslatorSettingsForm(
       </div>
     </div>
 
-    <div class="ft-help-row ft-settings__privacy-summary" data-provider-only="chrome-local">
-      <span>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}</span>
-      ${help("FOUNDRY_TRANSLATE.Settings.PrivacyChrome", "FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}
-    </div>
-
-    <div class="ft-help-row ft-settings__privacy-summary" data-provider-only="google-cloud-basic">
-      <span>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}</span>
-      ${help("FOUNDRY_TRANSLATE.Settings.PrivacyGoogle", "FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}
-    </div>
-
-    <div class="ft-help-row ft-settings__privacy-summary" data-provider-only="openai-compatible">
+    <div class="ft-help-row ft-settings__privacy-summary">
       <span>${localize("FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}</span>
       ${help("FOUNDRY_TRANSLATE.Settings.PrivacyOpenAI", "FOUNDRY_TRANSLATE.Settings.PrivacyLabel")}
     </div>
@@ -130,15 +97,7 @@ export function renderTranslatorSettingsForm(
     </div>
 
     <footer class="ft-settings__actions">
-      <a class="ft-settings__cloud-link" data-provider-only="chrome-local" href="https://developer.chrome.com/docs/ai/translator-api" target="_blank" rel="noreferrer">
-        ${localize("FOUNDRY_TRANSLATE.Settings.OpenChromeHelp")}
-        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </a>
-      <a class="ft-settings__cloud-link" data-provider-only="google-cloud-basic" href="https://console.cloud.google.com/apis/library/translate.googleapis.com" target="_blank" rel="noreferrer">
-        ${localize("FOUNDRY_TRANSLATE.Settings.OpenGoogleCloud")}
-        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </a>
-      <a class="ft-settings__cloud-link" data-provider-only="openai-compatible" href="https://lmstudio.ai/docs/developer/openai-compat" target="_blank" rel="noreferrer">
+      <a class="ft-settings__cloud-link" href="https://lmstudio.ai/docs/developer/openai-compat" target="_blank" rel="noreferrer">
         ${localize("FOUNDRY_TRANSLATE.Settings.OpenAI.Help")}
         <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
       </a>
@@ -155,8 +114,6 @@ export function renderTranslatorSettingsForm(
     </footer>
   `;
 
-  const provider = form.querySelector("[name='provider']");
-  const apiKey = form.querySelector("[name='apiKey']");
   const sourceLanguage = form.querySelector("[name='sourceLanguage']");
   const targetLanguage = form.querySelector("[name='targetLanguage']");
   const openAiBaseUrl = form.querySelector("[name='openAiBaseUrl']");
@@ -164,8 +121,6 @@ export function renderTranslatorSettingsForm(
   const openAiApiKey = form.querySelector("[name='openAiApiKey']");
   const worldContext = form.querySelector("[name='worldContext']");
 
-  if (provider instanceof HTMLSelectElement) provider.value = settings.provider;
-  if (apiKey instanceof HTMLInputElement) apiKey.value = settings.apiKey;
   if (sourceLanguage instanceof HTMLSelectElement) sourceLanguage.value = settings.sourceLanguage;
   if (targetLanguage instanceof HTMLSelectElement) targetLanguage.value = settings.targetLanguage;
   if (openAiBaseUrl instanceof HTMLInputElement) openAiBaseUrl.value = settings.openAiBaseUrl;
@@ -173,7 +128,6 @@ export function renderTranslatorSettingsForm(
   if (openAiApiKey instanceof HTMLInputElement) openAiApiKey.value = settings.openAiApiKey;
   if (worldContext instanceof HTMLTextAreaElement) worldContext.value = settings.worldContext;
 
-  updateProviderFields(form, settings.provider);
   activateHelpTooltips(form);
   return form;
 }

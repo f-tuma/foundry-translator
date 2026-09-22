@@ -1403,3 +1403,20 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
 5. If the user reports specific failed parts from their real `Gamemaster's
    Guide` run, ask for the copyable log from the Active translations window
    and address the reported fallbacks.
+
+
+## 2026-09-22 — OpenAI-only and passage context (0.21.0)
+
+- User requested removal of both browser/Chrome translation and Google Cloud
+  choices; runtime factory and settings now use only OpenAI-compatible API.
+  Legacy provider IDs remain accepted as imported translation provenance.
+- Bounded source neighbours/titles reach Journal/Markdown/Actor/Item translation,
+  cache keys and retries. APEX isolates passages while keeping sentence groups.
+- Reference A/B evaluation: 30 synthetic + 24 private Ember passages, with a
+  local review table and explicit known semantic errors. See
+  `docs/benchmarks/context-quality-2026-09-22.md`; do not describe this as a
+  certified semantic validator. Source fallback remains visible and safe.
+- Local Foundry settings, real synthetic Journal translation, unchanged source
+  and zero-request repeat tested. Changes/fixtures only in the private QA copy.
+- Continue to publish on GitHub; user updates production himself. Never restart
+  production for a release unless separately requested.

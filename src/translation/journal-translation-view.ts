@@ -27,13 +27,7 @@ export function renderJournalTranslationView(
 ): HTMLFormElement {
   const form = document.createElement("form");
   form.className = "ft-settings ft-journal-translation";
-  const providerName = localize(
-    data.settings.provider === "chrome-local"
-      ? "FOUNDRY_TRANSLATE.Settings.Provider.Chrome"
-      : data.settings.provider === "openai-compatible"
-        ? "FOUNDRY_TRANSLATE.JournalTranslation.OpenAIProvider"
-        : "FOUNDRY_TRANSLATE.JournalTranslation.GoogleProvider",
-  );
+  const providerName = localize("FOUNDRY_TRANSLATE.Settings.Provider.OpenAI");
   const sourceLanguage =
     data.settings.sourceLanguage === "auto"
       ? localize("FOUNDRY_TRANSLATE.Settings.SourceLanguage.Auto")

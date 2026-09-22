@@ -1,3 +1,5 @@
+import { normalizePassageContext } from "./passage-context";
+import type { PassageContext } from "../providers/types";
 import type { GlossaryEntry } from "../glossary/types";
 import type { TranslationProvider } from "../providers/types";
 import type { ProviderId } from "../settings/settings";
@@ -19,6 +21,7 @@ interface PreparedHtmlField {
   target: HtmlFieldTranslationTarget;
   targetIndex: number;
   units: readonly (readonly string[])[];
+  contexts: readonly (PassageContext | undefined)[];
   apply(translated: readonly (readonly string[])[]): string;
 }
 
@@ -32,6 +35,7 @@ export interface TranslateHtmlFieldsOptions {
     targetLanguage: string;
   };
   documentLabel: string;
+  documentTitle?: string;
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
@@ -68,6 +72,11 @@ export async function translateHtmlFields(
       target,
       targetIndex,
       units: plan.units,
+      contexts: plan.units.map((_unit, index) => normalizePassageContext({
+        ...plan.contexts[index],
+        ...(options.documentTitle ? { documentTitle: options.documentTitle } : {}),
+        ...(target.itemName ? { sectionTitle: target.itemName } : {}), field: target.path.join("."),
+      })),
       apply: plan.apply,
     });
   }
@@ -81,6 +90,7 @@ export async function translateHtmlFields(
     const units = batch.flatMap(({ units }) => units);
     const translated = await translateUnits({
       units,
+      contexts: batch.flatMap(field => field.contexts),
       glossary: options.glossary,
       provider: options.provider,
       settings: options.settings,

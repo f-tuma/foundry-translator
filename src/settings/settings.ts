@@ -2,7 +2,6 @@ import { MODULE_ID } from "../constants";
 
 export const SETTINGS = {
   PROVIDER: "provider",
-  GOOGLE_API_KEY: "googleApiKey",
   SOURCE_LANGUAGE: "sourceLanguage",
   TARGET_LANGUAGE: "targetLanguage",
   GLOSSARY_CANDIDATES: "glossaryCandidates",
@@ -17,7 +16,6 @@ export type ProviderId = "chrome-local" | "google-cloud-basic" | "openai-compati
 
 export interface TranslatorSettings {
   provider: ProviderId;
-  apiKey: string;
   openAiBaseUrl: string;
   openAiModel: string;
   openAiApiKey: string;
@@ -32,13 +30,10 @@ export function isProviderId(value: unknown): value is ProviderId {
 }
 
 export function getTranslatorSettings(): TranslatorSettings {
-  const storedProvider = String(
-    game.settings.get(MODULE_ID, SETTINGS.PROVIDER) ?? "chrome-local",
-  );
-
+  // Legacy provider IDs remain valid provenance for imported translations, but
+  // active translation always uses the user's OpenAI-compatible connection.
   return {
-    provider: isProviderId(storedProvider) ? storedProvider : "chrome-local",
-    apiKey: String(game.settings.get(MODULE_ID, SETTINGS.GOOGLE_API_KEY) ?? ""),
+    provider: "openai-compatible",
     openAiBaseUrl: String(
       game.settings.get(MODULE_ID, SETTINGS.OPENAI_BASE_URL) ?? "http://localhost:1234/v1",
     ),
@@ -55,8 +50,7 @@ export function getTranslatorSettings(): TranslatorSettings {
 }
 
 export async function saveTranslatorSettings(settings: TranslatorSettings): Promise<void> {
-  await game.settings.set(MODULE_ID, SETTINGS.PROVIDER, settings.provider);
-  await game.settings.set(MODULE_ID, SETTINGS.GOOGLE_API_KEY, settings.apiKey.trim());
+  await game.settings.set(MODULE_ID, SETTINGS.PROVIDER, "openai-compatible");
   await game.settings.set(MODULE_ID, SETTINGS.OPENAI_BASE_URL, settings.openAiBaseUrl.trim());
   await game.settings.set(MODULE_ID, SETTINGS.OPENAI_MODEL, settings.openAiModel.trim());
   await game.settings.set(MODULE_ID, SETTINGS.OPENAI_API_KEY, settings.openAiApiKey.trim());

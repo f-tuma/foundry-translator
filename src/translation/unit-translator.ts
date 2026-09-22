@@ -4,7 +4,8 @@ import {
   protectGlossaryTerms,
   restoreGlossaryTerms,
 } from "../glossary/protection";
-import type { GlossaryInflectionReference, TranslationProvider } from "../providers/types";
+import { normalizePassageContext } from "./passage-context";
+import type { PassageContext, GlossaryInflectionReference, TranslationProvider } from "../providers/types";
 import type { ProviderId } from "../settings/settings";
 import type { TranslationCache, TranslationCacheEntry } from "./cache";
 import { sha256 } from "./hash";
@@ -53,6 +54,7 @@ export interface TranslationUnitSettings {
 
 export interface TranslateUnitsOptions {
   units: readonly (readonly string[])[];
+  contexts?: readonly (PassageContext | undefined)[];
   glossary: readonly GlossaryEntry[];
   provider: TranslationProvider;
   settings: TranslationUnitSettings;
@@ -70,6 +72,7 @@ export interface TranslationQualityFallback {
 }
 
 interface PreparedUnit {
+  context?: PassageContext;
   indices: number[];
   key: string;
   inFlight: InFlightTranslation;
@@ -146,10 +149,12 @@ async function cacheKey(
   glossaryFingerprint: string,
   settings: TranslationUnitSettings,
   providerIdentity?: string,
+  context?: PassageContext,
 ): Promise<string> {
   return sha256(
     JSON.stringify({
-      schemaVersion: 9,
+      schemaVersion: 10,
+      ...(context ? { context } : {}),
       segments,
       glossaryFingerprint,
       ...(providerIdentity ? { providerIdentity } : {}),
@@ -314,6 +319,7 @@ async function retrySuspiciousSegments(
           format: "text",
           glossary,
           inflections: inflectionReferences([preparedSegment]),
+          ...(prepared.context ? { contexts: [prepared.context] } : {}),
         });
         candidate = typeof retry?.translatedText === "string" ? retry.translatedText : "";
         problem = translationProblem(preparedSegment, candidate, settings);
@@ -332,7 +338,7 @@ async function retrySuspiciousSegments(
     // keep all syntax/vocabulary checks and report the degraded mode explicitly.
     if (problem && problem.reason !== "provider" && preparedSegment.protection.tokens.some(token => token.endToken)) {
       const references = inflectionReferences([preparedSegment]);
-      const rejected = provider.rejectedGlossaryTokens?.(source, references) ?? [];
+      const rejected = provider.rejectedGlossaryTokens?.(source, references, prepared.context) ?? [];
       const recoverySets = [new Set(rejected.length ? rejected : references.map(reference => reference.token))];
       if (rejected.length && rejected.length < references.length) recoverySets.push(new Set(references.map(reference => reference.token)));
       for (const exactTokens of recoverySets) {
@@ -345,7 +351,8 @@ async function retrySuspiciousSegments(
         attempt += 1;
         try {
           const [retry] = await provider.translate({ texts: [fixed.protection.text], sourceLanguage: settings.sourceLanguage,
-            targetLanguage: settings.targetLanguage, format: "text", glossary, inflections: inflectionReferences([fixed]) });
+            targetLanguage: settings.targetLanguage, format: "text", glossary, inflections: inflectionReferences([fixed]),
+            ...(prepared.context ? { contexts: [prepared.context] } : {}) });
           const exact = retry?.translatedText ?? "";
           if (!translationProblem(fixed, exact, settings)) {
             candidate = preparedSegment.protection.tokens.reduce((text, token) => token.endToken && exactTokens.has(token.token)
@@ -447,6 +454,7 @@ async function translateSegmentsSeparately(
     format: "text",
     glossary,
     inflections: inflectionReferences(prepared.segments),
+    ...(prepared.context ? { contexts: translatable.map(() => prepared.context) } : {}),
   });
   if (results.length !== translatable.length) {
     throw new Error("Překladač vrátil jiný počet HTML segmentů, než kolik dostal.");
@@ -525,7 +533,7 @@ function requestBatches(
       ? MAX_OPENAI_UNITS_PER_REQUEST
       : MAX_UNITS_PER_REQUEST;
   for (const prepared of misses) {
-    const size = prepared.protectedText.length;
+    const size = prepared.protectedText.length + (prepared.context ? JSON.stringify(prepared.context).length : 0);
     if (
       batch.length &&
       (batch.length >= maxUnits || characters + size > MAX_REQUEST_CHARACTERS)
@@ -549,6 +557,9 @@ export async function glossaryFingerprint(entries: readonly GlossaryEntry[]): Pr
 export async function translateUnits(
   options: TranslateUnitsOptions,
 ): Promise<readonly (readonly string[])[]> {
+  if (options.contexts && options.contexts.length !== options.units.length) {
+    throw new Error("Passage context count does not match translation units.");
+  }
   if (!options.units.length) return [];
 
   const glossaryFingerprint = await sha256(glossarySnapshot(options.glossary));
@@ -556,6 +567,8 @@ export async function translateUnits(
   const misses: PreparedUnit[] = [];
   const missesByKey = new Map<string, PreparedUnit>();
   const waiting: Array<{ index: number; promise: Promise<readonly string[]> }> = [];
+  const contexts = options.units.map((_unit, index) => options.provider.supportsPassageContext
+    ? normalizePassageContext(options.contexts?.[index]) : undefined);
   const keyedUnits = await Promise.all(options.units.map(async (segments, index) => ({
     index,
     segments,
@@ -564,6 +577,7 @@ export async function translateUnits(
       glossaryFingerprint,
       options.settings,
       options.provider.cacheIdentity,
+      contexts[index],
     ),
   })));
   let cachedValues = new Map<string, readonly string[]>();
@@ -616,6 +630,7 @@ export async function translateUnits(
     const inFlight = createInFlightTranslation();
     const prepared: PreparedUnit = {
       indices: [index],
+      ...(contexts[index] ? { context: contexts[index] } : {}),
       key,
       inFlight,
       boundaryTokens,
@@ -638,6 +653,7 @@ export async function translateUnits(
         format: "text",
         glossary: options.glossary,
         inflections: inflectionReferences(batch.flatMap(({ segments }) => segments)),
+        ...(batch.some(unit => unit.context) ? { contexts: batch.map(unit => unit.context) } : {}),
       });
 
       if (results.length !== batch.length) {

@@ -1,22 +1,12 @@
 import { logger } from "../logger";
-import {
-  ChromeLocalProvider,
-  type ChromeLocalProviderStatus,
-} from "../providers/chrome-local";
-import { GoogleCloudBasicProvider } from "../providers/google-cloud-basic";
 import { OpenAiCompatibleProvider } from "../providers/openai-compatible";
-import type { TranslationProvider } from "../providers/types";
+import { createTranslationProvider } from "../providers/factory";
 import {
   getTranslatorSettings,
-  isProviderId,
   saveTranslatorSettings,
-  type ProviderId,
   type TranslatorSettings,
 } from "./settings";
-import {
-  renderTranslatorSettingsForm,
-  updateProviderFields,
-} from "./translator-settings-view";
+import { renderTranslatorSettingsForm } from "./translator-settings-view";
 import { collectWorldContextSource } from "./world-context";
 
 type ConnectionState = "idle" | "testing" | "success" | "error";
@@ -53,18 +43,11 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
       .querySelector<HTMLElement>("[data-action='test-connection']")
       ?.addEventListener("click", () => void this.#testConnection(form));
     form
-      .querySelector<HTMLElement>("[data-action='toggle-key']")
-      ?.addEventListener("click", (event) => this.#toggleKey(event, form));
-    form
       .querySelector<HTMLElement>("[data-action='toggle-openai-key']")
       ?.addEventListener("click", (event) => this.#toggleKey(event, form));
     form
       .querySelector<HTMLElement>("[data-action='generate-world-context']")
       ?.addEventListener("click", () => void this.#generateWorldContext(form));
-    const providerSelect = form.elements.namedItem("provider");
-    if (providerSelect instanceof HTMLSelectElement) {
-      providerSelect.addEventListener("change", () => this.#providerChanged(form));
-    }
   }
 
   async #save(event: SubmitEvent, form: HTMLFormElement): Promise<void> {
@@ -94,26 +77,16 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     this.#setStatus(
       form,
       "testing",
-      settings.provider === "chrome-local"
-        ? "FOUNDRY_TRANSLATE.Settings.Status.TestingChrome"
-        : settings.provider === "openai-compatible"
-          ? "FOUNDRY_TRANSLATE.Settings.Status.TestingOpenAI"
-          : "FOUNDRY_TRANSLATE.Settings.Status.TestingGoogle",
+      "FOUNDRY_TRANSLATE.Settings.Status.TestingOpenAI",
     );
 
     try {
-      const provider = this.#createProvider(settings, (status) => {
-        this.#setChromeStatus(form, status);
-      });
+      const provider = createTranslationProvider(settings);
       await provider.testConnection(settings.targetLanguage);
       this.#setStatus(
         form,
         "success",
-        settings.provider === "chrome-local"
-          ? "FOUNDRY_TRANSLATE.Settings.Status.ConnectedChrome"
-          : settings.provider === "openai-compatible"
-            ? "FOUNDRY_TRANSLATE.Settings.Status.ConnectedOpenAI"
-            : "FOUNDRY_TRANSLATE.Settings.Status.ConnectedGoogle",
+        "FOUNDRY_TRANSLATE.Settings.Status.ConnectedOpenAI",
       );
     } catch (error) {
       logger.error("Translation provider test failed.", error);
@@ -157,75 +130,11 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     }
   }
 
-  #createProvider(
-    settings: TranslatorSettings,
-    onStatus: (status: ChromeLocalProviderStatus) => void,
-  ): TranslationProvider {
-    if (settings.provider === "chrome-local") {
-      return new ChromeLocalProvider({ onStatus });
-    }
-
-    if (settings.provider === "openai-compatible") {
-      return new OpenAiCompatibleProvider({
-        baseUrl: settings.openAiBaseUrl,
-        model: settings.openAiModel,
-        apiKey: settings.openAiApiKey,
-        worldContext: settings.worldContext,
-      });
-    }
-
-    return new GoogleCloudBasicProvider(settings.apiKey);
-  }
-
-  #setChromeStatus(form: HTMLFormElement, status: ChromeLocalProviderStatus): void {
-    if (status.component !== "translator") return;
-
-    if (status.phase === "download") {
-      const template = game.i18n.localize(
-        "FOUNDRY_TRANSLATE.Settings.Status.DownloadingChrome",
-      );
-      this.#setStatus(
-        form,
-        "testing",
-        template.replace("{progress}", String(Math.round(status.progress * 100))),
-        false,
-      );
-      return;
-    }
-
-    if (status.phase === "ready") {
-      this.#setStatus(
-        form,
-        "testing",
-        "FOUNDRY_TRANSLATE.Settings.Status.ChromeModelReady",
-      );
-      return;
-    }
-
-    const statusKey = {
-      available: "FOUNDRY_TRANSLATE.Settings.Status.ChromeModelAvailable",
-      downloadable: "FOUNDRY_TRANSLATE.Settings.Status.ChromeDownloadStarting",
-      downloading: "FOUNDRY_TRANSLATE.Settings.Status.ChromeDownloading",
-      unavailable: "FOUNDRY_TRANSLATE.Settings.Status.ChromeUnavailable",
-    }[status.availability];
-    this.#setStatus(
-      form,
-      status.availability === "unavailable" ? "error" : "testing",
-      statusKey,
-    );
-  }
-
-  #providerChanged(form: HTMLFormElement): void {
-    const provider = this.#readProvider(form);
-    updateProviderFields(form, provider);
-    this.#setStatus(form, "idle", "FOUNDRY_TRANSLATE.Settings.Status.NotTested");
-  }
-
   #toggleKey(event: Event, form: HTMLFormElement): void {
     const button = event.currentTarget;
     const inputName = button instanceof HTMLElement
-      ? button.dataset.secretTarget ?? "apiKey"
-      : "apiKey";
+      ? button.dataset.secretTarget ?? "openAiApiKey"
+      : "openAiApiKey";
     const input = form.elements.namedItem(inputName);
     if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLInputElement)) return;
 
@@ -243,17 +152,10 @@ export class TranslatorSettingsApplication extends foundry.applications.api.Appl
     if (accessibleLabel) accessibleLabel.textContent = button.title;
   }
 
-  #readProvider(form: HTMLFormElement): ProviderId {
-    const data = new FormData(form);
-    const provider = String(data.get("provider") ?? "chrome-local");
-    return isProviderId(provider) ? provider : "chrome-local";
-  }
-
   #readForm(form: HTMLFormElement): TranslatorSettings {
     const data = new FormData(form);
     return {
-      provider: this.#readProvider(form),
-      apiKey: String(data.get("apiKey") ?? "").trim(),
+      provider: "openai-compatible",
       openAiBaseUrl: String(data.get("openAiBaseUrl") ?? "").trim(),
       openAiModel: String(data.get("openAiModel") ?? "").trim(),
       openAiApiKey: String(data.get("openAiApiKey") ?? "").trim(),

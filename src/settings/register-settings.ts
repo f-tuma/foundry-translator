@@ -22,16 +22,7 @@ export function registerSettings(): void {
     scope: "world",
     config: false,
     type: String,
-    default: "chrome-local",
-  });
-
-  game.settings.register(MODULE_ID, SETTINGS.GOOGLE_API_KEY, {
-    name: "FOUNDRY_TRANSLATE.Settings.ApiKey.Name",
-    hint: "FOUNDRY_TRANSLATE.Settings.ApiKey.Hint",
-    scope: "client",
-    config: false,
-    type: String,
-    default: "",
+    default: "openai-compatible",
   });
 
   game.settings.register(MODULE_ID, SETTINGS.OPENAI_BASE_URL, {
