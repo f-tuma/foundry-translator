@@ -9,6 +9,7 @@ import {
 } from "./compendium-translation-repository";
 import { readJournalTranslationFlag, type JournalTranslationProgress } from "./journal";
 import { JournalTranslationService, TranslationCancelledError } from "./journal-service";
+import { openTranslationReference } from "./translated-link-navigation";
 
 interface JournalEntrySheetApplication {
   entry?: FoundryJournalDocument;
@@ -231,11 +232,11 @@ export async function addShowTranslationHeaderButton(
   if (!pack) return;
   const targetLanguage = getTranslatorSettings().targetLanguage;
   const index = await pack.getIndex({ fields: [TRANSLATION_FLAG_PATH] });
-  const entry = [...index.values()].find((candidate) => {
+  const matches = [...index.values()].filter((candidate) => {
     const flag = readJournalTranslationFlag(candidate.flags);
     return flag?.sourceUuid === journal.uuid && flag.targetLanguage === targetLanguage;
   });
-  if (!entry) return;
+  if (matches.length !== 1) return;
   if (!frame.header.isConnected || frame.header.querySelector(".ft-journal-show-translation")) {
     return;
   }
@@ -247,9 +248,14 @@ export async function addShowTranslationHeaderButton(
   button.title = label;
   button.setAttribute("aria-label", label);
   button.addEventListener("click", () => {
-    void pack.getDocument(entry._id).then((translated) => {
-      if (translated) return showDocument(application, translated as FoundryJournalDocument);
-      return undefined;
+    const pageId = activePageId(application);
+    const uuid = `${journal.uuid}${pageId ? `.JournalEntryPage.${pageId}` : ""}`;
+    void openTranslationReference(uuid, { view: "translation" }).then(async opened => {
+      if (opened) await application.close?.();
+      else ui.notifications.warn(localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference"));
+    }).catch(error => {
+      logger.warn("Stored translation could not be opened.", { uuid, error });
+      ui.notifications.warn(localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference"));
     });
   });
   const translateButton = frame.header.querySelector(".ft-journal-translate-header");

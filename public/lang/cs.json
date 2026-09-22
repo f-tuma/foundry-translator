@@ -295,5 +295,10 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnsafeExisting": "Existující kopie obsahuje uniklé instrukce modelu. Zůstala zachovaná ke kontrole; automatické přepsání je zastavené.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.ManualEditsProtected": "Ruční úpravy nebo neověřitelná starší kopie zůstaly zachované. Obsah ani odkazy se nepřepsaly.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.EditedPartial": "Rozpracovaná kopie má ruční úpravy nebo nemá ověřitelný otisk. Automatické pokračování by je mohlo přepsat, proto se zastavilo. Nejdříve kopii exportujte a zkontrolujte.",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Status.CheckingExisting": "Kontrola uložených překladů"
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.CheckingExisting": "Kontrola uložených překladů",
+  "FOUNDRY_TRANSLATE.EmberBridge.Connected": "Propojeno s původní událostí",
+  "FOUNDRY_TRANSLATE.EmberBridge.Unavailable": "Překlad nelze bezpečně propojit s původní událostí. Herní ovládání je zablokované; použijte originál.",
+  "FOUNDRY_TRANSLATE.EmberBridge.OpenSource": "Otevřít původní událost",
+  "FOUNDRY_TRANSLATE.EmberBridge.Explanation": "Přeložený pohled používá původní událost a její živý herní stav. Pravidla události upravujte v originálu.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference": "Překlad této stránky nelze jednoznačně dohledat. Původní dokument zůstal otevřený."
 }

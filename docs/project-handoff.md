@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-22
-- Latest GitHub release: `v0.20.0` (PR #24, squash `7529d03`); production installation is now user-managed.
+- Current code/release metadata: `v0.22.0`; verify publication in GitHub Releases. Prior release `v0.21.0` was PR #25 (`bc9e7e4`). Production installation is user-managed.
 - Deployed version: `v0.19.1`; PRs #21 and #22 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,34 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-22, Ember runtime identity (0.22.0): user requested
+  programmatic, idempotent bidirectional UUID mapping. Added a read-only public
+  resolver and explicit original/translation opening API, duplicate/cycle/stale
+  mapping rejection, and narrow idempotent content-link interception. Ember
+  translated event pages bind to the source's identical live event via a getter;
+  no event/state clone or global UUID resolver replacement. Copy initializers
+  cannot re-register events/quests or delete custom outcomes. Missing source,
+  registry mismatch or changed mechanics block page controls and offer the source.
+  Outcome labels are DOM-only. Full design/boundaries: docs/ember-runtime-identity.md.
+
+  397 tests pass, four model integration suites skipped (translation prompts did
+  not change), typecheck/build/release metadata pass. In the private localhost
+  Foundry 14.368 / Crucible 0.11.0 / Ember 0.6.2 QA copy, synthetic event
+  qaFtRuntimeIdentity progressed through native begin, outcome confirmation and
+  complete to step 3. Source document unchanged; registry object, pointer and
+  selected outcome preserved. Three repeated renders/initializers did not change
+  registry count or state. A separate copy of a real quest verified the same
+  identity and no quest label/pointer changes. Private synthetic source Journal
+  7wcMOAlw3dK4WPrO and compendium copies 7Le34bXIQIUyJuwg (synthetic) and
+  72cIhjbtY6NVvS4n (real quest sample) exist only in foundry-local-qa.
+  Native automatic event opening can still show the original; actors/tokens and
+  combat automation are not globally remapped. No whole-campaign certification.
+  Production and the user's original local Foundry data are untouched. Final
+  0.22.0 runtime confirmed after restart: completed synthetic state/outcome
+  persisted and rebound; a controlled in-memory rules mismatch disabled controls
+  without state change; original-event button opened the correct source page.
+
 
 - 2026-09-22, safe pause/resume released as 0.20.0 (PR #24): pause waits for a
   committed page/field batch; continue keeps the same run/settings. Cancellation

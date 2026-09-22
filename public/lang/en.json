@@ -295,5 +295,10 @@
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnsafeExisting": "The existing copy contains leaked model instructions. It was preserved for review; automatic replacement is blocked.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.ManualEditsProtected": "Manual edits or an unverifiable legacy copy were preserved. Its content and links were not rewritten.",
   "FOUNDRY_TRANSLATE.JournalTranslation.Status.EditedPartial": "The unfinished copy has manual edits or no verifiable fingerprint. Automatic continuation would risk overwriting them, so it was stopped. Export and review the copy first.",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Status.CheckingExisting": "Checking saved translations"
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.CheckingExisting": "Checking saved translations",
+  "FOUNDRY_TRANSLATE.EmberBridge.Connected": "Connected to original event",
+  "FOUNDRY_TRANSLATE.EmberBridge.Unavailable": "This translation cannot be safely linked to the original event. Game controls are blocked; use the original.",
+  "FOUNDRY_TRANSLATE.EmberBridge.OpenSource": "Open original event",
+  "FOUNDRY_TRANSLATE.EmberBridge.Explanation": "This translated view uses the original event and its live game state. Edit event rules in the original.",
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference": "A unique translation of this page could not be resolved. The original document remains open."
 }

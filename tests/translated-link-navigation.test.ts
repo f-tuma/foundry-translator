@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { parseHTML } from "linkedom";
 
 import {
   isTranslatableDocumentReference,
   openTranslatedReference,
+  openTranslationReference,
+  linkedDocumentUuid,
+  registerTranslatedLinkNavigation,
   translatedEmbeddedUuid,
 } from "../src/translation/translated-link-navigation";
 
@@ -73,7 +77,7 @@ describe("translated link navigation", () => {
     const translatedRootUuid =
       "Compendium.world.foundry-translate-translations.JournalEntry.csGuide";
     const render = vi.fn();
-    const translatedRoot = { id: "csGuide", uuid: translatedRootUuid, sheet: { render } };
+    const translatedRoot = { id: "csGuide", uuid: translatedRootUuid, flags: journalFlag(), sheet: { render } };
     const translatedPage = {
       id: "intro",
       uuid: `${translatedRootUuid}.JournalEntryPage.intro`,
@@ -92,15 +96,17 @@ describe("translated link navigation", () => {
       packs: new Map([["world.foundry-translate-translations", pack]]),
     });
     vi.stubGlobal("fromUuid", vi.fn(async (uuid: string) =>
-      uuid === translatedPage.uuid ? translatedPage : null));
+      uuid === translatedPage.uuid ? translatedPage : uuid === "JournalEntry.guide" ? { id: "guide", uuid } : uuid === "JournalEntry.guide.JournalEntryPage.intro" ? { id: "intro", uuid } : null));
 
     await expect(openTranslatedReference(
       "JournalEntry.guide.JournalEntryPage.intro",
     )).resolves.toBe(true);
-    expect(render).toHaveBeenCalledWith(true, undefined);
+    expect(render).toHaveBeenCalledWith({ force: true, pageId: "intro" });
+    await Promise.all([openTranslationReference("JournalEntry.guide.JournalEntryPage.intro", {view: "translation"}), openTranslationReference("JournalEntry.guide.JournalEntryPage.intro", {view: "translation"})]);
+    expect(render).toHaveBeenCalledTimes(2);
   });
 
-  it("opens the translated Journal root when an old embedded page ID no longer exists", async () => {
+  it("does not silently open a different page when an embedded page no longer exists", async () => {
     const render = vi.fn();
     const translatedRoot = {
       id: "csGuide",
@@ -121,7 +127,17 @@ describe("translated link navigation", () => {
 
     await expect(openTranslatedReference(
       "JournalEntry.guide.JournalEntryPage.removed",
-    )).resolves.toBe(true);
-    expect(render).toHaveBeenCalledWith(true, { pageId: "removed" });
+    )).resolves.toBe(false);
+    expect(render).not.toHaveBeenCalled();
   });
+});
+
+it("installs link navigation once and leaves gameplay controls alone", () => {
+  const { document, HTMLElement, Element } = parseHTML('<html><body><a class="content-link" data-uuid="Actor.hero"><span>Hero</span></a><button data-action="attack" data-uuid="Actor.hero">Attack</button><div data-uuid="Actor.hero">Card</div><a class="content-link" data-action="custom" data-uuid="Actor.hero">Action</a></body></html>');
+  vi.stubGlobal("document", document); vi.stubGlobal("Element", Element); vi.stubGlobal("HTMLElement", HTMLElement);
+  const add = vi.spyOn(document, "addEventListener");
+  registerTranslatedLinkNavigation(); registerTranslatedLinkNavigation();
+  expect(add).toHaveBeenCalledTimes(1);
+  expect(linkedDocumentUuid({ target: document.querySelector("span") } as unknown as MouseEvent)).toBe("Actor.hero");
+  for (const node of document.querySelectorAll("button,div,a[data-action]")) expect(linkedDocumentUuid({ target: node } as unknown as MouseEvent)).toBeNull();
 });
