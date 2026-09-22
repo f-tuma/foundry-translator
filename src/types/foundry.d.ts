@@ -198,7 +198,7 @@ declare const foundry: {
         create(data: Record<string, unknown>): Promise<FoundryJournalWorldDocument | undefined>;
         createDocuments(
           data: FoundryJournalEntryData[],
-          operation: { pack: string },
+          operation: { pack: string; keepId?: boolean },
         ): Promise<FoundryJournalDocument[]>;
         updateDocuments(
           data: FoundryJournalEntryData[],

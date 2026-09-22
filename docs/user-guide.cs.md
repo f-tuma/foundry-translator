@@ -189,3 +189,37 @@ zablokuje ovládání a nabídne originál. Pravidla upravujte v originálu. Př
 zůstávají samostatnými dokumenty; přeložená postava nenahrazuje živou postavu
 na scéně a nesynchronizuje její životy. Některá automaticky otevřená okna a
 texty generované přímo Emberem mohou stále zobrazit originál.
+
+
+## Scény a aktivní efekty (0.23.0)
+
+V nastavení scény nebo efektu klikněte na **Přeložit text**. Překlad celého deníku
+zahrne také odkazované scény a efekty; u navázaných postav a předmětů najde i
+vložené efekty. Překlad jediné stránky nadále zpracovává jen zvolenou stránku.
+
+Překládá se název scény, navigační název, text kreseb a poznámek na mapě, názvy
+úrovní a oblastí. U efektů se překládá název a popis. Původní UUID, mapa,
+pozice, bonusy, stavy, trvání a spouštěné skripty zůstávají beze změny.
+
+Texty se ukládají do **Foundry Translate — Scene & Effect Text**. Každý dokument
+má samostatné stránky pro jednotlivá pole; zde lze opravovat překlad. U krátkých
+názvů ponechte jediný obyčejný odstavec. Do popisu nevkládejte nové příkazy ani
+neměňte cíle odkazů; kontrola takové úpravy odmítne zobrazit.
+
+Čeština se zobrazí v navigaci, na mapě, v seznamu objektů, na běžných odkazech
+na dokumenty a v kartách efektů Crucible. Ve formulářích zůstává původní hodnota,
+nad nimi je český náhled pouze pro čtení. U efektu v přeložené kopii postavy či
+předmětu se překlad dohledá přes uložené UUID originálu a shodné ID efektu.
+Nově vytvořený efekt s jiným UUID vyžaduje vlastní překlad; názvy se nepárují odhadem.
+Speciální okna jiných modulů a texty uvnitř obrázků tento postup nepokrývá.
+
+Kompendium je ve výchozím stavu dostupné jen GM, protože obsahuje i skryté
+názvy a poznámky. Hráči uvidí překlady jen při odpovídajícím přístupu ke kompendiu;
+nepovolujte jim celý obsah, pokud obsahuje tajné informace.
+
+Změní-li se zdrojový text, jeho zastaralý překlad se přestane používat. Opakované
+spuštění zachová kompatibilní ruční opravy; změna zdroje, glosáře nebo modelu
+blokuje přepsání existujícího záznamu. Pokud chcete takový záznam nahradit,
+nejprve si uchovejte potřebné opravy a odstraňte jen příslušný překlad, nikoli scénu.
+Záznamy jsou součástí JSON balíčku; formát 3 vyžaduje modul 0.23.0 nebo novější.
+Import nevyžaduje AI a nemění herní dokumenty. Makra, hudba a tabulky se nepřekládají.

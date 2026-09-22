@@ -300,5 +300,10 @@
   "FOUNDRY_TRANSLATE.EmberBridge.Unavailable": "This translation cannot be safely linked to the original event. Game controls are blocked; use the original.",
   "FOUNDRY_TRANSLATE.EmberBridge.OpenSource": "Open original event",
   "FOUNDRY_TRANSLATE.EmberBridge.Explanation": "This translated view uses the original event and its live game state. Edit event rules in the original.",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference": "A unique translation of this page could not be resolved. The original document remains open."
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference": "A unique translation of this page could not be resolved. The original document remains open.",
+  "FOUNDRY_TRANSLATE.DisplayText.Translate": "Translate text",
+  "FOUNDRY_TRANSLATE.DisplayText.Help": "Displays translated names and descriptions over the original document. UUIDs, form values and game rules remain unchanged. Review translations in the Scene & Effect Text compendium.",
+  "FOUNDRY_TRANSLATE.DisplayText.Done": "Translated text is ready.",
+  "FOUNDRY_TRANSLATE.DisplayText.Review": "Translation saved; passages left in the original need review.",
+  "FOUNDRY_TRANSLATE.DisplayText.Progress": "{document} — {page} ({current}/{total})"
 }

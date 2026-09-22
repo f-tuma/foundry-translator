@@ -2,6 +2,7 @@ import { parseHTML } from "linkedom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODULE_ID } from "../src/constants";
 import { JournalTranslationService } from "../src/translation/journal-service";
+import { exportTranslationBundle, importTranslationBundle, planBundleImport } from "../src/bundles/service";
 import { activeTranslations } from "../src/translation/active-translations";
 import { readJournalTranslationFlag, type JournalData } from "../src/translation/journal";
 
@@ -18,6 +19,7 @@ vi.mock("../src/settings/settings", async (original) => ({
 }));
 vi.mock("../src/glossary/compendium-repository", () => ({ GlossaryCompendiumRepository: class {
   async prepareForTranslation() { return structuredClone(mock.glossary); }
+  async loadExisting() { return structuredClone(mock.glossary); }
 } }));
 
 type Stored = Record<string, any>;
@@ -86,7 +88,7 @@ beforeEach(() => {
     collections: { CompendiumCollection: { async createCompendium({ name }: { name: string }) { return makePack(name); } } },
   } });
   vi.stubGlobal("game", {
-    user: { isGM: true }, packs, folders: { contents: [{ id: "folder", name: "Foundry Translate", type: "Compendium" }] },
+    user: { isGM: true }, system: { id: "crucible", version: "0.11.0" }, packs, folders: { contents: [{ id: "folder", name: "Foundry Translate", type: "Compendium" }] },
     i18n: { localize: (key: string) => key },
   });
   vi.stubGlobal("ui", { notifications: { warn: vi.fn(), info: vi.fn() } });
@@ -301,4 +303,122 @@ describe("failures and dependent documents", () => {
     expect(rootCopy()!.name).toBe("Jiný překlad");
     expect(contentWrites()).toHaveLength(0);
   });
+});
+
+describe("scene and effect display translation", () => {
+  function displaySource(kind: "Scene" | "ActiveEffect") {
+    const data: Stored = { _id: `source${kind}`, name: "English Name", flags: { ember: { automation: "unchanged" } },
+      ...(kind === "Scene" ? { active: true, tokens: [{ actorId: "a", name: "Untouched" }], navName: "English Navigation" }
+        : { description: "<p>English protection.</p>", disabled: false, changes: [{ key: "system.defense", value: "2" }], duration: { seconds: 30 } }),
+    };
+    const doc = { id: data._id, uuid: `${kind}.${data._id}`, name: data.name, documentName: kind, toObject: () => structuredClone(data) };
+    sourceActors.push(doc);
+    return { data, doc };
+  }
+  it("translates both dependencies while retaining original UUIDs and mechanical data", async () => {
+    vi.stubGlobal("Hooks", { callAll: vi.fn() });
+    const scene = displaySource("Scene"), effect = displaySource("ActiveEffect");
+    source.pages[0]!.text!.content = `<p>English @UUID[${scene.doc.uuid}] @UUID[${effect.doc.uuid}]</p>`;
+    const before = JSON.stringify([scene.doc.toObject(), effect.doc.toObject()]);
+    const result = await new JournalTranslationService().translate(sourceDoc);
+    expect(result.processedDocuments).toBe(3);
+    expect(result.dependencyWarnings).toEqual([]);
+    expect(result.data.pages[0]!.text!.content).toContain(`@UUID[${scene.doc.uuid}]`);
+    expect(result.data.pages[0]!.text!.content).toContain(`@UUID[${effect.doc.uuid}]`);
+    expect(JSON.stringify([scene.doc.toObject(), effect.doc.toObject()])).toBe(before);
+    const rows = tables.get("world.foundry-translate-display-text")!;
+    expect(rows.size).toBe(2);
+    const record = [...rows.values()].find(row => row.flags[MODULE_ID].displayTranslation.documentType === "Scene")!;
+    record.pages[0].text.content = "<p>Ruční Úprava</p>";
+    mock.translate.mockClear();
+    const repeated = await new JournalTranslationService().translate(sourceDoc);
+    expect(repeated.reusedDocuments).toBe(3);
+    expect(mock.translate).not.toHaveBeenCalled();
+    expect(record.pages[0].text.content).toContain("Ruční Úprava");
+  });
+  it("stops a source text change before saving", async () => {
+    vi.stubGlobal("Hooks", { callAll: vi.fn() });
+    const { data, doc } = displaySource("Scene");
+    mock.translate.mockImplementation(async (request: { texts: string[] }) => {
+      data.name = "Changed Name";
+      return translate(request);
+    });
+    await expect(new JournalTranslationService().translateDisplay(doc)).rejects.toThrow("IncompatibleExisting");
+    expect(tables.get("world.foundry-translate-display-text")?.size ?? 0).toBe(0);
+  });
+  it("stops on duplicate or malformed stored claims instead of silently creating another translation", async () => {
+    vi.stubGlobal("Hooks", { callAll: vi.fn() });
+    const { doc } = displaySource("ActiveEffect");
+    await new JournalTranslationService().translateDisplay(doc);
+    const rows = tables.get("world.foundry-translate-display-text")!;
+    const [id, record] = [...rows][0]!;
+    rows.set("duplicate", structuredClone(record));
+    await expect(new JournalTranslationService().translateDisplay(doc)).rejects.toThrow("Duplicate");
+    rows.delete("duplicate");
+    record.flags[MODULE_ID].displayTranslation.fields[0].path = ["system", "damage"];
+    await expect(new JournalTranslationService().translateDisplay(doc)).rejects.toThrow("Invalid");
+    expect([...rows.keys()]).toEqual([id]);
+  });
+  it("exports and imports scene/effect text offline, without source writes or clone UUIDs", async () => {
+    vi.stubGlobal("Hooks", { callAll: vi.fn() });
+    const scene = displaySource("Scene"), effect = displaySource("ActiveEffect");
+    const before = JSON.stringify([scene.data, effect.data]);
+    await new JournalTranslationService().translateDisplay(scene.doc);
+    await new JournalTranslationService().translateDisplay(effect.doc);
+    const { bundle, skipped } = await exportTranslationBundle("cs");
+    expect(skipped).toEqual([]);
+    expect(bundle.version).toBe(3);
+    expect(bundle.documents.map(d => d.kind)).toEqual(["Scene", "ActiveEffect"]);
+    expect(JSON.stringify(bundle)).not.toMatch(/automation|disabled|duration|actorId/);
+    tables.get("world.foundry-translate-display-text")!.clear();
+    mock.translate.mockClear();
+    const plan = await planBundleImport(bundle);
+    expect(plan.rows.map(r => r.state)).toEqual(["ready", "ready"]);
+    const result = await importTranslationBundle(plan);
+    expect(result).toMatchObject({ imported: 2, issues: [] });
+    expect(mock.translate).not.toHaveBeenCalled();
+    expect(JSON.stringify([scene.data, effect.data])).toBe(before);
+    const repeated = await importTranslationBundle(plan);
+    expect(repeated).toMatchObject({ imported: 0, skipped: 2, issues: [] });
+    expect((await exportTranslationBundle("cs")).bundle.documents).toEqual(bundle.documents);
+    // Portable imports have no local provider identity, but can still be reused safely.
+    expect((await new JournalTranslationService().translateDisplay(effect.doc)).reused).toBe(true);
+    expect(mock.translate).not.toHaveBeenCalled();
+    const invalid = structuredClone(bundle);
+    invalid.documents[0]!.patches.push({ path: ["flags", "ember", "automation"], format: "text", source: "unchanged", translation: "changed" });
+    expect((await planBundleImport(invalid)).rows[0]!.state).toBe("invalid");
+    const incomplete = structuredClone(bundle);
+    incomplete.documents[0]!.partial = true;
+    expect((await planBundleImport(incomplete)).rows[0]!.state).toBe("invalid");
+  });
+  it("checks the write guard when another translation appears during generation", async () => {
+    vi.stubGlobal("Hooks", { callAll: vi.fn() });
+    const { doc } = displaySource("Scene");
+    await new JournalTranslationService().translateDisplay(doc);
+    const rows = tables.get("world.foundry-translate-display-text")!;
+    const saved = structuredClone([...rows.values()][0]!);
+    rows.clear();
+    tables.get("world.foundry-translate-cache")!.clear();
+    mock.translate.mockImplementation(async (request: { texts: string[] }) => {
+      rows.set("otherGM", { ...saved, _id: "otherGM" });
+      return translate(request);
+    });
+    await expect(new JournalTranslationService().translateDisplay(doc)).rejects.toThrow("OutputChanged");
+    expect([...rows.keys()]).toEqual(["otherGM"]);
+  });
+
+  it("discovers embedded effects without an explicit journal link, preserving the copied effect data", async () => {
+    vi.stubGlobal("Hooks", { callAll: vi.fn() });
+    const effect = displaySource("ActiveEffect");
+    const actorData = { name: "English Actor", type: "adversary", system: {}, effects: [effect.data] };
+    const actor = { id: "carrier", uuid: "Actor.carrier", name: actorData.name, documentName: "Actor",
+      effects: { contents: [effect.doc] }, toObject: () => structuredClone(actorData) };
+    sourceActors.push(actor);
+    source.pages[0]!.text!.content = "<p>English @UUID[Actor.carrier]</p>";
+    const result = await new JournalTranslationService().translate(sourceDoc);
+    expect(result.processedDocuments).toBe(3);
+    expect(tables.get("world.foundry-translate-display-text")!.size).toBe(1);
+    expect([...tables.get("world.foundry-translate-actors")!.values()][0]!.effects).toEqual(actorData.effects);
+  });
+
 });

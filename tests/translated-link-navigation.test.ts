@@ -49,6 +49,8 @@ describe("translated link navigation", () => {
 
     expect(isTranslatableDocumentReference("Folder.journals")).toBe(false);
     expect(isTranslatableDocumentReference("Scene.map")).toBe(false);
+    expect(isTranslatableDocumentReference("Actor.hero.ActiveEffect.blessing")).toBe(false);
+    expect(isTranslatableDocumentReference("Compendium.ember.items.Item.sword.ActiveEffect.magic")).toBe(false);
     expect(isTranslatableDocumentReference("Playlist.ambience")).toBe(false);
     expect(isTranslatableDocumentReference(
       "Compendium.world.foundry-translate-translations.JournalEntry.csGuide",

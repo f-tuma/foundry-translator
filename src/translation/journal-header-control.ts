@@ -79,6 +79,7 @@ export function formatOverallSuffix(progress: JournalTranslationProgress): strin
 }
 
 export function progressStatusKey(kind: JournalTranslationProgress["kind"]): string {
+  if (kind === "display-field") return "FOUNDRY_TRANSLATE.DisplayText.Progress";
   if (kind === "actor-field") return "FOUNDRY_TRANSLATE.JournalTranslation.Status.ActorProgress";
   if (kind === "item-field") return "FOUNDRY_TRANSLATE.JournalTranslation.Status.ItemProgress";
   return "FOUNDRY_TRANSLATE.JournalTranslation.Status.Progress";

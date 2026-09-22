@@ -10,7 +10,7 @@ function targetLanguage(): string {
 /** Only presentation links are redirected; system UUID resolution stays untouched. */
 export function isTranslatableDocumentReference(uuid: string): boolean {
   const ref = parseDocumentReference(uuid);
-  return !!ref && !TRANSLATION_IDENTITIES.some(spec => ref.root.startsWith(`Compendium.${spec.pack}.`));
+  return !!ref && !/\.ActiveEffect\.[^.]+(?:#.*)?$/u.test(uuid) && !TRANSLATION_IDENTITIES.some(spec => ref.root.startsWith(`Compendium.${spec.pack}.`));
 }
 
 export function translatedEmbeddedUuid(sourceUuid: string, translatedRootUuid: string): string | null {
