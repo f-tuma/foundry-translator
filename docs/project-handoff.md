@@ -1491,3 +1491,45 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
   and zero-request repeat tested. Changes/fixtures only in the private QA copy.
 - Continue to publish on GitHub; user updates production himself. Never restart
   production for a release unless separately requested.
+
+## 2026-09-22 — Translation review editor (0.24.0)
+
+- New **Adventure translation → Review and corrections** ApplicationV2 workspace.
+  Side-by-side paragraph table, book/category order, embedded-item sections,
+  section search, unverified-only filter, explicit Save / Verify / Unverify.
+- User explicitly chose saving and verification as separate actions. Proofs are
+  `flags.foundry-translate.review`, version 1, keyed by SHA-256 of stable source
+  identity/language/field/paragraph address. Fingerprints bind source context and
+  translated paragraph; source or text changes invalidate the displayed proof.
+  Reviewer ID/name and time are stored. No model is involved in review.
+- Review writes are re-derived from the existing schema allowlist and guarded
+  against intervening document changes. Only translated copies or display sidecar
+  pages are editable. No source or mechanics writes. Embedded rows use IDs,
+  schema arrays preserve adjacent data; generated output hashes are not restamped.
+- HTML formatting/assets/attributes and Foundry commands stay protected. UUIDs
+  appear as friendly markers; UUID link labels can be edited separately. Text
+  segments preserve inline formatting. Markdown is edited as a protected field.
+- Incomplete pages cannot be verified; manual corrections to a partial journal
+  block automatic continuation by the existing output-edit protection. The UI
+  warns about this. Running translation must reach pause before review writes.
+- JSON exports include saved corrections, but verification marks stay local.
+  Foundry has no server CAS: detected stale edits are rejected, not a guarantee
+  against simultaneous writes from two GM clients. Coordinate shared editing.
+- Local QA used Foundry 14.368 / Crucible 0.11.0 / Ember 0.6.2, the private QA
+  world only. Tested at 1440×1000 and 1024×800 with canvas disabled temporarily
+  for UI testing. Corrected a real Guide paragraph, saved, explicitly verified,
+  hid via filter, edited again and confirmed invalidation. Corrected an existing
+  synthetic ActiveEffect sidecar, verified and reloaded: status persisted.
+  English and Czech UI rendered. Native close-button regression was found and
+  fixed (busy state now disables content controls only).
+- Four native source document SHA-256 values (Guide, Agraband, QA Scene and
+  QA ActiveEffect) were identical before/after browser edits. Review fixtures
+  and the corrected paragraph exist only in private QA copies. No production
+  access or updates, no AI requests. Existing Ember/Crucible data warnings were
+  observed; no editor errors. The QA loopback proxy exited during testing and
+  was restarted; UI checks completed before and after recovery.
+- Automated validation: 429 tests passed, 4 optional LM integrations skipped;
+  typecheck, build and release metadata verification passed. New tests cover
+  review persistence/invalidation, draft retention, concurrency/locks, partial
+  pages, embedded IDs/arrays, ordering, protected links, HTML escaping, actors,
+  items and display sidecars.

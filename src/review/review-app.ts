@@ -1,0 +1,249 @@
+import { getTranslatorSettings } from "../settings/settings";
+import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
+import { loadReview, reviewCatalog, updateReview, type ReviewDocument, type ReviewRow, type ReviewSnapshot } from "./service";
+import { maskReviewReferences, restoreReviewReferences, type ReviewReference } from "./text-plan";
+
+const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Review.${key}`);
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] => {
+  const node = document.createElement(tag); node.className = className; if (text !== undefined) node.textContent = text; return node;
+};
+const button = (label: string, action: () => void): HTMLButtonElement => {
+  const node = el("button", "", label); node.type = "button"; node.addEventListener("click", action); return node;
+};
+interface Draft { text: string[]; references: ReviewReference[][] }
+function draftFor(row: ReviewRow): Draft {
+  const parts = row.translation.map(maskReviewReferences);
+  return { text: parts.map(part => part.text), references: parts.map(part => part.references) };
+}
+function labelFor(path: string): string {
+  const key = ({ name: "Name", "text.content": "Text", "text.markdown": "Text", "prototypeToken.name": "TokenName", description: "Description", navName: "NavigationName",
+    "system.description": "Description", "system.subtitle": "Subtitle", "system.details.archetype.description": "Archetype",
+    "system.details.taxonomy.description": "Taxonomy", "system.details.biography.appearance": "Appearance",
+    "system.details.biography.public": "PublicBiography", "system.details.biography.private": "PrivateBiography" } as Record<string, string>)[path];
+  if (key) return t(key);
+  const outcome = /^system\.outcomes\.(\d+)\.label$/u.exec(path);
+  if (outcome) return t("Outcome").replace("{number}", String(Number(outcome[1]) + 1));
+  const final = path.split(".").at(-1) ?? path;
+  const known = t(`Field.${final}`);
+  if (!known.startsWith("FOUNDRY_TRANSLATE.")) return known;
+  const label = final.replace(/([a-z])([A-Z])/gu, "$1 $2");
+  return label.charAt(0).toLocaleUpperCase() + label.slice(1);
+}
+
+export class TranslationReviewApplication extends foundry.applications.api.ApplicationV2 {
+  static DEFAULT_OPTIONS = { id: "foundry-translate-review", classes: ["foundry-translate", "ft-review-window"],
+    position: { width: 1120, height: 800 }, window: { title: "FOUNDRY_TRANSLATE.Review.Title", icon: "fa-solid fa-list-check", resizable: true } };
+  #catalog: ReviewDocument[] | null = null;
+  #snapshot: ReviewSnapshot | null = null;
+  #group = "document";
+  #drafts = new Map<string, Draft>();
+  #busy = false;
+  #onlyUnverified = false;
+  #search = "";
+  #message = "";
+  #error = false;
+  #scrollTop = 0;
+
+  async close(options?: Record<string, unknown>): Promise<FoundryApplicationV2> {
+    if (this.#busy || this.#drafts.size) {
+      this.#status(t(this.#busy ? "Working" : "UnsavedNavigation"), true);
+      return this;
+    }
+    return super.close(options);
+  }
+
+  async #run(action: () => Promise<void>): Promise<void> {
+    if (this.#busy) return;
+    this.#busy = true;
+    this.#scrollTop = this.element.querySelector(".ft-review__scroll")?.scrollTop ?? 0;
+    this.element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement | HTMLSelectElement>(".ft-review input,.ft-review textarea,.ft-review button,.ft-review select").forEach(input => { input.disabled = true; });
+    this.#status(t("Working"));
+    try { await action(); } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.#status(message.startsWith("Review.") ? t(message.slice(7)) : message, true);
+    } finally { this.#busy = false; await this.render({ force: true }); }
+  }
+
+  #status(message: string, error = false): void {
+    this.#message = message; this.#error = error;
+    const node = this.element?.querySelector<HTMLElement>("[data-review-status]");
+    if (node) { node.textContent = message; node.classList.toggle("ft-review__error", error); }
+  }
+  #canNavigate(): boolean {
+    if (!this.#drafts.size) return true;
+    this.#status(t("UnsavedNavigation"), true); return false;
+  }
+  #counts(): string {
+    const rows = this.#snapshot?.rows ?? [];
+    return t("Progress").replace("{verified}", String(rows.filter(row => row.verified).length)).replace("{total}", String(rows.filter(row => !row.blocked).length));
+  }
+
+  protected async _renderHTML(): Promise<HTMLElement> {
+    const root = el("section", "ft-review");
+    const header = el("header", "ft-review__header");
+    const heading = el("div", "ft-heading-with-help");
+    heading.append(el("h2", "", t("Heading")));
+    const help = el("span"); help.innerHTML = renderHelpTooltip(t("Help"), t("Heading")); heading.append(help);
+    header.append(heading);
+    if (!this.#catalog) {
+      try {
+        this.#catalog = await reviewCatalog(getTranslatorSettings().targetLanguage);
+        if (this.#catalog[0]) this.#snapshot = await loadReview(this.#catalog[0]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.#message = message.startsWith("Review.") ? t(message.slice(7)) : message; this.#error = true;
+        this.#catalog ??= [];
+      }
+    }
+    const controls = el("div", "ft-review__controls");
+    const documentLabel = el("label", "ft-review__document", t("Document"));
+    const select = el("select"); select.setAttribute("aria-label", t("Document"));
+    for (const entry of this.#catalog) {
+      const option = el("option", "", `${t(entry.kind)} · ${entry.name}`); option.value = entry.uuid;
+      option.selected = entry.uuid === this.#snapshot?.entry.uuid; select.append(option);
+    }
+    select.addEventListener("change", () => {
+      if (!this.#canNavigate()) { select.value = this.#snapshot?.entry.uuid ?? ""; return; }
+      const entry = this.#catalog!.find(entry => entry.uuid === select.value);
+      if (entry) void this.#run(async () => { this.#snapshot = await loadReview(entry); this.#group = "document"; this.#scrollTop = 0; this.#search = ""; this.#status(""); });
+    });
+    documentLabel.append(select); controls.append(documentLabel);
+    controls.append(button(t("Refresh"), () => {
+      if (!this.#canNavigate()) return;
+      void this.#run(async () => {
+        this.#catalog = await reviewCatalog(getTranslatorSettings().targetLanguage);
+        const entry = this.#catalog.find(entry => entry.uuid === this.#snapshot?.entry.uuid) ?? this.#catalog[0];
+        this.#snapshot = entry ? await loadReview(entry) : null; this.#status(t("Refreshed"));
+      });
+    }));
+    const discard = button(t("DiscardAll"), () => { this.#drafts.clear(); this.#status(t("Discarded")); void this.render({ force: true }); });
+    discard.disabled = !this.#drafts.size; discard.dataset.reviewDiscard = ""; controls.append(discard);
+    header.append(controls); root.append(header);
+    const filters = el("div", "ft-review__filters");
+    const search = el("input"); search.type = "search"; search.placeholder = t("Search"); search.setAttribute("aria-label", t("Search")); search.value = this.#search;
+    search.addEventListener("input", () => { this.#search = search.value; this.#applyFilters(root); });
+    const label = el("label"); const checkbox = el("input"); checkbox.type = "checkbox"; checkbox.checked = this.#onlyUnverified;
+    checkbox.addEventListener("change", () => { this.#onlyUnverified = checkbox.checked; this.#applyFilters(root); });
+    label.append(checkbox, document.createTextNode(t("OnlyUnverified")));
+    filters.append(search, label, el("span", "ft-review__progress", this.#counts())); root.append(filters);
+    if (this.#snapshot?.warning) root.append(el("p", "ft-review__warning", t(this.#snapshot.warning)));
+    else if (this.#snapshot?.partial) root.append(el("p", "ft-review__warning", t("PartialWarning")));
+    const layout = el("div", "ft-review__layout");
+    const nav = el("nav", "ft-review__nav"); nav.setAttribute("aria-label", t("Sections"));
+    const groups = this.#snapshot?.groups ?? [];
+    if (!groups.some(group => group.id === this.#group)) this.#group = groups[0]?.id ?? "document";
+    for (const group of groups) {
+      const rows = this.#snapshot!.rows.filter(row => row.group === group.id);
+      const item = button("", () => { this.#group = group.id; this.#scrollTop = 0; void this.render({ force: true }); });
+      item.classList.toggle("is-current", group.id === this.#group); item.setAttribute("aria-current", group.id === this.#group ? "true" : "false");
+      const ready = rows.filter(row => !row.blocked).length;
+      item.append(el("span", "", group.id === "document" ? t("DocumentDetails") : group.name), el("small", "", ready ? `${rows.filter(row => row.verified).length} / ${ready}` : t("Pending")));
+      nav.append(item);
+    }
+    const main = el("div", "ft-review__scroll");
+    main.append(el("h3", "ft-review__section-title", groups.find(group => group.id === this.#group)?.name ?? t("Empty")));
+    const table = el("table", "ft-review__table");
+    const thead = el("thead"), headers = el("tr");
+    for (const key of ["Original", "Translation", "Review"]) { const th = el("th", "", t(key)); th.scope = "col"; headers.append(th); }
+    thead.append(headers); table.append(thead);
+    const body = el("tbody"); let lastField = "";
+    for (const row of this.#snapshot?.rows.filter(row => row.group === this.#group) ?? []) {
+      if (row.fieldId !== lastField) {
+        const field = el("tr", "ft-review__field"); field.dataset.fieldId = row.fieldId;
+        const th = el("th", "", labelFor(row.label)); th.colSpan = 3; th.scope = "rowgroup"; field.append(th); body.append(field); lastField = row.fieldId;
+      }
+      body.append(this.#row(row));
+    }
+    table.append(body); main.append(table);
+    const empty = el("p", "ft-review__empty", this.#snapshot ? t("NoMatches") : t("Empty")); empty.dataset.reviewEmpty = ""; main.append(empty);
+    layout.append(nav, main); root.append(layout);
+    const footer = el("footer", "ft-review__footer");
+    const status = el("p", this.#error ? "ft-review__error" : "", this.#message); status.dataset.reviewStatus = ""; status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
+    const dirty = el("span", "", this.#drafts.size ? t("UnsavedCount").replace("{count}", String(this.#drafts.size)) : ""); dirty.dataset.reviewDirtyCount = "";
+    footer.append(status, dirty); root.append(footer);
+    this.#applyFilters(root); activateHelpTooltips(root); return root;
+  }
+
+  #row(row: ReviewRow): HTMLTableRowElement {
+    const tr = el("tr", row.heading ? "ft-review__row is-heading" : "ft-review__row"); tr.dataset.reviewRow = row.id; tr.dataset.fieldId = row.fieldId;
+    const original = el("td", "ft-review__original"), translated = el("td", "ft-review__translation"), actions = el("td", "ft-review__actions");
+    original.setAttribute("data-label", t("Original")); translated.setAttribute("data-label", t("Translation")); actions.setAttribute("data-label", t("Review"));
+    for (const part of row.source) {
+      const masked = maskReviewReferences(part); const text = el("p", "", masked.text);
+      original.append(text);
+      for (const ref of masked.references) original.append(el("small", "ft-review__reference", `${ref.marker} ${ref.label || t("LinkedDocument")}`));
+    }
+    const draft = this.#drafts.get(row.id) ?? draftFor(row);
+    const changed = () => {
+      this.#drafts.set(row.id, draft);
+      if (JSON.stringify(draft) === JSON.stringify(draftFor(row))) this.#drafts.delete(row.id);
+      this.#updateRowState(tr, row);
+      const discard = this.element.querySelector<HTMLButtonElement>("[data-review-discard]"); if (discard) discard.disabled = !this.#drafts.size;
+      const count = this.element.querySelector("[data-review-dirty-count]"); if (count) count.textContent = this.#drafts.size ? t("UnsavedCount").replace("{count}", String(this.#drafts.size)) : "";
+    };
+    draft.text.forEach((text, index) => {
+      const input = el("textarea"); input.value = text; input.rows = Math.max(2, Math.min(12, Math.ceil(text.length / 48)));
+      input.disabled = !!row.blocked; input.lang = this.#snapshot!.entry.language; input.spellcheck = true;
+      input.setAttribute("aria-label", `${t("Translation")} · ${labelFor(row.label)} · ${index + 1}`);
+      input.addEventListener("input", () => { draft.text[index] = input.value; changed(); this.#grow(input); });
+      input.addEventListener("focus", () => { original.querySelectorAll("p").forEach((p, i) => p.classList.toggle("is-focused", i === index)); });
+      input.addEventListener("blur", () => { original.querySelectorAll("p").forEach(p => p.classList.remove("is-focused")); });
+      translated.append(input);
+      for (const reference of draft.references[index] ?? []) {
+        const label = el("label", "ft-review__reference", `${reference.marker} ${t("LinkLabel")}`);
+        if (reference.editable) {
+          const name = el("input"); name.type = "text"; name.value = reference.label; name.placeholder = t("AutomaticLabel"); name.disabled = !!row.blocked;
+          name.addEventListener("input", () => { reference.label = name.value; changed(); }); label.append(name);
+        } else label.append(el("span", "", t("ProtectedCommand")));
+        translated.append(label);
+      }
+    });
+    const status = el("span", "ft-review__badge"); status.dataset.rowStatus = ""; actions.append(status);
+    if (row.blocked) actions.append(el("small", "ft-review__reason", t(row.blocked)));
+    else {
+      const save = button(t("Save"), () => void this.#run(async () => {
+        const current = this.#drafts.get(row.id); if (!current) return;
+        const parts = current.text.map((text, index) => restoreReviewReferences(text, current.references[index]!));
+        this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: "save", parts });
+        this.#drafts.delete(row.id); this.#status(t("Saved"));
+      })); save.dataset.reviewSave = "";
+      const verify = button(row.verified ? t("Unverify") : t("Verify"), () => void this.#run(async () => {
+        this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: row.verified ? "unverify" : "verify" });
+        this.#status(t(row.verified ? "Unverified" : "Verified"));
+      })); verify.dataset.reviewVerify = "";
+      const discard = button(t("Discard"), () => { this.#scrollTop = this.element.querySelector(".ft-review__scroll")?.scrollTop ?? 0; this.#drafts.delete(row.id); void this.render({ force: true }); }); discard.dataset.reviewDiscardRow = "";
+      actions.append(save, verify, discard);
+    }
+    tr.append(original, translated, actions); this.#updateRowState(tr, row); return tr;
+  }
+
+  #updateRowState(tr: HTMLElement, row: ReviewRow): void {
+    const dirty = this.#drafts.has(row.id);
+    tr.classList.toggle("is-dirty", dirty); tr.classList.toggle("is-verified", !!row.verified && !dirty);
+    const status = tr.querySelector<HTMLElement>("[data-row-status]")!;
+    status.textContent = t(dirty ? "Unsaved" : row.blocked ? "Unavailable" : row.verified ? "Verified" : "NeedsReview");
+    status.title = row.verified ? `${row.verified.userName} · ${new Date(row.verified.at).toLocaleString()}` : "";
+    const save = tr.querySelector<HTMLButtonElement>("[data-review-save]"); if (save) { save.disabled = !dirty; save.hidden = !dirty; }
+    const verify = tr.querySelector<HTMLButtonElement>("[data-review-verify]"); if (verify) { verify.disabled = dirty; verify.title = dirty ? t("SaveFirst") : ""; }
+    const discard = tr.querySelector<HTMLButtonElement>("[data-review-discard-row]"); if (discard) discard.hidden = !dirty;
+  }
+  #applyFilters(root: HTMLElement): void {
+    const query = this.#search.trim().toLocaleLowerCase(); let visible = 0;
+    for (const node of root.querySelectorAll<HTMLElement>("[data-review-row]")) {
+      const row = this.#snapshot?.rows.find(row => row.id === node.dataset.reviewRow);
+      const text = row ? [...row.source, ...(this.#drafts.get(row.id)?.text ?? row.translation)].join(" ") : "";
+      node.hidden = !row || (!!row.verified && this.#onlyUnverified && !this.#drafts.has(row.id)) || !text.toLocaleLowerCase().includes(query);
+      if (!node.hidden) visible += 1;
+    }
+    for (const field of root.querySelectorAll<HTMLElement>(".ft-review__field")) {
+      field.hidden = ![...root.querySelectorAll<HTMLElement>("[data-review-row]")].some(row => !row.hidden && row.dataset.fieldId === field.dataset.fieldId);
+    }
+    const empty = root.querySelector<HTMLElement>("[data-review-empty]"); if (empty) empty.hidden = visible > 0;
+  }
+  #grow(input: HTMLTextAreaElement): void { input.style.height = "auto"; input.style.height = `${Math.max(58, input.scrollHeight + 2)}px`; }
+  protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }
+  protected _onRender(): void {
+    this.element.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(input => this.#grow(input));
+    const scroll = this.element.querySelector(".ft-review__scroll"); if (scroll) scroll.scrollTop = this.#scrollTop;
+  }
+}
