@@ -2,8 +2,9 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.23.0** adds display-only translations for scenes and active effects.
-It preserves their original UUIDs and game mechanics, including Ember automation.
+Version **0.24.0** adds a side-by-side translation editor with explicit manual
+verification. It also supports display-only translations for scenes and active
+effects, preserving their original UUIDs and game mechanics, including Ember automation.
 It includes safe pause/continue, protected saved translations,
 an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
@@ -45,13 +46,38 @@ The module translates scene/navigation names, map drawing and note text, level a
 region names, and effect names/descriptions. Rules, positions, scripts, statuses,
 durations, and source UUIDs are never translated or copied by this feature.
 
-Review the editable text pages in **Foundry Translate — Scene & Effect Text**.
+Review them through **Adventure translation → Review and corrections**, or edit
+the text pages in **Foundry Translate — Scene & Effect Text** directly.
 The pack is GM-only by default because scene names and notes may contain spoilers.
 Translations display in navigation, map labels, placeable lists, native content
 links and Crucible effect cards; configuration fields keep their original values
 with a read-only translated preview. This does not patch every third-party widget.
 Changed source text falls back to the original. Existing manual corrections are
 kept, and incompatible or conflicting records block regeneration.
+
+## Review and corrections
+
+Open **Adventure translation → Review and corrections**. Select a translated
+Journal, Actor, Item, Scene or Active Effect. Sections keep Journal pages and
+embedded items together; the table aligns original paragraphs with editable
+translations. Inline formatting is preserved through separate text segments.
+Link markers protect UUIDs and game commands while their display labels remain
+editable. Search a section or show only unverified blocks.
+
+**Save correction** and **Verify** are separate actions. Verification records
+the reviewing GM and time and is valid only for the saved paragraph and original
+field context. A changed source or translated block no longer appears verified.
+Untranslated pages in partial journals cannot be verified. Dirty drafts survive
+section navigation, and closing/reloading requires saving or discarding them.
+
+Edits only update translation copies or display-text sidecars. Locked packs,
+changed sources, mismatched structures and detected intervening edits block writes.
+Pause a running translation before editing; correcting a partial copy blocks its
+automatic continuation to preserve manual work. Foundry does not offer a server
+compare-and-swap transaction: coordinate simultaneous GM edits to one document.
+JSON bundles include saved corrections; verification marks remain local and must
+be confirmed again in an importing world. A manual mark is a reviewer's approval,
+not an automatic guarantee of semantic accuracy.
 
 Portable JSON bundles include these records (bundle format 3, requires 0.23.0+).
 Import does not need a model and never modifies the scene or effect itself.

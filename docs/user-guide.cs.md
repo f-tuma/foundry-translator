@@ -1,4 +1,4 @@
-# Foundry Translate 0.19.2 — stručný návod
+# Foundry Translate 0.24.0 — stručný návod
 
 ## České rozhraní
 
@@ -46,6 +46,42 @@ najdete v přehledu překladů.
 Při změně glosáře nebo modelu se nově přeloží vybraná stránka, ostatní
 přeložené stránky zůstanou čitelné. Pokud se změnila samotná zdrojová kniha,
 modul vyžádá obnovu celého deníku, aby nepřepsal zbývající překlady zdrojem.
+
+## Kontrola a opravy překladu
+
+Otevřete **Překlad dobrodružství → Kontrola a opravy**. Vyberte dokument
+a vlevo jeho oddíl nebo stránku. Tabulka ukazuje originál vedle překladu;
+podporuje deníky, postavy, předměty, texty scén i aktivních efektů.
+
+1. Opravte text v pravém sloupci a stiskněte **Uložit opravu**.
+2. Po porovnání významu s originálem stiskněte **Ověřit**.
+3. Přepněte na **Pouze neověřené**, pokud chcete pokračovat zbývajícími bloky.
+
+Formátované úseky odstavce mají samostatná pole, aby se neztratilo zvýraznění
+nebo formátování. Značky jako `⟦1⟧` chrání odkazy a herní příkazy. Popisek
+odkazu upravíte v samostatném poli pod textem; prázdný popisek použije název
+propojeného dokumentu. UUID a herní pravidla tím neměníte.
+
+Ověření platí pro konkrétní uložený text a původní kontext. Při změně překladu
+nebo zdroje se již nezobrazuje jako platné; ověření můžete také ručně zrušit.
+Jméno kontrolujícího a čas uvidíte po najetí na značku. Nepřeložené stránky
+rozpracovaného deníku nelze ověřovat. Upozornění automatických kontrol nejsou
+totéž co ruční ověření významu.
+
+Rozepsané opravy zůstávají při přepínání oddílů. Před zavřením, přepnutím
+dokumentu či novým načtením je uložte nebo zahoďte příslušným tlačítkem.
+Pokud dokument mezitím upravil někdo jiný, editor odmítne přepis a ponechá
+rozepsaný text v okně ke zkopírování. Současné opravy více GM ve stejném
+dokumentu si koordinujte; Foundry nenabízí atomický zámek mezi klienty.
+
+Před opravami pozastavte překlad. **Ruční opravy rozpracované kopie zablokují
+automatické pokračování této kopie**, aby se nepřepsaly. Pro souvislou práci
+je proto vhodné nejdříve dokončit překlad dokumentu a potom ho korigovat.
+Změněný zdroj, nesoulad struktury nebo zamčené kompendium ukládání zablokuje.
+Originální dobrodružství zůstává beze změn.
+
+Uložené opravy přenese JSON export překladů. Značky ručního ověření jsou
+lokální a do jiného světa se nepřenášejí; tam je potřeba text zkontrolovat znovu.
 
 ## Vlastní jména a běžné pojmy
 
