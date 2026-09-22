@@ -11,6 +11,7 @@ const STORAGE_PACK_IDS = new Set([
   "world.foundry-translate-translations",
   "world.foundry-translate-actors",
   "world.foundry-translate-items",
+  "world.foundry-translate-display-text",
 ]);
 let creatingFolder: Promise<FoundryFolder> | undefined;
 let organizingPacks: Promise<void> = Promise.resolve();

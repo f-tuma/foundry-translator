@@ -300,5 +300,10 @@
   "FOUNDRY_TRANSLATE.EmberBridge.Unavailable": "Překlad nelze bezpečně propojit s původní událostí. Herní ovládání je zablokované; použijte originál.",
   "FOUNDRY_TRANSLATE.EmberBridge.OpenSource": "Otevřít původní událost",
   "FOUNDRY_TRANSLATE.EmberBridge.Explanation": "Přeložený pohled používá původní událost a její živý herní stav. Pravidla události upravujte v originálu.",
-  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference": "Překlad této stránky nelze jednoznačně dohledat. Původní dokument zůstal otevřený."
+  "FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference": "Překlad této stránky nelze jednoznačně dohledat. Původní dokument zůstal otevřený.",
+  "FOUNDRY_TRANSLATE.DisplayText.Translate": "Přeložit text",
+  "FOUNDRY_TRANSLATE.DisplayText.Help": "Zobrazí přeložené názvy a popisy nad původním dokumentem. UUID, formulářová pole a herní pravidla zůstávají původní. Překlady můžete upravit v kompendiu Scene & Effect Text.",
+  "FOUNDRY_TRANSLATE.DisplayText.Done": "Překlad textu je připraven.",
+  "FOUNDRY_TRANSLATE.DisplayText.Review": "Překlad je uložen; části ponechané v originále vyžadují kontrolu.",
+  "FOUNDRY_TRANSLATE.DisplayText.Progress": "{document} — {page} ({current}/{total})"
 }

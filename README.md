@@ -2,7 +2,8 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.22.0** adds bounded passage context and an OpenAI-only connection.
+Version **0.23.0** adds display-only translations for scenes and active effects.
+It preserves their original UUIDs and game mechanics, including Ember automation.
 It includes safe pause/continue, protected saved translations,
 an adventure translation desk, an Ember-aware name
 glossary, and portable JSON translation bundles. Translation runs locally through
@@ -35,6 +36,26 @@ separate action. See [coverage and maintenance](docs/czech-interface.md).
 Names are synchronized automatically before translation. For a long book, use
 **Translate a whole journal**; this also processes linked documents. A single-page
 translation only processes that page and reuses already available linked copies.
+
+## Scenes and active effects
+
+Click **Translate text** in a Scene or Active Effect sheet. Whole-journal translation
+also processes linked scenes/effects and effects embedded in linked actors/items.
+The module translates scene/navigation names, map drawing and note text, level and
+region names, and effect names/descriptions. Rules, positions, scripts, statuses,
+durations, and source UUIDs are never translated or copied by this feature.
+
+Review the editable text pages in **Foundry Translate — Scene & Effect Text**.
+The pack is GM-only by default because scene names and notes may contain spoilers.
+Translations display in navigation, map labels, placeable lists, native content
+links and Crucible effect cards; configuration fields keep their original values
+with a read-only translated preview. This does not patch every third-party widget.
+Changed source text falls back to the original. Existing manual corrections are
+kept, and incompatible or conflicting records block regeneration.
+
+Portable JSON bundles include these records (bundle format 3, requires 0.23.0+).
+Import does not need a model and never modifies the scene or effect itself.
+Macros, roll tables, playlists and text baked into images remain outside scope.
 
 ## Installation
 

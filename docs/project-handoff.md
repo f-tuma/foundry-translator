@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-22
-- Current code/release metadata: `v0.22.0`; verify publication in GitHub Releases. Prior release `v0.21.0` was PR #25 (`bc9e7e4`). Production installation is user-managed.
+- Current code/release metadata: `v0.23.0`; verify publication in GitHub Releases. Prior release `v0.21.0` was PR #25 (`bc9e7e4`). Production installation is user-managed.
 - Deployed version: `v0.19.1`; PRs #21 and #22 merged, GitHub release published and installed in Foundry.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,49 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-22, scenes/effects (0.23.0): user explicitly requested these two
+  unsupported types, leaving macros/playlists/tables alone. Added GM-only Journal
+  sidecar pack `world.foundry-translate-display-text`. Source identities remain
+  unchanged. Allowlist: Scene name/navName, Drawing.text, Note.text, Level.name,
+  Region.name; ActiveEffect name/description. Recursive graph treats them as
+  leaves; Actor/Item embedded effects are also discovered. Scene/effect records
+  never become gameplay link destinations. Copy effect display follows explicit
+  parent source metadata and stable embedded IDs. No global Document getters or
+  UUID resolver are patched; Crucible renderCard wraps only returned HTML.
+  Presentation is DOM/PIXI only; native forms retain original values. v14
+  placeables directory is supported as well as older region legend markup.
+  Validated translations are cached; canvas refresh reads raw source text without
+  cloning entire scenes. Stale text, malformed records and duplicate identities
+  fail closed. Storage uses the existing optimistic write guard (not server CAS).
+  JSON bundle format 3 carries allowlisted text patches; imports preserve sources,
+  require source UUID and display-field fingerprint, and keep existing records.
+  Imported display records use an empty local provider fingerprint; valid imports
+  can be reused with the same glossary and unchanged source. Legacy bundles v1/v2
+  are still supported. New compendium is private to GMs by default to avoid leaking
+  GM-only scene notes. Configuration previews are read-only; no global translation
+  of custom third-party widgets or newly instantiated effects with unrelated UUIDs.
+
+  Private QA: Foundry 14.368 / Crucible 0.11.0 / Ember 0.6.2 at localhost:30000,
+  APEX `hy-mt2-30b-a3b-apex`. Synthetic source Scene.aOOPt019UyVets4T and
+  Actor.91IN43N2qynWOeXH.ActiveEffect.7nhCm70tgP1CBQOx. Source snapshots were
+  unchanged after translation; UI showed Stará brána, Nevstupovat, Strážní
+  stanoviště and Ochranné požehnání. Effect card retained native duration tags.
+  Original QA-prefixed scene name remained English by glossary/name handling;
+  navigation and other fields translated. This is not a new linguistic-quality
+  certification or a whole-campaign automation test. Production and the user's
+  original local Foundry data are untouched; production update remains manual.
+
+  Final QA also rendered Nebezpečná zóna in the v14 Placeables sidebar. Short
+  Journal ZCwHJIfKWwi3iajL translated to copy aGyo0MLupOmd0Iwz, reused both
+  existing display records, retained both original Scene/effect UUIDs, and clicking
+  the Czech effect link opened the original effect sheet. Source JSON equality
+  still held after the recursive run. 412 tests, typecheck/build/release metadata
+  passed (four opt-in model suites skipped; manual APEX UI test performed).
+  Console: no translator exceptions; an EmberSoundscape.deactivate undefined
+  sound.stop error occurred when leaving Broken Tower after an audio timeout.
+  Its stack is in Ember's scene teardown; no soundscape fix or global automation
+  certification is included. Test documents and translations remain in private QA.
 
 - 2026-09-22, Ember runtime identity (0.22.0): user requested
   programmatic, idempotent bidirectional UUID mapping. Added a read-only public

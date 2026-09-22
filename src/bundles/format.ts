@@ -26,7 +26,7 @@ export interface BundleDocument {
 }
 export interface TranslationBundle {
   format: typeof BUNDLE_FORMAT;
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   createdAt: string;
   moduleVersion: string;
   systemId: string;
@@ -49,7 +49,7 @@ function shortString(value: unknown, max = 500): value is string {
 export function parseTranslationBundle(text: string): TranslationBundle {
   requireValue(new TextEncoder().encode(text).length <= MAX_BUNDLE_BYTES, "maximum size is 50 MB.");
   const value: unknown = JSON.parse(text);
-  requireValue(record(value) && value.format === BUNDLE_FORMAT && (value.version === 1 || value.version === 2), "unsupported format or version.");
+  requireValue(record(value) && value.format === BUNDLE_FORMAT && (value.version === 1 || value.version === 2 || value.version === 3), "unsupported format or version.");
   for (const key of ["createdAt", "moduleVersion", "systemId", "targetLanguage"]) requireValue(shortString(value[key]), `missing ${key}.`);
   requireValue(typeof value.systemVersion === "string", "missing system version.");
   requireValue(/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(value.targetLanguage as string), "invalid language.");
@@ -72,7 +72,7 @@ export function parseTranslationBundle(text: string): TranslationBundle {
   requireValue(Array.isArray(value.documents) && value.documents.length <= 10000, "invalid document list.");
   const seenDocuments = new Set<string>();
   const documents = value.documents.map((entry: unknown): BundleDocument => {
-    requireValue(record(entry) && ["JournalEntry", "Actor", "Item"].includes(String(entry.kind)), "invalid document kind.");
+    requireValue(record(entry) && (value.version === 3 ? ["JournalEntry", "Actor", "Item", "Scene", "ActiveEffect"] : ["JournalEntry", "Actor", "Item"]).includes(String(entry.kind)), "invalid document kind.");
     requireValue(shortString(entry.sourceUuid) && shortString(entry.sourceName), "invalid document identity.");
     requireValue(typeof entry.sourceFingerprint === "string" && /^[a-f0-9]{64}$/.test(entry.sourceFingerprint), "invalid source fingerprint.");
     requireValue(!seenDocuments.has(entry.sourceUuid), "duplicate document.");

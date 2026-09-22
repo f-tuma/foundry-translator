@@ -59,6 +59,8 @@ import {
 } from "./system-html-fields";
 import { containsTranslationPromptLeak, glossaryFingerprint } from "./unit-translator";
 import { availableDocumentReferences } from "./available-references";
+import { DISPLAY_TEXT_REVISION, displayFields, displaySourceHash, isDisplayDocument, readDisplayTextFlag, readDisplayTranslation, translateDisplayText, type DisplayDocument } from "./display-text";
+import { CompendiumDisplayTextRepository } from "./compendium-display-text-repository";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
@@ -107,7 +109,8 @@ export interface JournalDependencyWarning {
 type GraphSourceDocument =
   | FoundryJournalWorldDocument
   | FoundryActorWorldDocument
-  | FoundryItemWorldDocument;
+  | FoundryItemWorldDocument
+  | DisplayDocument;
 type GraphTranslatedDocument =
   | FoundryJournalDocument
   | FoundryActorDocument
@@ -153,6 +156,7 @@ interface TranslationRuntime {
   translations: CompendiumJournalTranslationRepository;
   actorTranslations: CompendiumActorTranslationRepository;
   itemTranslations: CompendiumItemTranslationRepository;
+  displayTranslations: CompendiumDisplayTextRepository;
 }
 
 interface RuntimePageSystem {
@@ -231,7 +235,7 @@ function isItemDocument(document: FoundryUuidDocument): document is FoundryItemW
 }
 
 function isSupportedSourceDocument(document: FoundryUuidDocument): document is GraphSourceDocument {
-  return isJournalDocument(document) || isActorDocument(document) || isItemDocument(document);
+  return isJournalDocument(document) || isActorDocument(document) || isItemDocument(document) || isDisplayDocument(document);
 }
 
 function isTranslatedDocument(document: FoundryUuidDocument): boolean {
@@ -388,6 +392,7 @@ function actorHtmlFieldPaths(
 }
 
 function documentTranslationUnits(document: GraphSourceDocument): number {
+  if (isDisplayDocument(document)) return displayFields(document.documentName, document.toObject()).length;
   if (isActorDocument(document)) {
     const source = document.toObject() as ActorData;
     const paths = actorHtmlFieldPaths(document, source);
@@ -411,6 +416,10 @@ export class JournalTranslationService {
   }
 
   async translate(sourceDocument: FoundryJournalWorldDocument): Promise<JournalTranslationResult> {
+    return this.#run(sourceDocument, {});
+  }
+
+  async translateDisplay(sourceDocument: DisplayDocument): Promise<JournalTranslationResult> {
     return this.#run(sourceDocument, {});
   }
 
@@ -446,7 +455,7 @@ export class JournalTranslationService {
 
     const settings = getTranslatorSettings();
     const source = sourceDocument.toObject() as JournalData;
-    const htmlFieldPaths = systemHtmlFieldPaths(sourceDocument, source);
+    const htmlFieldPaths = isDisplayDocument(sourceDocument) ? [] : systemHtmlFieldPaths(sourceDocument, source);
     let runId: number | undefined;
     const provider = createTranslationProvider(settings, {
       ...(this.#onChromeStatus ? { onChromeStatus: this.#onChromeStatus } : {}),
@@ -457,7 +466,7 @@ export class JournalTranslationService {
 
     // Calling prepare before the first await preserves Chrome's user activation.
     const preparation = provider.prepare?.({
-      texts: [translationSample(source, htmlFieldPaths)],
+      texts: [isDisplayDocument(sourceDocument) ? sourceDocument.name : translationSample(source, htmlFieldPaths)],
       sourceLanguage: settings.sourceLanguage,
       targetLanguage: settings.targetLanguage,
       format: "text",
@@ -491,6 +500,7 @@ export class JournalTranslationService {
         translations: new CompendiumJournalTranslationRepository(),
         actorTranslations: new CompendiumActorTranslationRepository(),
         itemTranslations: new CompendiumItemTranslationRepository(),
+        displayTranslations: new CompendiumDisplayTextRepository(),
       };
       const result = await this.#translateGraph(sourceDocument, runtime, runId, scope);
       activeTranslations.finish(runId);
@@ -545,7 +555,7 @@ export class JournalTranslationService {
         const node = nodeFor(document);
         if (node.children) return node.children;
         const depth = depths.get(document.uuid) ?? 0;
-        if (depth >= depthLimit) {
+        if (depth >= depthLimit || isDisplayDocument(document)) {
           node.children = [];
           return node.children;
         }
@@ -618,7 +628,8 @@ export class JournalTranslationService {
             });
             continue;
           }
-          const root = rootDocument(resolved);
+          // Effects have their own text identity even when embedded in an Actor/Item.
+          const root = isDisplayDocument(resolved) ? resolved : rootDocument(resolved);
           if (!isSupportedSourceDocument(root)) {
             addWarning({
               kind: "unsupported",
@@ -634,6 +645,18 @@ export class JournalTranslationService {
           childDocuments.set(root.uuid, root);
           nodeFor(root);
           depths.set(root.uuid, Math.min(depths.get(root.uuid) ?? Number.POSITIVE_INFINITY, depth + 1));
+        }
+        // Effects are embedded in Actors/Items even when no prose links to them.
+        // They receive display records while their owning gameplay documents retain them unchanged.
+        if (isActorDocument(document) || isItemDocument(document)) {
+          type EffectOwner = { effects?: { contents: FoundryUuidDocument[] }; items?: { contents: EffectOwner[] } };
+          const owner = document as unknown as EffectOwner;
+          const effects = [owner, ...owner.items?.contents ?? []].flatMap(item => item.effects?.contents ?? []);
+          for (const effect of effects) if (isDisplayDocument(effect)) {
+            childDocuments.set(effect.uuid, effect);
+            nodeFor(effect);
+            depths.set(effect.uuid, Math.min(depths.get(effect.uuid) ?? Number.POSITIVE_INFINITY, depth + 1));
+          }
         }
         node.children = [...childDocuments.values()];
         return node.children;
@@ -751,7 +774,7 @@ export class JournalTranslationService {
     for (const document of graph.completed) {
       await checkpointControl(runId);
       const node = nodes.get(document.uuid);
-      if (!node?.result) continue;
+      if (!node?.result || isDisplayDocument(document)) continue;
       const savedFlag = readJournalTranslationFlag(node.result.data.flags) ?? readActorTranslationFlag(node.result.data.flags) ?? readItemTranslationFlag(node.result.data.flags);
       if (!savedFlag?.outputHash || await hasManualOutputEdits(node.result.data, savedFlag.outputHash)) continue;
       // Compare against the snapshot produced by the service, not a live mutable document.
@@ -808,6 +831,8 @@ export class JournalTranslationService {
       .filter((result): result is GraphTranslationResult => Boolean(result));
     return {
       ...(rootResult as JournalTranslationResult),
+      translatedTextPages: (rootResult as Partial<JournalTranslationResult>).translatedTextPages ?? 0,
+      skippedTextPages: (rootResult as Partial<JournalTranslationResult>).skippedTextPages ?? 0,
       fallbackTextSegments: completedResults.reduce(
         (total, result) => total + result.fallbackTextSegments,
         0,
@@ -830,7 +855,9 @@ export class JournalTranslationService {
     const existingEntries = await Promise.all(documents.map(async (document) => {
       const sourceUuid = document.uuid;
       let translated: GraphTranslatedDocument | null;
-      if (isJournalDocument(document)) {
+      if (isDisplayDocument(document)) {
+        return [sourceUuid, null] as const;
+      } else if (isJournalDocument(document)) {
         translated = await runtime.translations.find(
           sourceUuid,
           runtime.settings.targetLanguage,
@@ -896,6 +923,9 @@ export class JournalTranslationService {
       currentDocument: sourceDocument.name,
       currentUnit: "",
     });
+    if (isDisplayDocument(sourceDocument)) {
+      return this.#translateDisplayOne(sourceDocument, runtime, onProgress);
+    }
     if (isActorDocument(sourceDocument)) {
       return this.#translateActorOne(sourceDocument, runtime, onProgress);
     }
@@ -903,6 +933,48 @@ export class JournalTranslationService {
       return this.#translateItemOne(sourceDocument, runtime, onProgress);
     }
     return this.#translateJournalOne(sourceDocument, runtime, onProgress, pageIds);
+  }
+
+  async #translateDisplayOne(sourceDocument: DisplayDocument, runtime: TranslationRuntime,
+    onProgress: (progress: JournalTranslationProgress) => void): Promise<GraphTranslationResult> {
+    const source = sourceDocument.toObject();
+    const sourceHash = await displaySourceHash(sourceDocument.documentName, source);
+    const existing = await runtime.displayTranslations.find(sourceDocument.uuid, runtime.settings.targetLanguage);
+    const flag = existing && readDisplayTextFlag(existing.flags);
+    const guard = await captureTranslationWriteGuard(existing);
+    if (existing) {
+      if (!flag || flag.documentType !== sourceDocument.documentName || flag.sourceHash !== sourceHash || flag.engineRevision !== DISPLAY_TEXT_REVISION ||
+        flag.glossaryFingerprint !== runtime.glossaryHash || (flag.providerFingerprint && flag.providerFingerprint !== runtime.providerHash)) {
+        throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.IncompatibleExisting"));
+      }
+      const data = existing.toObject() as JournalData;
+      const expected = displayFields(sourceDocument.documentName, source);
+      if (expected.length !== flag.fields.length || expected.some(field => !flag.fields.some(saved =>
+        JSON.stringify(saved.path) === JSON.stringify(field.path) && saved.source === field.source && saved.format === field.format)) ||
+        flag.fields.some(field => readDisplayTranslation(data, field) === null)) {
+        throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnsafeExisting"));
+      }
+      return { data, document: sourceDocument, reused: true, fallbackTextSegments: flag.fallbackTextSegments };
+    }
+    const data = await translateDisplayText({
+      source, sourceUuid: sourceDocument.uuid, kind: sourceDocument.documentName,
+      glossary: runtime.glossary, provider: runtime.provider, cache: runtime.cache,
+      glossaryHash: runtime.glossaryHash, providerHash: runtime.providerHash,
+      settings: { providerId: runtime.settings.provider, sourceLanguage: runtime.settings.sourceLanguage, targetLanguage: runtime.settings.targetLanguage },
+      beforeBatch: () => checkpointControl(runtime.runId),
+      onQualityFallback: fallback => activeTranslations.addIssue(runtime.runId, {
+        type: "fallback", documentName: sourceDocument.name, ...fallback,
+      }),
+      onField: (completedPages, totalPages, pageName) => onProgress({ kind: "display-field", completedPages, totalPages,
+        pageIndex: completedPages - 1, pageName, documentName: sourceDocument.name, translatedText: true, skippedText: false }),
+    });
+    const live = await fromUuid(sourceDocument.uuid);
+    if (!live || !isDisplayDocument(live) || await displaySourceHash(live.documentName, live.toObject()) !== sourceHash) {
+      throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.IncompatibleExisting"));
+    }
+    await runtime.displayTranslations.save(data, guard);
+    Hooks.callAll("foundryTranslateDisplayTextChanged");
+    return { data, document: sourceDocument, reused: false, fallbackTextSegments: readDisplayTextFlag(data.flags)!.fallbackTextSegments };
   }
 
   async #translateJournalOne(

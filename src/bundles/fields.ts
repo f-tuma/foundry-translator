@@ -1,7 +1,8 @@
+import { displayFields, isDisplayDocument } from "../translation/display-text";
 import type { JournalData } from "../translation/journal";
 import { discoverSystemHtmlFieldPaths, discoverEmberTextFieldPaths, readPath, type HtmlFieldPath } from "../translation/system-html-fields";
 
-export type BundleDocumentKind = "JournalEntry" | "Actor" | "Item";
+export type BundleDocumentKind = "JournalEntry" | "Actor" | "Item" | "Scene" | "ActiveEffect";
 export type FieldFormat = "text" | "html" | "markdown";
 export interface PortableField { path: HtmlFieldPath; format: FieldFormat }
 export interface PortableDocument extends FoundryJournalDocument {
@@ -14,6 +15,11 @@ export interface PortableDocument extends FoundryJournalDocument {
 
 /** The import allowlist is derived from local schemas, never from a bundle. */
 export function portableFields(document: PortableDocument, data = document.toObject()): PortableField[] {
+  if (isDisplayDocument(document)) return displayFields(document.documentName, data).map(field => {
+    const path: (string | number)[] = [...field.path];
+    if (path.length === 3) path[1] = (data[path[0]!] as { _id: string }[]).findIndex(row => row._id === field.path[1]);
+    return { path, format: field.format };
+  });
   const fields: PortableField[] = [];
   const addSystem = (runtime: { system?: FoundryRuntimeSystem } | undefined, value: unknown, prefix: HtmlFieldPath): void => {
     for (const path of discoverSystemHtmlFieldPaths(runtime?.system?.constructor?.schema?.fields, value)) {

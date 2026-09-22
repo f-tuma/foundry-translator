@@ -28,6 +28,7 @@ export async function availableDocumentReferences(data: unknown, language: strin
   const keys = [...roots.keys()].sort((a, b) => b.length - a.length);
   const result: DocumentReferenceReplacement[] = [];
   for (const { sourceUuid } of discoverObjectDependencies(data)) {
+    if (/\.ActiveEffect\.[^.]+(?:#.*)?$/u.test(sourceUuid)) continue;
     const root = keys.find((key) => sourceUuid === key || sourceUuid.startsWith(`${key}.`));
     if (!root) continue;
     const target = `${roots.get(root)}${sourceUuid.slice(root.length)}`;
