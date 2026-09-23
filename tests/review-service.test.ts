@@ -222,3 +222,25 @@ it("refuses unsafe undo and validates every planned paragraph before any write",
   await expect(saveReviewRows(current, [{ rowId: row.id, parts: ["Jiná věta."] }, { rowId: "missing", parts: ["X"] }])).rejects.toThrow("MissingField");
   expect(writes).toHaveLength(count);
 });
+
+it("stores notes outside translated documents and preserves proof, source and output hash", async () => {
+  let store: unknown = { version: 1, entries: {} };
+  game.settings = { get: () => store, set: vi.fn(async (_ns, _key, value) => { store = value; }), register: vi.fn(), registerMenu: vi.fn() };
+  let view = await snapshot(); const id = textRow(view).id;
+  view = await updateReview(view, id, { type: "verify" });
+  const before = JSON.stringify(copy), original = JSON.stringify(source), count = writes.length;
+  view = await updateReview(view, id, { type: "editorial", state: "discussion", note: "Should this be claws?" });
+  expect(view.rows.find(row => row.id === id)?.editorial).toMatchObject({ state: "discussion", note: "Should this be claws?" });
+  expect(view.rows.find(row => row.id === id)?.verified).not.toBeNull();
+  expect(JSON.stringify(copy)).toBe(before); expect(JSON.stringify(source)).toBe(original); expect(writes).toHaveLength(count);
+  view = await updateReview(view, id, { type: "save", parts: ["Tříprsté končetiny."] });
+  const updated = view.rows.find(row => row.id === id)!;
+  expect(updated.editorial?.fingerprint).not.toBe(updated.fingerprint); expect(updated.verified).toBeNull();
+  await expect(updateReview({ ...view, rows: view.rows.map(row => ({ ...row, editorial: null })) }, id, { type: "editorial", state: "none", note: "" })).rejects.toThrow("Conflict");
+});
+it("rejects notes when the underlying document changed since opening", async () => {
+  game.settings = { get: () => undefined, set: vi.fn(), register: vi.fn(), registerMenu: vi.fn() };
+  const view = await snapshot(); copy.name = "Externally changed";
+  await expect(updateReview(view, textRow(view).id, { type: "editorial", state: "meaning", note: "note" })).rejects.toThrow("Conflict");
+  expect(game.settings.set).not.toHaveBeenCalled();
+});

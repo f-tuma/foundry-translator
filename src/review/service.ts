@@ -1,3 +1,4 @@
+import { readEditorial, editorialKey, writeEditorial, type EditorialRecord, type EditorialState } from "./editorial";
 import { hasManualOutputEdits } from "../translation/output-hash";
 import { isEditorProtected, readEditorProtection, recordEditorProtection } from "../translation/editor-protection";
 import { MODULE_ID } from "../constants";
@@ -30,7 +31,7 @@ export interface ReviewRecord { fingerprint: string; at: string; userId: string;
 export interface ReviewRow {
   id: string; fieldId: string; unitId: string; group: string; label: string; format: FieldFormat;
   source: string[]; translation: string[]; heading: boolean; fingerprint: string;
-  verified: ReviewRecord | null; blocked: string | null; protected?: boolean;
+  verified: ReviewRecord | null; blocked: string | null; protected?: boolean; editorial?: EditorialRecord | null;
 }
 export interface ReviewField {
   id: string; source: string; translation: string; format: FieldFormat; targetPath: HtmlFieldPath; displayPlain: boolean;
@@ -166,6 +167,8 @@ export async function loadReview(entry: ReviewDocument, knownCatalog?: ReviewDoc
         protected: !rowBlocked && protection?.rows[id] === fingerprint, blocked: rowBlocked, verified: rowBlocked ? null : proof(copy.flags, id, fingerprint) });
     }
   }
+  const editorial = readEditorial();
+  for (const row of snapshot.rows) row.editorial = editorial.entries[editorialKey(current, row.id)] ?? null;
   snapshot.groups.sort((left, right) => {
     const a = groupOrder.get(left.id)!, b = groupOrder.get(right.id)!;
     return a[0]! - b[0]! || a[1]! - b[1]!;
@@ -177,7 +180,7 @@ interface WritableReviewDocument extends FoundryJournalDocument {
   update(data: Record<string, unknown>): Promise<unknown>;
   updateEmbeddedDocuments(kind: string, updates: Record<string, unknown>[]): Promise<unknown>;
 }
-export type ReviewAction = { type: "save"; parts: string[] } | { type: "verify" } | { type: "unverify" };
+export type ReviewAction = { type: "save"; parts: string[] } | { type: "verify" } | { type: "unverify" } | { type: "editorial"; state: EditorialState; note: string };
 
 /** Foundry updates schema arrays as arrays, not dotted numeric object keys. */
 function fieldUpdate(data: Record<string, unknown>, path: HtmlFieldPath, value: string): Record<string, unknown> {
@@ -200,6 +203,10 @@ export async function updateReview(snapshot: ReviewSnapshot, rowId: string, acti
   const row = fresh.rows.find(row => row.id === rowId);
   if (!row) fail("MissingField");
   if (row.blocked) fail(row.blocked);
+  if (action.type === "editorial") {
+    await writeEditorial(fresh.entry, row, snapshot.rows.find(item => item.id === rowId)?.editorial ?? null, action.state, action.note);
+    return loadReview(fresh.entry);
+  }
   const pack = game.packs.get(fresh.entry.pack)!;
   if (pack.locked) fail("Locked");
   const target = await pack.getDocument(fresh.entry.id) as WritableReviewDocument | undefined;

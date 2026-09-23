@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-23
-- Current code/release metadata: `v0.26.0`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
+- Current code/release metadata: `v0.27.0`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
 - Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,47 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-23, editorial queue and context (0.27.0): new **Editorial queue**
+  loads translated document passages in document/section order, filters unverified,
+  discussion, meaning and notes, exposes skipped documents/unavailable rows, and
+  opens fresh source/target context. Next unverified rebuilds the index, crosses
+  documents and wraps; scans yield/cancel. UI localization catalogs remain in their
+  separate existing Interface workspace. Translation memory remains a future step.
+- Shared notes/status use GM-written world setting `reviewEditorial` v1, keyed by
+  copy UUID, source UUID, language and stable row ID. They do not modify source,
+  translated content, output hashes, verification or editor protection. Continuation
+  cannot overwrite this separate store. Notes bind the reviewed fingerprint, survive
+  corrections and warn on changed text; saving again acknowledges the current text.
+  Clearing note plus status deletes the entry. Notes are not private or exported in
+  translation bundles. Limit 8,000 characters/note and 20,000 entries/world. Stale
+  row/document and stale same-note writes are rejected; Foundry has no server CAS,
+  and simultaneous writes to the shared setting can race (documented).
+- Context shows longest matching source glossary terms/aliases, original UUID links,
+  and neighboring paragraphs within the field, all rendered as inert text. No AI
+  calls or automatic edits. Glossary reloads with Refresh. Notes retain drafts across
+  sections/tabs, block document navigation/close, and join the beforeunload guard.
+- Ctrl/Cmd+S saves selected correction or focused note; Ctrl/Cmd+Enter verifies only
+  saved, not-yet-verified rows; Alt+Down opens next unverified. Bookmark localStorage
+  is scoped by origin/world/user/language and stores IDs only, not text; resume validates
+  current document and row. Missing/disabled browser storage is tolerated. Drafts are
+  in memory, not persisted through forced reload/crash.
+- QA uses private loopback Foundry 14.368 + Ember 0.6.2 / Crucible 0.11.0 through CUA,
+  at 1440x1000 and 1024x800. Note/save shortcut, draft navigation guard, meaning queue
+  filter, exact passage opening, correction/save/separate verify, stale-note warning,
+  restart persistence/resume, and next-section keyboard navigation passed. On narrow
+  windows context moves below text; selecting context now scrolls the passage into view.
+  Test source JSON stayed identical; synthetic Section 2 text was restored and its
+  verification cleared. Correction history/protection remain in the disposable fixture.
+  Existing Crucible/Ember data warnings and Bitwarden autofill errors are unrelated.
+  QA infrastructure processes terminated once; removed verified orphan socket and
+  restarted safely. No production access or model calls.
+- Validation: 472 tests pass, four optional LM tests skipped; typecheck, build,
+  release metadata and diff whitespace checks pass. New tests cover shared note
+  conflicts/GM limits, no document changes on metadata save, stale-text detection,
+  queue ordering/filter/wrap/availability, glossary and command boundaries,
+  bookmark isolation, unsaved note guards and separate keyboard save/verify.
+
 
 - 2026-09-23, name consistency and protected continuation (0.26.0): implemented
   the first two proposed advanced editing features. New **Name consistency** tab
