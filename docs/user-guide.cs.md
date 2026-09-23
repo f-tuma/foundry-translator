@@ -351,3 +351,44 @@ Po opravách spusťte kontrolu znovu. Nedostupné dokumenty a nepřeložené ús
 jsou uvedené zvlášť. **Export nálezů JSON** je čitelný protokol pro revizi,
 nikoli import překladů. Kontrola nemusí odhalit významové chyby ani jména,
 která nejsou rozpoznatelná v původní pasáži.
+
+## Redakční fronta a kontext (od 0.27.0)
+
+V editoru otevřete **Redakční fronta → Načíst frontu**. Fronta zahrnuje úseky
+přeložených dokumentů v cílovém jazyce, v pořadí dokumentů a jejich oddílů.
+Filtry **Ke kontrole**, **K diskusi**, **Nesedí význam** a **S poznámkou** pomohou
+rozdělit práci. Nedostupné úseky (například dosud nepřeložené stránky) se neřadí
+do fronty; jejich počet a dokumenty, které se nepodařilo načíst, zůstávají viditelné.
+Fronta se aktualizuje tlačítkem **Načíst frontu**. Otevření úseku vždy načte jeho
+aktuální obsah.
+
+**Kontext a poznámky** u odstavce zobrazí odpovídající hesla glosáře, odkazy
+na originální postavy či místa a sousední odstavce ze stejného textového pole.
+V užším okně se panel přesune pod text. Lze jej skrýt a získat více místa pro
+korekturu. Delší vysvětlení jsou pod ikonami nápovědy.
+
+Redakční stav a poznámku ukládá samostatné tlačítko **Uložit poznámku**.
+Nemění samotný překlad ani příznak ověření. Poznámka zůstane zachována i po
+opravě odstavce, ale upozorní na změněný text; po kontrole ji lze znovu uložit.
+Stav **Bez připomínky** a prázdná poznámka záznam odstraní. Redakční připomínka
+může existovat i u ověřeného úseku: jde o samostatné údaje.
+
+Poznámky jsou sdílená data tohoto světa, nikoli soukromé poznámky uživatele.
+Nepřenášejí se exportem překladů. Ukládají se odděleně od přeložených dokumentů,
+takže pokračující překlad je nepřepíše. Při změně stejné poznámky jiným editorem
+se zastaralé uložení odmítne. Stejně jako u oprav Foundry neposkytuje transakční
+zámek proti dvěma zcela současným zápisům. Poznámky jsou uložené ve společném
+nastavení světa, proto je při práci více redaktorů neukládejte současně.
+
+- **Ctrl/Cmd+S** uloží opravu vybraného úseku; při psaní v panelu uloží poznámku.
+- **Ctrl/Cmd+Enter** samostatně ověří uložený úsek. Rozepsanou opravu neověří
+  a již udělené ověření zkratkou neruší.
+- **Alt+↓** nebo **Další neověřený úsek** načte aktuální frontu a přejde dál,
+  i do následujícího dokumentu. Na konci pokračuje od začátku. Rozepsané opravy
+  a poznámky je třeba nejprve uložit nebo zahodit.
+- **Pokračovat v kontrole** obnoví naposledy vybraný úsek i po zavření editoru
+  nebo obnovení stránky. Pozice je uložená v tomto prohlížeči zvlášť pro svět,
+  uživatele a cílový jazyk. Pokud už úsek neexistuje, editor požádá o nový výběr.
+
+Rozepsané změny nejsou automaticky ukládané na disk; editor brání zavření a
+upozorní při obnovování stránky. Před ukončením práce je uložte.

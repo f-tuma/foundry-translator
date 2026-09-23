@@ -15,6 +15,8 @@ async function fixture() {
     async close() { this.element.remove(); return this; }
   } } } });
   const service = await import("../src/review/service");
+  const glossary = await import("../src/glossary/compendium-repository");
+  vi.spyOn(glossary.GlossaryCompendiumRepository.prototype, "loadExisting").mockResolvedValue([]);
   const settings = await import("../src/settings/settings");
   vi.spyOn(settings, "getTranslatorSettings").mockReturnValue({ targetLanguage: "cs" } as ReturnType<typeof settings.getTranslatorSettings>);
   const snapshot: ReviewSnapshot = { entry: { id: "copy", uuid: "Compendium.world.pack.JournalEntry.copy", kind: "JournalEntry", name: "<img src=x onerror=alert(1)>", sourceUuid: "JournalEntry.source", language: "cs", pack: "world.pack" },
@@ -27,7 +29,7 @@ async function fixture() {
     verified: action.type === "verify" ? { fingerprint: row.fingerprint, at: "2026-09-22", userId: "gm", userName: "GM" } : null } : row) }));
   const { TranslationReviewApplication } = await import("../src/review/review-app");
   const app = new TranslationReviewApplication(); document.body.append(app.element); await app.render(true);
-  return { app, Event, save };
+  return { app, Event, save, snapshot };
 }
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -58,4 +60,30 @@ it("retains the draft after a detected conflict and does not mark it verified", 
   await vi.waitFor(() => expect(app.element.querySelector("textarea")!.disabled).toBe(false));
   expect(app.element.querySelector("textarea")!.value).toBe("Moje oprava");
   expect(app.element.querySelector<HTMLButtonElement>("[data-review-verify]")!.disabled).toBe(true);
+});
+it("keeps note drafts across sections, blocks navigation and refuses to close until explicitly discarded", async () => {
+  const { app, Event, snapshot } = await fixture();
+  await app.openAt(snapshot.entry.uuid, "document", "row1");
+  const note = app.element.querySelector<HTMLTextAreaElement>("[data-review-context] textarea")!;
+  note.value = "Need to check this meaning."; note.dispatchEvent(new Event("input"));
+  await app.close(); expect(app.element.isConnected).toBe(true);
+  await expect(app.openAt(snapshot.entry.uuid, "page2", "row2")).rejects.toThrow("UnsavedNavigation");
+  (app.element.querySelectorAll("nav button")[1] as HTMLButtonElement).click();
+  await vi.waitFor(() => expect(app.element.querySelector("textarea")!.value).toBe("Další"));
+  await app.close(); expect(app.element.isConnected).toBe(true);
+  app.element.querySelector<HTMLButtonElement>("[data-review-discard]")!.click();
+  await app.close(); expect(app.element.isConnected).toBe(false);
+});
+it("scopes shortcuts to the selected row, saves before verifying and never toggles an existing verification off", async () => {
+  const { app, Event, save } = await fixture();
+  const input = app.element.querySelector("textarea")!;
+  input.dispatchEvent(new Event("focusin", { bubbles: true }));
+  input.value = "Nový překlad"; input.dispatchEvent(new Event("input"));
+  const key = (value: string) => { const event = new Event("keydown", { bubbles: true, cancelable: true }); Object.assign(event, { key: value, ctrlKey: true }); app.element.querySelector("textarea")!.dispatchEvent(event); };
+  key("Enter"); expect(save).not.toHaveBeenCalled();
+  key("s"); await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  await vi.waitFor(() => expect(app.element.querySelector("textarea")!.disabled).toBe(false));
+  key("Enter"); await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+  await vi.waitFor(() => expect(app.element.querySelector("textarea")!.disabled).toBe(false));
+  key("Enter"); expect(save).toHaveBeenCalledTimes(2);
 });
