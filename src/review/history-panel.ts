@@ -17,7 +17,7 @@ export class ReviewHistoryPanel {
     for (const { doc, operation } of entries.slice(this.#page * 20, (this.#page + 1) * 20)) {
       const item = el("article", "ft-workbench__hit"), header = el("header");
       header.append(el("strong", "", doc.entry.name), button(t("OpenPassage"), () => this.#host.run(() => this.#host.open(doc.entry.uuid, operation.rows[0]?.group, operation.rows[0]?.rowId))));
-      item.append(header, el("small", "", `${new Date(operation.at).toLocaleString()} · ${operation.userName} · ${t("Passages")}: ${operation.rows.length} · ${["Undo", "Correction"].includes(operation.label) ? t(operation.label) : operation.label}`));
+      item.append(header, el("small", "", `${new Date(operation.at).toLocaleString()} · ${operation.userName} · ${t("Passages")}: ${operation.rows.length} · ${["Undo", "Correction", "ProjectImport"].includes(operation.label) ? t(operation.label) : operation.label}`));
       const details = el("details"); details.open = this.#confirm === `${doc.entry.uuid}:${operation.id}`;
       details.append(el("summary", "", t("ShowChanges")));
       for (const row of operation.rows) {

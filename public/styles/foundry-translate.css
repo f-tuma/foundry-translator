@@ -1231,6 +1231,9 @@
 .ft-review .ft-workbench__primary { background: var(--ft-color-accent); color: #171b1b; border-color: var(--ft-color-accent); align-self: flex-end; padding: 9px 18px; }
 .ft-workbench__file { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .ft-workbench__file input { max-width: 220px; }
+.ft-project .ft-workbench__hit > small { display: block; margin: 7px 0; color: var(--ft-color-text-muted); }
+.ft-project__details { display: grid; gap: 14px; margin-top: 14px; }
+.ft-project__details > section { padding-top: 12px; border-top: 1px solid var(--ft-color-border); }
 .ft-ui-review__key { font-size: 11px; margin-bottom: 8px; overflow-wrap: anywhere; }
 .ft-ui-review__key code { display: block; white-space: normal; font-size: 11px; margin: 6px 0; }
 .ft-workbench__reset { padding: 10px; border: 1px solid var(--ft-color-warning); }

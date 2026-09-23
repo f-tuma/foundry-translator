@@ -7,11 +7,14 @@ import { ReviewSearchPanel } from "./search-panel";
 import { UiReviewPanel } from "./ui-panel";
 import { ReviewHistoryPanel } from "./history-panel";
 import { resolveReviewTarget } from "./target";
+import { LocalReviewDrafts, documentDraft, draftFor, recoverText, textPayload, type TextDraft } from "./drafts";
+import { RecoveryPanel, previewRecovery, type RecoveryPreview } from "./recovery-panel";
+import { EditorialProjectPanel } from "./project-panel";
 import type { PanelHost } from "./elements";
 import { getTranslatorSettings } from "../settings/settings";
 import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
 import { loadReview, reviewCatalog, updateReview, type ReviewDocument, type ReviewRow, type ReviewSnapshot } from "./service";
-import { maskReviewReferences, restoreReviewReferences, type ReviewReference } from "./text-plan";
+import { maskReviewReferences, restoreReviewReferences } from "./text-plan";
 
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Review.${key}`);
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] => {
@@ -20,11 +23,6 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?
 const button = (label: string, action: () => void): HTMLButtonElement => {
   const node = el("button", "", label); node.type = "button"; node.addEventListener("click", action); return node;
 };
-interface Draft { text: string[]; references: ReviewReference[][] }
-function draftFor(row: ReviewRow): Draft {
-  const parts = row.translation.map(maskReviewReferences);
-  return { text: parts.map(part => part.text), references: parts.map(part => part.references) };
-}
 
 export class TranslationReviewApplication extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = { id: "foundry-translate-review", classes: ["foundry-translate", "ft-review-window"],
@@ -35,14 +33,19 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   #noteDrafts = new Map<string, NoteDraft>();
   #selectedRow: string | undefined;
   #contextVisible = false;
-  #drafts = new Map<string, Draft>();
+  #drafts = new Map<string, TextDraft>();
+  #draftWarning = "";
+  #localDrafts = new LocalReviewDrafts(() => getTranslatorSettings().targetLanguage, key => {
+    this.#draftWarning = t(key); const warning = this.element?.querySelector<HTMLElement>("[data-draft-warning]");
+    if (warning) { warning.textContent = this.#draftWarning; warning.hidden = false; }
+  });
   #busy = false;
   #onlyUnverified = false;
   #search = "";
   #message = "";
   #error = false;
   #scrollTop = 0;
-  #mode: "documents" | "search" | "interface" | "history" | "names" | "queue" = "documents";
+  #mode: "documents" | "search" | "interface" | "history" | "names" | "queue" | "recovery" | "project" = "documents";
   #focusRow: string | undefined;
   #host: PanelHost = {
     run: action => { void this.#run(action); }, render: () => { void this.render({ force: true }); },
@@ -53,10 +56,33 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   #queuePanel = new EditorialQueuePanel(this.#host);
   #contextPanel = new ReviewContextPanel();
   #searchPanel = new ReviewSearchPanel(this.#host);
-  #uiPanel = new UiReviewPanel(this.#host);
+  #uiPanel = new UiReviewPanel(this.#host, this.#localDrafts);
+  #recoveryPanel = new RecoveryPanel(this.#host, this.#localDrafts, preview => this.#recover(preview));
+  #projectPanel = new EditorialProjectPanel(this.#host, () => this.#hasDrafts(), async () => { this.#catalog = null; this.#snapshot = null; this.#queuePanel.invalidate(); this.#searchPanel.invalidate(); await this.#uiPanel.load(); });
   #namePanel = new NameConsistencyPanel(this.#host);
   #historyPanel = new ReviewHistoryPanel(this.#host);
   #hasDrafts(): boolean { return this.#drafts.size > 0 || this.#noteDrafts.size > 0 || this.#uiPanel.dirty || this.#searchPanel.dirty; }
+
+  async #recover(preview: RecoveryPreview): Promise<void> {
+    if (this.#hasDrafts()) throw new Error("Review.UnsavedNavigation");
+    const fresh = await previewRecovery(preview.saved, getTranslatorSettings().targetLanguage);
+    if (fresh.blocked || JSON.stringify(fresh.current) !== JSON.stringify(preview.current) || fresh.snapshot?.guard.fingerprint !== preview.snapshot?.guard.fingerprint || JSON.stringify(fresh.ui?.catalog.store) !== JSON.stringify(preview.ui?.catalog.store) || JSON.stringify(fresh.snapshot?.rows.map(row => row.editorial)) !== JSON.stringify(preview.snapshot?.rows.map(row => row.editorial))) throw new Error("Review.Conflict");
+    const p = preview.saved.payload;
+    if (p.kind === "ui") {
+      this.#uiPanel.recover(fresh.ui!, p.value); this.#mode = "interface";
+      this.#localDrafts.adopt(preview.saved, { ...p, baseline: fresh.ui!.row.value });
+    } else {
+      await this.#selectDocument(p.uuid, p.group, p.rowId);
+      const row = this.#snapshot!.rows.find(row => row.id === p.rowId)!;
+      // A second load in selectDocument must still be the previewed version.
+      if (row.blocked || this.#snapshot!.sourceHash !== fresh.snapshot!.sourceHash || this.#snapshot!.guard.fingerprint !== fresh.snapshot!.guard.fingerprint || JSON.stringify(row.editorial) !== JSON.stringify(fresh.snapshot!.rows.find(item => item.id === p.rowId)?.editorial)) throw new Error("Review.Conflict");
+      if (p.kind === "text") this.#drafts.set(row.id, recoverText(p));
+      else this.#noteDrafts.set(row.id, { state: p.state, note: p.note });
+      this.#localDrafts.adopt(preview.saved, { ...p, ...documentDraft(this.#snapshot!, row), ...(p.kind === "note" ? { baselineNote: row.editorial ?? null } : {}) });
+    }
+    this.#status(t("DraftRecovered"));
+  }
+  #clearDraft(kind: "text" | "note", rowId: string): void { if (this.#snapshot) this.#localDrafts.clear(`${kind}:${this.#snapshot.entry.uuid}:${rowId}`); }
 
   #watchingUnload = false;
   #beforeUnload = (event: BeforeUnloadEvent): void => {
@@ -130,7 +156,8 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const help = el("span"); help.innerHTML = renderHelpTooltip(t("Help"), t("Heading")); heading.append(help);
     header.append(heading);
     const tabs = el("div", "ft-workbench__tabs"); tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", t("Workspaces"));
-    for (const [mode, label] of [["documents", "Documents"], ["queue", "Queue"], ["search", "GlobalSearch"], ["names", "NameConsistency"], ["interface", "Interface"], ["history", "History"]] as const) {
+    const savedDrafts = this.#localDrafts.list();
+    for (const [mode, label] of [["documents", "Documents"], ["queue", "Queue"], ["search", "GlobalSearch"], ["names", "NameConsistency"], ["interface", "Interface"], ["history", "History"], ["recovery", "Recovery"], ["project", "Project"]] as const) {
       const tab = button(t(label), () => {
         void this.#run(async () => {
           this.#mode = mode; this.#scrollTop = 0;
@@ -140,12 +167,14 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
           if (mode === "documents" && this.#snapshot && !this.#drafts.size && !this.#noteDrafts.size) this.#snapshot = await loadReview(this.#snapshot.entry);
         });
       });
+      if (mode === "recovery" && savedDrafts.length) tab.textContent += ` (${savedDrafts.length})`;
       tab.setAttribute("role", "tab"); tab.setAttribute("aria-selected", String(this.#mode === mode)); tab.classList.toggle("is-current", this.#mode === mode); tabs.append(tab);
     }
     header.append(tabs);
+    const draftWarning = el("p", "ft-review__error", this.#draftWarning); draftWarning.dataset.draftWarning = ""; draftWarning.hidden = !this.#draftWarning; header.append(draftWarning);
     if (this.#mode !== "documents") {
       root.append(header);
-      try { root.append(this.#mode === "queue" ? this.#queuePanel.render() : this.#mode === "search" ? this.#searchPanel.render() : this.#mode === "interface" ? await this.#uiPanel.render() : this.#mode === "names" ? this.#namePanel.render() : await this.#historyPanel.render()); }
+      try { root.append(this.#mode === "project" ? this.#projectPanel.render() : this.#mode === "recovery" ? this.#recoveryPanel.render() : this.#mode === "queue" ? this.#queuePanel.render() : this.#mode === "search" ? this.#searchPanel.render() : this.#mode === "interface" ? await this.#uiPanel.render() : this.#mode === "names" ? this.#namePanel.render() : await this.#historyPanel.render()); }
       catch (error) { this.#message = String(error); this.#error = true; }
       root.append(this.#footer()); activateHelpTooltips(root); return root;
     }
@@ -237,7 +266,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const footer = el("footer", "ft-review__footer");
     const status = el("p", this.#error ? "ft-review__error" : "", this.#message); status.dataset.reviewStatus = ""; status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
     const dirty = el("span", "", (this.#drafts.size + this.#noteDrafts.size) ? t("UnsavedCount").replace("{count}", String(this.#drafts.size + this.#noteDrafts.size)) : ""); dirty.dataset.reviewDirtyCount = "";
-    const discard = button(t("DiscardAll"), () => { this.#drafts.clear(); this.#noteDrafts.clear(); this.#uiPanel.discard(); this.#searchPanel.discard(); this.#status(t("Discarded")); void this.render({ force: true }); });
+    const discard = button(t("DiscardAll"), () => { for (const id of this.#drafts.keys()) this.#clearDraft("text", id); for (const id of this.#noteDrafts.keys()) this.#clearDraft("note", id); this.#drafts.clear(); this.#noteDrafts.clear(); this.#uiPanel.discard(); this.#searchPanel.discard(); this.#status(t("Discarded")); void this.render({ force: true }); });
     discard.dataset.reviewDiscard = ""; footer.append(status, dirty, discard); return footer;
   }
 
@@ -255,6 +284,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const changed = () => {
       this.#drafts.set(row.id, draft);
       if (JSON.stringify(draft) === JSON.stringify(draftFor(row))) this.#drafts.delete(row.id);
+      if (this.#drafts.has(row.id)) this.#localDrafts.write(textPayload(this.#snapshot!, row, draft)); else this.#clearDraft("text", row.id);
       this.#updateRowState(tr, row);
       const discard = this.element.querySelector<HTMLButtonElement>("[data-review-discard]"); if (discard) discard.disabled = !this.#drafts.size && !this.#noteDrafts.size;
       const count = this.element.querySelector("[data-review-dirty-count]"); if (count) count.textContent = (this.#drafts.size + this.#noteDrafts.size) ? t("UnsavedCount").replace("{count}", String(this.#drafts.size + this.#noteDrafts.size)) : "";
@@ -286,13 +316,13 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
         const current = this.#drafts.get(row.id); if (!current) return;
         const parts = current.text.map((text, index) => restoreReviewReferences(text, current.references[index]!));
         this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: "save", parts });
-        this.#drafts.delete(row.id); this.#searchPanel.invalidate(true); this.#status(t("Saved"));
+        this.#clearDraft("text", row.id); this.#drafts.delete(row.id); this.#searchPanel.invalidate(true); this.#status(t("Saved"));
       })); save.dataset.reviewSave = "";
       const verify = button(row.verified ? t("Unverify") : t("Verify"), () => void this.#run(async () => {
         this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: row.verified ? "unverify" : "verify" });
         this.#status(t(row.verified ? "Unverified" : "Verified"));
       })); verify.dataset.reviewVerify = "";
-      const discard = button(t("Discard"), () => { this.#scrollTop = this.element.querySelector(".ft-review__scroll")?.scrollTop ?? 0; this.#drafts.delete(row.id); void this.render({ force: true }); }); discard.dataset.reviewDiscardRow = "";
+      const discard = button(t("Discard"), () => { this.#scrollTop = this.element.querySelector(".ft-review__scroll")?.scrollTop ?? 0; this.#clearDraft("text", row.id); this.#drafts.delete(row.id); void this.render({ force: true }); }); discard.dataset.reviewDiscardRow = "";
       actions.append(save, verify, discard);
     }
     tr.append(original, translated, actions); this.#updateRowState(tr, row); return tr;
@@ -303,7 +333,8 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     tr.classList.toggle("is-dirty", dirty); tr.classList.toggle("is-verified", !!row.verified && !dirty);
     const status = tr.querySelector<HTMLElement>("[data-row-status]")!;
     status.textContent = t(dirty ? "Unsaved" : row.blocked ? "Unavailable" : row.verified ? "Verified" : "NeedsReview");
-    status.title = row.verified ? `${row.verified.userName} · ${new Date(row.verified.at).toLocaleString()}` : "";
+    status.title = row.verified ? `${row.verified.importedAt ? `${t("ImportedVerification")} · ` : ""}${row.verified.userName} · ${new Date(row.verified.at).toLocaleString()}` : "";
+    if (row.verified?.importedAt && !dirty) status.textContent = t("ImportedVerification");
     const save = tr.querySelector<HTMLButtonElement>("[data-review-save]"); if (save) { save.disabled = !dirty; save.hidden = !dirty; }
     const verify = tr.querySelector<HTMLButtonElement>("[data-review-verify]"); if (verify) { verify.disabled = dirty; verify.title = dirty ? t("SaveFirst") : ""; }
     const discard = tr.querySelector<HTMLButtonElement>("[data-review-discard-row]"); if (discard) discard.hidden = !dirty;
@@ -320,14 +351,15 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const root = this.#contextPanel.render(this.#snapshot!, row, draft, {
       change: value => {
         if (JSON.stringify(value) === JSON.stringify(noteFor(row))) this.#noteDrafts.delete(row.id); else this.#noteDrafts.set(row.id, value);
+        if (this.#noteDrafts.has(row.id)) this.#localDrafts.write({ ...documentDraft(this.#snapshot!, row), kind: "note", baselineNote: row.editorial ?? null, ...value }); else this.#clearDraft("note", row.id);
         const count = this.element.querySelector("[data-review-dirty-count]"); if (count) count.textContent = this.#drafts.size + this.#noteDrafts.size ? t("UnsavedCount").replace("{count}", String(this.#drafts.size + this.#noteDrafts.size)) : "";
         const discard = this.element.querySelector<HTMLButtonElement>("[data-review-discard]"); if (discard) discard.disabled = !this.#hasDrafts();
       },
       save: () => void this.#run(async () => {
         this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: "editorial", ...draft });
-        this.#noteDrafts.delete(row.id); this.#queuePanel.invalidate(); this.#status(t("NoteSaved"));
+        this.#clearDraft("note", row.id); this.#noteDrafts.delete(row.id); this.#queuePanel.invalidate(); this.#status(t("NoteSaved"));
       }),
-      discard: () => { this.#noteDrafts.delete(row.id); void this.render({ force: true }); },
+      discard: () => { this.#clearDraft("note", row.id); this.#noteDrafts.delete(row.id); void this.render({ force: true }); },
       close: () => { this.#contextVisible = false; void this.render({ force: true }); },
       go: next => { this.#remember(next); this.#focusRow = next.id; void this.render({ force: true }); },
       open: uuid => void this.#run(async () => { const doc = await fromUuid(uuid) as { sheet?: { render(options: { force: boolean }): unknown } } | null; if (!doc?.sheet) throw new Error("Review.TranslationMissing"); doc.sheet.render({ force: true }); }),

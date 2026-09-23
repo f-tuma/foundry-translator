@@ -2,8 +2,9 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.26.0** adds glossary name checks and protected editorial corrections
-that survive continuation of unfinished journals. The editor also includes global
+Version **0.28.0** adds recoverable local drafts and previewed editorial project
+export/import, including notes and imported attestations. Glossary name checks
+and protected editorial corrections survive continuation of unfinished journals. The editor also includes global
 fuzzy search, previewed bulk corrections, undo history and Czech UI catalogs. It also supports display-only translations for scenes and active
 effects, preserving their original UUIDs and game mechanics, including Ember automation.
 It includes safe pause/continue, protected saved translations,
@@ -64,6 +65,20 @@ embedded items together; the table aligns original paragraphs with editable
 translations. Inline formatting is preserved through separate text segments.
 Link markers protect UUIDs and game commands while their display labels remain
 editable. Search a section or show only unverified blocks.
+
+
+**Recovery** restores locally saved document, note and interface drafts after a
+reload or crash, with a comparison against current content. Recovery only fills
+the editor; save and verification remain separate. Storage failures are visible
+and drafts can be downloaded. Bulk replacement selections require a fresh preview.
+
+**Project file** exports saved translations, glossary, notes, issue states,
+valid attestations and Czech interface overrides. Import has explicit selection
+and text/metadata previews, requires matching original UUIDs and content, and
+rejects stale previews. Imported attestations retain the claimed author and time
+and are visibly labelled; they are not signatures. Stale notes remain stale.
+Existing conflicting glossary terms are preserved. Drafts and undo history are
+not transferred. Partial failures are reported; reopen the file to re-plan.
 
 Open **Find and replace** to search all stored translations in the target language.
 Choose original or translated text, document types and unverified-only results.

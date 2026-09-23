@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-09-23
-- Current code/release metadata: `v0.27.0`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
+- Current code/release metadata: `v0.28.0`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
 - Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,53 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-23, recovery and editorial projects (0.28.0): **Recovery** persists
+  document paragraph/link-label drafts, notes and UI overrides locally per
+  origin/world/user/language and editor session. Every input persists; quota or
+  denied storage is visibly reported, with in-memory JSON download fallback.
+  Fresh-editor recovery compares current content; changed sources/structures block
+  it, changed translations require explicit use of the draft. Recovery fills only
+  the editor. Successful saves or explicit discard remove matching revisions;
+  another tab's newer draft is preserved. Bulk replacement selections are not
+  persisted and must be freshly searched/previewed.
+- **Project file** is a versioned 100 MB JSON wrapper around the existing 50 MB
+  translation bundle, with portable row attestations/editorial notes and Czech UI
+  overrides. Canonical source UUIDs bind proof to the entire original field plus
+  exact translated paragraph; copy UUIDs are remapped during import. Imported
+  proofs retain claimed author/time, have no local user ID and display as imported.
+  Stale notes remain stale; absent notes do not erase local notes. Undo history
+  and local drafts are not transferred. Source UUID/content/structure checks,
+  preview selection and freshness guards precede writes. Existing text updates use
+  saveReviewRows (history, protected structures, editor receipts, proof clearing).
+  Existing valid local proof is retained. New copies reuse bundle creation.
+  Matching protected corrections also transfer their continuation receipts; receipt
+  creation still refuses to bless unknown local edits.
+  Incompatible partial coverage is blocked instead of guessed. Glossary import
+  is an independent opt-in for additions; conflicting existing choices are kept.
+- Import is sequential, not an all-world transaction. Partial errors are reported;
+  reload the file for a fresh preview before retrying. Shared notes retain the
+  Foundry setting concurrency limitation documented in 0.27. Attestations are
+  portable claims, not signatures. Repeated identical import makes no writes.
+- Validation: 483 tests pass, four optional LM integration suites skipped;
+  typecheck, production build, release metadata verification and diff check pass.
+  CUA QA at localhost Foundry 14.368 / Ember 0.6.2 / Crucible 0.11.0 restored a
+  persisted paragraph in a fresh browser tab, verified no document write before
+  Save and separate verification, then exported seven documents with zero skips.
+  Reimport selected only the synthetic QA journal, restored its text and note,
+  preserved the proof author/time and marked the attestation as imported. Real
+  downloaded JSON was used. Semantic file-chooser invocation timed out once;
+  retry through the current AX file-input button succeeded. No production access.
+  Browser plugin skill absent; available native CUA browser used, no external
+  Playwright process. The browser reload guard prevented one attempted reload;
+  recovery was therefore exercised in a new tab (cold editor instance).
+  Final native QA also rejected a project preview after a subsequent paragraph/note
+  edit, verified 1440x1000 and 1024x800 layouts/scrolling, and found no module console
+  errors. Temporary QA paragraph/note/proof changes were restored (original source
+  unchanged, zero notes/drafts). The QA proxy later exited with 143 during cleanup;
+  the orphaned socket was removed after confirming the server exited, and a fresh
+  loopback instance was used to restore browser-only settings. Screenshot/chooser
+  timing glitches were automation-side, not module errors.
 
 - 2026-09-23, editorial queue and context (0.27.0): new **Editorial queue**
   loads translated document passages in document/section order, filters unverified,

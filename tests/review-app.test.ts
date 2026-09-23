@@ -6,7 +6,9 @@ async function fixture() {
   vi.resetModules();
   const { document, Event } = parseHTML("<html><body></body></html>");
   vi.stubGlobal("document", document);
-  vi.stubGlobal("game", { i18n: { localize: (key: string) => key }, tooltip: { activate: vi.fn(), deactivate: vi.fn(), clearPending: vi.fn() } });
+  vi.stubGlobal("game", { world: { id: "qa" }, user: { id: "gm", isGM: true }, i18n: { localize: (key: string) => key }, tooltip: { activate: vi.fn(), deactivate: vi.fn(), clearPending: vi.fn() } });
+  const storage = new Map<string, string>();
+  vi.stubGlobal("localStorage", { get length() { return storage.size; }, key: (i: number) => [...storage.keys()][i] ?? null, getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) });
   vi.stubGlobal("foundry", { applications: { api: { ApplicationV2: class {
     readonly element = document.createElement("section");
     readonly content = document.createElement("div");
@@ -22,16 +24,34 @@ async function fixture() {
   const snapshot: ReviewSnapshot = { entry: { id: "copy", uuid: "Compendium.world.pack.JournalEntry.copy", kind: "JournalEntry", name: "<img src=x onerror=alert(1)>", sourceUuid: "JournalEntry.source", language: "cs", pack: "world.pack" },
     rows: [{ id: "row1", fieldId: "field1", group: "document", unitId: "text", label: "name", format: "text", source: ["Original"], translation: ["Překlad"], fingerprint: "f1", verified: null, heading: false, blocked: null },
       { id: "row2", fieldId: "field2", group: "page2", unitId: "text", label: "name", format: "text", source: ["Other"], translation: ["Další"], fingerprint: "f2", verified: null, heading: false, blocked: null }],
-    sourceName: "Source", fields: [], groups: [{ id: "document", name: "Source" }, { id: "page2", name: "Page two" }], guard: { id: "copy", fingerprint: "x" }, sourceHash: "source", warning: null, partial: false, reverse: new Map() };
+    sourceName: "Source", fields: ["field1", "field2"].map(id => ({ id, source: id === "field1" ? "Original" : "Other", translation: id === "field1" ? "Překlad" : "Další", format: "text", targetPath: ["name"], displayPlain: false })), groups: [{ id: "document", name: "Source" }, { id: "page2", name: "Page two" }], guard: { id: "copy", fingerprint: "x" }, sourceHash: "source", warning: null, partial: false, reverse: new Map() };
   vi.spyOn(service, "reviewCatalog").mockResolvedValue([snapshot.entry]);
   vi.spyOn(service, "loadReview").mockResolvedValue(snapshot);
   const save = vi.spyOn(service, "updateReview").mockImplementation(async (view, id, action) => ({ ...view, rows: view.rows.map(row => row.id === id ? { ...row, translation: action.type === "save" ? action.parts : row.translation,
     verified: action.type === "verify" ? { fingerprint: row.fingerprint, at: "2026-09-22", userId: "gm", userName: "GM" } : null } : row) }));
   const { TranslationReviewApplication } = await import("../src/review/review-app");
   const app = new TranslationReviewApplication(); document.body.append(app.element); await app.render(true);
-  return { app, Event, save, snapshot };
+  return { app, Event, save, snapshot, storage, TranslationReviewApplication };
 }
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it("offers a persisted crash draft in a new editor, restores only to the form and clears recovery only after saving", async () => {
+  const { app, Event, save, storage, TranslationReviewApplication } = await fixture();
+  const input = app.element.querySelector("textarea")!; input.value = "Rozepsaná oprava"; input.dispatchEvent(new Event("input"));
+  expect([...storage.keys()].some(key => key.includes("review-draft"))).toBe(true);
+  app.element.remove();
+  const cold = new TranslationReviewApplication(); document.body.append(cold.element); await cold.render(true);
+  expect(cold.element.querySelector("textarea")!.value).toBe("Překlad"); expect(save).not.toHaveBeenCalled();
+  const click = (text: string) => { const item = [...cold.element.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes(`Review.${text}`)); expect(item).toBeTruthy(); item!.click(); };
+  click("Recovery"); await vi.waitFor(() => expect(cold.element.textContent).toContain("DownloadDraft"));
+  click("Preview"); await vi.waitFor(() => expect(cold.element.textContent).toContain("RecoveryReady"));
+  click("RecoverDraft"); await vi.waitFor(() => expect(cold.element.querySelector("textarea")!.value).toBe("Rozepsaná oprava"));
+  expect(save).not.toHaveBeenCalled();
+  cold.element.querySelector<HTMLButtonElement>("[data-review-save]")!.click();
+  await vi.waitFor(() => expect(cold.element.querySelector("[data-review-status]")!.textContent).toContain("Saved"));
+  expect([...storage.keys()].filter(key => key.includes("review-draft"))).toEqual([]);
+  expect(cold.element.querySelector("[data-row-status]")!.textContent).toContain("NeedsReview");
+});
 
 it("keeps drafts across sections, prevents accidental closing and requires saving before verification", async () => {
   const { app, Event, save } = await fixture();

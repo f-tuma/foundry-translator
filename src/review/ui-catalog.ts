@@ -3,7 +3,7 @@ import { sha256 } from "../translation/hash";
 
 export type UiScope = "core" | "ember" | "crucible";
 export const UI_OVERRIDES_SETTING = "uiTranslationOverrides";
-export interface UiOverride { scope: UiScope; key: string; source: string; base: string; value: string; at: string; userName: string; verified?: string }
+export interface UiOverride { scope: UiScope; key: string; source: string; base: string; value: string; at: string; userName: string; verified?: string; importedAt?: string }
 export interface UiStore { version: 1; entries: UiOverride[] }
 export interface UiRow { scope: UiScope; key: string; source: string; base: string; value: string; override: UiOverride | null; blocked: boolean; verified: boolean }
 export interface UiCatalog { rows: UiRow[]; store: UiStore; errors: string[] }
@@ -115,6 +115,29 @@ export async function importUiOverrides(preview: UiImport): Promise<UiCatalog> {
   const checked = previewUiImport(preview.catalog, JSON.stringify({ format: "foundry-translate-ui", version: 1, language: "cs", entries: preview.entries }));
   const entries = [...current.entries.filter(entry => !checked.entries.some(change => same(change, entry))), ...checked.entries];
   await game.settings.set(MODULE_ID, UI_OVERRIDES_SETTING, { version: 1, entries }); return loadUiCatalog();
+}
+
+/** Project imports may carry a foreign attestation, always labelled as imported. */
+export async function previewUiProject(catalog: UiCatalog, incoming: UiOverride[]): Promise<UiImport> {
+  const entries: UiOverride[] = []; let skipped = 0;
+  for (const item of incoming) {
+    const row = catalog.rows.find(row => same(item, row));
+    if (!row || !safeKey(item.key) || !compatible(row, item)) { skipped++; continue; }
+    const proof = item.verified && item.verified === await fingerprint(item) ? item.verified : undefined;
+    if (row.value === item.value && (!proof || row.verified)) continue;
+    entries.push({ scope: row.scope, key: row.key, source: row.source, base: row.base, value: item.value, at: item.at, userName: item.userName,
+      ...(proof ? { verified: proof, importedAt: new Date().toISOString() } : {}) });
+  }
+  return { catalog, entries, skipped };
+}
+export async function importUiProject(preview: UiImport): Promise<UiCatalog> {
+  gm();
+  const catalog = await loadUiCatalog();
+  if (JSON.stringify(catalog.store) !== JSON.stringify(preview.catalog.store)) fail("Conflict");
+  const checked = await previewUiProject(catalog, preview.entries), current = readStore();
+  if (checked.skipped || JSON.stringify(current) !== JSON.stringify(catalog.store)) fail("Conflict");
+  if (checked.entries.length) await game.settings.set(MODULE_ID, UI_OVERRIDES_SETTING, { version: 1, entries: [...current.entries.filter(entry => !checked.entries.some(change => same(change, entry))), ...checked.entries] });
+  return loadUiCatalog();
 }
 
 /** Run after native catalogs load, BEFORE Foundry pre-localizes data-model labels.

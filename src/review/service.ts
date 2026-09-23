@@ -1,4 +1,5 @@
-import { readEditorial, editorialKey, writeEditorial, type EditorialRecord, type EditorialState } from "./editorial";
+import { readEditorial, editorialKey, writeEditorial, EDITORIAL_SETTING, type EditorialRecord, type EditorialState } from "./editorial";
+import type { PortableReviewMetadata } from "./project-format";
 import { hasManualOutputEdits } from "../translation/output-hash";
 import { isEditorProtected, readEditorProtection, recordEditorProtection } from "../translation/editor-protection";
 import { MODULE_ID } from "../constants";
@@ -27,7 +28,7 @@ const SPECS = [
 export interface ReviewDocument {
   id: string; pack: string; uuid: string; name: string; kind: BundleDocumentKind; sourceUuid: string; language: string;
 }
-export interface ReviewRecord { fingerprint: string; at: string; userId: string; userName: string }
+export interface ReviewRecord { fingerprint: string; at: string; userId: string; userName: string; importedAt?: string }
 export interface ReviewRow {
   id: string; fieldId: string; unitId: string; group: string; label: string; format: FieldFormat;
   source: string[]; translation: string[]; heading: boolean; fingerprint: string;
@@ -221,6 +222,50 @@ export async function updateReview(snapshot: ReviewSnapshot, rowId: string, acti
 }
 
 export interface ReviewChange { rowId: string; parts: string[] }
+/** Portable attestation: source context and canonical links, independent of copy IDs. */
+export function portableReviewBinding(snapshot: ReviewSnapshot, row: ReviewRow, parts = row.translation): Promise<string> {
+  const field = snapshot.fields.find(field => field.id === row.fieldId)!;
+  return sha256(JSON.stringify([row.id, row.format, field.source, remapBundleReferences(parts, snapshot.reverse)]));
+}
+export async function importReviewMetadata(snapshot: ReviewSnapshot, records: PortableReviewMetadata[]): Promise<ReviewSnapshot> {
+  gmOnly();
+  if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
+  const fresh = await loadReview(snapshot.entry);
+  if (fresh.guard.fingerprint !== snapshot.guard.fingerprint || fresh.sourceHash !== snapshot.sourceHash) fail("Conflict");
+  const notes = readEditorial(), previousNotes = JSON.stringify(notes), patch: Record<string, unknown> = {};
+  const protectedRows: Record<string, string> = {}, protectedFields = new Set<string>();
+  for (const record of records) {
+    const row = fresh.rows.find(row => row.id === record.rowId), expected = snapshot.rows.find(row => row.id === record.rowId);
+    if (!row || row.blocked || await portableReviewBinding(fresh, row) !== record.binding) fail("Conflict");
+    if (record.protected && !row.protected && !displayKind(fresh.entry.kind)) { protectedRows[row.id] = row.fingerprint; protectedFields.add(row.fieldId); }
+    if (record.proof && !row.verified) {
+      patch[`flags.${MODULE_ID}.review.version`] = 1;
+      patch[`flags.${MODULE_ID}.review.entries.${row.id}`] = { fingerprint: row.fingerprint, at: record.proof.at, userName: record.proof.userName, userId: "", importedAt: new Date().toISOString() } satisfies ReviewRecord;
+    }
+    if (record.editorial) {
+      if (JSON.stringify(row.editorial ?? null) !== JSON.stringify(expected?.editorial ?? null)) fail("Conflict");
+      const note = record.editorial, key = editorialKey(fresh.entry, row.id);
+      const fingerprint = note.stale ? `imported-stale:${record.binding}` : row.fingerprint;
+      notes.entries[key] = { state: note.state, note: note.note, at: note.at, userName: note.userName, fingerprint };
+    }
+  }
+  if (Object.keys(notes.entries).length > 20000) fail("NoteInvalid");
+  const target = await game.packs.get(fresh.entry.pack)!.getDocument(fresh.entry.id) as WritableReviewDocument | undefined;
+  if (!target || (await captureTranslationWriteGuard(target))?.fingerprint !== fresh.guard.fingerprint || JSON.stringify(readEditorial()) !== previousNotes) fail("Conflict");
+  if (protectedFields.size) {
+    const data = target.toObject(), flag = SPECS.find(spec => spec.pack === fresh.entry.pack)!.read(target.flags)!;
+    const protection = await recordEditorProtection(data, data, fresh.sourceHash, "outputHash" in flag ? flag.outputHash : undefined,
+      fresh.fields.filter(field => protectedFields.has(field.id)).map(field => ({ id: field.id, path: JSON.parse(field.id) as HtmlFieldPath, value: field.translation })), protectedRows);
+    if (protection) patch[`flags.${MODULE_ID}.editorProtection`] = protection;
+    if ((await captureTranslationWriteGuard(target))?.fingerprint !== fresh.guard.fingerprint) fail("Conflict");
+  }
+  if (Object.keys(patch).length) await target.update(patch);
+  if (JSON.stringify(notes) !== previousNotes) {
+    if (JSON.stringify(readEditorial()) !== previousNotes) fail("Conflict");
+    await game.settings.set(MODULE_ID, EDITORIAL_SETTING, notes);
+  }
+  return loadReview(fresh.entry);
+}
 export interface ReviewHistoryEntry {
   id: string; at: string; userName: string; sourceHash: string; label: string;
   rows: { rowId: string; before: string[]; after: string[]; label: string; group: string }[];
