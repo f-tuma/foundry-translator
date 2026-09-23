@@ -10,6 +10,11 @@ export class ReviewSearchPanel {
   #selected = new Set<string>(); #replacements = new Map<string, string>(); #variant: string | null = null;
   #plan: BulkPlan | null = null; #page = 0; #previewPage = 0; #stop = false;
   constructor(host: PanelHost) { this.#host = host; }
+  async openQuery(query: string): Promise<void> {
+    if (this.dirty) throw new Error("Review.UnsavedNavigation");
+    this.#query = query; this.#side = "translation"; this.#fuzzy = true; this.#kind = "all"; this.#unverified = false;
+    await this.search(true);
+  }
   get dirty(): boolean { return [...this.#replacements.values()].some(Boolean); }
   discard(): void { this.#selected.clear(); this.#replacements.clear(); this.#plan = null; }
   invalidate(keepReplacements = false): void { this.#index = null; this.#hits = []; this.#plan = null; this.#searched = ""; this.#selected.clear(); if (!keepReplacements) this.#replacements.clear(); }

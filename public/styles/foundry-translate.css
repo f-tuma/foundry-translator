@@ -1252,3 +1252,14 @@
   .ft-workbench__hit > header, .ft-review__footer { flex-wrap: wrap; }
 }
 .ft-workbench__excerpt mark { background: #5c4f21; color: #ffe7a4; border-radius: 2px; padding: 1px 2px; }
+
+/* Name audit shares the workbench's inert two-column passage cards. */
+.ft-review__protected { display: block; margin: 8px 0; color: var(--ft-color-accent); font-size: 11px; line-height: 1.45; }
+.ft-name__candidate { margin: 8px 0; font-weight: 600; color: var(--ft-color-accent); overflow-wrap: anywhere; }
+.ft-name__approved { flex: 0 0 auto; max-height: 150px; overflow: auto; font-size: 12px; }
+.ft-name__approved summary { cursor: pointer; padding: 6px 0; }
+.ft-name__approved .ft-workbench__toolbar { padding: 6px 0; }
+[data-name-panel] > .ft-workbench__toolbar input[type="search"] { flex: 1 1 180px; min-width: 150px; }
+[data-name-panel] .ft-workbench__hit .ft-workbench__toolbar input[type="text"] { width: auto; flex: 1 1 180px; }
+.ft-workbench__summary { margin: 0; color: var(--ft-color-text-muted); font-size: 12px; }
+.ft-workbench__toolbar .ft-workbench__check { flex: 0 0 auto; justify-content: flex-start; }

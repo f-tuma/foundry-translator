@@ -1,3 +1,5 @@
+import { loadReview, reviewCatalog, saveReviewRows, updateReview } from "../src/review/service";
+import { isEditorProtected, readEditorProtection } from "../src/translation/editor-protection";
 import { parseHTML } from "linkedom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODULE_ID } from "../src/constants";
@@ -40,6 +42,18 @@ function storedDocument(pack: string, id: string) {
     get name() { return rows.get(id)?.name; },
     get flags() { return rows.get(id)?.flags; },
     toObject: () => structuredClone(rows.get(id)),
+    update: async (patch: Stored) => {
+      const data = rows.get(id)!;
+      function apply(target: Stored, values: Stored) {
+        for (const [key, value] of Object.entries(values)) {
+          const path = key.split("."); let obj = target;
+          for (const part of path.slice(0, -1)) obj = obj[part] ??= {};
+          obj[path.at(-1)!] = structuredClone(value);
+        }
+      }
+      const { pages, items, ...root } = patch; apply(data, root);
+      for (const [collection, changes] of [[data.pages, pages], [data.items, items]]) for (const change of changes ?? []) apply(collection.find((entry: Stored) => entry._id === change._id), change);
+    },
   };
 }
 function makePack(name: string) {
@@ -421,4 +435,73 @@ describe("scene and effect display translation", () => {
     expect([...tables.get("world.foundry-translate-actors")!.values()][0]!.effects).toEqual(actorData.effects);
   });
 
+});
+
+async function correctCheckpoint() {
+  const snapshot = await loadReview((await reviewCatalog("cs")).find(entry => entry.sourceUuid === sourceDoc.uuid)!);
+  const paragraph = snapshot.rows.find(row => row.group === "pages:page1" && row.label === "text.content")!;
+  const name = snapshot.rows.find(row => row.group === "document" && row.label === "name")!;
+  const corrected = await saveReviewRows(snapshot, [{ rowId: paragraph.id, parts: ["Ručně opravený odstavec."] }, { rowId: name.id, parts: ["Můj Průvodce"] }]);
+  return updateReview(corrected, paragraph.id, { type: "verify" });
+}
+describe("editor-protected continuation", () => {
+  it("continues a cancelled book with corrected title and paragraph, keeping verification and history", async () => {
+    await interruptAfterFirstPage();
+    rootCopy()!.flags.otherModule = { note: "Keep this module state" };
+    rootCopy()!.ownership = { default: 0 };
+    const edited = await correctCheckpoint();
+    expect(edited.protection).toBe("tracked");
+    expect(edited.rows.filter(row => row.protected)).toHaveLength(2);
+    tables.get("world.foundry-translate-cache")!.clear(); mock.translate.mockClear();
+    const result = await new JournalTranslationService().translate(sourceDoc);
+    expect(result.data.flags!.otherModule).toEqual({ note: "Keep this module state" });
+    expect(result.data.ownership).toEqual({ default: 0 });
+    expect(result.data.name).toBe("Můj Průvodce");
+    expect(result.data.pages[0]!.text!.content).toBe("<p>Ručně opravený odstavec.</p>");
+    expect(readJournalTranslationFlag(result.data.flags)?.partial).toBe(false);
+    expect(await isEditorProtected(result.data, readJournalTranslationFlag(result.data.flags)!.sourceHash, readJournalTranslationFlag(result.data.flags)!.outputHash)).toBe(true);
+    const reviewed = await loadReview(edited.entry);
+    expect(reviewed.rows.find(row => row.protected && row.group === "pages:page1")?.verified).toBeTruthy();
+    expect(result.data.flags![MODULE_ID]!.reviewHistory).toBeTruthy();
+    expect(mock.translate.mock.calls.flatMap(([request]) => request.texts).join(" ")).not.toContain("paragraph 1");
+    mock.translate.mockClear(); await new JournalTranslationService().translate(sourceDoc); expect(mock.translate).not.toHaveBeenCalled();
+  });
+  it("accepts editor corrections while paused, including their separate verification", async () => {
+    const job = new JournalTranslationService({ onProgress: progress => {
+      if (progress.completedPages === 1) activeTranslations.requestPause(latestRun().id);
+    } }).translate(sourceDoc);
+    await vi.waitFor(() => expect(latestRun()?.pausedAt).toBeDefined());
+    await correctCheckpoint(); activeTranslations.resume(latestRun().id);
+    const result = await job;
+    expect(result.data.name).toBe("Můj Průvodce");
+    expect(result.data.pages[0]!.text!.content).toBe("<p>Ručně opravený odstavec.</p>");
+    expect(readEditorProtection(result.data)?.rows).toBeTruthy();
+  });
+  it.each(["before", "after"])("does not bless an unrelated change made %s an editor correction", async when => {
+    await interruptAfterFirstPage();
+    if (when === "before") rootCopy()!.pages[1]!.name = "Nesledovaná změna";
+    await correctCheckpoint();
+    if (when === "after") rootCopy()!.pages[1]!.name = "Nesledovaná změna";
+    const saved = structuredClone(rootCopy()); mock.translate.mockClear();
+    await expect(new JournalTranslationService().translate(sourceDoc)).rejects.toThrow("EditedPartial");
+    expect(rootCopy()).toEqual(saved); expect(mock.translate).not.toHaveBeenCalled();
+  });
+  it("still rejects changed glossary and source after a tracked correction", async () => {
+    await interruptAfterFirstPage(); await correctCheckpoint();
+    source.pages[1]!.text!.content = "<p>Changed original.</p>";
+    const saved = structuredClone(rootCopy());
+    await expect(new JournalTranslationService().translate(sourceDoc)).rejects.toThrow("IncompatibleExisting");
+    expect(rootCopy()).toEqual(saved);
+  });
+});
+it("rewrites links in new pages while preserving corrected fields and their review proof", async () => {
+  const actorData = { name: "English Scout", type: "npc", system: { description: "<p>English biography</p>" } };
+  sourceActors.push({ id: "scout", uuid: "Actor.scout", documentName: "Actor", name: actorData.name, type: "npc", toObject: () => structuredClone(actorData) });
+  source.pages[1]!.text!.content += " @UUID[Actor.scout]";
+  await interruptAfterFirstPage(); const edited = await correctCheckpoint();
+  const result = await new JournalTranslationService().translate(sourceDoc);
+  expect(result.data.pages[1]!.text!.content).toContain("@UUID[Compendium.world.foundry-translate-actors.Actor.");
+  expect(result.data.pages[0]!.text!.content).toBe("<p>Ručně opravený odstavec.</p>");
+  expect((await loadReview(edited.entry)).rows.find(row => row.protected && row.group === "pages:page1")?.verified).toBeTruthy();
+  expect(await isEditorProtected(result.data, readJournalTranslationFlag(result.data.flags)!.sourceHash, readJournalTranslationFlag(result.data.flags)!.outputHash)).toBe(true);
 });

@@ -1,3 +1,4 @@
+import { registerNameForms } from "./review/name-consistency";
 import { createApi } from "./api";
 import { MODULE_HOOKS, MODULE_ID, MODULE_TITLE } from "./constants";
 import { logger } from "./logger";
@@ -19,6 +20,7 @@ let ready = false;
 Hooks.once("init", () => {
   registerSettings();
   registerUiOverrides();
+  registerNameForms();
   registerReviewHeaderControl();
   registerJournalTranslationHeaderControl();
   registerGlossaryCandidateHooks();

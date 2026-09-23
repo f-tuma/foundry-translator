@@ -1,8 +1,8 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-09-22
-- Current code/release metadata: `v0.23.0`; verify publication in GitHub Releases. Prior release `v0.21.0` was PR #25 (`bc9e7e4`). Production installation is user-managed.
-- Deployed version: `v0.19.1`; PRs #21 and #22 merged, GitHub release published and installed in Foundry.
+- Updated: 2026-09-23
+- Current code/release metadata: `v0.26.0`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
+- Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
 This document provides the working context needed to continue the project from
@@ -11,6 +11,58 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-23, name consistency and protected continuation (0.26.0): implemented
+  the first two proposed advanced editing features. New **Name consistency** tab
+  checks enabled source glossary terms/aliases against aligned translated rows.
+  Longest source phrases win. Single-word proper names require capitalization in
+  source prose to avoid Tempest/the tempest false positives; generic `term` entries
+  remain case-insensitive. Czech inflection uses the existing conservative guard.
+  Candidates belonging to another expected glossary term are not reported as fuzzy
+  mistakes. Concerns are missing names, original wording, capitalization and similar
+  spellings, never an automatic semantic verdict. Unavailable rows/docs are counted,
+  code/UUID destinations are opaque, inline text and displayed labels are checked.
+  Scans yield and cancel; pagination, source/context, direct paragraph opening,
+  prefilled global search, and audit JSON export are included. `reviewNameForms`
+  is a GM-written world setting, bound to language/source/replacement/mode; it only
+  affects auditing, not translation prompts or glossary hashes. Approvals can be
+  revoked and do not imply paragraph verification; exported audit is not importable.
+
+  `editorProtection` receipts bind sourceHash, generated outputHash and current
+  outputHash, stable field paths/values and corrected-row fingerprints. Editor saves
+  only issue/extend receipts when the previous output is generated or validly tracked.
+  Unknown edits cannot be blessed by saving another paragraph. Older editor changes
+  remain untracked and keep blocking partial continuation. Partial Journal runs skip
+  completed pages, preserve corrected fields byte-for-byte (including root/category
+  names), history/proof and stored root flags/permissions, and stamp the receipt on
+  every checkpoint. A paused job accepts only editor-only changes against its saved
+  checkpoint; other content/metadata edits, deletion or competing output still fail.
+  Graph reference rewriting updates new fields while restoring corrected fields.
+  `hasManualOutputEdits` continues treating receipt-bearing copies as editorial work,
+  even after generation stamps an inclusive output hash. This is optimistic safety,
+  not a server CAS, and is page-level continuation: no edits inside unfinished pages.
+
+  Validation: 460 tests pass, four opt-in LM suites skipped; typecheck/build/release
+  verification and diff check pass. Native private QA: Foundry 14.368 / Ember 0.6.2 /
+  Crucible 0.11.0, localhost:30000, CUA browser (no external Playwright). APEX translated
+  a synthetic six-page book. Prepared a four-page checkpoint from that generated
+  copy, edited and separately verified page 1 plus the title via actual editor UI,
+  then resumed through the source Journal button. Finished 6/6; title, paragraph,
+  verification and history survived, source JSON unchanged. Paused in-flight editing,
+  cache loss, incompatible sources/settings, unrelated edits, and subsequent UUID
+  rewriting are covered by service integration tests. Native audit exposed common-
+  noun/other-name false positives, fixed and regression-tested: final scan had three
+  concerns (Ordain's, Yarnacŭí, Yarnacŭi), 137 term comparisons, 2201 unavailable rows
+  in the old partial guide. Approval/revocation of Ordainu returned the setting to its
+  empty baseline; no original translations were corrected by the audit. Deep link
+  to Main Quest Overview and prefilled fuzzy search both worked. Layout checked at
+  1440×1000 and 1024×800. Existing Ember/Crucible warnings, the expected QA restart
+  disconnect, and a Bitwarden autofill-overlay exception were unrelated to the module.
+  No new translator exception. Production and the user's original local Foundry data were untouched.
+  Synthetic private QA source JournalEntry.jTN8CpBGRSKUa4Jx and copy
+  Compendium.world.foundry-translate-translations.JournalEntry.lJazbyKmrgbifmpu
+  remain as a reproducible receipt/proof fixture (QA Bezpečné Pokračování).
+
 
 - 2026-09-22, scenes/effects (0.23.0): user explicitly requested these two
   unsupported types, leaving macros/playlists/tables alone. Added GM-only Journal

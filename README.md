@@ -2,8 +2,9 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.25.0** expands the translation editor with global fuzzy search,
-previewed bulk corrections, persistent undo history and editable Czech UI catalogs. It also supports display-only translations for scenes and active
+Version **0.26.0** adds glossary name checks and protected editorial corrections
+that survive continuation of unfinished journals. The editor also includes global
+fuzzy search, previewed bulk corrections, undo history and Czech UI catalogs. It also supports display-only translations for scenes and active
 effects, preserving their original UUIDs and game mechanics, including Ember automation.
 It includes safe pause/continue, protected saved translations,
 an adventure translation desk, an Ember-aware name
@@ -100,8 +101,10 @@ section navigation, and closing/reloading requires saving or discarding them.
 
 Edits only update translation copies or display-text sidecars. Locked packs,
 changed sources, mismatched structures and detected intervening edits block writes.
-Pause a running translation before editing; correcting a partial copy blocks its
-automatic continuation to preserve manual work. Foundry does not offer a server
+Pause a running translation before editing. Corrections saved by the 0.26+ editor
+carry a verifiable receipt: unchanged source/glossary/provider allow continuation
+of remaining pages while corrected fields, review marks and history are preserved.
+Untracked changes (including older corrections) still block unfinished copies. Foundry does not offer a server
 compare-and-swap transaction: coordinate simultaneous GM edits to one document.
 JSON bundles include saved corrections; verification marks remain local and must
 be confirmed again in an importing world. A manual mark is a reviewer's approval,
@@ -308,9 +311,28 @@ the module never adds it to the glossary automatically. If the source phrase
 cannot be inferred safely, it is left blank and must be supplied before the
 suggestion can be accepted. Newly generated Journal, Actor, and Item copies also
 carry an output fingerprint. A compatible completed copy with manual corrections
-is reused without rewriting it. An edited unfinished copy is preserved and
-automatic continuation stops for review. The correction can also become a
+is reused. An unfinished copy with tracked editor corrections can continue safely;
+unknown changes still stop automatic continuation for review. The correction can also become a
 glossary suggestion after explicit review.
+
+## Name consistency checks (0.26.0)
+
+In **Translation editor → Name consistency**, run a fresh scan of saved copies.
+It uses enabled glossary names and aliases found in source passages, including
+visible UUID labels. It highlights retained English names, missing equivalents,
+capitalization differences and similar spellings. Recognized Czech inflections
+are shown separately from concerns; this is a spelling heuristic, not semantic
+or grammatical certification. Overlapping source phrases use the longest match.
+
+Open a passage to inspect context, or send a spelling to global search for
+selected replacements with preview. Unusual correct forms can be approved for
+checks in this world, for this language and glossary wording; changing the base
+translation invalidates that approval. Approval does not edit the glossary,
+change translation prompts or mark a passage verified. Approvals can be revoked.
+Re-scan after editing. Exported audit JSON is a report, not an import format.
+Blocked/untranslated passages and unreadable documents are counted explicitly.
+The scan only evaluates terms identifiable in source prose, not all possible
+semantic omissions or names hidden in unlabelled references.
 
 ## Translate a Journal Entry
 

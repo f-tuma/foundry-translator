@@ -1,3 +1,4 @@
+import { isEditorProtected, isEditorOnlyUpdate, preserveEditorContent, restampEditorProtection } from "./editor-protection";
 import { captureTranslationWriteGuard, TranslationConflictError } from "./write-guard";
 import { GlossarySyncCancelledError } from "../glossary/types";
 import { providerFingerprint } from "./provider-fingerprint";
@@ -776,7 +777,8 @@ export class JournalTranslationService {
       const node = nodes.get(document.uuid);
       if (!node?.result || isDisplayDocument(document)) continue;
       const savedFlag = readJournalTranslationFlag(node.result.data.flags) ?? readActorTranslationFlag(node.result.data.flags) ?? readItemTranslationFlag(node.result.data.flags);
-      if (!savedFlag?.outputHash || await hasManualOutputEdits(node.result.data, savedFlag.outputHash)) continue;
+      const protectedJournal = isJournalDocument(document) && !!savedFlag && await isEditorProtected(node.result.data, savedFlag.sourceHash, savedFlag.outputHash);
+      if (!savedFlag?.outputHash || (await hasManualOutputEdits(node.result.data, savedFlag.outputHash) && !protectedJournal)) continue;
       // Compare against the snapshot produced by the service, not a live mutable document.
       const guard = await captureTranslationWriteGuard({ id: node.result.document.id, toObject: () => node.result!.data });
       const replacements: DocumentReferenceReplacement[] = [];
@@ -799,12 +801,13 @@ export class JournalTranslationService {
       if (!replacements.length) continue;
 
       const rewritten = rewriteDocumentReferences(node.result.data, replacements);
+      if (protectedJournal) preserveEditorContent(rewritten, node.result.data);
       if (JSON.stringify(rewritten) === JSON.stringify(node.result.data)) continue;
       if (isJournalDocument(document)) {
         const journalData = rewritten as JournalData;
         const flag = readJournalTranslationFlag(journalData.flags);
         if (flag) await assertJournalSourceUnchanged(document, flag.sourceHash);
-        await stampJournalOutputHash(journalData);
+        restampEditorProtection(journalData, await stampJournalOutputHash(journalData));
         node.result.data = journalData;
         node.result.document = await runtime.translations.save(journalData, guard);
       } else if (isActorDocument(document)) {
@@ -1013,12 +1016,13 @@ export class JournalTranslationService {
         dependencyWarnings: [],
       };
     }
-    if (manuallyEdited) throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.EditedPartial"));
+    if (manuallyEdited && !(existingData && existingFlag && await isEditorProtected(existingData, sourceHash, existingFlag.outputHash))) throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.EditedPartial"));
     const requestedPageIds = pageIds ?? source.pages.map(page => page._id).filter((id): id is string => Boolean(id));
     const remainingPageIds = existingFlag
       ? requestedPageIds.filter(id => !canReuseJournalPageTranslation(existingFlag, sourceHash, id, runtime.glossaryHash, runtime.providerHash))
       : pageIds;
     const resumedPages = remainingPageIds ? requestedPageIds.length - remainingPageIds.length : 0;
+    let latestData = existingData;
     const saveTranslatedData = async (
       data: JournalData,
       mergeInitialPartial: boolean,
@@ -1027,8 +1031,22 @@ export class JournalTranslationService {
       const savedData = mergeInitialPartial && existingData && existingFlag
         ? mergePartialJournalTranslation(existingData, data)
         : data;
-      await stampJournalOutputHash(savedData);
+      // A paused run can accept editor-only corrections to its last checkpoint.
+      // Mechanical edits, deletion, another run, or changed flags remain conflicts.
+      const latest = await runtime.translations.find(sourceDocument.uuid, runtime.settings.targetLanguage);
+      const latestGuard = await captureTranslationWriteGuard(latest);
+      if (latestGuard?.fingerprint !== guard?.fingerprint) {
+        const candidate = latest?.toObject() as JournalData | undefined;
+        const previousFlag = latestData && readJournalTranslationFlag(latestData.flags);
+        if (!candidate || !latestData || !previousFlag || !await isEditorOnlyUpdate(latestData, candidate, sourceHash, previousFlag.outputHash)) {
+          throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.OutputChanged"));
+        }
+        latestData = candidate; guard = latestGuard;
+      }
+      if (latestData && await isEditorProtected(latestData, sourceHash, readJournalTranslationFlag(latestData.flags)?.outputHash)) preserveEditorContent(savedData, latestData);
+      restampEditorProtection(savedData, await stampJournalOutputHash(savedData));
       const document = await runtime.translations.save(savedData, guard);
+      latestData = document.toObject() as JournalData;
       guard = await captureTranslationWriteGuard(document);
       if (sourceDocument.uuid === runtime.rootUuid && document.uuid) {
         activeTranslations.update(runtime.runId, {
