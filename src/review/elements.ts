@@ -24,6 +24,7 @@ export interface PanelHost {
   status(text: string, error?: boolean): void;
   open(uuid: string, group?: string, rowId?: string): Promise<void>;
   language(): string;
+  find?(query: string): Promise<void>;
 }
 export function pager(total: number, page: number, size: number, change: (page: number) => void): HTMLElement {
   const footer = el("div", "ft-workbench__pager");

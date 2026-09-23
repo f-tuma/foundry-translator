@@ -1,3 +1,5 @@
+import { hasManualOutputEdits } from "../translation/output-hash";
+import { isEditorProtected, readEditorProtection, recordEditorProtection } from "../translation/editor-protection";
 import { MODULE_ID } from "../constants";
 import { portableFields, type BundleDocumentKind, type FieldFormat, type PortableDocument } from "../bundles/fields";
 import { assertPortableText } from "../bundles/format";
@@ -28,7 +30,7 @@ export interface ReviewRecord { fingerprint: string; at: string; userId: string;
 export interface ReviewRow {
   id: string; fieldId: string; unitId: string; group: string; label: string; format: FieldFormat;
   source: string[]; translation: string[]; heading: boolean; fingerprint: string;
-  verified: ReviewRecord | null; blocked: string | null;
+  verified: ReviewRecord | null; blocked: string | null; protected?: boolean;
 }
 export interface ReviewField {
   id: string; source: string; translation: string; format: FieldFormat; targetPath: HtmlFieldPath; displayPlain: boolean;
@@ -36,7 +38,7 @@ export interface ReviewField {
 export interface ReviewSnapshot {
   entry: ReviewDocument; sourceName: string; rows: ReviewRow[]; fields: ReviewField[];
   groups: { id: string; name: string }[]; guard: TranslationWriteGuard; sourceHash: string;
-  warning: string | null; partial: boolean; reverse: Map<string, string>;
+  warning: string | null; partial: boolean; protection?: "tracked" | "untracked" | null; reverse: Map<string, string>;
 }
 
 function fail(key: string): never { throw new Error(`Review.${key}`); }
@@ -109,6 +111,10 @@ export async function loadReview(entry: ReviewDocument, knownCatalog?: ReviewDoc
   const snapshot: ReviewSnapshot = { entry: current, sourceName: String(data.name ?? current.sourceUuid), rows: [], fields: [],
     groups: [{ id: "document", name: String(data.name ?? current.name) }], guard: (await captureTranslationWriteGuard(copy))!, sourceHash, warning,
     partial: "partial" in flag && flag.partial, reverse };
+  const outputHash = "outputHash" in flag ? flag.outputHash : undefined;
+  const tracked = !display && await isEditorProtected(output, sourceHash, outputHash);
+  const protection = tracked ? readEditorProtection(output) : null;
+  snapshot.protection = tracked ? "tracked" : !display && snapshot.partial && (!outputHash || await hasManualOutputEdits(output, outputHash)) ? "untracked" : null;
   const groupIds = new Set(["document"]);
   const groupOrder = new Map<string, number[]>([["document", [-1, -1]]]);
   for (const field of portableFields(source, data)) {
@@ -157,7 +163,7 @@ export async function loadReview(entry: ReviewDocument, knownCatalog?: ReviewDoc
       const fingerprint = await sha256(JSON.stringify([id, field.format, original, parts]));
       snapshot.rows.push({ id, fieldId, unitId: unit.id, group, label: unit.attribute ? `${label} · ${unit.attribute}` : label,
         format: field.format, source: unit.parts, translation: parts, heading: unit.heading, fingerprint,
-        blocked: rowBlocked, verified: rowBlocked ? null : proof(copy.flags, id, fingerprint) });
+        protected: !rowBlocked && protection?.rows[id] === fingerprint, blocked: rowBlocked, verified: rowBlocked ? null : proof(copy.flags, id, fingerprint) });
     }
   }
   snapshot.groups.sort((left, right) => {
@@ -277,6 +283,18 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
       } else if (collection === "categories" && path.length === 3 && path[2] === "name") patch.categories = entries;
       else fail("MissingField");
     } else Object.assign(patch, fieldUpdate(staged, path, storedValue));
+  }
+  if (!displayKind(fresh.entry.kind)) {
+    const flag = SPECS.find(spec => spec.pack === fresh.entry.pack)!.read(target.flags)!;
+    const protectedRows: Record<string, string> = {};
+    for (const change of history.rows) {
+      const row = fresh.rows.find(row => row.id === change.rowId)!, field = fresh.fields.find(field => field.id === row.fieldId)!;
+      protectedRows[row.id] = await sha256(JSON.stringify([row.id, field.format, field.source, change.after]));
+    }
+    const protection = await recordEditorProtection(data, staged, fresh.sourceHash, ("outputHash" in flag ? flag.outputHash : undefined),
+      [...fieldValues].map(([id, value]) => ({ id, path: JSON.parse(id) as HtmlFieldPath, value })), protectedRows);
+    // Explicit null clears a stale receipt instead of authenticating unknown edits.
+    patch[`flags.${MODULE_ID}.editorProtection`] = protection;
   }
   patch[`flags.${MODULE_ID}.reviewHistory.${history.id}`] = history;
   if (options.undoId) patch[`flags.${MODULE_ID}.reviewHistory.${options.undoId}.undoneAt`] = history.at;

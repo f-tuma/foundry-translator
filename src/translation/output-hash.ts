@@ -1,3 +1,4 @@
+import { MODULE_ID } from "../constants";
 import { sha256 } from "./hash";
 
 /**
@@ -31,5 +32,8 @@ export async function hasManualOutputEdits(
   data: Record<string, unknown>,
   expectedHash: string | undefined,
 ): Promise<boolean> {
-  return Boolean(expectedHash) && await translatedOutputHash(data) !== expectedHash;
+  const flags = data.flags as Record<string, Record<string, unknown>> | undefined;
+  // A generated checkpoint may include preserved editorial work. Keep treating
+  // that work as manual even after a safe continuation stamps the new output.
+  return Boolean(flags?.[MODULE_ID]?.editorProtection) || (Boolean(expectedHash) && await translatedOutputHash(data) !== expectedHash);
 }

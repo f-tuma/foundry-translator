@@ -74,9 +74,14 @@ Pokud dokument mezitím upravil někdo jiný, editor odmítne přepis a ponechá
 rozepsaný text v okně ke zkopírování. Současné opravy více GM ve stejném
 dokumentu si koordinujte; Foundry nenabízí atomický zámek mezi klienty.
 
-Před opravami pozastavte překlad. **Ruční opravy rozpracované kopie zablokují
-automatické pokračování této kopie**, aby se nepřepsaly. Pro souvislou práci
-je proto vhodné nejdříve dokončit překlad dokumentu a potom ho korigovat.
+Před opravami pozastavte překlad. Od verze **0.26.0** se opravy uložené tímto
+editorem označí jako **Oprava chráněná při navázání**. Při pokračování nebo
+novém spuštění se dopřeloží zbývající stránky; opravené texty, název, kategorie,
+ověření a historie zůstanou zachované. Podmínkou je stejný originál, glosář a
+nastavení překladače. Změny mimo sledované opravy (také opravy ze starších verzí)
+nadále blokují automatické navázání. Uložení další opravy je samo neodsouhlasí.
+Ochrana neznamená ověření významu. Hotové stránky se znovu nepřekládají;
+uvnitř rozpracované stránky zatím nelze opravovat jednotlivé hotové věty.
 Změněný zdroj, nesoulad struktury nebo zamčené kompendium ukládání zablokuje.
 Originální dobrodružství zůstává beze změn.
 
@@ -320,3 +325,29 @@ blokuje přepsání existujícího záznamu. Pokud chcete takový záznam nahrad
 nejprve si uchovejte potřebné opravy a odstraňte jen příslušný překlad, nikoli scénu.
 Záznamy jsou součástí JSON balíčku; formát 3 vyžaduje modul 0.23.0 nebo novější.
 Import nevyžaduje AI a nemění herní dokumenty. Makra, hudba a tabulky se nepřekládají.
+
+## Kontrola názvů (0.26.0)
+
+V editoru otevřete **Kontrola názvů → Zkontrolovat názvy**. Kontrola vyhledá
+aktivní hesla a jejich aliasy v originálu a porovná odpovídající českou pasáž.
+Přednost mají delší názvy, takže „Old Carinth“ nezamění za samostatný „Carinth“.
+Prohlíží i popisky odkazů; UUID, příkazy a kód nehodnotí jako překládaný text.
+
+- **Zůstal původní název**: v českém textu se našel anglický název.
+- **Podobný zápis / velikost písmen k revizi**: možný překlep nebo jiná podoba.
+- **Odpovídající název nenalezen**: porovnejte celé věty; někdy je v překladu
+  správně použité zájmeno nebo volnější formulace.
+- **I odpovídající tvary** zobrazí přesné znění, rozpoznané české skloňování
+  a ručně schválené tvary. Rozpoznávání je pomůcka, ne jazyková záruka.
+
+**Otevřít oddíl** vede na konkrétní odstavec. **Najít tuto podobu k opravě**
+přejde do hromadného hledání; každou náhradu vyberete a zkontrolujete v náhledu.
+U hesel se skloňováním můžete potvrdit neobvyklý správný tvar pomocí
+**Schválit tvar pro kontrolu**. Tím se nemění překlad, glosář, prompt modelu ani
+ověření odstavce. Schválení platí pro tento svět, jazyk a znění hesla; lze je
+zrušit v **Ručně schválené tvary**. Po změně základního překladu už neplatí.
+
+Po opravách spusťte kontrolu znovu. Nedostupné dokumenty a nepřeložené úseky
+jsou uvedené zvlášť. **Export nálezů JSON** je čitelný protokol pro revizi,
+nikoli import překladů. Kontrola nemusí odhalit významové chyby ani jména,
+která nejsou rozpoznatelná v původní pasáži.

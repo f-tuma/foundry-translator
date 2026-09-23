@@ -1,3 +1,4 @@
+import { NameConsistencyPanel } from "./name-panel";
 import { labelFor } from "./labels";
 import { ReviewSearchPanel } from "./search-panel";
 import { UiReviewPanel } from "./ui-panel";
@@ -35,15 +36,17 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   #message = "";
   #error = false;
   #scrollTop = 0;
-  #mode: "documents" | "search" | "interface" | "history" = "documents";
+  #mode: "documents" | "search" | "interface" | "history" | "names" = "documents";
   #focusRow: string | undefined;
   #host: PanelHost = {
     run: action => { void this.#run(action); }, render: () => { void this.render({ force: true }); },
     status: (message, error) => this.#status(message, error), language: () => getTranslatorSettings().targetLanguage,
     open: (uuid, group, rowId) => this.#selectDocument(uuid, group, rowId),
+    find: async query => { await this.#searchPanel.openQuery(query); this.#mode = "search"; },
   };
   #searchPanel = new ReviewSearchPanel(this.#host);
   #uiPanel = new UiReviewPanel(this.#host);
+  #namePanel = new NameConsistencyPanel(this.#host);
   #historyPanel = new ReviewHistoryPanel(this.#host);
   #hasDrafts(): boolean { return this.#drafts.size > 0 || this.#uiPanel.dirty || this.#searchPanel.dirty; }
 
@@ -65,7 +68,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const target = resolveReviewTarget(this.#catalog, uuid);
     if (!target) throw new Error("Review.TranslationMissing");
     this.#snapshot = await loadReview(target.entry); this.#group = group ?? target.group;
-    this.#focusRow = rowId; this.#mode = "documents"; this.#search = ""; this.#onlyUnverified = false; this.#scrollTop = 0;
+    this.#status(""); this.#focusRow = rowId; this.#mode = "documents"; this.#search = ""; this.#onlyUnverified = false; this.#scrollTop = 0;
   }
 
   async close(options?: Record<string, unknown>): Promise<FoundryApplicationV2> {
@@ -84,7 +87,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     this.#scrollTop = this.element.querySelector(".ft-review__scroll")?.scrollTop ?? 0;
     this.element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement | HTMLSelectElement>(".ft-review input,.ft-review textarea,.ft-review button,.ft-review select").forEach(input => { input.disabled = true; });
     const stop = this.element.querySelector<HTMLButtonElement>("[data-review-stop]");
-    if (stop) { stop.hidden = false; stop.disabled = false; }
+    if (stop) { stop.hidden = false; stop.disabled = false; stop.onclick = () => { this.#searchPanel.stop(); this.#namePanel.stop(); }; }
     this.#status(t("Working"));
     try { await action(); } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -114,11 +117,12 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const help = el("span"); help.innerHTML = renderHelpTooltip(t("Help"), t("Heading")); heading.append(help);
     header.append(heading);
     const tabs = el("div", "ft-workbench__tabs"); tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", t("Workspaces"));
-    for (const [mode, label] of [["documents", "Documents"], ["search", "GlobalSearch"], ["interface", "Interface"], ["history", "History"]] as const) {
+    for (const [mode, label] of [["documents", "Documents"], ["search", "GlobalSearch"], ["names", "NameConsistency"], ["interface", "Interface"], ["history", "History"]] as const) {
       const tab = button(t(label), () => {
         void this.#run(async () => {
           this.#mode = mode; this.#scrollTop = 0;
           if (mode === "history") this.#historyPanel.invalidate();
+          if (mode === "names") this.#namePanel.invalidate();
           if (mode === "documents" && this.#snapshot && !this.#drafts.size) this.#snapshot = await loadReview(this.#snapshot.entry);
         });
       });
@@ -127,7 +131,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     header.append(tabs);
     if (this.#mode !== "documents") {
       root.append(header);
-      try { root.append(this.#mode === "search" ? this.#searchPanel.render() : this.#mode === "interface" ? await this.#uiPanel.render() : await this.#historyPanel.render()); }
+      try { root.append(this.#mode === "search" ? this.#searchPanel.render() : this.#mode === "interface" ? await this.#uiPanel.render() : this.#mode === "names" ? this.#namePanel.render() : await this.#historyPanel.render()); }
       catch (error) { this.#message = String(error); this.#error = true; }
       root.append(this.#footer()); activateHelpTooltips(root); return root;
     }
@@ -171,7 +175,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     label.append(checkbox, document.createTextNode(t("OnlyUnverified")));
     filters.append(search, label, el("span", "ft-review__progress", this.#counts())); root.append(filters);
     if (this.#snapshot?.warning) root.append(el("p", "ft-review__warning", t(this.#snapshot.warning)));
-    else if (this.#snapshot?.partial) root.append(el("p", "ft-review__warning", t("PartialWarning")));
+    else if (this.#snapshot?.partial) root.append(el("p", "ft-review__warning", t(this.#snapshot.protection === "tracked" ? "ProtectedPartial" : this.#snapshot.protection === "untracked" ? "UntrackedPartial" : "PartialWarning")));
     const layout = el("div", "ft-review__layout");
     const nav = el("nav", "ft-review__nav"); nav.setAttribute("aria-label", t("Sections"));
     const groups = this.#snapshot?.groups ?? [];
@@ -247,6 +251,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
       }
     });
     const status = el("span", "ft-review__badge"); status.dataset.rowStatus = ""; actions.append(status);
+    if (row.protected) actions.append(el("small", "ft-review__protected", t("ProtectedRow")));
     if (row.blocked) actions.append(el("small", "ft-review__reason", t(row.blocked)));
     else {
       const save = button(t("Save"), () => void this.#run(async () => {
