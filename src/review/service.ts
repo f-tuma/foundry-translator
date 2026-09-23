@@ -88,9 +88,9 @@ function proof(flags: FoundryJournalDocument["flags"], id: string, fingerprint: 
   return value?.fingerprint === fingerprint && typeof value.at === "string" && typeof value.userId === "string" && typeof value.userName === "string" ? value : null;
 }
 
-export async function loadReview(entry: ReviewDocument): Promise<ReviewSnapshot> {
+export async function loadReview(entry: ReviewDocument, knownCatalog?: ReviewDocument[]): Promise<ReviewSnapshot> {
   gmOnly();
-  const catalog = await reviewCatalog(entry.language);
+  const catalog = knownCatalog ?? await reviewCatalog(entry.language);
   const matches = catalog.filter(item => item.sourceUuid === entry.sourceUuid && item.kind === entry.kind);
   if (matches.length !== 1 || matches[0]?.uuid !== entry.uuid) fail("IdentityChanged");
   const current = matches[0];
@@ -186,6 +186,7 @@ function fieldUpdate(data: Record<string, unknown>, path: HtmlFieldPath, value: 
 /** Re-derive the allowlist and compare a fresh snapshot; callers never supply a write path.
  * Foundry has no server CAS: this detects intervening edits, not simultaneous GM commits. */
 export async function updateReview(snapshot: ReviewSnapshot, rowId: string, action: ReviewAction): Promise<ReviewSnapshot> {
+  if (action.type === "save") return saveReviewRows(snapshot, [{ rowId, parts: action.parts }]);
   gmOnly();
   if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   const fresh = await loadReview(snapshot.entry);
@@ -197,37 +198,105 @@ export async function updateReview(snapshot: ReviewSnapshot, rowId: string, acti
   if (pack.locked) fail("Locked");
   const target = await pack.getDocument(fresh.entry.id) as WritableReviewDocument | undefined;
   if (!target || (await captureTranslationWriteGuard(target))?.fingerprint !== fresh.guard.fingerprint) fail("Conflict");
-  if (action.type === "save") {
-    const field = fresh.fields.find(field => field.id === row.fieldId)!;
-    if (action.parts.length !== row.translation.length || action.parts.some(part => typeof part !== "string" || !part.trim())) fail("EmptyText");
-    const value = planReviewText(field.translation, field.format).replace(row.unitId, action.parts);
-    try {
-      assertPortableText(field.source, remapBundleReferences(value, fresh.reverse), field.format);
-      // Also retain copy-specific targets. Normalizing two different copies to the same
-      // source must never make a target change acceptable.
-      assertPortableText(field.translation, value, field.format);
-    } catch { fail("ProtectedText"); }
-    const storedValue = field.displayPlain ? `<p>${escapeDisplayText(value)}</p>` : value;
-    const path = field.targetPath;
-    if (typeof path[1] === "number") {
-      const collection = path[0]!;
-      const entries = target.toObject()[collection] as Record<string, unknown>[];
-      const item = entries[path[1]];
-      if (!item) fail("MissingField");
-      if (collection === "pages" || collection === "items") {
-        await target.updateEmbeddedDocuments(collection === "pages" ? "JournalEntryPage" : "Item", [{ _id: item._id, ...fieldUpdate(item, path.slice(2), storedValue) }]);
-      } else if (collection === "categories" && path.length === 3 && path[2] === "name") {
-        await target.update({ categories: entries.map((entry, index) => index === path[1] ? { ...entry, name: storedValue } : entry) });
-      } else fail("MissingField");
-    } else await target.update(fieldUpdate(target.toObject(), path, storedValue));
-    // Never stamp the generated outputHash: manual corrections must remain protected.
-  } else {
-    const user = game.user as { id?: string; name?: string };
-    const value: ReviewRecord | null = action.type === "verify" ? {
-      fingerprint: row.fingerprint, at: new Date().toISOString(), userId: user.id ?? "", userName: user.name ?? "GM",
-    } : null;
-    await target.update({ [`flags.${MODULE_ID}.review.version`]: 1, [`flags.${MODULE_ID}.review.entries.${row.id}`]: value });
-  }
+  const user = game.user as { id?: string; name?: string };
+  const value: ReviewRecord | null = action.type === "verify" ? {
+    fingerprint: row.fingerprint, at: new Date().toISOString(), userId: user.id ?? "", userName: user.name ?? "GM",
+  } : null;
+  await target.update({ [`flags.${MODULE_ID}.review.version`]: 1, [`flags.${MODULE_ID}.review.entries.${row.id}`]: value });
   if (displayKind(fresh.entry.kind)) Hooks.callAll("foundryTranslateDisplayTextChanged");
   return loadReview(fresh.entry);
+}
+
+export interface ReviewChange { rowId: string; parts: string[] }
+export interface ReviewHistoryEntry {
+  id: string; at: string; userName: string; sourceHash: string; label: string;
+  rows: { rowId: string; before: string[]; after: string[]; label: string; group: string }[];
+  undoneAt?: string;
+}
+export interface ReviewHistoryDocument { entry: ReviewDocument; operations: ReviewHistoryEntry[] }
+export function readReviewHistory(flags: FoundryJournalDocument["flags"]): ReviewHistoryEntry[] {
+  const history = flags?.[MODULE_ID]?.reviewHistory as Record<string, ReviewHistoryEntry> | undefined;
+  return Object.values(history ?? {}).filter(item => item && typeof item.id === "string" && typeof item.at === "string" && Array.isArray(item.rows));
+}
+export async function reviewHistory(language: string): Promise<ReviewHistoryDocument[]> {
+  const result: ReviewHistoryDocument[] = [];
+  for (const entry of await reviewCatalog(language)) {
+    const doc = await game.packs.get(entry.pack)!.getDocument(entry.id);
+    const operations = readReviewHistory(doc?.flags);
+    if (operations.length) result.push({ entry, operations });
+  }
+  return result;
+}
+
+/** Compile only schema-allowed text updates. One document update includes its embedded
+ * changes and undo record, so a lost response can be resolved from persistent history. */
+export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string } = {}): Promise<ReviewSnapshot> {
+  gmOnly();
+  if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
+  const fresh = await loadReview(snapshot.entry);
+  if (fresh.guard.fingerprint !== snapshot.guard.fingerprint || fresh.sourceHash !== snapshot.sourceHash) fail("Conflict");
+  if (!changes.length || new Set(changes.map(change => change.rowId)).size !== changes.length) fail("MissingField");
+  const pack = game.packs.get(fresh.entry.pack)!;
+  if (pack.locked) fail("Locked");
+  const target = await pack.getDocument(fresh.entry.id) as WritableReviewDocument | undefined;
+  if (!target) fail("Conflict");
+  const data = target.toObject(), staged = structuredClone(data), fieldValues = new Map<string, string>();
+  const history: ReviewHistoryEntry = { id: options.id ?? crypto.randomUUID(), at: new Date().toISOString(), userName: (game.user as { name?: string }).name ?? "GM",
+    sourceHash: fresh.sourceHash, label: options.label ?? "Correction", rows: [] };
+  if (!/^[a-zA-Z0-9-]{1,80}$/u.test(history.id) || (options.undoId && !/^[a-zA-Z0-9-]{1,80}$/u.test(options.undoId))) fail("MissingField");
+  if (readReviewHistory(target.flags).some(item => item.id === history.id)) fail("Conflict");
+  const patch: Record<string, unknown> = {};
+  for (const change of changes) {
+    const row = fresh.rows.find(row => row.id === change.rowId);
+    if (!row) fail("MissingField");
+    if (row.blocked) fail(row.blocked);
+    if (change.parts.length !== row.translation.length || change.parts.some(part => typeof part !== "string" || !part.trim())) fail("EmptyText");
+    if (JSON.stringify(change.parts) === JSON.stringify(row.translation)) continue;
+    const field = fresh.fields.find(field => field.id === row.fieldId)!;
+    const previous = fieldValues.get(field.id) ?? field.translation;
+    const value = planReviewText(previous, field.format).replace(row.unitId, change.parts);
+    try { assertPortableText(field.source, remapBundleReferences(value, fresh.reverse), field.format); assertPortableText(field.translation, value, field.format); }
+    catch { fail("ProtectedText"); }
+    fieldValues.set(field.id, value);
+    history.rows.push({ rowId: row.id, before: row.translation, after: [...change.parts], label: row.label, group: row.group });
+    patch[`flags.${MODULE_ID}.review.entries.${row.id}`] = null;
+  }
+  if (!history.rows.length) return fresh;
+  for (const [id, value] of fieldValues) {
+    const field = fresh.fields.find(field => field.id === id)!;
+    const path = field.targetPath, storedValue = field.displayPlain ? `<p>${escapeDisplayText(value)}</p>` : value;
+    if (!path.length || !writePath(staged, path, storedValue)) fail("MissingField");
+    if (typeof path[1] === "number") {
+      const collection = path[0]!;
+      const entries = staged[collection] as Record<string, unknown>[], item = entries[path[1]]!;
+      if (collection === "pages" || collection === "items") {
+        const updates = (patch[collection] ??= []) as Record<string, unknown>[];
+        let embeddedPatch = updates.find(row => row._id === item._id);
+        if (!embeddedPatch) { embeddedPatch = { _id: item._id }; updates.push(embeddedPatch); }
+        Object.assign(embeddedPatch, fieldUpdate(item, path.slice(2), storedValue));
+      } else if (collection === "categories" && path.length === 3 && path[2] === "name") patch.categories = entries;
+      else fail("MissingField");
+    } else Object.assign(patch, fieldUpdate(staged, path, storedValue));
+  }
+  patch[`flags.${MODULE_ID}.reviewHistory.${history.id}`] = history;
+  if (options.undoId) patch[`flags.${MODULE_ID}.reviewHistory.${options.undoId}.undoneAt`] = history.at;
+  // Recheck immediately before the single persistence operation. Never restamp outputHash.
+  if ((await captureTranslationWriteGuard(target))?.fingerprint !== fresh.guard.fingerprint) fail("Conflict");
+  await target.update(patch);
+  if (displayKind(fresh.entry.kind)) Hooks.callAll("foundryTranslateDisplayTextChanged");
+  return loadReview(fresh.entry);
+}
+
+/** Undo only unchanged affected paragraphs, preserving subsequent edits elsewhere. */
+export async function undoReview(entry: ReviewDocument, operationId: string): Promise<ReviewSnapshot> {
+  gmOnly();
+  const snapshot = await loadReview(entry), doc = await game.packs.get(entry.pack)!.getDocument(entry.id);
+  const operation = readReviewHistory(doc?.flags).find(item => item.id === operationId);
+  if (!operation || operation.undoneAt || operation.sourceHash !== snapshot.sourceHash) fail("UndoConflict");
+  const changes = operation.rows.map(change => {
+    const row = snapshot.rows.find(row => row.id === change.rowId);
+    if (!row || row.blocked || JSON.stringify(row.translation) !== JSON.stringify(change.after)) fail("UndoConflict");
+    return { rowId: row.id, parts: change.before };
+  });
+  return saveReviewRows(snapshot, changes, { label: "Undo", undoId: operationId });
 }

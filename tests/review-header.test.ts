@@ -1,0 +1,23 @@
+import { parseHTML } from "linkedom";
+import { afterEach, expect, it, vi } from "vitest";
+import * as service from "../src/review/service";
+import { addReviewHeaderButton } from "../src/review/header-control";
+import * as settings from "../src/settings/settings";
+import type { ReviewDocument } from "../src/review/service";
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it("adds one shortcut to original or translated sheets, and none without a matching translation", async () => {
+  const { document } = parseHTML("<html><body><header><button class='controls'></button></header></body></html>");
+  vi.stubGlobal("document", document); vi.stubGlobal("game", { user: { isGM: true }, i18n: { localize: (key: string) => key } });
+  vi.spyOn(settings, "getTranslatorSettings").mockReturnValue({ targetLanguage: "cs" } as any);
+  const entry: ReviewDocument = { id: "a", uuid: "Compendium.world.pack.Actor.a", sourceUuid: "Actor.a", name: "Here", kind: "Actor", pack: "world.pack", language: "cs" };
+  vi.spyOn(service, "reviewCatalog").mockResolvedValue([entry]);
+  const app = { document: { uuid: "Actor.a", documentName: "Actor" }, window: { header: document.querySelector("header")!, controls: document.querySelector("button")! } };
+  await addReviewHeaderButton(app); await addReviewHeaderButton(app);
+  expect(document.querySelectorAll(".ft-review-header")).toHaveLength(1);
+  document.querySelector(".ft-review-header")!.remove(); app.document.uuid = entry.uuid;
+  await addReviewHeaderButton(app); expect(document.querySelectorAll(".ft-review-header")).toHaveLength(1);
+  document.querySelector(".ft-review-header")!.remove(); app.document.uuid = "Actor.missing";
+  await addReviewHeaderButton(app); expect(document.querySelectorAll(".ft-review-header")).toHaveLength(0);
+  app.document.uuid = entry.uuid; game.user!.isGM = false;
+  await addReviewHeaderButton(app); expect(document.querySelectorAll(".ft-review-header")).toHaveLength(0);
+});

@@ -11,10 +11,15 @@ import { registerCrucibleEmbedLabels } from "./translation/crucible-embed-labels
 import { registerEmberRuntimeBridge } from "./translation/ember-runtime-bridge";
 import { registerDisplayTextView } from "./translation/display-text-view";
 
+import { registerReviewHeaderControl } from "./review/header-control";
+import { registerUiOverrides } from "./review/ui-catalog";
+
 let ready = false;
 
 Hooks.once("init", () => {
   registerSettings();
+  registerUiOverrides();
+  registerReviewHeaderControl();
   registerJournalTranslationHeaderControl();
   registerGlossaryCandidateHooks();
   registerTranslationDesk();

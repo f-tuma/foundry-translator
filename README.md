@@ -2,8 +2,8 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.24.0** adds a side-by-side translation editor with explicit manual
-verification. It also supports display-only translations for scenes and active
+Version **0.25.0** expands the translation editor with global fuzzy search,
+previewed bulk corrections, persistent undo history and editable Czech UI catalogs. It also supports display-only translations for scenes and active
 effects, preserving their original UUIDs and game mechanics, including Ember automation.
 It includes safe pause/continue, protected saved translations,
 an adventure translation desk, an Ember-aware name
@@ -46,7 +46,7 @@ The module translates scene/navigation names, map drawing and note text, level a
 region names, and effect names/descriptions. Rules, positions, scripts, statuses,
 durations, and source UUIDs are never translated or copied by this feature.
 
-Review them through **Adventure translation → Review and corrections**, or edit
+Review them through **Adventure translation → Translation editor**, or edit
 the text pages in **Foundry Translate — Scene & Effect Text** directly.
 The pack is GM-only by default because scene names and notes may contain spoilers.
 Translations display in navigation, map labels, placeable lists, native content
@@ -57,12 +57,40 @@ kept, and incompatible or conflicting records block regeneration.
 
 ## Review and corrections
 
-Open **Adventure translation → Review and corrections**. Select a translated
+Open **Adventure translation → Translation editor**. Select a translated
 Journal, Actor, Item, Scene or Active Effect. Sections keep Journal pages and
 embedded items together; the table aligns original paragraphs with editable
 translations. Inline formatting is preserved through separate text segments.
 Link markers protect UUIDs and game commands while their display labels remain
 editable. Search a section or show only unverified blocks.
+
+Open **Find and replace** to search all stored translations in the target language.
+Choose original or translated text, document types and unverified-only results.
+Similar spellings are suggestions: each literal variant has its own replacement,
+so Czech inflections can be corrected independently. Bulk corrections do not
+change the glossary; update its base term separately for future translations. Select variants or individual
+occurrences, inspect the paragraph-level before/after preview, then save. Names
+split across formatting segments are offered for manual editing. Commands, UUIDs,
+Markdown destinations and code are excluded from automatic replacement.
+
+**Correction history** records before/after text, reviewer and time for each saved
+correction. Changes and their history are saved together in one document update.
+Batches preflight all selected documents, commit sequentially and stop on failure;
+there is no all-world transaction. A stop completes the current document. Undo
+works per document and refuses to overwrite subsequently changed passages or
+changed sources. Undo also clears verification. Export history as JSON for a
+readable audit record; it is not an importable translation bundle. History is
+stored with the translated document and inherits its access permissions.
+
+The **Edit translation** header icon opens the corresponding document/page directly,
+from either a translated sheet or its source when a unique translation exists.
+The **Interface** tab edits installed Foundry, Ember and Crucible Czech catalogs:
+search, correct, verify separately or restore the bundled text. Overrides live in
+the world settings, survive module updates, and apply on each client's next reload.
+Variables, tags and URLs are validated. JSON export/import offers a before/after
+preview; imports skip incompatible source strings and do not import verification.
+An updated source disables a stale override until it is corrected. Interface
+settings are world-scoped; they do not customize Foundry Setup before a world loads.
 
 **Save correction** and **Verify** are separate actions. Verification records
 the reviewing GM and time and is valid only for the saved paragraph and original

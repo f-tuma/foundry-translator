@@ -1,3 +1,4 @@
+import { saveReviewRows, readReviewHistory, undoReview } from "../src/review/service";
 import { parseHTML } from "linkedom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { loadReview, reviewCatalog, updateReview, type ReviewSnapshot } from "../src/review/service";
@@ -27,7 +28,13 @@ function install(): void {
   copyDocument = {
     id: "copy", uuid: `Compendium.${packId}.JournalEntry.copy`, get name() { return copy.name; },
     get flags() { return copy.flags; }, toObject: () => structuredClone(copy),
-    update: async (patch: any) => { writes.push({ kind: "root", patch }); dotted(copy, patch); },
+    update: async (patch: any) => {
+      writes.push({ kind: "root", patch });
+      const { pages, items, ...root } = patch; dotted(copy, root);
+      for (const [collection, updates] of [[copy.pages, pages], [copy.items, items]] as any[]) {
+        for (const update of updates ?? []) dotted(collection.find((entry: any) => entry._id === update._id), update);
+      }
+    },
     updateEmbeddedDocuments: async (kind: string, patches: any[]) => {
       writes.push({ kind, patch: patches });
       for (const patch of patches) dotted((kind === "Item" ? copy.items as any[] : copy.pages).find(page => page._id === patch._id), patch);
@@ -63,7 +70,7 @@ it("saves only the translated paragraph, separately verifies it, preserves origi
   const original = JSON.stringify(source), before = await snapshot(); const row = textRow(before);
   const saved = await updateReview(before, row.id, { type: "save", parts: ["Tříprsté nohy."] });
   expect(copy.pages[0]!.text!.content).toBe('<p>Tříprsté nohy.</p><p>Druhý odstavec.</p>');
-  expect(writes[0]).toEqual({ kind: "JournalEntryPage", patch: [{ _id: "one", "text.content": copy.pages[0]!.text!.content }] });
+  expect(writes[0]).toMatchObject({ kind: "root", patch: { pages: [{ _id: "one", "text.content": copy.pages[0]!.text!.content }] } });
   expect(saved.rows.find(r => r.id === row.id)!.verified).toBeNull();
   expect(await hasManualOutputEdits(copy, (copy.flags![MODULE_ID]!.translation as any).outputHash)).toBe(true);
   const verified = await updateReview(saved, row.id, { type: "verify" });
@@ -152,7 +159,7 @@ it("writes Ember outcome labels as a schema array and preserves adjacent automat
   sourceDocument.pages = { contents: [{ id: "one", system: { constructor: { schema: { fields: { outcomes: { element: { fields: { label: { constructor: { name: "StringField" } } } } } } } } } }] };
   const view = await snapshot(); const row = view.rows.find(row => row.label === "system.outcomes.0.label")!;
   await updateReview(view, row.id, { type: "save", parts: ["Výhra"] });
-  expect(writes[0]!.patch[0]["system.outcomes"]).toEqual([{ ...outcomes[0], label: "Výhra" }, outcomes[1]]);
+  expect(writes[0]!.patch.pages[0]["system.outcomes"]).toEqual([{ ...outcomes[0], label: "Výhra" }, outcomes[1]]);
   expect((copy.pages[0]!.system!.outcomes as any[])[0].effect).toEqual(outcomes[0]!.effect);
 });
 
@@ -182,11 +189,36 @@ it.each(["Actor", "Item"] as const)("restricts %s editing to schema prose, inclu
   expect(view.rows.some(row => row.label.includes("damage"))).toBe(false);
   const prose = view.rows.find(row => row.label === "system.description")!;
   view = await updateReview(view, prose.id, { type: "save", parts: ["Opravený popis."] });
-  expect(writes[0]).toEqual({ kind: "root", patch: { "system.description": "<p>Opravený popis.</p>" } });
+  expect(writes[0]).toMatchObject({ kind: "root", patch: { "system.description": "<p>Opravený popis.</p>" } });
   if (kind === "Actor") {
     const item = view.rows.find(row => row.group === "items:blade")!;
     await updateReview(view, item.id, { type: "save", parts: ["Meč"] });
     expect(copy.items).toEqual([{ _id: "blade", name: "Meč", system: { damage: 12 } }]);
   }
   expect(JSON.stringify(source)).toBe(original);
+});
+
+it("commits multiple paragraphs and durable undo history in one document update", async () => {
+  const before = await snapshot(), rows = before.rows.filter(row => row.label === "text.content" && row.group === "pages:one");
+  const edited = await saveReviewRows(before, rows.map((row, i) => ({ rowId: row.id, parts: [i === 0 ? "Tříprsté nohy." : "Další odstavec."] })), { id: "batch-one", label: "Feet" });
+  expect(writes).toHaveLength(1);
+  expect(writes[0]!.patch.pages).toEqual([{ _id: "one", "text.content": "<p>Tříprsté nohy.</p><p>Další odstavec.</p>" }]);
+  expect(readReviewHistory(copy.flags)[0]!.rows).toHaveLength(2);
+  // Unrelated subsequent edits must survive undo.
+  await updateReview(edited, edited.rows.find(row => row.group === "pages:two" && row.label === "name")!.id, { type: "save", parts: ["Později"] });
+  await undoReview(before.entry, "batch-one");
+  expect(copy.pages[0]!.text!.content).toBe("<p>Třínohé končetiny.</p><p>Druhý odstavec.</p>");
+  expect(copy.pages[1]!.name).toBe("Později");
+  expect(readReviewHistory(copy.flags).find(item => item.id === "batch-one")!.undoneAt).toBeTruthy();
+  await expect(undoReview(before.entry, "batch-one")).rejects.toThrow("UndoConflict");
+});
+it("refuses unsafe undo and validates every planned paragraph before any write", async () => {
+  const before = await snapshot(), row = textRow(before);
+  const edited = await saveReviewRows(before, [{ rowId: row.id, parts: ["Nohy."] }], { id: "first" });
+  await updateReview(edited, row.id, { type: "save", parts: ["Další ruční oprava."] });
+  const count = writes.length;
+  await expect(undoReview(before.entry, "first")).rejects.toThrow("UndoConflict");
+  const current = await snapshot();
+  await expect(saveReviewRows(current, [{ rowId: row.id, parts: ["Jiná věta."] }, { rowId: "missing", parts: ["X"] }])).rejects.toThrow("MissingField");
+  expect(writes).toHaveLength(count);
 });

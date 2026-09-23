@@ -1,4 +1,4 @@
-# Foundry Translate 0.24.0 — stručný návod
+# Foundry Translate 0.25.0 — stručný návod
 
 ## České rozhraní
 
@@ -49,7 +49,7 @@ modul vyžádá obnovu celého deníku, aby nepřepsal zbývající překlady zd
 
 ## Kontrola a opravy překladu
 
-Otevřete **Překlad dobrodružství → Kontrola a opravy**. Vyberte dokument
+Otevřete **Překlad dobrodružství → Editor překladů**. Vyberte dokument
 a vlevo jeho oddíl nebo stránku. Tabulka ukazuje originál vedle překladu;
 podporuje deníky, postavy, předměty, texty scén i aktivních efektů.
 
@@ -82,6 +82,67 @@ Originální dobrodružství zůstává beze změn.
 
 Uložené opravy přenese JSON export překladů. Značky ručního ověření jsou
 lokální a do jiného světa se nepřenášejí; tam je potřeba text zkontrolovat znovu.
+
+## Hledání a hromadné opravy (0.25.0)
+
+V editoru otevřete **Hledat a nahradit**. Vyhledávání projde uložené překlady
+zvoleného jazyka, včetně názvů dokumentů, tokenů, odstavců a popisků UUID odkazů.
+Lze hledat i v originálu, omezit typ dokumentu nebo zobrazit jen neověřené úseky.
+**I podobné zápisy** najde část překlepů a skloňovaných podob; procento vyjadřuje
+podobnost zápisu, nikoli jazykovou správnost. Pro aktuální změny z jiných oken
+použijte **Znovu načíst překlady**.
+
+1. Zadejte například `Agraband Rychlý` a klikněte na **Vyhledat**.
+2. U nalezených podob vyberte výskyty a napište pro každou vlastní náhradu.
+   `Agraband Rychlý` a `Agrabandem Rychlým` mají samostatné náhrady.
+3. Vpravo lze jednotlivé výskyty vyřadit. **Otevřít oddíl** přeskočí do jejich
+   původního kontextu v editoru.
+4. **Připravit náhled vybraných oprav** ukáže původní a nové znění odstavců.
+5. Teprve **Uložit zobrazené změny** zapíše opravy a zruší ověření dotčených úseků.
+
+Náhrady se týkají pouze vybraných výskytů. Neprovádí se automatické skloňování
+náhrad. Hromadná oprava nemění glosář: nové schválené jméno zapište také
+do glosáře, aby jej používaly budoucí překlady. Text rozdělený různým formátováním se nabídne k ruční opravě v oddílu.
+Kód, herní příkazy, UUID a cílové adresy zůstávají chráněné. Nepřeložené části
+rozpracovaných deníků se neprohledávají jako hotový překlad.
+
+Před zápisem se zkontrolují všechny vybrané dokumenty. Ukládá se po jednom;
+při konfliktu nebo chybě se další zápisy zastaví. **Zastavit po aktuálním dokumentu**
+dokončí probíhající zápis. Při přerušeném spojení ověřte výsledek v historii.
+Rozpracované ruční opravy v okně se neukládají samy.
+
+## Historie a vrácení oprav
+
+**Historie oprav** obsahuje změny uložené editorem od verze 0.25.0: původní
+znění, opravené znění, čas a jméno GM. **Vrátit opravu** nejprve zobrazí obsah
+zásahu a vyžádá potvrzení v okně. Vrací se jeden dokument; nesouvisející
+pozdější opravy zůstávají zachované. Pokud se změnil některý dotčený úsek nebo
+originál, editor vrácení odmítne. Vrácené úseky je nutné znovu ověřit.
+
+Záznam historie se ukládá společně s opravou a přežije obnovení prohlížeče.
+Je součástí metadat kopie a má stejná přístupová práva. Export historie JSON
+slouží jako čitelný záznam, není určen k importu překladů. Historie nezachytává
+změny provedené mimo editor a nenahrazuje zálohu světa.
+
+## Otevření z dokumentu a úpravy rozhraní
+
+Ikona pera **Upravit překlad** v záhlaví deníku, postavy, předmětu, scény
+nebo efektu otevře příslušný překlad. U deníku zachová aktuální stránku.
+Je dostupná i na originálu, pokud k němu existuje jednoznačný překlad.
+
+V části **Rozhraní** vyberte **Foundry**, **Ember** nebo **Crucible**. Hledejte
+podle originálu, češtiny nebo klíče; případně zapněte podobné zápisy. Opravy se
+ukládají a ověřují samostatně. Proměnné jako `{name}`, značky HTML a adresy
+musí zůstat zachované. **Obnovit z modulu** ukáže náhled výchozího textu.
+
+Vlastní opravy jsou uložené v nastavení světa a aktualizace modulu je nesmaže.
+Projeví se u každého klienta po příštím obnovení jeho stránky; editor nikoho
+automaticky neodpojí. Nevztahují se na Setup před spuštěním světa. Pokud nová
+verze Foundry či systému změní originál, zastaralá oprava se dočasně nepoužije.
+
+**Export oprav JSON** a **Import oprav JSON** přenášejí pouze vlastní změny
+rozhraní. Import nejprve ukáže rozdíly, nekompatibilní klíče vynechá a vyžádá
+samostatné uložení. Přenesené opravy se automaticky neoznačí za ověřené.
 
 ## Vlastní jména a běžné pojmy
 
