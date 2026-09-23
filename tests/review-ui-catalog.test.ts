@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { sha256 } from "../src/translation/hash";
 let store: any, module: typeof import("../src/review/ui-catalog");
 const source = { UI: { Greeting: "Hello, {name}.", Link: '<a href="https://example.test">More</a>' } };
 const base = { UI: { Greeting: "Ahoj, {name}.", Link: '<a href="https://example.test">Více</a>' } };
@@ -49,4 +50,16 @@ it("applies overrides during language load and leaves other languages untouched"
 });
 it("does not allow non-GMs to edit or inspect world overrides", async () => {
   game.user!.isGM = false; await expect(module.loadUiCatalog()).rejects.toThrow("GMOnly");
+});
+it("preserves project verification only for the exact source/value and marks its foreign author", async () => {
+  let catalog = await module.loadUiCatalog(); const row = catalog.rows[0]!;
+  const entry = { scope: row.scope, key: row.key, source: row.source, base: row.base, value: "Vítej, {name}.", at: "2026-09-23", userName: "Alice", verified: "" };
+  entry.verified = await sha256(JSON.stringify([entry.scope, entry.key, entry.source, entry.value]));
+  const preview = await module.previewUiProject(catalog, [entry]); expect(store.entries).toHaveLength(0);
+  catalog = await module.importUiProject(preview); expect(catalog.rows[0]!.verified).toBe(true); expect(catalog.rows[0]!.override).toMatchObject({ userName: "Alice", importedAt: expect.any(String) });
+  expect((await module.previewUiProject(catalog, [entry])).entries).toHaveLength(0);
+  const changed = await module.previewUiProject(catalog, [{ ...entry, value: "Zdravím, {name}." }]);
+  expect(changed.entries[0]!.verified).toBeUndefined();
+  catalog = await module.importUiProject(changed); expect(catalog.rows[0]!.verified).toBe(false);
+  expect((await module.previewUiProject(catalog, [{ ...entry, source: "Changed source, {name}." }])).skipped).toBe(1);
 });

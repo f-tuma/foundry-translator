@@ -390,5 +390,48 @@ nastavení světa, proto je při práci více redaktorů neukládejte současně
   nebo obnovení stránky. Pozice je uložená v tomto prohlížeči zvlášť pro svět,
   uživatele a cílový jazyk. Pokud už úsek neexistuje, editor požádá o nový výběr.
 
-Rozepsané změny nejsou automaticky ukládané na disk; editor brání zavření a
-upozorní při obnovování stránky. Před ukončením práce je uložte.
+Od verze 0.28.0 se rozepsané opravy dokumentů, poznámky a úpravy rozhraní
+průběžně ukládají do místního úložiště prohlížeče. Uložení do dokumentu a jeho
+ověření zůstávají samostatnými kroky. Editor nadále upozorňuje na neuložené změny.
+
+## Obnova konceptů a pracovní soubor (od 0.28.0)
+
+**Obnova** nabídne koncepty po pádu nebo obnovení stránky. Jsou oddělené podle
+adresy Foundry, světa, uživatele a cílového jazyka. Nejdříve otevřete **Porovnat**:
+aktuální text a koncept jsou vedle sebe. **Obnovit do editoru** pouze naplní editor;
+teprve tlačítko **Uložit opravu** změní dokument. Změnil-li se uložený překlad,
+je nutné výslovně zvolit použití konceptu. Změna originálu nebo struktury automatické
+obnovení zablokuje; koncept lze stáhnout jako JSON pro ruční sloučení.
+
+Koncept se odstraní až po úspěšném uložení nebo výslovném zahození. Při nedostupném
+úložišti nebo vyčerpané kapacitě se zobrazí varování; aktuální koncept je možné
+stáhnout. Koncepty nejsou zálohou serveru a smazání dat prohlížeče je odstraní.
+Rozepsané hromadné nahrazování a výběr výskytů se neobnovují: musí vzniknout nový
+náhled nad aktuálním obsahem.
+
+**Pracovní soubor → Exportovat redakci** uloží překlady, glosář, poznámky,
+stavy problémů, platná ověření a vlastní české úpravy Foundry/Ember/Crucible.
+Nejprve je potřeba uložit rozepsané změny. Export vypíše vynechané dokumenty
+(například při změně originálu). Historie pro vracení změn a místní koncepty
+nejsou součástí tohoto souboru; historii lze exportovat samostatně.
+
+**Otevřít pracovní soubor** načte JSON (nejvýše 100 MB) a zobrazí náhled.
+Vyberte dokumenty a položky rozhraní, které chcete přenést. U existujících kopií
+se přenesou zobrazené opravy a poznámky; poznámky chybějící v souboru se nemažou.
+Nové překlady vzniknou z odpovídajících originálů. Originály musí mít stejné UUID
+a obsah; názvy se k párování nepoužívají. Rozdílné pokrytí částečných překladů
+může vyžadovat nejprve jejich dokončení. Existující konfliktní glosářová hesla
+se ponechají; přidání nových hesel je samostatná volba.
+
+Ověření se přenese jen při shodě originálu, celého zdrojového pole a konkrétního
+překladu v souboru. Zobrazí se jako **Převzaté ověření** s původním autorem a časem.
+Jde o údaj převzatý ze souboru, nikoli kryptografický podpis autora. Poznámka ke
+staršímu textu zůstane označená jako zastaralá. Opravy existujících překladů
+procházejí stejnou kontrolou struktury a historií jako ruční úpravy. Ochrana
+redakčních oprav při navázání překladu se přenáší i do nových kopií.
+
+Import kontroluje změny od náhledu a zastaví se při konfliktu. Foundry neposkytuje
+transakci přes celý svět: při výpadku mohou být některé dokumenty již uložené.
+Zobrazený výsledek to uvede; pro pokračování soubor znovu otevřete. Opakovaný
+import nezakládá další kopie ani další historii pro nezměněný text. Úpravy rozhraní
+se jako dosud projeví po obnovení stránky jednotlivých klientů.

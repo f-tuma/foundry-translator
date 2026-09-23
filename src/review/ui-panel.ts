@@ -1,14 +1,19 @@
 import { exportUiOverrides, importUiOverrides, loadUiCatalog, previewUiImport, saveUiRow, type UiCatalog, type UiImport, type UiRow, type UiScope } from "./ui-catalog";
 import { findTextMatches, normalizeSearch } from "./search";
 import { button, checkbox, diffText, downloadJson, el, pager, selectControl, t, type PanelHost } from "./elements";
+import { uiPayload, type LocalReviewDrafts } from "./drafts";
 
 export class UiReviewPanel {
   #host: PanelHost; #catalog: UiCatalog | null = null; #scope: UiScope = "core";
   #search = ""; #fuzzy = false; #onlyOverrides = false; #unverified = false; #page = 0;
   #drafts = new Map<string, string>(); #import: UiImport | null = null; #reset: string | null = null;
-  constructor(host: PanelHost) { this.#host = host; }
+  constructor(host: PanelHost, private storage?: LocalReviewDrafts) { this.#host = host; }
   get dirty(): boolean { return this.#drafts.size > 0 || this.#import !== null; }
-  discard(): void { this.#drafts.clear(); this.#import = null; this.#reset = null; }
+  discard(): void { for (const id of this.#drafts.keys()) this.storage?.clear(`ui:${id}`); this.#drafts.clear(); this.#import = null; this.#reset = null; }
+  recover(current: { catalog: UiCatalog; row: UiRow }, value: string): void {
+    this.#catalog = current.catalog; this.#scope = current.row.scope; this.#search = current.row.key; this.#page = 0; this.#onlyOverrides = false; this.#unverified = false;
+    this.#drafts.set(`${current.row.scope}:${current.row.key}`, value);
+  }
   async load(): Promise<void> { this.#catalog = await loadUiCatalog(); }
   async render(): Promise<HTMLElement> {
     if (!this.#catalog) await this.load();
@@ -46,21 +51,22 @@ export class UiReviewPanel {
       original.append(key, el("p", "", row.source));
       const input = el("textarea"); input.value = this.#drafts.get(id) ?? row.value; input.rows = Math.min(8, Math.max(2, Math.ceil(input.value.length / 52))); input.lang = "cs"; input.spellcheck = true; input.setAttribute("aria-label", `${t("Translation")} · ${row.key}`);
       const save = button(t("Save"), () => this.#host.run(async () => {
-        this.#catalog = await saveUiRow(catalog, row, this.#drafts.get(id) ?? row.value, "save"); this.#drafts.delete(id); this.#host.status(t("UiSaved"));
+        this.#catalog = await saveUiRow(catalog, row, this.#drafts.get(id) ?? row.value, "save"); this.storage?.clear(`ui:${id}`); this.#drafts.delete(id); this.#host.status(t("UiSaved"));
       }));
       const verify = button(t(row.verified ? "Unverify" : "Verify"), () => this.#host.run(async () => { this.#catalog = await saveUiRow(catalog, row, row.value, row.verified ? "unverify" : "verify"); this.#host.status(t(row.verified ? "Unverified" : "Verified")); }));
       const badge = el("span", "ft-review__badge"), changed = () => {
         const dirty = this.#drafts.has(id); badge.textContent = t(dirty ? "Unsaved" : row.blocked ? "Unavailable" : row.verified ? "Verified" : row.override ? "Customized" : "Bundled");
+        if (!dirty && row.verified && row.override?.importedAt) badge.textContent = t("ImportedVerification");
         save.disabled = !dirty; verify.disabled = dirty || row.blocked;
       };
-      input.addEventListener("input", () => { if (input.value === row.value) this.#drafts.delete(id); else this.#drafts.set(id, input.value); changed(); });
+      input.addEventListener("input", () => { if (input.value === row.value) { this.#drafts.delete(id); this.storage?.clear(`ui:${id}`); } else { this.#drafts.set(id, input.value); this.storage?.write(uiPayload(row, input.value)); } changed(); });
       translation.append(input);
       if (row.override) { const base = el("details"); base.append(el("summary", "", t("Bundled")), el("p", "ft-workbench__excerpt", row.base)); translation.append(base); }
       actions.append(badge, save, verify);
       if (row.override) actions.append(button(t("ResetOverride"), () => { this.#reset = id; this.#host.render(); }));
       if (this.#reset === id) {
         const reset = el("div", "ft-workbench__reset"); reset.append(el("p", "", t("ResetPreview")), diffText(row.value, row.base, true), button(t("ConfirmReset"), () => this.#host.run(async () => {
-          this.#catalog = await saveUiRow(catalog, row, row.base, "reset"); this.#reset = null; this.#drafts.delete(id); this.#host.status(t("UiSaved"));
+          this.#catalog = await saveUiRow(catalog, row, row.base, "reset"); this.#reset = null; this.storage?.clear(`ui:${id}`); this.#drafts.delete(id); this.#host.status(t("UiSaved"));
         })), button(t("Cancel"), () => { this.#reset = null; this.#host.render(); })); translation.append(reset);
       }
       if (row.blocked) actions.append(el("small", "ft-workbench__warning", t("UiSourceChanged")));
