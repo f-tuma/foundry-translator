@@ -1533,3 +1533,66 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
   review persistence/invalidation, draft retention, concurrency/locks, partial
   pages, embedded IDs/arrays, ordering, protected links, HTML escaping, actors,
   items and display sidecars.
+
+## 2026-09-23 — Editor workbench, 0.25.0
+
+- User chose spelling variants with separate replacements and explicit preview.
+  Editor now has Documents, Find and replace, Interface and Correction history.
+- Global search indexes module-managed translated compendia in the configured
+  target language. Supports source/translation, type and unverified filters,
+  accent/case folding, conservative spelling/inflection matching, per-variant
+  replacements and per-occurrence selection. Scores are spelling similarity,
+  not quality confidence. Search yields between row batches, with cancellation.
+  Source/target paragraphs and friendly field names stay visible. Names spanning
+  inline formatting are offered for manual editing, not unsafe replacement.
+- Commands, UUIDs, code, Markdown destinations and URL targets are excluded from
+  substitution. UUID display labels remain editable. Whole-field structural
+  validation runs again before writing. No model calls for editing/search.
+- `saveReviewRows` compiles a schema allowlisted update, including embedded pages
+  or items, and writes it together with its before/after history through one
+  Foundry document update. Native QA confirmed root-plus-embedded updates work.
+  History is stored in `flags.foundry-translate.reviewHistory`; inherits the
+  document's permissions. Generated outputHash is never restamped. Review marks
+  of edited/undone rows are explicitly cleared. Existing verification-only
+  actions still do not mark a copy as manually edited.
+- Bulk preflights all document guards, then rechecks each just before saving.
+  First failure stops subsequent writes; completed operations remain in history.
+  Stops finish the current document. A lost response may have committed; the UI
+  directs the GM to history. No all-world transaction or server CAS is claimed.
+  Undo checks source hash and exact affected paragraphs, preserving unrelated
+  later edits. Single and bulk corrections are covered. History export is an
+  audit JSON, not an import bundle; history/verification remain local.
+- Header shortcut resolves either source or copy UUID, choosing the longest
+  unique root, and opens the active Journal page / embedded Item group. A shared
+  editor instance preserves drafts. Native close and browser unload protect
+  unsaved drafts. Tabs retain drafts; detected stale writes retain user text.
+- Interface editor loads English catalogs from the installed Foundry/Ember/
+  Crucible and bundled Czech defaults, with independent save/verify, search,
+  reset preview and JSON import/export preview. Overrides are world setting
+  `uiTranslationOverrides` v1. Wrapper around `game.i18n.setLanguage` applies
+  compatible overrides after native dictionaries but before schema localization.
+  They take effect on client reload and survive module updates. Changed English
+  source invalidates an override. Placeholder/tag/URL validation and key allowlist
+  prevent arbitrary new keys or executable formatting. Imports strip verification.
+  This does not customize Setup outside a loaded world.
+- Bulk corrections do not change the reviewed glossary. Documented that an
+  approved base term must also be edited there for future translations.
+- QA: private loopback Foundry 14.368 / Crucible 0.11.0 / Ember 0.6.2 only.
+  Tested English/Czech, 1440x1000 and 1024x800 using CUA browser capabilities.
+  Fuzzy search found six occurrences of Agraband Rychlý / Agrabandem Rychlým in
+  two documents. Previewed and committed distinct forms, checked Actor name,
+  prototype token, prose and Guide embedded page, then undid both operations
+  through persistent history. Both test names reverted. Verified header entry
+  from translated Actor and original Guide's Main Quest Overview page.
+- Native UI correction save/verify and language-load activation worked. Native
+  JSON import showed a diff and wrote nothing until confirmation; imported text
+  remained unverified. Both test overrides were reset through UI, leaving zero
+  overrides. History remains in QA as evidence. Source SHA-256 comparison for
+  Guide, Agraband, QA Scene and QA ActiveEffect remained identical. No production
+  access, no LM calls. Existing Crucible/Ember world-data warnings only; expected
+  temporary connection warning on our QA restart, no editor errors.
+- Automated checks: 446 tests pass; four optional LM integrations skipped.
+  Typecheck, build and release metadata validation pass. New tests cover fuzzy
+  variants/Unicode/inline splits, protected references, selection/preview gating,
+  stale batch preflight, boundary stop, narrow multi-row commits and safe undo,
+  header identity resolution, UI overrides/import/format/freshness and activation.

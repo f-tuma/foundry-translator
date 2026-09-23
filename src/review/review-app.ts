@@ -1,3 +1,9 @@
+import { labelFor } from "./labels";
+import { ReviewSearchPanel } from "./search-panel";
+import { UiReviewPanel } from "./ui-panel";
+import { ReviewHistoryPanel } from "./history-panel";
+import { resolveReviewTarget } from "./target";
+import type { PanelHost } from "./elements";
 import { getTranslatorSettings } from "../settings/settings";
 import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
 import { loadReview, reviewCatalog, updateReview, type ReviewDocument, type ReviewRow, type ReviewSnapshot } from "./service";
@@ -15,24 +21,10 @@ function draftFor(row: ReviewRow): Draft {
   const parts = row.translation.map(maskReviewReferences);
   return { text: parts.map(part => part.text), references: parts.map(part => part.references) };
 }
-function labelFor(path: string): string {
-  const key = ({ name: "Name", "text.content": "Text", "text.markdown": "Text", "prototypeToken.name": "TokenName", description: "Description", navName: "NavigationName",
-    "system.description": "Description", "system.subtitle": "Subtitle", "system.details.archetype.description": "Archetype",
-    "system.details.taxonomy.description": "Taxonomy", "system.details.biography.appearance": "Appearance",
-    "system.details.biography.public": "PublicBiography", "system.details.biography.private": "PrivateBiography" } as Record<string, string>)[path];
-  if (key) return t(key);
-  const outcome = /^system\.outcomes\.(\d+)\.label$/u.exec(path);
-  if (outcome) return t("Outcome").replace("{number}", String(Number(outcome[1]) + 1));
-  const final = path.split(".").at(-1) ?? path;
-  const known = t(`Field.${final}`);
-  if (!known.startsWith("FOUNDRY_TRANSLATE.")) return known;
-  const label = final.replace(/([a-z])([A-Z])/gu, "$1 $2");
-  return label.charAt(0).toLocaleUpperCase() + label.slice(1);
-}
 
 export class TranslationReviewApplication extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = { id: "foundry-translate-review", classes: ["foundry-translate", "ft-review-window"],
-    position: { width: 1120, height: 800 }, window: { title: "FOUNDRY_TRANSLATE.Review.Title", icon: "fa-solid fa-list-check", resizable: true } };
+    position: { width: 1240, height: 850 }, window: { title: "FOUNDRY_TRANSLATE.Review.Title", icon: "fa-solid fa-list-check", resizable: true } };
   #catalog: ReviewDocument[] | null = null;
   #snapshot: ReviewSnapshot | null = null;
   #group = "document";
@@ -43,12 +35,46 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   #message = "";
   #error = false;
   #scrollTop = 0;
+  #mode: "documents" | "search" | "interface" | "history" = "documents";
+  #focusRow: string | undefined;
+  #host: PanelHost = {
+    run: action => { void this.#run(action); }, render: () => { void this.render({ force: true }); },
+    status: (message, error) => this.#status(message, error), language: () => getTranslatorSettings().targetLanguage,
+    open: (uuid, group, rowId) => this.#selectDocument(uuid, group, rowId),
+  };
+  #searchPanel = new ReviewSearchPanel(this.#host);
+  #uiPanel = new UiReviewPanel(this.#host);
+  #historyPanel = new ReviewHistoryPanel(this.#host);
+  #hasDrafts(): boolean { return this.#drafts.size > 0 || this.#uiPanel.dirty || this.#searchPanel.dirty; }
+
+  #watchingUnload = false;
+  #beforeUnload = (event: BeforeUnloadEvent): void => {
+    if (!this.#hasDrafts() && !this.#busy) return;
+    event.preventDefault(); event.returnValue = "";
+  };
+  async openAt(uuid: string, group?: string, rowId?: string): Promise<void> {
+    if (this.#busy) { this.#status(t("Working"), true); return; }
+    this.#busy = true;
+    try { await this.#selectDocument(uuid, group, rowId); }
+    finally { this.#busy = false; }
+    await this.render({ force: true });
+  }
+  async #selectDocument(uuid: string, group?: string, rowId?: string): Promise<void> {
+    if (this.#drafts.size) throw new Error("Review.UnsavedNavigation");
+    this.#catalog = await reviewCatalog(getTranslatorSettings().targetLanguage);
+    const target = resolveReviewTarget(this.#catalog, uuid);
+    if (!target) throw new Error("Review.TranslationMissing");
+    this.#snapshot = await loadReview(target.entry); this.#group = group ?? target.group;
+    this.#focusRow = rowId; this.#mode = "documents"; this.#search = ""; this.#onlyUnverified = false; this.#scrollTop = 0;
+  }
 
   async close(options?: Record<string, unknown>): Promise<FoundryApplicationV2> {
-    if (this.#busy || this.#drafts.size) {
+    if (this.#busy || this.#hasDrafts()) {
       this.#status(t(this.#busy ? "Working" : "UnsavedNavigation"), true);
       return this;
     }
+    if (typeof window !== "undefined") window.removeEventListener("beforeunload", this.#beforeUnload);
+    this.#watchingUnload = false;
     return super.close(options);
   }
 
@@ -57,11 +83,13 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     this.#busy = true;
     this.#scrollTop = this.element.querySelector(".ft-review__scroll")?.scrollTop ?? 0;
     this.element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement | HTMLSelectElement>(".ft-review input,.ft-review textarea,.ft-review button,.ft-review select").forEach(input => { input.disabled = true; });
+    const stop = this.element.querySelector<HTMLButtonElement>("[data-review-stop]");
+    if (stop) { stop.hidden = false; stop.disabled = false; }
     this.#status(t("Working"));
     try { await action(); } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.#status(message.startsWith("Review.") ? t(message.slice(7)) : message, true);
-    } finally { this.#busy = false; await this.render({ force: true }); }
+    } finally { this.#busy = false; if (this.#message === t("Working")) this.#status(""); this.#historyPanel.invalidate(); await this.render({ force: true }); }
   }
 
   #status(message: string, error = false): void {
@@ -85,6 +113,24 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     heading.append(el("h2", "", t("Heading")));
     const help = el("span"); help.innerHTML = renderHelpTooltip(t("Help"), t("Heading")); heading.append(help);
     header.append(heading);
+    const tabs = el("div", "ft-workbench__tabs"); tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", t("Workspaces"));
+    for (const [mode, label] of [["documents", "Documents"], ["search", "GlobalSearch"], ["interface", "Interface"], ["history", "History"]] as const) {
+      const tab = button(t(label), () => {
+        void this.#run(async () => {
+          this.#mode = mode; this.#scrollTop = 0;
+          if (mode === "history") this.#historyPanel.invalidate();
+          if (mode === "documents" && this.#snapshot && !this.#drafts.size) this.#snapshot = await loadReview(this.#snapshot.entry);
+        });
+      });
+      tab.setAttribute("role", "tab"); tab.setAttribute("aria-selected", String(this.#mode === mode)); tab.classList.toggle("is-current", this.#mode === mode); tabs.append(tab);
+    }
+    header.append(tabs);
+    if (this.#mode !== "documents") {
+      root.append(header);
+      try { root.append(this.#mode === "search" ? this.#searchPanel.render() : this.#mode === "interface" ? await this.#uiPanel.render() : await this.#historyPanel.render()); }
+      catch (error) { this.#message = String(error); this.#error = true; }
+      root.append(this.#footer()); activateHelpTooltips(root); return root;
+    }
     if (!this.#catalog) {
       try {
         this.#catalog = await reviewCatalog(getTranslatorSettings().targetLanguage);
@@ -116,8 +162,6 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
         this.#snapshot = entry ? await loadReview(entry) : null; this.#status(t("Refreshed"));
       });
     }));
-    const discard = button(t("DiscardAll"), () => { this.#drafts.clear(); this.#status(t("Discarded")); void this.render({ force: true }); });
-    discard.disabled = !this.#drafts.size; discard.dataset.reviewDiscard = ""; controls.append(discard);
     header.append(controls); root.append(header);
     const filters = el("div", "ft-review__filters");
     const search = el("input"); search.type = "search"; search.placeholder = t("Search"); search.setAttribute("aria-label", t("Search")); search.value = this.#search;
@@ -157,11 +201,15 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     table.append(body); main.append(table);
     const empty = el("p", "ft-review__empty", this.#snapshot ? t("NoMatches") : t("Empty")); empty.dataset.reviewEmpty = ""; main.append(empty);
     layout.append(nav, main); root.append(layout);
+    root.append(this.#footer());
+    this.#applyFilters(root); activateHelpTooltips(root); return root;
+  }
+  #footer(): HTMLElement {
     const footer = el("footer", "ft-review__footer");
     const status = el("p", this.#error ? "ft-review__error" : "", this.#message); status.dataset.reviewStatus = ""; status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
     const dirty = el("span", "", this.#drafts.size ? t("UnsavedCount").replace("{count}", String(this.#drafts.size)) : ""); dirty.dataset.reviewDirtyCount = "";
-    footer.append(status, dirty); root.append(footer);
-    this.#applyFilters(root); activateHelpTooltips(root); return root;
+    const discard = button(t("DiscardAll"), () => { this.#drafts.clear(); this.#uiPanel.discard(); this.#searchPanel.discard(); this.#status(t("Discarded")); void this.render({ force: true }); });
+    discard.dataset.reviewDiscard = ""; footer.append(status, dirty, discard); return footer;
   }
 
   #row(row: ReviewRow): HTMLTableRowElement {
@@ -205,7 +253,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
         const current = this.#drafts.get(row.id); if (!current) return;
         const parts = current.text.map((text, index) => restoreReviewReferences(text, current.references[index]!));
         this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: "save", parts });
-        this.#drafts.delete(row.id); this.#status(t("Saved"));
+        this.#drafts.delete(row.id); this.#searchPanel.invalidate(true); this.#status(t("Saved"));
       })); save.dataset.reviewSave = "";
       const verify = button(row.verified ? t("Unverify") : t("Verify"), () => void this.#run(async () => {
         this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: row.verified ? "unverify" : "verify" });
@@ -243,7 +291,12 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   #grow(input: HTMLTextAreaElement): void { input.style.height = "auto"; input.style.height = `${Math.max(58, input.scrollHeight + 2)}px`; }
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }
   protected _onRender(): void {
+    if (typeof window !== "undefined" && !this.#watchingUnload) { window.addEventListener("beforeunload", this.#beforeUnload); this.#watchingUnload = true; }
     this.element.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(input => this.#grow(input));
     const scroll = this.element.querySelector(".ft-review__scroll"); if (scroll) scroll.scrollTop = this.#scrollTop;
+    if (this.#focusRow) {
+      const row = [...this.element.querySelectorAll<HTMLElement>("[data-review-row]")].find(row => row.dataset.reviewRow === this.#focusRow);
+      row?.scrollIntoView?.({ block: "center" }); row?.classList.add("is-target"); this.#focusRow = undefined;
+    }
   }
 }

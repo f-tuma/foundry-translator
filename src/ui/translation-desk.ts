@@ -8,7 +8,7 @@ import { JournalTranslationApplication } from "../translation/journal-translatio
 import { openActiveTranslationsOverview } from "../translation/active-translations-app";
 import { TRANSLATIONS_PACK_ID, TRANSLATION_FLAG_PATH } from "../translation/compendium-translation-repository";
 import { readJournalTranslationFlag } from "../translation/journal";
-import { TranslationReviewApplication } from "../review/review-app";
+import { openReviewEditor } from "../review/header-control";
 
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Desk.${key}`);
 export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
@@ -42,7 +42,7 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
       return child.render(true);
     };
     const actions: Record<string, () => unknown> = { settings: () => open(new TranslatorSettingsApplication()), glossary: () => open(new GlossaryApplication()),
-      bundles: () => open(new BundleApplication()), review: () => open(new TranslationReviewApplication()), active: openActiveTranslationsOverview, journal: () => open(new JournalTranslationApplication()) };
+      bundles: () => open(new BundleApplication()), review: () => openReviewEditor(), active: openActiveTranslationsOverview, journal: () => open(new JournalTranslationApplication()) };
     for (const button of this.element.querySelectorAll<HTMLElement>("[data-desk-action]")) {
       button.addEventListener("click", () => actions[button.dataset.deskAction ?? ""]?.());
     }
