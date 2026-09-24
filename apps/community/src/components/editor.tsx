@@ -330,6 +330,7 @@ export function Editor() {
               <button
                 key={id}
                 className={filter === id ? "active" : ""}
+                aria-pressed={filter === id}
                 onClick={() => {
                   setFilter(id);
                   setOffset(0);

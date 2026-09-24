@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { themeBootstrap } from "../components/theme";
 import "../style.css";
 export const Route = createRootRoute({
   head: () => ({
@@ -30,8 +31,9 @@ function Root() {
       }),
   );
   return (
-    <html lang="cs">
+    <html lang="cs" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <HeadContent />
       </head>
       <body>
