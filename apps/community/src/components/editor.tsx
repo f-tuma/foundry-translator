@@ -80,7 +80,7 @@ function useDrafts(userId: string) {
     },
   };
 }
-export function TextPart({
+function ReferenceFields({
   value,
   onChange,
   label,
@@ -88,6 +88,112 @@ export function TextPart({
   value: string;
   onChange?: (value: string) => void;
   label: string;
+}) {
+  const masked = maskReviewReferences(value);
+  const [error, setError] = useState("");
+  return (
+    <>
+      {masked.references.map((reference, index) => (
+        <label key={reference.marker}>
+          <span className="reference-marker">{reference.marker}</span>
+          {onChange && reference.editable ? (
+            <input
+              aria-label={`${label} — název odkazu ${index + 1}`}
+              value={reference.label}
+              onChange={(event) => {
+                try {
+                  onChange(
+                    restoreReviewReferences(
+                      masked.text,
+                      masked.references.map((item, i) =>
+                        i === index
+                          ? { ...item, label: event.target.value }
+                          : item,
+                      ),
+                    ),
+                  );
+                  setError("");
+                } catch {
+                  setError("Popisek odkazu obsahuje nepovolené znaky.");
+                }
+              }}
+            />
+          ) : (
+            <span>{reference.label || "Chráněný příkaz"}</span>
+          )}
+        </label>
+      ))}
+      <Notice error={error} />
+    </>
+  );
+}
+
+function RowReferences({
+  source,
+  target,
+  row,
+  onChange,
+}: {
+  source: string[];
+  target: string[];
+  row: number;
+  onChange: (parts: string[]) => void;
+}) {
+  const count = Math.max(
+    ...[source, target].map((parts) =>
+      parts.reduce(
+        (n, part) => n + maskReviewReferences(part).references.length,
+        0,
+      ),
+    ),
+  );
+  if (!count) return null;
+  return (
+    <details className="reference-labels row-references">
+      <summary>
+        <ChevronRight size={14} className="disclosure-arrow" />
+        <LockKeyhole size={12} />
+        Odkazy ({count})
+      </summary>
+      <div className="reference-columns">
+        <div>
+          <h3>Originál</h3>
+          {source.map((value, index) => (
+            <ReferenceFields
+              key={index}
+              value={value}
+              label={`Originál ${row}.${index + 1}`}
+            />
+          ))}
+        </div>
+        <div>
+          <h3>Český překlad</h3>
+          {target.map((value, index) => (
+            <ReferenceFields
+              key={index}
+              value={value}
+              label={`Překlad ${row}.${index + 1}`}
+              onChange={(next) =>
+                onChange(target.map((part, i) => (i === index ? next : part)))
+              }
+            />
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
+export function TextPart({
+  value,
+  onChange,
+  label,
+  showReferences = true,
+}: {
+  value: string;
+  onChange?: (value: string) => void;
+  label: string;
+  showReferences?: boolean;
 }) {
   const masked = maskReviewReferences(value);
   const [error, setError] = useState("");
@@ -112,33 +218,13 @@ export function TextPart({
       ) : (
         <p className="prose">{masked.text}</p>
       )}
-      {masked.references.length ? (
+      {showReferences && masked.references.length ? (
         <details className="reference-labels">
           <summary>
             <LockKeyhole size={12} />
             Odkazy ({masked.references.length})
           </summary>
-          {masked.references.map((r, i) => (
-            <label key={r.marker}>
-              {r.marker}
-              {onChange && r.editable ? (
-                <input
-                  aria-label={`Název odkazu ${i + 1}`}
-                  value={r.label}
-                  onChange={(e) =>
-                    update(
-                      masked.text,
-                      masked.references.map((ref, j) =>
-                        i === j ? { ...ref, label: e.target.value } : ref,
-                      ),
-                    )
-                  }
-                />
-              ) : (
-                <span>{r.label || "Chráněný příkaz"}</span>
-              )}
-            </label>
-          ))}
+          <ReferenceFields value={value} onChange={onChange} label={label} />
         </details>
       ) : null}
       <Notice error={error} />
@@ -277,21 +363,23 @@ export function Editor() {
           />
         </label>
         <nav aria-label="Dokumenty">
-          {books.data?.books.map((b) => (
-            <button
-              key={b.id}
-              className={b.id === selectedBook ? "selected" : ""}
-              onClick={() => {
-                setBook(b.id);
-                setSearch("");
-                setSelected(null);
-                setOffset(0);
-              }}
-            >
-              <BookOpen size={17} />
-              <span>{b.title}</span>
-            </button>
-          ))}
+          <ul className="document-list">
+            {books.data?.books.map((b) => (
+              <li key={b.id}>
+                <button
+                  aria-current={b.id === selectedBook ? "page" : undefined}
+                  onClick={() => {
+                    setBook(b.id);
+                    setSearch("");
+                    setSelected(null);
+                    setOffset(0);
+                  }}
+                >
+                  {b.title}
+                </button>
+              </li>
+            ))}
+          </ul>
         </nav>
         <Notice error={books.error} />
         {who.role === "admin" ? (
@@ -381,6 +469,7 @@ export function Editor() {
                     <TextPart
                       key={i}
                       value={p}
+                      showReferences={false}
                       label={`Originál ${offset + index + 1}.${i + 1}`}
                     />
                   ))}
@@ -390,6 +479,7 @@ export function Editor() {
                     <TextPart
                       key={i}
                       value={part}
+                      showReferences={false}
                       label={`Překlad ${offset + index + 1}.${i + 1}`}
                       onChange={(value) =>
                         update(
@@ -399,55 +489,61 @@ export function Editor() {
                       }
                     />
                   ))}
-                  <div className="row-status">
-                    {change ? (
-                      <>
-                        <span>
-                          Koncept
-                          {change.baseRevision !== unit.revision
-                            ? " · aktuální text se změnil"
-                            : ""}
-                        </span>
-                        <button
-                          className="text-button"
-                          onClick={() =>
-                            setDrafts((old) => {
-                              const next = { ...old };
-                              delete next[unit.id];
-                              return next;
-                            })
-                          }
-                        >
-                          Zahodit opravu
-                        </button>
-                      </>
-                    ) : unit.approval ? (
-                      <span className="verified">
-                        <Check size={13} />
-                        Ověřeno
+                </div>
+                <RowReferences
+                  source={unit.source}
+                  target={parts}
+                  row={offset + index + 1}
+                  onChange={(value) => update(unit, value)}
+                />
+                <div className="row-status">
+                  {change ? (
+                    <>
+                      <span>
+                        Koncept
+                        {change.baseRevision !== unit.revision
+                          ? " · aktuální text se změnil"
+                          : ""}
                       </span>
-                    ) : (
-                      <>
-                        <span>Čeká na kontrolu</span>
-                        <button
-                          className="text-button"
-                          onClick={() =>
-                            setDrafts((old) => ({
-                              ...old,
-                              [unit.id]: {
-                                unitId: unit.id,
-                                baseRevision: unit.revision,
-                                before: unit.value,
-                                after: unit.value,
-                              },
-                            }))
-                          }
-                        >
-                          Zahrnout ke kontrole
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          setDrafts((old) => {
+                            const next = { ...old };
+                            delete next[unit.id];
+                            return next;
+                          })
+                        }
+                      >
+                        Zahodit opravu
+                      </button>
+                    </>
+                  ) : unit.approval ? (
+                    <span className="verified">
+                      <Check size={13} />
+                      Ověřeno
+                    </span>
+                  ) : (
+                    <>
+                      <span>Čeká na kontrolu</span>
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          setDrafts((old) => ({
+                            ...old,
+                            [unit.id]: {
+                              unitId: unit.id,
+                              baseRevision: unit.revision,
+                              before: unit.value,
+                              after: unit.value,
+                            },
+                          }))
+                        }
+                      >
+                        Zahrnout ke kontrole
+                      </button>
+                    </>
+                  )}
                 </div>
               </section>
             );

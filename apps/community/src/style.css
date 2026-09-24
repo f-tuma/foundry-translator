@@ -410,7 +410,7 @@ small {
 }
 .text-button {
   min-height: 28px;
-  padding: 3px 0;
+  padding: 4px 10px;
   background: none;
   border: 0;
   color: var(--accent);
@@ -529,33 +529,40 @@ small {
   margin-bottom: 20px;
 }
 .book-rail nav {
-  margin: 20px -6px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  margin: 20px -18px;
+}
+.document-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.document-list li + li {
+  border-top: 1px solid var(--line);
 }
 .book-rail nav button {
   border: 0;
+  border-radius: 0;
+  width: 100%;
   justify-content: flex-start;
   text-align: left;
-  padding: 13px 11px;
+  padding: 13px 18px;
   background: transparent;
+  color: var(--muted);
   font-size: 13px;
-  gap: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
-.book-rail nav button svg {
-  flex: none;
-}
-.book-rail nav button.selected {
-  background: var(--wash);
-  color: var(--accent);
-  box-shadow: inset 2px 0 var(--accent);
+.book-rail nav button[aria-current="page"] {
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 600;
 }
 .book-rail nav button:hover {
   background: var(--raised);
+  color: var(--ink);
 }
-.book-rail nav button span {
-  overflow-wrap: anywhere;
+.book-rail nav button:focus-visible {
+  outline-offset: -3px;
 }
 .rail-upload {
   margin-top: auto;
@@ -622,7 +629,8 @@ small {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 25px;
+  column-gap: 25px;
+  row-gap: 0;
   padding: 20px 0 20px 35px;
   border-bottom: 1px solid var(--line);
   align-items: start;
@@ -666,6 +674,7 @@ small {
   border-color: var(--line-strong);
 }
 .row-status {
+  grid-column: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -706,6 +715,49 @@ small {
   min-width: 0;
   padding: 6px;
   width: 100%;
+}
+.row-references {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+}
+.row-references > summary {
+  min-height: 30px;
+  padding: 4px 10px;
+}
+.row-references > summary:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+.reference-labels summary::-webkit-details-marker {
+  display: none;
+}
+.row-references[open] > summary .disclosure-arrow {
+  transform: rotate(90deg);
+}
+.reference-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 25px;
+  padding: 12px 11px;
+  border-block: 1px solid var(--line);
+}
+.reference-columns > div {
+  min-width: 0;
+}
+.reference-columns h3 {
+  margin: 0 0 12px;
+  font:
+    500 11px/1.5 Inter,
+    system-ui,
+    sans-serif;
+  color: var(--muted);
+}
+.reference-columns label {
+  min-height: 32px;
+  overflow-wrap: anywhere;
+}
+.reference-marker {
+  flex-shrink: 0;
 }
 .context-rail {
   padding: 0 20px 30px;
@@ -1028,16 +1080,26 @@ small {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+.proposal-list {
+  margin-inline: -16px;
+}
 .proposal-list-row {
   display: flex;
   width: 100%;
   justify-content: space-between;
   text-align: left;
-  padding: 25px 0;
+  padding: 25px 16px;
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: none;
+}
+.proposal-list-row > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.proposal-list-row > .state {
+  flex-shrink: 0;
 }
 .proposal-list-row h3 {
   font-family: var(--serif);
@@ -1215,6 +1277,12 @@ small {
   .book-rail {
     padding: 23px 13px;
   }
+  .book-rail nav {
+    margin-inline: -13px;
+  }
+  .book-rail nav button {
+    padding-inline: 13px;
+  }
   .prose,
   .prose-input {
     font-size: 17px;
@@ -1292,16 +1360,11 @@ small {
     margin-bottom: 12px;
   }
   .book-rail nav {
-    flex-direction: row;
-    overflow: auto;
-    margin: 12px 0 0;
+    margin: 12px -17px -17px;
   }
   .book-rail nav button {
     font-size: 12px;
-    min-width: 160px;
-    max-width: 220px;
-    flex: none;
-    padding: 10px;
+    padding: 10px 17px;
   }
   .rail-upload {
     display: none;
@@ -1417,6 +1480,10 @@ small {
   .change-columns.three {
     grid-template-columns: 1fr;
     gap: 15px;
+  }
+  .reference-columns {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
   .change-columns small {
     margin: 10px 0;
