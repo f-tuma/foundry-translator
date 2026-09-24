@@ -560,5 +560,8 @@
   "FOUNDRY_TRANSLATE.Review.ProjectPreviewChanged": "A document or editorial record changed after the preview. Reopen the project file; this import made no writes.",
   "FOUNDRY_TRANSLATE.Review.ProjectWriteConflict": "Import stopped because a document or editorial record changed concurrently.",
   "FOUNDRY_TRANSLATE.Review.ProjectLanguage": "Translation language: {language}",
-  "FOUNDRY_TRANSLATE.Review.ProjectImport": "Editorial import"
+  "FOUNDRY_TRANSLATE.Review.ProjectImport": "Editorial import",
+  "FOUNDRY_TRANSLATE.Review.CommunityInvalid": "Invalid community translation file (maximum 50 MB).",
+  "FOUNDRY_TRANSLATE.Review.CommunitySourceMissing": "The original document is unavailable in this installation",
+  "FOUNDRY_TRANSLATE.Review.CommunitySourceChanged": "The original differs from the community release; nothing was imported"
 }

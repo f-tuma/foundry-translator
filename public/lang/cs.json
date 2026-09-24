@@ -560,5 +560,8 @@
   "FOUNDRY_TRANSLATE.Review.ProjectPreviewChanged": "Od vytvoření náhledu se změnil dokument nebo redakce. Otevři pracovní soubor znovu; import nic nezapsal.",
   "FOUNDRY_TRANSLATE.Review.ProjectWriteConflict": "Import se zastavil kvůli souběžné změně dokumentu nebo redakce.",
   "FOUNDRY_TRANSLATE.Review.ProjectLanguage": "Jazyk překladů: {language}",
-  "FOUNDRY_TRANSLATE.Review.ProjectImport": "Import redakce"
+  "FOUNDRY_TRANSLATE.Review.ProjectImport": "Import redakce",
+  "FOUNDRY_TRANSLATE.Review.CommunityInvalid": "Neplatný komunitní soubor překladu (maximum 50 MB).",
+  "FOUNDRY_TRANSLATE.Review.CommunitySourceMissing": "Originální dokument není v této instalaci dostupný",
+  "FOUNDRY_TRANSLATE.Review.CommunitySourceChanged": "Originál se liší od komunitního vydání; import nic nezapsal"
 }

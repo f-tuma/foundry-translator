@@ -2,7 +2,11 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.28.0** adds recoverable local drafts and previewed editorial project
+Version **0.29.0** adds validated community-release imports and a separate
+[Weblate-backed community editor](apps/community/README.md), deployable as one
+Docker Compose stack in Dokploy. Accounts and permissions remain native Weblate.
+
+The Foundry editor includes recoverable local drafts and previewed editorial project
 export/import, including notes and imported attestations. Glossary name checks
 and protected editorial corrections survive continuation of unfinished journals. The editor also includes global
 fuzzy search, previewed bulk corrections, undo history and Czech UI catalogs. It also supports display-only translations for scenes and active

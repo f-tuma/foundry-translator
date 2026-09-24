@@ -1,0 +1,13 @@
+:8080 {
+  request_body {
+    max_size 25MB
+  }
+  handle /weblate/* {
+    reverse_proxy weblate:8080 {
+      header_up X-Forwarded-Proto {$COMMUNITY_SCHEME:https}
+    }
+  }
+  handle {
+    reverse_proxy studio:3000
+  }
+}
