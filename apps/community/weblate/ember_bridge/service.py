@@ -35,7 +35,7 @@ def workspace(user, permission=None, lock=False):
         query = query.select_for_update()
     ws = query.filter(project__slug=settings.EMBER_PROJECT).first()
     if not user.is_authenticated or not user.is_active:
-        raise Problem(401, "Přihlaste se do Weblate.")
+        raise Problem(401, "Pro pokračování se přihlaste.")
     if not ws:
         raise Problem(503, "Správce musí nejprve inicializovat projekt.")
     if ws.project.access_control != Project.ACCESS_PRIVATE:

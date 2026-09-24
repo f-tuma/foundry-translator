@@ -1,0 +1,326 @@
+:root {
+  color-scheme: dark;
+  --ember-canvas: #101414;
+  --ember-paper: #141818;
+  --ember-raised: #1d2120;
+  --ember-ink: #e7dfcc;
+  --ember-muted: #a8aaa4;
+  --ember-line: #3b403d;
+  --ember-accent: #d7a925;
+  --ember-accent-ink: #171b1b;
+  --ember-danger: #ff9a90;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ember-canvas: #eee8dc;
+  --ember-paper: #fcfaf5;
+  --ember-raised: #eae4d8;
+  --ember-ink: #2d302a;
+  --ember-muted: #62685e;
+  --ember-line: #d2cbbd;
+  --ember-accent: #785317;
+  --ember-accent-ink: #fffaf0;
+  --ember-danger: #9c392f;
+}
+body.ember-account {
+  margin: 0;
+  min-width: 320px;
+  background: var(--ember-canvas);
+  color: var(--ember-ink);
+  font:
+    15px/1.6 Inter,
+    system-ui,
+    sans-serif;
+  --bs-body-color: var(--ember-ink);
+  --bs-body-bg: var(--ember-paper);
+  --bs-border-color: var(--ember-line);
+  --bs-secondary-color: var(--ember-muted);
+  --bs-tertiary-bg: var(--ember-raised);
+  --bs-link-color: var(--ember-accent);
+}
+.ember-account a {
+  color: var(--ember-accent);
+}
+.ember-account a:focus-visible,
+.ember-account summary:focus-visible,
+.ember-account button:focus-visible {
+  outline: 2px solid var(--ember-accent);
+  outline-offset: 3px;
+}
+.ember-header {
+  min-height: 72px;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--ember-line);
+  background: var(--ember-raised);
+}
+.ember-header .ember-wordmark {
+  font:
+    30px/1.2 Georgia,
+    serif;
+  text-decoration: none;
+  color: var(--ember-ink);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ember-wordmark small,
+.ember-wordmark span {
+  color: var(--ember-muted);
+}
+.ember-wordmark small {
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+.ember-header nav {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+}
+.ember-auth-main {
+  max-width: 1020px;
+  margin: 56px auto 36px;
+  padding: 0 24px;
+}
+.ember-auth-main:has(.ember-login) {
+  max-width: 560px;
+}
+.ember-auth-main > .container {
+  max-width: none;
+  padding: 0;
+}
+.ember-auth-main h1 {
+  font:
+    500 34px/1.3 Georgia,
+    serif;
+  margin-bottom: 20px;
+}
+.ember-auth-main h2 {
+  font-size: 20px;
+  margin: 0 0 16px;
+}
+.ember-auth-main h4 {
+  font-size: 18px;
+  margin: 0;
+}
+.ember-auth-main h5 {
+  font-size: 16px;
+  line-height: 1.5;
+}
+.ember-account .ember-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: var(--ember-muted);
+  margin-bottom: 16px;
+}
+.ember-account .help-block,
+.ember-account .form-text {
+  color: var(--ember-muted);
+  font-size: 13px;
+}
+.ember-account .form-label {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.ember-account .form-control,
+.ember-account .form-select {
+  border: 1px solid var(--ember-line);
+  background-color: var(--ember-paper);
+  color: var(--ember-ink);
+  border-radius: 5px;
+  padding: 11px;
+}
+.ember-account .form-control:focus {
+  border-color: var(--ember-accent);
+  box-shadow: 0 0 0 1px var(--ember-accent);
+}
+.ember-account .btn {
+  padding: 10px 15px;
+  font-size: 14px;
+  line-height: 1.4;
+  border-radius: 5px;
+  white-space: normal;
+}
+.ember-account .btn-primary {
+  background: var(--ember-accent);
+  border-color: var(--ember-accent);
+  color: var(--ember-accent-ink);
+}
+.ember-account .btn-outline-primary {
+  border-color: var(--ember-line);
+  color: var(--ember-ink);
+  background: var(--ember-paper);
+}
+.ember-account .btn-primary:hover {
+  filter: brightness(1.12);
+}
+.ember-account .btn-outline-primary:hover {
+  background: var(--ember-raised);
+}
+.ember-account .btn-danger,
+.ember-account .btn-outline-danger,
+.ember-account .invalid-feedback {
+  color: var(--ember-danger);
+}
+.ember-account .card {
+  border: 1px solid var(--ember-line);
+  background: var(--ember-paper);
+  color: var(--ember-ink);
+  box-shadow: none;
+  border-radius: 5px;
+  margin: 24px 0;
+}
+.ember-account .card-header,
+.ember-account .card-footer {
+  background: transparent;
+  border-color: var(--ember-line);
+  padding: 18px 24px;
+}
+.ember-account .card-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.ember-account .card-body {
+  padding: 24px;
+}
+.ember-account .list-group-item {
+  background: transparent;
+  border-color: var(--ember-line);
+  color: var(--ember-ink);
+  overflow-wrap: anywhere;
+}
+.ember-account .table {
+  --bs-table-color: var(--ember-ink);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--ember-line);
+  font-size: 13px;
+  margin: 0;
+}
+.ember-account .table td,
+.ember-account .table th {
+  padding: 12px 24px;
+}
+.ember-account .second-factor .row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin: 0;
+}
+.ember-account .second-factor .row > div {
+  width: 100%;
+  padding: 0 0 24px;
+  border-bottom: 1px solid var(--ember-line);
+}
+.ember-account .second-factor .row > div:last-child {
+  border: 0;
+  padding-bottom: 0;
+}
+.ember-account .form-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.ember-account .form-inline input {
+  max-width: 350px;
+}
+.ember-login form {
+  margin-top: 28px;
+}
+.ember-login-reset {
+  margin-top: 20px;
+  font-size: 14px;
+}
+.ember-auth-providers,
+.ember-security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+.ember-legal {
+  border-top: 1px solid var(--ember-line);
+  padding-top: 20px;
+  margin-top: 32px;
+  color: var(--ember-muted);
+  font-size: 13px;
+}
+.ember-legal summary {
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--ember-ink);
+}
+.ember-legal[open] summary {
+  margin-bottom: 16px;
+}
+.ember-auth-footer {
+  text-align: center;
+  padding: 32px 24px;
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .ember-header {
+    padding: 16px;
+    flex-wrap: wrap;
+  }
+  .ember-header .ember-wordmark {
+    font-size: 26px;
+    gap: 10px;
+  }
+  .ember-header nav {
+    gap: 16px;
+  }
+  .ember-auth-main {
+    margin-top: 32px;
+    padding: 0 16px;
+  }
+  .ember-account .card-body,
+  .ember-account .card-header,
+  .ember-account .card-footer {
+    padding: 16px;
+  }
+  .ember-account .table td,
+  .ember-account .table th {
+    padding: 12px;
+  }
+}
+.ember-account .card-header,
+.ember-account .card-title,
+.ember-account .card-header h2 {
+  color: var(--ember-ink);
+}
+.ember-account .btn {
+  font-weight: 500;
+}
+.ember-account .second-factor .btn-primary {
+  background: var(--ember-paper);
+  border-color: var(--ember-line);
+  color: var(--ember-ink);
+}
+.ember-auth-main {
+  max-width: 640px;
+}
+.ember-auth-main:has(.second-factor) {
+  max-width: 1020px;
+}
+.ember-auth-main > .container > .row > .col-sm-6 {
+  width: 100%;
+  order: initial !important;
+}
+.ember-account .alert {
+  background: var(--ember-raised);
+  border-color: var(--ember-line);
+  color: var(--ember-ink);
+  font-size: 14px;
+}
+.ember-account .alert-danger {
+  border-color: var(--ember-danger);
+  color: var(--ember-danger);
+}
+.ember-account .form-label {
+  font-weight: 500;
+}

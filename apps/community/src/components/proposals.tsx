@@ -46,7 +46,8 @@ interface Detail {
   comments: { id: number; body: string; author: string; at: string }[];
 }
 export function Proposals() {
-  const who = useSession().data!.member;
+  // Shell mounts this component only for an admitted member.
+  const who = useSession().data!.member!;
   const qc = useQueryClient();
   const [id, setId] = useState(() =>
     typeof window !== "undefined"

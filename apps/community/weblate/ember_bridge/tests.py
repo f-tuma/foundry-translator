@@ -351,3 +351,173 @@ class EditorialTests(TestCase):
         self.assertFalse(Path(created[0]).exists())
         self.assertTrue(Path(self.book.component.full_path).exists())
         self.assertEqual(Book.objects.filter(workspace=self.ws).count(), 1)
+
+    def test_account_is_available_without_membership_but_content_stays_private(self):
+        client = Client(enforce_csrf_checks=True)
+        self.assertEqual(client.get("/weblate/foundry/account").status_code, 401)
+        client.force_login(self.outsider)
+        session = client.get("/weblate/foundry/session").json()
+        self.assertIsNone(session["member"])
+        self.assertEqual(session["account"]["username"], self.outsider.username)
+        self.assertNotIn("password", session["account"])
+        self.assertEqual(client.get("/weblate/foundry/units").status_code, 403)
+        self.assertEqual(client.get("/weblate/accounts/profile/").status_code, 200)
+
+    def test_account_edits_use_native_validation_csrf_audit_and_revision(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.author)
+        session = client.get("/weblate/foundry/session").json()
+        original = session["account"]
+        payload = {
+            k: original[k] for k in ("username", "full_name", "email", "revision")
+        }
+        payload["full_name"] = "Zkušební Překladatel"
+        url = "/weblate/foundry/account"
+        self.assertEqual(
+            client.post(url, data=payload, content_type="application/json").status_code,
+            403,
+        )
+
+        def post(data):
+            return client.post(
+                url,
+                data=data,
+                content_type="application/json",
+                HTTP_X_CSRFTOKEN=session["csrf"],
+            )
+
+        self.assertEqual(post({**payload, "is_superuser": True}).status_code, 400)
+        self.assertEqual(
+            post({**payload, "email": "unverified@example.test"}).status_code, 400
+        )
+        self.assertEqual(
+            post({**payload, "username": self.reviewer.username}).status_code, 400
+        )
+        before = self.author.auditlog_set.count()
+        response = post(payload)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.full_name, payload["full_name"])
+        self.assertEqual(self.author.email, original["email"])
+        self.assertFalse(self.author.is_superuser)
+        self.assertGreater(self.author.auditlog_set.count(), before)
+        self.assertEqual(post({**payload, "full_name": "Stale edit"}).status_code, 409)
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.full_name, payload["full_name"])
+
+    def test_native_editor_is_reserved_for_admins(self):
+        client = Client()
+        native = f"/weblate/projects/{self.ws.project.slug}/"
+        self.assertRedirects(
+            client.get(native), "/editor", fetch_redirect_response=False
+        )
+        client.force_login(self.reviewer)
+        self.assertRedirects(
+            client.get(native), "/editor", fetch_redirect_response=False
+        )
+        self.assertEqual(client.post(native).status_code, 403)
+        self.assertEqual(client.get("/weblate/api/projects/").status_code, 403)
+        client.force_login(self.admin)
+        self.assertEqual(client.get(native).status_code, 200)
+
+    def test_account_templates_keep_native_forms_and_brand_shell(self):
+        from django.template.loader import get_template
+
+        from .template_loader import ACCOUNT_TEMPLATES, NATIVE
+
+        for name in ACCOUNT_TEMPLATES:
+            self.assertIn('{% extends "base.html" %}', (NATIVE / name).read_text())
+            get_template(name)
+        client = Client(enforce_csrf_checks=True)
+        for path in ("login", "reset", "register"):
+            response = client.get(
+                "/weblate/accounts/" + path + "/", HTTP_ACCEPT_LANGUAGE="en-US"
+            )
+            self.assertEqual(response.status_code, 200, response.content[:300])
+            self.assertEqual(response["Content-Language"], "cs")
+            if path == "login":
+                self.assertContains(response, "Uživatelské jméno nebo e-mail")
+            self.assertContains(response, 'id="ember-account-content"')
+            self.assertContains(response, "csrfmiddlewaretoken")
+            self.assertNotContains(response, "navbar-collapse")
+        self.assertEqual(
+            client.post(
+                "/weblate/accounts/login/", {"username": "bad", "password": "bad"}
+            ).status_code,
+            403,
+        )
+        client.force_login(self.author)
+        for path in ("password", "profile"):
+            response = client.get("/weblate/accounts/" + path + "/")
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'id="ember-account-content"')
+        self.assertEqual(
+            client.post(
+                "/weblate/accounts/profile/",
+                HTTP_X_CSRFTOKEN=client.get("/weblate/foundry/session").json()["csrf"],
+            ).status_code,
+            405,
+        )
+
+    def test_native_login_still_enforces_second_factor_and_safe_redirect(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        self.author.set_password("Synthetic-test-password-123!")
+        self.author.save()
+        client = Client()
+        response = client.post(
+            "/weblate/accounts/login/",
+            {
+                "username": self.author.username,
+                "password": "Synthetic-test-password-123!",
+                "next": "https://external.example.test/",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("external.example.test", response.url)
+        client.logout()
+        device = TOTPDevice.objects.create(
+            user=self.author, name="Test TOTP", confirmed=True
+        )
+        response = client.post(
+            "/weblate/accounts/login/",
+            {
+                "username": self.author.username,
+                "password": "Synthetic-test-password-123!",
+                "next": "/editor",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/auth/second-factor/", response.url)
+        self.assertEqual(client.get("/weblate/foundry/units").status_code, 401)
+        self.assertContains(client.get(response.url), 'id="ember-account-content"')
+        from django_otp.oath import totp
+
+        token = str(
+            totp(device.bin_key, step=device.step, t0=device.t0, digits=device.digits)
+        ).zfill(device.digits)
+        verified = client.post(response.url, {"otp_token": token, "next": "/editor"})
+        self.assertEqual(verified.status_code, 302)
+        self.assertEqual(client.get("/weblate/foundry/units").status_code, 200)
+
+    def test_native_invitation_keeps_matching_user_check(self):
+        from weblate.auth.models import Invitation
+
+        invite = Invitation.objects.create(
+            author=self.admin,
+            user=self.outsider,
+            email=self.outsider.email,
+            username=self.outsider.username,
+            full_name="",
+            group=self.author.groups.get(name=self.author.username),
+        )
+        client = Client()
+        client.force_login(self.reviewer)
+        self.assertEqual(client.post(invite.get_absolute_url()).status_code, 302)
+        self.assertFalse(self.outsider.groups.filter(pk=invite.group_id).exists())
+        client.force_login(self.outsider)
+        response = client.get(invite.get_absolute_url())
+        self.assertContains(response, 'id="ember-account-content"')
+        response = client.post(invite.get_absolute_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(self.outsider.groups.filter(pk=invite.group_id).exists())

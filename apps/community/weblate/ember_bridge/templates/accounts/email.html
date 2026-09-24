@@ -1,0 +1,12 @@
+{% extends 'ember/account-base.html' %}
+{% load crispy_forms_tags %}
+{% block extra_script %}{{ form.media }}{% endblock %}
+{% block content %}
+<h1>Ověřit novou adresu</h1>
+<p class="help-block">Na novou e-mailovou adresu pošleme odkaz pro její ověření.</p>
+<form action="{% url 'email_login' %}" method="post" accept-charset="utf-8">
+  {% csrf_token %}
+  {{ form|crispy }}
+  <button type="submit" class="btn btn-primary">Odeslat ověřovací odkaz</button>
+</form>
+{% endblock %}

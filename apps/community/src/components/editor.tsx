@@ -234,7 +234,8 @@ export function TextPart({
 export function Editor() {
   const navigate = useNavigate();
   const dialog = useRef<HTMLDialogElement>(null);
-  const who = useSession().data!.member;
+  // Shell mounts this component only for an admitted member.
+  const who = useSession().data!.member!;
   const qc = useQueryClient();
   const {
     drafts,
@@ -688,9 +689,6 @@ export function Editor() {
               </div>
             ))}
             <Notice error={history.error} />
-            <a href="/weblate/projects/ember-cs/" className="text-link">
-              Úplná historie ve Weblate
-            </a>
           </>
         )}
       </aside>

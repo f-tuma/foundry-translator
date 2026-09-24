@@ -1,0 +1,38 @@
+{% load i18n static translations %}
+<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'cs' }}" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title|default:'Účet' }} · Ember</title>
+  <script src="{% static 'ember/theme.js' %}"></script>
+  <link rel="stylesheet" href="{% static 'styles/vendor/bootstrap5.css' %}">
+  <link rel="stylesheet" href="{% static 'styles/vendor/tom-select.css' %}">
+  <link rel="stylesheet" href="{% static 'styles/variables.css' %}">
+  <link rel="stylesheet" href="{% static 'styles/main.css' %}">
+  <link rel="stylesheet" href="{% static 'ember/account.css' %}">
+  <script src="{% url 'js-catalog' %}" defer></script>
+  <meta name="argon2id-worker-url" content="{% static 'js/vendor/argon2id.js' %}">
+  <script defer src="{% static 'js/vendor/bootstrap5.js' %}"></script>
+  <script defer src="{% static 'ember/account.js' %}"></script>
+  {% block extra_script %}{% endblock %}
+  {% block extra_meta %}{% endblock %}
+  {% block extra_styles %}{% endblock %}
+</head>
+<body class="ember-account">
+<header class="ember-header">
+  <a class="ember-wordmark" href="/">Ember <span>/</span> <small>Český překlad</small></a>
+  <nav aria-label="Navigace účtu"><a href="/editor">Editor</a><a href="/ucet">Můj účet</a></nav>
+</header>
+<main class="ember-auth-main" id="ember-account-content">
+  {% if user.is_authenticated and user.requires_2fa and not user.profile.has_2fa %}
+    <p class="alert alert-warning">Pro přístup do redakce nastavte dvoufázové přihlášení.</p>
+  {% endif %}
+  {% for message in messages %}{% show_message message.tags message %}{% endfor %}
+  <p id="ember-copy-status" role="status"></p>
+  {% block content %}{% endblock %}
+</main>
+<form method="post" action="" id="link-post">{% csrf_token %}</form>
+<footer class="ember-auth-footer"><a href="/vydani">Veřejná vydání</a></footer>
+</body>
+</html>
