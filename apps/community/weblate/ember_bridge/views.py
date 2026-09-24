@@ -48,10 +48,13 @@ def accessible_books(ws, user):
     ]
 
 
-def visible_proposal(p, books, ws):
-    allowed = {r["id"] for b in books for r in b.rows} | {
+def visible_row_ids(books, ws):
+    return {r["id"] for b in books for r in b.rows} | {
         r["id"] for r in glossary_rows(ws)
     }
+
+
+def visible_proposal(p, allowed):
     return all(c["unitId"] in allowed for c in p.changes)
 
 
@@ -164,6 +167,7 @@ def endpoint(request, action):
                     "rows": glossary_rows(ws),
                 }
             elif action == "proposals":
+                allowed = visible_row_ids(books, ws)
                 output = {
                     "proposals": [
                         proposal_json(p)
@@ -177,14 +181,14 @@ def endpoint(request, action):
                         )
                         .select_related("author")
                         .order_by("-updated_at")[:200]
-                        if visible_proposal(p, books, ws)
+                        if visible_proposal(p, allowed)
                     ]
                 }
             elif action.startswith("proposals/"):
                 p = Proposal.objects.select_related("author").get(
                     pk=action.split("/")[1], workspace=ws
                 )
-                if not visible_proposal(p, books, ws):
+                if not visible_proposal(p, visible_row_ids(books, ws)):
                     raise Problem(403, "Chybí přístup k dokumentům návrhu.")
                 ids = {c["unitId"] for c in p.changes}
                 selected = [b for b in books if any(r["id"] in ids for r in b.rows)]
@@ -240,7 +244,7 @@ def endpoint(request, action):
                 output = publish(request.user, data)
             elif action == "comments":
                 p = Proposal.objects.get(pk=data["id"], workspace=ws)
-                if not visible_proposal(p, books, ws):
+                if not visible_proposal(p, visible_row_ids(books, ws)):
                     raise Problem(403, "Chybí přístup k návrhu.")
                 body = data.get("body", "").strip()
                 if not 1 <= len(body) <= 8000:
