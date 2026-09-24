@@ -115,8 +115,8 @@ export function Releases() {
                   <h3>{r.title}</h3>
                   <p className="pre-line">{r.notes}</p>
                   <small>
-                    {r.document_count} dokumentů · {r.reviewed_count} z{" "}
-                    {r.unit_count} oddílů ověřeno
+                    Dokumenty: {r.document_count} · Ověřené oddíly:{" "}
+                    {r.reviewed_count} / {r.unit_count}
                   </small>
                 </div>
                 <a

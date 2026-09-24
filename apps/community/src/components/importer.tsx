@@ -31,7 +31,7 @@ export function Importer() {
       }),
     onSuccess: (r) => {
       setResult(
-        `Přijato ${r.imported} dokumentů. Weblate nyní připravuje jejich oddíly.`,
+        `Počet přijatých dokumentů: ${r.imported}. Weblate nyní připravuje jejich oddíly.`,
       );
       preview.reset();
       qc.invalidateQueries({ queryKey: ["books"] });

@@ -146,7 +146,7 @@ export function Proposals() {
               <div>
                 <h3>{item.title}</h3>
                 <small>
-                  {item.author_name} · {item.changes.length} oddílů ·{" "}
+                  {item.author_name} · oddíly: {item.changes.length} ·{" "}
                   {new Date(item.updated_at).toLocaleDateString("cs-CZ")}
                 </small>
               </div>
