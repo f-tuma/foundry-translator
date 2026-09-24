@@ -12,7 +12,8 @@ při najetí myší, klávesnicí i klepnutím na mobilu, nad rolovacími panely
 
 1. Vytvořte službu Docker Compose z tohoto repozitáře. Cesta k souboru:
    `compose.community.yml`; build context musí zůstat kořen repozitáře.
-2. Do Environment vložte hodnoty podle `apps/community/.env.example`.
+2. Do Environment vložte hodnoty podle [`.env.example`](../../.env.example)
+   v kořeni repozitáře vedle Compose souboru.
    Nastavte skutečný SMTP server pro pozvánky a obnovu hesla. Doména je bez
    `https://`; hesla generujte samostatně. Údaje nepatří do Gitu.
 3. Doménu s HTTPS připojte ke službě **gateway**, port **8080**. Ostatní služby
@@ -31,7 +32,9 @@ nebo přidat do týmu. Přístup k projektu musí zůstat Private. Po odebrání
 API znovu ověří oprávnění; lokálně rozepsané koncepty mohou zůstat v prohlížeči
 původního člena. Weblate spravuje i nastavení MFA, reset hesla a délku relace.
 
-Lokální spuštění použije stejný Compose; přidejte vlastní override s portem
+Pro lokální konfiguraci spusťte z kořene repozitáře `cp .env.example .env`
+a doplňte hodnoty. Compose tento soubor načte automaticky; `.env` je ignorovaný
+Gitem. Lokální spuštění použije stejný Compose; přidejte vlastní override s portem
 `127.0.0.1:3101:8080` pro gateway a nastavte `COMMUNITY_HOST=localhost:3101`,
 `COMMUNITY_SCHEME=http`, `COMMUNITY_HTTPS=0`. Produkční SMTP lze při testu nahradit
 lokálním Mailpit. Nikdy nenastavujte testovací HTTP profil na veřejné doméně.
