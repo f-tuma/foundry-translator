@@ -10,6 +10,7 @@ from django.utils import timezone
 from weblate.lang.models import Language
 from weblate.trans.models import Component, Project, Unit
 from weblate.utils.state import STATE_APPROVED
+from weblate.utils.stats import ProjectLanguage
 from weblate.vcs.git import LocalRepository
 
 from .engine import content_engine
@@ -47,6 +48,10 @@ def workspace(user, permission=None, lock=False):
     ):
         raise Problem(403, "Přístup do redakce musí schválit správce projektu.")
     return ws
+
+
+def language_scope(ws):
+    return ProjectLanguage(ws.project, Language.objects.get(code="cs"))
 
 
 def event(ws, user, action, subject, details=None):
@@ -292,6 +297,8 @@ def proposal_json(p):
 
 
 def check_changes(ws, user, changes, strict=True, review=False):
+    from .glossary import corrected_glossary, glossary_rows
+
     if (
         not isinstance(changes, list)
         or not 1 <= len(changes) <= 500
@@ -310,6 +317,8 @@ def check_changes(ws, user, changes, strict=True, review=False):
         if any(r["id"] in wanted for r in b.rows)
     ]
     rows, native = rows_for_books(books, lock=True)
+    terms = [r for r in glossary_rows(ws) if r["id"] in wanted]
+    rows.extend(terms)
     by_id = {r["id"]: r for r in rows}
     conflicts = []
     for change in changes:
@@ -325,7 +334,13 @@ def check_changes(ws, user, changes, strict=True, review=False):
         if not row:
             continue
         permission = "unit.review" if review else "suggestion.add"
-        if any(not user.has_perm(permission, p) for p in native[row["id"]]):
+        if (
+            row["kind"] == "glossary"
+            and not user.has_perm(permission, language_scope(ws))
+        ) or (
+            row["kind"] != "glossary"
+            and any(not user.has_perm(permission, p) for p in native[row["id"]])
+        ):
             raise Problem(403, "Chybí oprávnění pro tento oddíl.")
         after = change.get("after")
         if (
@@ -341,6 +356,8 @@ def check_changes(ws, user, changes, strict=True, review=False):
             conflicts,
         )
     replacements = {c["unitId"]: c["after"] for c in changes}
+    if terms:
+        corrected_glossary(ws, changes)
     for book in books:
         content_engine(
             "validate",
@@ -398,6 +415,8 @@ def save_proposal(user, data):
 
 @transaction.atomic
 def transition(user, data):
+    from .glossary import merge_glossary
+
     ws = workspace(user, lock=True)
     p = (
         Proposal.objects.select_for_update()
@@ -407,7 +426,7 @@ def transition(user, data):
     action = data.get("action")
     if action not in ("submit", "approve", "merge", "reject", "rebase"):
         raise Problem(400, "Neznámá operace.")
-    reviewer = user.has_perm("unit.review", ws.project)
+    reviewer = user.has_perm("unit.review", language_scope(ws))
     if action == "merge" and p.status == "merged" and reviewer:
         return {"id": str(p.pk), "duplicate": True}
     if (
@@ -474,7 +493,7 @@ def transition(user, data):
             if (
                 not approver
                 or not approver.can_access_project(ws.project)
-                or not approver.has_perm("unit.review", ws.project)
+                or not approver.has_perm("unit.review", language_scope(ws))
             ):
                 raise Problem(
                     409,
@@ -490,6 +509,10 @@ def transition(user, data):
                     409, "Schvalující reviewer už nemá oprávnění k oddílům návrhu."
                 )
             for change in p.changes:
+                if change["unitId"].startswith("glossary:"):
+                    if not user.has_perm("unit.edit", language_scope(ws)):
+                        raise Problem(403, "Chybí oprávnění uložit glosář.")
+                    continue
                 for unit, value in zip(
                     native[change["unitId"]], change["after"], strict=True
                 ):
@@ -508,6 +531,7 @@ def transition(user, data):
                             409,
                             "Kontrola Weblate změnila text nebo odmítla ověření. Sloučení bylo vráceno.",
                         )
+            merge_glossary(ws, p.changes, user)
             p.status = "merged"
     p.save()
     event(ws, user, f"proposal.{action}", p.pk, {"revision": p.revision})

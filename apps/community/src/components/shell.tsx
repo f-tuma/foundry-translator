@@ -29,6 +29,7 @@ export function Shell({
           <small>Český překlad</small>
         </Link>
         <nav aria-label="Hlavní navigace">
+          <Link to="/prehled">Přehled</Link>
           <Link to="/editor">Editor</Link>
           <Link to="/navrhy">Návrhy</Link>
           <Link to="/glosar">Glosář</Link>
@@ -70,7 +71,7 @@ export function Shell({
           ) : (
             <a
               className="button quiet"
-              href="/weblate/accounts/login/?next=/editor"
+              href="/weblate/accounts/login/?next=/prehled"
             >
               <LogIn size={16} />
               Přihlásit se
@@ -100,7 +101,7 @@ export function Shell({
               ) : (
                 <a
                   className="button primary"
-                  href="/weblate/accounts/login/?next=/editor"
+                  href="/weblate/accounts/login/?next=/prehled"
                 >
                   Přihlásit se
                 </a>

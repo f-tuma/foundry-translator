@@ -20,6 +20,7 @@ export function Releases() {
     mutationFn: () => api("publish", { id, title, notes }),
     onSuccess: () => {
       setForm(false);
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["releases"] });
     },
   });
@@ -38,7 +39,7 @@ export function Releases() {
               Stáhněte si vydání a importujte ho do Foundry Translate.
               Originální obsah Emberu zůstává ve vašem světě.
             </p>
-            <Link className="text-link" to="/editor">
+            <Link className="text-link" to="/prehled">
               Vstoupit do redakce <ArrowRight size={17} />
             </Link>
           </div>

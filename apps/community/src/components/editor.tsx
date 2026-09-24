@@ -231,7 +231,11 @@ export function TextPart({
     </>
   );
 }
-export function Editor() {
+export function Editor({
+  initial = {},
+}: {
+  initial?: { book?: string; q?: string; state?: string; all?: boolean };
+}) {
   const navigate = useNavigate();
   const dialog = useRef<HTMLDialogElement>(null);
   // Shell mounts this component only for an admitted member.
@@ -243,9 +247,9 @@ export function Editor() {
     error: storageError,
     clear: clearDrafts,
   } = useDrafts(who.id);
-  const [book, setBook] = useState(""),
-    [search, setSearch] = useState(""),
-    [filter, setFilter] = useState("all"),
+  const [book, setBook] = useState(initial.book || ""),
+    [search, setSearch] = useState(initial.q || ""),
+    [filter, setFilter] = useState(initial.state || "all"),
     [offset, setOffset] = useState(0),
     [selected, setSelected] = useState<string | null>(null),
     [side, setSide] = useState("context"),
@@ -257,14 +261,15 @@ export function Editor() {
     queryKey: ["books"],
     queryFn: () => api<{ books: Doc[] }>("books"),
   });
-  const selectedBook = book || books.data?.books[0]?.id || "";
+  const selectedBook =
+    book || (initial.all ? "" : books.data?.books[0]?.id) || "";
   const rows = useQuery({
     queryKey: ["units", selectedBook, search, filter, offset],
     queryFn: () =>
       api<{ rows: Unit[]; total: number }>(
         `units?book=${search ? "" : selectedBook}&q=${encodeURIComponent(search)}&state=${filter}&offset=${offset}`,
       ),
-    enabled: !!selectedBook,
+    enabled: !!books.data?.books.length,
   });
   const glossary = useGlossary();
   const active =
@@ -309,6 +314,7 @@ export function Editor() {
       clearDrafts();
       setSubmit(null);
       qc.invalidateQueries({ queryKey: ["proposals"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
       navigate({ to: "/navrhy", search: { id: r.id } });
     },
   });
@@ -408,7 +414,10 @@ export function Editor() {
           <h1>
             {search
               ? "Výsledky hledání"
-              : currentDoc?.title || "Překlad čeká na své čtenáře."}
+              : currentDoc?.title ||
+                (initial.all
+                  ? "Všechny dokumenty"
+                  : "Překlad čeká na své čtenáře.")}
           </h1>
           <div className="filters">
             {[
@@ -550,8 +559,10 @@ export function Editor() {
             );
           })}
         </div>
-        {rows.isPending && selectedBook ? <p>Načítám oddíly…</p> : null}
-        {!selectedBook && !books.isPending ? (
+        {rows.isPending && !!books.data?.books.length ? (
+          <p>Načítám oddíly…</p>
+        ) : null}
+        {books.data?.books.length === 0 && !books.isPending ? (
           <div className="empty">
             <BookOpen size={28} />
             <p>Správce může začít nahráním exportu z Foundry.</p>
