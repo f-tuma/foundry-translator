@@ -1040,7 +1040,7 @@ small {
   font-size: 17px;
   overflow-wrap: anywhere;
 }
-.glossary-table td:last-child {
+.glossary-table td.glossary-actions {
   font-family: Inter, sans-serif;
   font-size: 12px;
 }
@@ -1508,7 +1508,7 @@ small {
     padding: 12px 7px;
     font-size: 10px;
   }
-  .glossary-table td:last-child {
+  .glossary-table td.glossary-actions {
     font-size: 10px;
   }
   .modal {
@@ -2036,8 +2036,14 @@ small {
   font-size: 12px;
   color: var(--muted);
 }
-.glossary-table td:last-child {
-  width: 105px;
+.glossary-table .glossary-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+.glossary-actions .text-button {
+  min-height: 36px;
+  padding: 9px 12px;
+  white-space: nowrap;
 }
 .glossary-table .is-editing {
   background: var(--surface);
@@ -2212,12 +2218,6 @@ small {
   .glossary-table td:nth-child(3),
   .glossary-table th:nth-child(3) {
     display: none;
-  }
-  .glossary-table td:last-child {
-    width: 84px;
-  }
-  .glossary-table .text-button {
-    padding: 9px 8px;
   }
   .glossary-edit {
     padding: 20px 12px;

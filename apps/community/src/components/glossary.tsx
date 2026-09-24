@@ -64,7 +64,7 @@ export function Glossary() {
             <th>Originál</th>
             <th>Český název</th>
             <th>Použití</th>
-            <th>
+            <th className="glossary-actions">
               <span className="sr-only">Úpravy</span>
             </th>
           </tr>
@@ -94,7 +94,7 @@ export function Glossary() {
                       ? "Lze skloňovat"
                       : "Přesný tvar"}
                 </td>
-                <td>
+                <td className="glossary-actions">
                   <button
                     className="text-button"
                     aria-label={`Upravit heslo ${t.source}`}
