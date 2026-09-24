@@ -4,6 +4,10 @@ Soukromá redakce českého Emberu s veřejnými vydáními pro Foundry Translat
 TanStack Start/React tvoří editor. **Weblate spravuje účty, přihlášení, pozvánky,
 oprávnění, aktuální překlady a jejich historii. Better Auth se nepoužívá.**
 
+Rozhraní používá barvy Foundry Translate. V hlavičce lze přepnout tmavý,
+světlý nebo systémový režim; volba se ukládá v prohlížeči. Nápovědy fungují
+při najetí myší, klávesnicí i klepnutím na mobilu, nad rolovacími panely.
+
 ## Nasazení v Dokploy
 
 1. Vytvořte službu Docker Compose z tohoto repozitáře. Cesta k souboru:

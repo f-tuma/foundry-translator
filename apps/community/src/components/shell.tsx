@@ -1,21 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import {
-  BookOpen,
-  LogIn,
-  UserRound,
-  CircleHelp,
-  ArrowUpRight,
-} from "lucide-react";
+import { BookOpen, LogIn, UserRound, ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSession, message } from "../api";
-export function Help({ children }: { children: string }) {
-  return (
-    <span className="help" tabIndex={0} role="note" aria-label={children}>
-      <CircleHelp size={15} />
-      <span className="tooltip">{children}</span>
-    </span>
-  );
-}
+import { ThemeControl } from "./theme";
+export { Help } from "./help";
 export function Notice({ error }: { error: unknown }) {
   return error ? (
     <div className="notice error" role="alert">
@@ -45,44 +33,47 @@ export function Shell({
           <Link to="/glosar">Glosář</Link>
           <Link to="/vydani">Vydání</Link>
         </nav>
-        {member ? (
-          <details className="account">
-            <summary>
-              <UserRound size={17} />
-              {member.name}
-            </summary>
-            <div>
-              <a href="/weblate/accounts/profile/">
-                Účet ve Weblate <ArrowUpRight size={14} />
-              </a>
-              {member.role === "admin" ? (
-                <>
-                  <a href="/weblate/access/ember-cs/">Členové a pozvánky</a>
-                  <Link to="/import">Nahrát export</Link>
-                </>
-              ) : null}
-              <a href="/weblate/projects/ember-cs/">Otevřít Weblate</a>
-              <form method="post" action="/weblate/accounts/logout/">
-                <input
-                  type="hidden"
-                  name="csrfmiddlewaretoken"
-                  value={session.data?.csrf || ""}
-                />
-                <button className="text-button" type="submit">
-                  Odhlásit se
-                </button>
-              </form>
-            </div>
-          </details>
-        ) : (
-          <a
-            className="button quiet"
-            href="/weblate/accounts/login/?next=/editor"
-          >
-            <LogIn size={16} />
-            Přihlásit se
-          </a>
-        )}
+        <div className="header-actions">
+          <ThemeControl />
+          {member ? (
+            <details className="account">
+              <summary aria-label={`Účet: ${member.name}`}>
+                <UserRound size={17} />
+                <span className="account-name">{member.name}</span>
+              </summary>
+              <div>
+                <a href="/weblate/accounts/profile/">
+                  Účet ve Weblate <ArrowUpRight size={14} />
+                </a>
+                {member.role === "admin" ? (
+                  <>
+                    <a href="/weblate/access/ember-cs/">Členové a pozvánky</a>
+                    <Link to="/import">Nahrát export</Link>
+                  </>
+                ) : null}
+                <a href="/weblate/projects/ember-cs/">Otevřít Weblate</a>
+                <form method="post" action="/weblate/accounts/logout/">
+                  <input
+                    type="hidden"
+                    name="csrfmiddlewaretoken"
+                    value={session.data?.csrf || ""}
+                  />
+                  <button className="text-button" type="submit">
+                    Odhlásit se
+                  </button>
+                </form>
+              </div>
+            </details>
+          ) : (
+            <a
+              className="button quiet"
+              href="/weblate/accounts/login/?next=/editor"
+            >
+              <LogIn size={16} />
+              Přihlásit se
+            </a>
+          )}
+        </div>
       </header>
       {privatePage && !member ? (
         <main className="gate">
