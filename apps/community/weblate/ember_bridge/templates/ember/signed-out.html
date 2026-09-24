@@ -1,0 +1,9 @@
+{% extends 'ember/account-base.html' %}
+{% block content %}
+<h1>Odhlášeno</h1>
+<p>Vaše přihlášení do redakce bylo ukončeno.</p>
+<div class="ember-security-actions">
+  <a class="btn btn-primary" href="/vydani">Prohlédnout vydání</a>
+  <a class="btn btn-outline-primary" href="{% url 'login' %}?next=/editor">Znovu se přihlásit</a>
+</div>
+{% endblock %}

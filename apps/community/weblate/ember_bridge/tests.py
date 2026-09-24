@@ -521,3 +521,17 @@ class EditorialTests(TestCase):
         response = client.post(invite.get_absolute_url())
         self.assertEqual(response.status_code, 302)
         self.assertTrue(self.outsider.groups.filter(pk=invite.group_id).exists())
+
+    def test_logout_keeps_ember_shell_and_ends_session_with_native_csrf(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.author)
+        csrf = client.get("/weblate/foundry/session").json()["csrf"]
+        url = "/weblate/accounts/logout/"
+        self.assertEqual(client.get(url).status_code, 405)
+        self.assertEqual(client.post(url).status_code, 403)
+        self.assertEqual(client.get("/weblate/foundry/session").status_code, 200)
+        response = client.post(url, HTTP_X_CSRFTOKEN=csrf)
+        self.assertContains(response, 'id="ember-account-content"')
+        self.assertContains(response, "Odhlášeno")
+        self.assertNotContains(response, "navbar-collapse")
+        self.assertEqual(client.get("/weblate/foundry/session").status_code, 401)

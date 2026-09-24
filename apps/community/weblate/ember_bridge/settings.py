@@ -17,7 +17,6 @@ REGISTRATION_OPEN = True  # required by native invitation registration
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
 # Keep login's redirect to the studio on this same host.
 LOGIN_REDIRECT_URL = "/editor"
-LOGOUT_REDIRECT_URL = "/vydani"
 # Use native credential views with a separate presentation layer. The loader is
 # scoped to account templates; administrators retain the native console.
 TEMPLATES[0]["DIRS"] = [str(Path(__file__).parent / "templates")]
