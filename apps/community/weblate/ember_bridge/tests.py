@@ -409,11 +409,11 @@ class EditorialTests(TestCase):
         client = Client()
         native = f"/weblate/projects/{self.ws.project.slug}/"
         self.assertRedirects(
-            client.get(native), "/editor", fetch_redirect_response=False
+            client.get(native), "/prehled", fetch_redirect_response=False
         )
         client.force_login(self.reviewer)
         self.assertRedirects(
-            client.get(native), "/editor", fetch_redirect_response=False
+            client.get(native), "/prehled", fetch_redirect_response=False
         )
         self.assertEqual(client.post(native).status_code, 403)
         self.assertEqual(client.get("/weblate/api/projects/").status_code, 403)
@@ -535,3 +535,216 @@ class EditorialTests(TestCase):
         self.assertContains(response, "Odhlášeno")
         self.assertNotContains(response, "navbar-collapse")
         self.assertEqual(client.get("/weblate/foundry/session").status_code, 401)
+
+    def seed_glossary(self):
+        self.ws.refresh_from_db()
+        self.ws.metadata["glossary"] = [
+            {
+                "source": "Old Carinth",
+                "replacement": "Starý Carinth",
+                "category": "location",
+                "aliases": [],
+                "mode": "inflect",
+            },
+            {
+                "source": "Scout",
+                "replacement": "Zvěd",
+                "category": "character",
+                "aliases": [],
+            },
+        ]
+        self.ws.save(update_fields=["metadata"])
+        from .glossary import glossary_rows
+
+        return glossary_rows(self.ws)
+
+    def glossary_proposal(self):
+        row = self.seed_glossary()[0]
+        after = list(row["value"])
+        after[0] = "Starobylý Carinth"
+        after[3] = "Soukromá poznámka redakce"
+        data = {
+            "requestId": str(uuid.uuid4()),
+            "title": "Glosář: Carinth",
+            "changes": [
+                {
+                    "unitId": row["id"],
+                    "baseRevision": row["revision"],
+                    "before": row["value"],
+                    "after": after,
+                }
+            ],
+        }
+        saved = save_proposal(self.author, data)
+        return {"id": saved["id"], "revision": 1}, data
+
+    def test_glossary_uses_separate_review_atomic_merge_and_public_snapshot(self):
+        from .glossary import glossary_rows
+
+        args, data = self.glossary_proposal()
+        self.assertTrue(save_proposal(self.author, data)["duplicate"])
+        client = Client()
+        client.force_login(self.reviewer)
+        response = client.get("/weblate/foundry/proposals/" + args["id"])
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["rows"][0]["kind"], "glossary")
+        transition(self.author, {**args, "action": "submit"})
+        self.assert_problem(403, transition, self.author, {**args, "action": "approve"})
+        transition(self.reviewer, {**args, "action": "approve"})
+        self.ws.refresh_from_db()
+        self.assertEqual(glossary_rows(self.ws)[0]["value"][0], "Starý Carinth")
+        transition(self.reviewer, {**args, "action": "merge"})
+        self.ws.refresh_from_db()
+        row = glossary_rows(self.ws)[0]
+        self.assertEqual(row["value"][0], "Starobylý Carinth")
+        self.assertTrue(row["approval"])
+        self.assertNotEqual(row["revision"], data["changes"][0]["baseRevision"])
+        self.assertEqual(rows_for_books([self.book])[0][0]["value"], ["Příručka"])
+        self.assertTrue(
+            transition(self.reviewer, {**args, "action": "merge"})["duplicate"]
+        )
+        publish(
+            self.admin, {"id": "glossary-v1", "title": "Opravený glosář", "notes": ""}
+        )
+        release = Release.objects.get(pk="glossary-v1").payload
+        term = release["bundle"]["glossary"][0]
+        self.assertEqual(term["replacement"], "Starobylý Carinth")
+        self.assertEqual(term["mode"], "inflect")
+        self.assertNotIn("notes", term)
+        self.assertNotIn("glossary_state", release["bundle"])
+
+    def test_glossary_conflict_alias_validation_and_revoked_approver(self):
+        from .glossary import glossary_rows
+
+        args, data = self.glossary_proposal()
+        bad = copy.deepcopy(data)
+        bad["requestId"] = str(uuid.uuid4())
+        bad["changes"][0]["after"][4] = "Scout"
+        with self.assertRaises(ValueError):
+            save_proposal(self.author, bad)
+        self.assertEqual(Proposal.objects.filter(workspace=self.ws).count(), 1)
+        transition(self.author, {**args, "action": "submit"})
+        transition(self.reviewer, {**args, "action": "approve"})
+        self.ws.refresh_from_db()
+        self.ws.metadata["glossary"][0]["replacement"] = "Jiný Carinth"
+        self.ws.save(update_fields=["metadata"])
+        self.assert_problem(409, transition, self.reviewer, {**args, "action": "merge"})
+        self.ws.refresh_from_db()
+        self.assertFalse(glossary_rows(self.ws)[0]["approval"])
+        current = glossary_rows(self.ws)[0]
+        transition(
+            self.author,
+            {
+                **args,
+                "action": "rebase",
+                "bases": [{"unitId": current["id"], "revision": current["revision"]}],
+            },
+        )
+        p = Proposal.objects.get(pk=args["id"])
+        self.assertIsNone(p.approval)
+        self.assertEqual(p.revision, 2)
+        args["revision"] = 2
+        transition(self.author, {**args, "action": "submit"})
+        transition(self.reviewer, {**args, "action": "approve"})
+        self.reviewer.groups.clear()
+        self.assert_problem(409, transition, self.admin, {**args, "action": "merge"})
+
+    def test_glossary_and_document_changes_rollback_together(self):
+        args, data = self.glossary_proposal()
+        row = self.rows[0]
+        data.update(id=args["id"], revision=1, requestId=str(uuid.uuid4()))
+        data["changes"].append(
+            {
+                "unitId": row["id"],
+                "baseRevision": row["revision"],
+                "before": row["value"],
+                "after": ["Nová Příručka"],
+            }
+        )
+        save_proposal(self.author, data)
+        args["revision"] = 2
+        transition(self.author, {**args, "action": "submit"})
+        transition(self.reviewer, {**args, "action": "approve"})
+        with patch(
+            "ember_bridge.glossary.merge_glossary",
+            side_effect=Problem(409, "Late failure"),
+        ):
+            self.assert_problem(
+                409, transition, self.reviewer, {**args, "action": "merge"}
+            )
+        self.assertEqual(rows_for_books([self.book])[0][0]["value"], ["Příručka"])
+        self.assertEqual(Proposal.objects.get(pk=args["id"]).status, "approved")
+
+    def test_dashboard_counts_current_rows_separately_from_approved_proposals(self):
+        client = Client()
+        self.assertEqual(client.get("/weblate/foundry/dashboard").status_code, 401)
+        client.force_login(self.outsider)
+        self.assertEqual(client.get("/weblate/foundry/dashboard").status_code, 403)
+        client.force_login(self.reviewer)
+        args, _ = self.approved()
+        data = client.get("/weblate/foundry/dashboard").json()
+        self.assertEqual(data["totals"]["units"], len(self.rows))
+        self.assertEqual(data["totals"]["reviewed"], 0)
+        self.assertEqual(data["proposals"]["approved"], 1)
+        self.assertEqual(data["documents"][0]["open_proposals"], 1)
+        self.assertNotIn("Private original", json.dumps(data))
+        self.assertNotIn("The forest is quiet", json.dumps(data))
+        transition(self.reviewer, {**args, "action": "merge"})
+        data = client.get("/weblate/foundry/dashboard").json()
+        self.assertEqual(data["totals"]["reviewed"], 1)
+        self.assertEqual(data["proposals"]["approved"], 0)
+        self.assertEqual(data["proposals"]["merged"], 1)
+        self.assertEqual(data["documents"][0]["title"], "Průvodce")
+        self.assertEqual(data["documents"][0]["open_proposals"], 0)
+        # Revocation of component visibility must also hide its proposal activity.
+        with patch("ember_bridge.views.accessible_books", return_value=[]):
+            data = client.get("/weblate/foundry/dashboard").json()
+        self.assertEqual(data["totals"]["units"], 0)
+        self.assertFalse(data["activity"])
+        self.assertFalse(data["work"])
+        self.assertEqual(data["proposals"]["merged"], 0)
+
+    def test_dashboard_missing_or_changed_native_parts_are_unknown_not_pending(self):
+        client = Client()
+        client.force_login(self.reviewer)
+        part = self.native[self.rows[0]["id"]][0]
+        Unit.objects.filter(pk=part.pk).update(source="Different source")
+        data = client.get("/weblate/foundry/dashboard").json()
+        self.assertEqual(data["totals"]["unknown"], 1)
+        self.assertEqual(data["totals"]["reviewed"], 0)
+        Unit.objects.filter(pk=part.pk).update(context="not-in-import")
+        self.assertEqual(
+            client.get("/weblate/foundry/dashboard").json()["totals"]["unknown"], 1
+        )
+
+    def test_dashboard_requires_every_part_and_counts_glossary_separately(self):
+        from weblate.utils.state import STATE_APPROVED
+
+        from .dashboard import overview
+
+        terms = self.seed_glossary()
+        # One logical row can span two native strings: approving one is insufficient.
+        row = copy.deepcopy(self.rows[0])
+        row["source"] = ["First", "Second"]
+        book = copy.copy(self.book)
+        book.rows = [row]
+        parts = [
+            {
+                "translation__component_id": book.component_id,
+                "context": f"{row['id']}_{i}",
+                "source": source,
+                "target": "Překlad",
+                "state": STATE_APPROVED if i == 0 else STATE_TRANSLATED,
+                "last_updated": self.native[self.rows[0]["id"]][0].last_updated,
+            }
+            for i, source in enumerate(row["source"])
+        ]
+        with patch("ember_bridge.dashboard.Unit.objects.filter") as query:
+            query.return_value.values.return_value = parts
+            data = overview(self.ws, [book], self.reviewer)
+            self.assertEqual(data["totals"], {"units": 1, "reviewed": 0, "unknown": 0})
+            parts[1]["state"] = STATE_APPROVED
+            data = overview(self.ws, [book], self.reviewer)
+        self.assertEqual(data["totals"]["reviewed"], 1)
+        self.assertEqual(data["glossary"]["total"], len(terms))
+        self.assertEqual(data["glossary"]["reviewed"], 0)

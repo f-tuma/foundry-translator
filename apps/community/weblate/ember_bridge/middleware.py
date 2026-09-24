@@ -61,7 +61,7 @@ class StudioBoundaryMiddleware(MiddlewareMixin):
             if ws and user.has_perm("project.edit", ws.project):
                 return None
         if request.method in ("GET", "HEAD") and not path.startswith("/weblate/api/"):
-            return HttpResponseRedirect("/editor")
+            return HttpResponseRedirect("/prehled")
         return JsonResponse(
             {"error": "Překlady se upravují v komunitním editoru."},
             status=403,

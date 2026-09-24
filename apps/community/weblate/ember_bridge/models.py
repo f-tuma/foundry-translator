@@ -7,6 +7,8 @@ class Workspace(models.Model):
         "trans.Project", on_delete=models.PROTECT, related_name="ember_workspace"
     )
     metadata = models.JSONField(default=dict)
+    # Per-term editorial revision/approval; never included in public bundles.
+    glossary_state = models.JSONField(default=dict)
 
 
 class Book(models.Model):

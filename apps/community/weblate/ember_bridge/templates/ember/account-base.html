@@ -22,7 +22,7 @@
 <body class="ember-account">
 <header class="ember-header">
   <a class="ember-wordmark" href="/">Ember <span>/</span> <small>Český překlad</small></a>
-  <nav aria-label="Navigace účtu"><a href="/editor">Editor</a><a href="/ucet">Můj účet</a></nav>
+  <nav aria-label="Navigace účtu"><a href="/prehled">Přehled</a><a href="/ucet">Můj účet</a></nav>
 </header>
 <main class="ember-auth-main" id="ember-account-content">
   {% if user.is_authenticated and user.requires_2fa and not user.profile.has_2fa %}

@@ -7,12 +7,15 @@ from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 
 from .accounts import account_json, update_account
+from .dashboard import overview
+from .glossary import glossary_rows
 from .models import Book, Comment, Event, Proposal, Release
 from .service import (
     Problem,
     book_titles,
     import_commit,
     import_preview,
+    language_scope,
     proposal_json,
     publish,
     rows_for_books,
@@ -45,8 +48,13 @@ def accessible_books(ws, user):
     ]
 
 
-def visible_proposal(p, books):
-    allowed = {r["id"] for b in books for r in b.rows}
+def visible_row_ids(books, ws):
+    return {r["id"] for b in books for r in b.rows} | {
+        r["id"] for r in glossary_rows(ws)
+    }
+
+
+def visible_proposal(p, allowed):
     return all(c["unitId"] in allowed for c in p.changes)
 
 
@@ -92,7 +100,7 @@ def endpoint(request, action):
                 access_message = None
                 try:
                     ws = workspace(request.user)
-                    reviewer = request.user.has_perm("unit.review", ws.project)
+                    reviewer = request.user.has_perm("unit.review", language_scope(ws))
                     admin = request.user.has_perm("project.edit", ws.project)
                     member = {
                         "id": str(request.user.pk),
@@ -120,7 +128,9 @@ def endpoint(request, action):
         ws = workspace(request.user)
         books = accessible_books(ws, request.user)
         if request.method == "GET":
-            if action == "books":
+            if action == "dashboard":
+                output = overview(ws, books, request.user)
+            elif action == "books":
                 titles = book_titles(books)
                 output = {
                     "books": [
@@ -152,26 +162,38 @@ def endpoint(request, action):
                 offset = max(0, int(request.GET.get("offset", "0")))
                 output = {"rows": rows[offset : offset + 60], "total": len(rows)}
             elif action == "glossary":
-                output = {"entries": ws.metadata.get("glossary", [])}
+                output = {
+                    "entries": ws.metadata.get("glossary", []),
+                    "rows": glossary_rows(ws),
+                }
             elif action == "proposals":
+                allowed = visible_row_ids(books, ws)
                 output = {
                     "proposals": [
                         proposal_json(p)
-                        for p in Proposal.objects.filter(workspace=ws)
+                        for p in Proposal.objects.filter(
+                            workspace=ws,
+                            **(
+                                {"status": request.GET["state"]}
+                                if request.GET.get("state")
+                                else {}
+                            ),
+                        )
                         .select_related("author")
                         .order_by("-updated_at")[:200]
-                        if visible_proposal(p, books)
+                        if visible_proposal(p, allowed)
                     ]
                 }
             elif action.startswith("proposals/"):
                 p = Proposal.objects.select_related("author").get(
                     pk=action.split("/")[1], workspace=ws
                 )
-                if not visible_proposal(p, books):
+                if not visible_proposal(p, visible_row_ids(books, ws)):
                     raise Problem(403, "Chybí přístup k dokumentům návrhu.")
                 ids = {c["unitId"] for c in p.changes}
                 selected = [b for b in books if any(r["id"] in ids for r in b.rows)]
                 rows, _ = rows_for_books(selected)
+                rows.extend(glossary_rows(ws))
                 output = {
                     "proposal": proposal_json(p),
                     "rows": [r for r in rows if r["id"] in ids],
@@ -222,7 +244,7 @@ def endpoint(request, action):
                 output = publish(request.user, data)
             elif action == "comments":
                 p = Proposal.objects.get(pk=data["id"], workspace=ws)
-                if not visible_proposal(p, books):
+                if not visible_proposal(p, visible_row_ids(books, ws)):
                     raise Problem(403, "Chybí přístup k návrhu.")
                 body = data.get("body", "").strip()
                 if not 1 <= len(body) <= 8000:

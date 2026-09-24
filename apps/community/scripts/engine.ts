@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { parseTranslationBundle } from "../../../src/bundles/format";
 import {
   parseImport,
   unitsForDocument,
@@ -19,7 +20,11 @@ try {
         rows: unitsForDocument(doc),
       })),
     };
-  } else if (input.action === "validate")
+  } else if (input.action === "glossary")
+    result = parseTranslationBundle(
+      JSON.stringify({ ...input.meta, glossary: input.entries, documents: [] }),
+    ).glossary;
+  else if (input.action === "validate")
     result = rebuildDocument(input.template, input.units);
   else if (input.action === "release")
     result = publicRelease(

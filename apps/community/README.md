@@ -56,7 +56,7 @@ profilové změny se posílají výhradně přes úzce vymezený account endpoin
    nikoliv z libovolné hlavičky návštěvníka.
 4. Deploy. První spuštění Weblate vytvoří schéma databáze, účet správce a
    soukromý projekt `ember-cs`. Počkejte, až bude kontejner Weblate healthy.
-5. Otevřete `/editor` a přihlaste se nativním účtem Weblate. V menu účtu otevřete
+5. Otevřete `/prehled` a přihlaste se nativním účtem Weblate. V menu účtu otevřete
    **Správa členů a pozvánek**. Překladatelé potřebují tým s rolí **Translate**,
    kontroloři **Review strings**, správci **Administration**.
    Weblate musí mít pro projekt zapnuté translation reviews (výchozí nastavení).
@@ -72,6 +72,29 @@ Gitem. Lokální spuštění použije stejný Compose; přidejte vlastní overri
 `127.0.0.1:3101:8080` pro gateway a nastavte `COMMUNITY_HOST=localhost:3101`,
 `COMMUNITY_SCHEME=http`, `COMMUNITY_HTTPS=0`. Produkční SMTP lze při testu nahradit
 lokálním Mailpit. Nikdy nenastavujte testovací HTTP profil na veřejné doméně.
+
+## Přehled redakce a glosář
+
+Po přihlášení se otevírá `/prehled`. Ukazuje ověřené **oddíly**, dokumenty,
+rozpracované návrhy, poslední události a veřejné vydání. Ověření oddílu znamená,
+že jsou ověřené všechny jeho nativní části. Schválené, dosud nesloučené návrhy
+se počítají zvlášť. Nezpracované nebo změněné mapování se označí jako neznámý
+stav. Čísla a aktivita respektují přístup k dokumentům; lokální koncepty cizích
+prohlížečů nejsou započítané. Přehled se obnovuje každých 30 sekund a ručně.
+
+V **Glosáři → Upravit** lze opravit český název, kategorii, režim skloňování,
+alternativní názvy originálu, soukromou poznámku a zapnutí hesla. Uložení vytvoří
+koncept návrhu; odeslání, schválení jiným reviewerem a sloučení jsou samostatné
+kroky. Oprava nepřejmenovává výskyty v hotových textech automaticky. Odkazy
+**Výskyty originálu / překladu** otevřou hledání napříč dokumenty (doslovné
+hledání; skloňované varianty je potřeba hledat samostatně).
+
+Aktuální glosář a jeho revize drží naše rozšíření v databázi Weblate, odděleně
+od nativních textových Units. Návrhy používají stejnou historii, kontrolu konfliktů,
+transakce a nativní česká jazyková oprávnění. Kolize názvů a aliasů ověřuje
+stejný validátor jako Foundry. Sloučená hesla jsou součástí dalšího veřejného
+JSON vydání; soukromé poznámky a interní revize se nepublikují. Vydaná starší
+verze se nikdy nemění. Migrace `0002` přidává pouze metadata kontroly glosáře.
 
 ## Práce s překladem
 
@@ -104,7 +127,7 @@ lokálním Mailpit. Nikdy nenastavujte testovací HTTP profil na veřejné domé
 
 - Jeden český projekt Ember/Crucible. Úpravy dokumentů, návrhy, diskuse, kontrola,
   atomické slučování, zamčená historie vydání a veřejné stahování.
-- Glosář z importu je zatím referenční a pouze ke čtení; pomáhá při opravách textů.
+- Stávající hesla glosáře lze opravovat přes návrhy. Přidávání a odstranění hesel ani změna jejich původní identity zatím nejsou v editoru dostupné.
 - UI overrides Foundry/Ember/Crucible z pracovního exportu se při importu výslovně
   vynechávají. Dosavadní lokální editor ve Foundry je nadále podporuje.
 - Mapování dokumentů používá přesná UUID a shodné zdrojové texty. Upřednostněte

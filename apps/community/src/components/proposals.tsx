@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { diffWordsWithSpace } from "diff";
 import { Check, GitMerge, ArrowLeft, MessageSquare } from "lucide-react";
 import { api, useSession } from "../api";
 import type { Proposal, Unit, Change } from "../shared";
 import { Notice, Help } from "./shell";
 import { TextPart } from "./editor";
+import {
+  GlossaryFields,
+  glossaryLabels,
+  glossaryValue,
+} from "./glossary-fields";
 const states = {
   draft: "Koncept",
   submitted: "Ke kontrole",
@@ -49,16 +55,15 @@ export function Proposals() {
   // Shell mounts this component only for an admitted member.
   const who = useSession().data!.member!;
   const qc = useQueryClient();
-  const [id, setId] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("id") || ""
-      : "",
-  );
+  const search = useSearch({ from: "/navrhy" });
+  const id = search.id || "",
+    filter = search.state || "";
+  const navigate = useNavigate();
   const [comment, setComment] = useState("");
   const [editing, setEditing] = useState(false);
   const all = useQuery({
-    queryKey: ["proposals"],
-    queryFn: () => api<{ proposals: Proposal[] }>("proposals"),
+    queryKey: ["proposals", filter],
+    queryFn: () => api<{ proposals: Proposal[] }>(`proposals?state=${filter}`),
   });
   const detail = useQuery({
     queryKey: ["proposal", id],
@@ -84,6 +89,9 @@ export function Proposals() {
       qc.invalidateQueries({ queryKey: ["proposal", id] });
       qc.invalidateQueries({ queryKey: ["proposals"] });
       qc.invalidateQueries({ queryKey: ["units"] });
+      qc.invalidateQueries({ queryKey: ["glossary"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["books"] });
     },
   });
   const sendComment = useMutation({
@@ -109,9 +117,11 @@ export function Proposals() {
             <button
               className="text-button"
               onClick={() => {
-                setId("");
                 setEditing(false);
-                history.replaceState(null, "", "/navrhy");
+                navigate({
+                  to: "/navrhy",
+                  search: { state: filter || undefined },
+                });
                 action.reset();
               }}
             >
@@ -132,15 +142,34 @@ export function Proposals() {
       </div>
       <Notice error={all.error || detail.error || action.error} />
       {!id ? (
+        <nav className="proposal-filters" aria-label="Stav návrhů">
+          <Link to="/navrhy" search={{}} className={!filter ? "selected" : ""}>
+            Všechny návrhy
+          </Link>
+          {Object.entries(states).map(([value, label]) => (
+            <Link
+              key={value}
+              to="/navrhy"
+              search={{ state: value }}
+              className={filter === value ? "selected" : ""}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+      {!id ? (
         <div className="proposal-list">
           {all.data?.proposals.map((item) => (
             <button
               className="proposal-list-row"
               key={item.id}
               onClick={() => {
-                setId(item.id);
                 setEditing(false);
-                history.replaceState(null, "", `/navrhy?id=${item.id}`);
+                navigate({
+                  to: "/navrhy",
+                  search: { id: item.id, state: filter || undefined },
+                });
                 action.reset();
               }}
             >
@@ -158,7 +187,11 @@ export function Proposals() {
           ))}
           {all.data?.proposals.length === 0 ? (
             <div className="empty">
-              <h3>Prostor pro první opravu.</h3>
+              <h3>
+                {filter
+                  ? "V tomto stavu nejsou žádné návrhy."
+                  : "Prostor pro první opravu."}
+              </h3>
               <p>V editoru upravte text a odešlete návrh ke kontrole.</p>
             </div>
           ) : null}
@@ -198,6 +231,7 @@ export function Proposals() {
                 setEditing(false);
                 qc.invalidateQueries({ queryKey: ["proposal", id] });
                 qc.invalidateQueries({ queryKey: ["proposals"] });
+                qc.invalidateQueries({ queryKey: ["dashboard"] });
               }}
             />
           ) : null}
@@ -214,30 +248,57 @@ export function Proposals() {
                     {current?.document_title}{" "}
                     <span className="muted">/ {current?.label}</span>
                   </h3>
-                  <div className={`change-columns ${changed ? "three" : ""}`}>
-                    <div>
-                      <small>SPOLEČNÝ ZÁKLAD</small>
-                      <Diff
-                        before={c.before.join("\n")}
-                        after={c.after.join("\n")}
+                  {current?.kind === "glossary" ? (
+                    <div
+                      className={`change-columns glossary-diff ${changed ? "three" : ""}`}
+                    >
+                      <GlossaryComparison
+                        title="SPOLEČNÝ ZÁKLAD"
+                        before={c.before}
+                        after={c.after}
                         side="before"
                       />
-                    </div>
-                    {changed ? (
-                      <div>
-                        <small>AKTUÁLNÍ PŘEKLAD</small>
-                        <p className="prose">{current.value.join("\n")}</p>
-                      </div>
-                    ) : null}
-                    <div>
-                      <small>NAVRHOVANÁ OPRAVA</small>
-                      <Diff
-                        before={c.before.join("\n")}
-                        after={c.after.join("\n")}
+                      {changed ? (
+                        <GlossaryComparison
+                          title="AKTUÁLNÍ GLOSÁŘ"
+                          before={current.value}
+                          after={current.value}
+                          side="after"
+                        />
+                      ) : null}
+                      <GlossaryComparison
+                        title="NAVRHOVANÁ OPRAVA"
+                        before={c.before}
+                        after={c.after}
                         side="after"
                       />
                     </div>
-                  </div>
+                  ) : (
+                    <div className={`change-columns ${changed ? "three" : ""}`}>
+                      <div>
+                        <small>SPOLEČNÝ ZÁKLAD</small>
+                        <Diff
+                          before={c.before.join("\n")}
+                          after={c.after.join("\n")}
+                          side="before"
+                        />
+                      </div>
+                      {changed ? (
+                        <div>
+                          <small>AKTUÁLNÍ PŘEKLAD</small>
+                          <p className="prose">{current.value.join("\n")}</p>
+                        </div>
+                      ) : null}
+                      <div>
+                        <small>NAVRHOVANÁ OPRAVA</small>
+                        <Diff
+                          before={c.before.join("\n")}
+                          after={c.after.join("\n")}
+                          side="after"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </section>
               );
             })}
@@ -361,6 +422,34 @@ export function Proposals() {
   );
 }
 
+function GlossaryComparison({
+  title,
+  before,
+  after,
+  side,
+}: {
+  title: string;
+  before: string[];
+  after: string[];
+  side: "before" | "after";
+}) {
+  return (
+    <div>
+      <small>{title}</small>
+      {glossaryLabels.map((label, i) => (
+        <div key={label}>
+          <h4>{label}</h4>
+          <Diff
+            before={glossaryValue(before[i], i)}
+            after={glossaryValue(after[i], i)}
+            side={side}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EditProposal({
   proposal,
   rows,
@@ -480,29 +569,45 @@ function EditProposal({
       {draft.changes.map((c, changeIndex) => (
         <section key={c.unitId}>
           <h3>{rows.find((r) => r.id === c.unitId)?.label}</h3>
-          {c.after.map((v, i) => (
-            <TextPart
-              key={i}
-              value={v}
-              label={`Oprava oddílu ${changeIndex + 1}.${i + 1}`}
-              onChange={(value) =>
+          {rows.find((r) => r.id === c.unitId)?.kind === "glossary" ? (
+            <GlossaryFields
+              values={c.after}
+              disabled={save.isPending}
+              onChange={(after) =>
                 setDraft({
                   ...draft,
                   requestId: crypto.randomUUID(),
                   changes: draft.changes.map((change) =>
-                    change.unitId === c.unitId
-                      ? {
-                          ...change,
-                          after: change.after.map((part, j) =>
-                            i === j ? value : part,
-                          ),
-                        }
-                      : change,
+                    change.unitId === c.unitId ? { ...change, after } : change,
                   ),
                 })
               }
             />
-          ))}
+          ) : (
+            c.after.map((v, i) => (
+              <TextPart
+                key={i}
+                value={v}
+                label={`Oprava oddílu ${changeIndex + 1}.${i + 1}`}
+                onChange={(value) =>
+                  setDraft({
+                    ...draft,
+                    requestId: crypto.randomUUID(),
+                    changes: draft.changes.map((change) =>
+                      change.unitId === c.unitId
+                        ? {
+                            ...change,
+                            after: change.after.map((part, j) =>
+                              i === j ? value : part,
+                            ),
+                          }
+                        : change,
+                    ),
+                  })
+                }
+              />
+            ))
+          )}
         </section>
       ))}
       <Notice error={storageError || save.error} />
