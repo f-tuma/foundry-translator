@@ -1,0 +1,14 @@
+.git
+**/node_modules
+**/.output
+**/.tanstack
+**/.env*
+**/engine.mjs
+**/engine.cjs
+**/__pycache__
+**/*.egg-info
+dist
+coverage
+docs
+tests
+*.log

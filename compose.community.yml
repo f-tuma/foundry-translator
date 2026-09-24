@@ -1,0 +1,82 @@
+services:
+  gateway:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    environment:
+      COMMUNITY_SCHEME: ${COMMUNITY_SCHEME:-https}
+    volumes:
+      - ./apps/community/Caddyfile:/etc/caddy/Caddyfile:ro
+    expose: ["8080"]
+    depends_on: [studio, weblate]
+  studio:
+    build:
+      context: .
+      dockerfile: apps/community/Dockerfile
+    restart: unless-stopped
+    expose: ["3000"]
+  weblate:
+    build:
+      context: .
+      dockerfile: apps/community/Dockerfile.weblate
+    restart: unless-stopped
+    environment:
+      WEBLATE_SITE_DOMAIN: ${COMMUNITY_HOST:?Set COMMUNITY_HOST}
+      WEBLATE_SITE_TITLE: Ember — Český překlad
+      WEBLATE_URL_PREFIX: /weblate
+      WEBLATE_ADMIN_NAME: ${WEBLATE_ADMIN_NAME:-admin}
+      WEBLATE_ADMIN_EMAIL: ${WEBLATE_ADMIN_EMAIL:?Set WEBLATE_ADMIN_EMAIL}
+      WEBLATE_ADMIN_PASSWORD: ${WEBLATE_ADMIN_PASSWORD:?Set WEBLATE_ADMIN_PASSWORD}
+      WEBLATE_SERVER_EMAIL: ${WEBLATE_ADMIN_EMAIL}
+      WEBLATE_DEFAULT_FROM_EMAIL: ${WEBLATE_ADMIN_EMAIL}
+      WEBLATE_EMAIL_HOST: ${SMTP_HOST:?Set SMTP_HOST}
+      WEBLATE_EMAIL_PORT: ${SMTP_PORT:-587}
+      WEBLATE_EMAIL_HOST_USER: ${SMTP_USER:-}
+      WEBLATE_EMAIL_HOST_PASSWORD: ${SMTP_PASSWORD:-}
+      WEBLATE_EMAIL_USE_TLS: ${SMTP_TLS:-1}
+      WEBLATE_ENABLE_HTTPS: ${COMMUNITY_HTTPS:-1}
+      WEBLATE_IP_PROXY_HEADER: HTTP_X_FORWARDED_FOR
+      WEBLATE_SECURE_PROXY_SSL_HEADER: HTTP_X_FORWARDED_PROTO,https
+      WEBLATE_REQUIRE_LOGIN: "1"
+      WEBLATE_REGISTRATION_OPEN: "1"
+      WEBLATE_DEFAULT_ACCESS_CONTROL: "100"
+      WEBLATE_DEFAULT_TRANSLATION_REVIEW: "1"
+      POSTGRES_DATABASE: weblate
+      POSTGRES_USER: weblate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_HOST: database
+      REDIS_HOST: redis
+      WEBLATE_WORKERS: "2"
+      CELERY_COMBINED_OPTIONS: --concurrency 2
+    volumes:
+      - weblate-data:/app/data
+    expose: ["8080"]
+    depends_on:
+      database: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: weblate
+      POSTGRES_USER: weblate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weblate -d weblate"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  weblate-data:
+  postgres-data:
+  redis-data:

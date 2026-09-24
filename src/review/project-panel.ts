@@ -1,6 +1,7 @@
 import { renderHelpTooltip } from "../ui/help-tooltip";
 import { button, checkbox, diffText, downloadJson, el, pager, t, type PanelHost } from "./elements";
-import { MAX_PROJECT_BYTES, parseEditorialProject } from "./project-format";
+import { MAX_PROJECT_BYTES } from "./project-format";
+import { readEditorialFile } from "./community";
 import { exportEditorialProject, importEditorialProject, planEditorialProject, uiProjectId, type ProjectDocumentPlan, type ProjectPlan } from "./project";
 
 export class EditorialProjectPanel {
@@ -22,7 +23,7 @@ export class EditorialProjectPanel {
       this.host.run(async () => {
         this.#clean(); if (selected.size > MAX_PROJECT_BYTES) throw new Error("Review.ProjectInvalid");
         this.#plan = null; this.#selected.clear(); this.#ui.clear(); this.#glossary = false; this.#page = 0; this.#expanded = null; this.#report = [];
-        this.#plan = await planEditorialProject(parseEditorialProject(await selected.text()));
+        this.#plan = await planEditorialProject(await readEditorialFile(await selected.text()));
       });
     }); label.append(file); toolbar.append(label); root.append(toolbar);
     for (const issue of this.#report) root.append(el("p", "ft-workbench__warning", issue === "Review.Conflict" ? t("ProjectWriteConflict") : issue.startsWith("Review.") ? t(issue.slice(7)) : issue));

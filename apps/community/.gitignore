@@ -1,0 +1,9 @@
+.output/
+.tanstack/
+.env
+.env.*
+!.env.example
+engine.cjs
+__pycache__/
+*.pyc
+*.egg-info/
