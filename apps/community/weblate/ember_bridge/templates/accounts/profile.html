@@ -1,0 +1,16 @@
+{% extends 'ember/account-base.html' %}
+{% load i18n authnames %}
+{% block content %}
+<p class="ember-eyebrow"><a href="/ucet">Můj účet</a> / Zabezpečení</p>
+<h1>Zabezpečení účtu</h1>
+<p class="help-block">{{ request.user.get_full_name|default:request.user.username }}</p>
+{% include 'ember/second-factor.html' %}
+<section class="card"><div class="card-header"><h2>Přihlášení</h2></div><div class="card-body ember-security-actions">
+  <a class="btn btn-primary" href="{% url 'password' %}">{% if request.user.has_usable_password %}Změnit heslo{% else %}Nastavit heslo{% endif %}</a>
+  {% if has_email_auth %}<form method="post" action="{% url 'social:begin' 'email' %}?next=/ucet">{% csrf_token %}<button class="btn btn-outline-primary" type="submit">Ověřit novou e-mailovou adresu</button></form>{% endif %}
+</div></section>
+<section class="card"><div class="card-header"><h2>Poslední aktivita účtu</h2></div><div class="table-responsive"><table class="table"><thead><tr><th>Kdy</th><th>Událost</th><th>IP adresa</th></tr></thead><tbody>
+{% for log in auditlog %}<tr><td>{{ log.timestamp|date:'d. m. Y H:i' }}</td><td>{{ log.get_message }}</td><td>{{ log.address|default_if_none:"—" }}</td></tr>{% empty %}<tr><td colspan="3">Zatím žádná aktivita.</td></tr>{% endfor %}
+</tbody></table></div></section>
+<details class="ember-legal"><summary>Osobní data a zrušení účtu</summary><div class="ember-security-actions"><form method="post" action="{% url 'userdata' %}">{% csrf_token %}<button class="btn btn-outline-primary" type="submit">Stáhnout moje data</button></form><a class="btn btn-outline-danger" href="{% url 'remove' %}">Zrušit účet…</a></div></details>
+{% endblock %}

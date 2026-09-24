@@ -1,0 +1,26 @@
+{% extends 'ember/account-base.html' %}
+{% load authnames crispy_forms_tags i18n %}
+{% block content %}
+<section class="ember-login">
+  <p class="ember-eyebrow">Český překlad Emberu</p>
+  <h1>Vstup do redakce</h1>
+  <p class="help-block">Přihlaste se svým účtem. Přístup k překladům uděluje správce na pozvání nebo po schválení.</p>
+  {% if show_login_form %}
+  <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    {{ form|crispy }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn btn-primary">Přihlásit se</button>
+  </form>
+  {% endif %}
+  {% if login_backends %}
+    <div class="ember-auth-providers">
+    {% for name in login_backends %}
+      <a href="" class="btn btn-outline-primary link-post" data-href="{% url 'social:begin' name %}" {% if next %}data-params='{"next": "{{ next|escapejs }}"}'{% endif %}>{% auth_name name %}</a>
+    {% endfor %}
+    </div>
+  {% endif %}
+  {% if can_reset %}<p class="ember-login-reset"><a href="{% if password_reset_url %}{{ password_reset_url }}{% else %}{% url 'password_reset' %}{% endif %}">Zapomenuté heslo</a></p>{% endif %}
+  {% include 'accounts/snippets/login-info.html' %}
+</section>
+{% endblock %}

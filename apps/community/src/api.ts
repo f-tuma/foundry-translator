@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Member } from "./shared";
+import type { Session } from "./shared";
 export const BRIDGE = "/weblate/foundry";
 export class ApiError extends Error {
   constructor(
@@ -23,11 +23,9 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
     headers,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const value = await response
-    .json()
-    .catch(() => ({
-      error: "Server nevrátil platnou odpověď. Zkuste obnovit stránku.",
-    }));
+  const value = await response.json().catch(() => ({
+    error: "Server nevrátil platnou odpověď. Zkuste obnovit stránku.",
+  }));
   if (!response.ok)
     throw new ApiError(
       value.error || "Operace se nezdařila.",
@@ -39,7 +37,7 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
 export function useSession() {
   return useQuery({
     queryKey: ["session"],
-    queryFn: () => api<{ member: Member; csrf: string }>("session"),
+    queryFn: () => api<Session>("session"),
     staleTime: 30000,
   });
 }

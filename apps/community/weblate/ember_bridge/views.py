@@ -6,6 +6,7 @@ from django.http import HttpResponse, JsonResponse
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 
+from .accounts import account_json, update_account
 from .models import Book, Comment, Event, Proposal, Release
 from .service import (
     Problem,
@@ -76,14 +77,24 @@ def endpoint(request, action):
             result["Cache-Control"] = "public, max-age=31536000, immutable"
             result["ETag"] = f'"{release.content_hash}"'
             return result
-        ws = workspace(request.user)
-        books = accessible_books(ws, request.user)
-        if request.method == "GET":
-            if action == "session":
-                reviewer = bool(request.user.has_perm("unit.review", ws.project))
-                admin = bool(request.user.has_perm("project.edit", ws.project))
-                output = {
-                    "member": {
+        if not request.user.is_authenticated or not request.user.is_active:
+            raise Problem(401, "Pro pokračování se přihlaste.")
+        if action in ("session", "account"):
+            if action == "account" and request.method == "POST":
+                if len(request.body) > 16 * 1024:
+                    raise Problem(413, "Požadavek je příliš velký.")
+                data = json.loads(request.body)
+                if not isinstance(data, dict):
+                    raise Problem(400, "Neplatné údaje účtu.")
+                output = {"account": update_account(request, data)}
+            elif request.method == "GET":
+                member = None
+                access_message = None
+                try:
+                    ws = workspace(request.user)
+                    reviewer = request.user.has_perm("unit.review", ws.project)
+                    admin = request.user.has_perm("project.edit", ws.project)
+                    member = {
                         "id": str(request.user.pk),
                         "name": request.user.get_full_name() or request.user.username,
                         "email": request.user.email,
@@ -92,10 +103,24 @@ def endpoint(request, action):
                         else "reviewer"
                         if reviewer
                         else "translator",
-                    },
+                    }
+                except Problem as error:
+                    if error.status not in (403, 503):
+                        raise
+                    access_message = error.message
+                output = {
+                    "account": account_json(request.user),
+                    "member": member,
+                    "accessMessage": access_message,
                     "csrf": get_token(request),
                 }
-            elif action == "books":
+            else:
+                raise Problem(405, "Nepodporovaná metoda.")
+            return JsonResponse(output, headers={"Cache-Control": "private, no-store"})
+        ws = workspace(request.user)
+        books = accessible_books(ws, request.user)
+        if request.method == "GET":
+            if action == "books":
                 titles = book_titles(books)
                 output = {
                     "books": [

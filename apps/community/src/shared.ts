@@ -1,4 +1,21 @@
 export type Role = "admin" | "reviewer" | "translator";
+export interface Account {
+  id: string;
+  name: string;
+  username: string;
+  full_name: string;
+  email: string;
+  emails: string[];
+  revision: string;
+  hasPassword: boolean;
+  hasSecondFactor: boolean;
+}
+export interface Session {
+  account: Account;
+  member: Member | null;
+  accessMessage: string | null;
+  csrf: string;
+}
 export interface Member {
   id: string;
   name: string;

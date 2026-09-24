@@ -20,6 +20,7 @@ export function Shell({
 }) {
   const session = useSession();
   const member = session.data?.member;
+  const account = session.data?.account;
   return (
     <>
       <header className="site-header">
@@ -35,23 +36,25 @@ export function Shell({
         </nav>
         <div className="header-actions">
           <ThemeControl />
-          {member ? (
+          {account ? (
             <details className="account">
-              <summary aria-label={`Účet: ${member.name}`}>
+              <summary aria-label={`Účet: ${account.name}`}>
                 <UserRound size={17} />
-                <span className="account-name">{member.name}</span>
+                <span className="account-name">{account.name}</span>
               </summary>
               <div>
-                <a href="/weblate/accounts/profile/">
-                  Účet ve Weblate <ArrowUpRight size={14} />
-                </a>
-                {member.role === "admin" ? (
+                <Link to="/ucet">Můj účet</Link>
+                {member?.role === "admin" ? (
                   <>
-                    <a href="/weblate/access/ember-cs/">Členové a pozvánky</a>
                     <Link to="/import">Nahrát export</Link>
+                    <a href="/weblate/access/ember-cs/">
+                      Správa členů a pozvánek <ArrowUpRight size={14} />
+                    </a>
+                    <a href="/weblate/projects/ember-cs/">
+                      Technická administrace <ArrowUpRight size={14} />
+                    </a>
                   </>
                 ) : null}
-                <a href="/weblate/projects/ember-cs/">Otevřít Weblate</a>
                 <form method="post" action="/weblate/accounts/logout/">
                   <input
                     type="hidden"
@@ -85,16 +88,23 @@ export function Shell({
           ) : (
             <>
               <p>
-                {session.error
-                  ? message(session.error)
-                  : "Vstup pro pozvané překladatele a reviewery."}
+                {session.data?.accessMessage ||
+                  (session.error
+                    ? message(session.error)
+                    : "Vstup pro pozvané překladatele a reviewery.")}
               </p>
-              <a
-                className="button primary"
-                href="/weblate/accounts/login/?next=/editor"
-              >
-                Přihlásit přes Weblate
-              </a>
+              {account ? (
+                <Link to="/ucet" className="button primary">
+                  Můj účet
+                </Link>
+              ) : (
+                <a
+                  className="button primary"
+                  href="/weblate/accounts/login/?next=/editor"
+                >
+                  Přihlásit se
+                </a>
+              )}
               <Link to="/vydani">Prohlédnout veřejná vydání</Link>
             </>
           )}

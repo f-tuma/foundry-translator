@@ -8,6 +8,40 @@ Rozhraní používá barvy Foundry Translate. V hlavičce lze přepnout tmavý,
 světlý nebo systémový režim; volba se ukládá v prohlížeči. Nápovědy fungují
 při najetí myší, klávesnicí i klepnutím na mobilu, nad rolovacími panely.
 
+## Vlastní rozhraní a role Weblate
+
+Běžný člen používá výhradně naši redakci a stránku **Můj účet** (`/ucet`).
+Může upravit jméno, unikátní uživatelské jméno a zvolit dříve ověřený e-mail.
+Zápis využívá nativní formulář Weblate, CSRF, audit a kontrolu souběžné změny;
+neumožňuje měnit vlastní roli nebo jiný účet. Účet funguje i před přijetím do
+redakce, soukromé dokumenty zůstávají nepřístupné.
+
+| Oblast | Kdo ji zajišťuje |
+| --- | --- |
+| Editor, porovnání, návrhy, diskuse, schválení, konflikty a vydání | Naše aplikace a rozšíření |
+| Profil, přihlášení a zabezpečení — vzhled | Naše React stránka a Django šablony |
+| Hesla, MFA, pozvánky, ověření e-mailu, relace a audit účtu | Nativní Weblate |
+| Oprávnění, překladové jednotky, Git a historie textů | Nativní Weblate |
+| Import/export Foundry, UUID a ochrana příkazů | Náš adaptér |
+
+Přihlášení, obnova hesla, ověření e-mailu, přijetí pozvánky a MFA běží dál na
+nativních `/weblate/accounts/…` adresách pod naším vzhledem. Neexistuje druhá
+kopie hesel ani paralelní autentifikace. Bezpečnostní klíče vyžadují HTTPS
+(nebo localhost); jejich registrace používá nativní WebAuthn obsluhu.
+
+Přímé stránky editoru i REST API Weblate middleware blokuje běžným členům,
+aby neobcházeli schvalování. Správcům zůstává v menu oddělená **Technická
+administrace** a **Správa členů a pozvánek** v původním Weblate. Tuto
+administraci zatím znovu neimplementujeme. Nativní kontroly oprávnění platí
+i uvnitř ní. Technické adresy a některé bezpečnostní texty stále mohou název
+Weblate obsahovat; nejde o nahrazení jeho backendu.
+
+Šablony bezpečnostních formulářů přebíráme z připnuté verze Weblate, měníme
+pouze jejich obal. MFA ovládání je převzaté pod GPL-3.0-or-later s atribucí.
+Při upgradu image ověřte také šablony, statické widgety, pozvánky a celé
+přihlášení s MFA. `/weblate/accounts/profile/` je naše stránka zabezpečení;
+profilové změny se posílají výhradně přes úzce vymezený account endpoint.
+
 ## Nasazení v Dokploy
 
 1. Vytvořte službu Docker Compose z tohoto repozitáře. Cesta k souboru:
@@ -23,7 +57,7 @@ při najetí myší, klávesnicí i klepnutím na mobilu, nad rolovacími panely
 4. Deploy. První spuštění Weblate vytvoří schéma databáze, účet správce a
    soukromý projekt `ember-cs`. Počkejte, až bude kontejner Weblate healthy.
 5. Otevřete `/editor` a přihlaste se nativním účtem Weblate. V menu účtu otevřete
-   **Členové a pozvánky**. Překladatelé potřebují tým s rolí **Translate**,
+   **Správa členů a pozvánek**. Překladatelé potřebují tým s rolí **Translate**,
    kontroloři **Review strings**, správci **Administration**.
    Weblate musí mít pro projekt zapnuté translation reviews (výchozí nastavení).
 
@@ -80,8 +114,9 @@ lokálním Mailpit. Nikdy nenastavujte testovací HTTP profil na veřejné domé
   První verze záměrně odmítne přepsat rozpracovanou redakci.
 - Hledání je bez rozlišení velikosti písmen, přes text. Fuzzy hromadné nahrazování
   z lokálního Foundry editoru zatím není součástí webové redakce.
-- Přímé nativní úpravy ve Weblate jsou možné podle rolí. Způsobí konflikt se
-  starými návrhy; export i Foundry import znovu kontrolují příkazy a strukturu.
+- Přímý editor a API Weblate jsou dostupné jen správcům projektu. Členové pracují
+  přes návrhy v našem editoru. Přímý zásah správce způsobí konflikt se starými
+  návrhy; export i Foundry import znovu kontrolují příkazy a strukturu.
 
 ## Aktualizace a zálohy
 

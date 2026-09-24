@@ -14,6 +14,7 @@ import { Route as EditorRouteImport } from './routes/editor'
 import { Route as GlosarRouteImport } from './routes/glosar'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as NavrhyRouteImport } from './routes/navrhy'
+import { Route as UcetRouteImport } from './routes/ucet'
 import { Route as VydaniRouteImport } from './routes/vydani'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +42,11 @@ const NavrhyRoute = NavrhyRouteImport.update({
   path: '/navrhy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UcetRoute = UcetRouteImport.update({
+  id: '/ucet',
+  path: '/ucet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VydaniRoute = VydaniRouteImport.update({
   id: '/vydani',
   path: '/vydani',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/glosar': typeof GlosarRoute
   '/import': typeof ImportRoute
   '/navrhy': typeof NavrhyRoute
+  '/ucet': typeof UcetRoute
   '/vydani': typeof VydaniRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/glosar': typeof GlosarRoute
   '/import': typeof ImportRoute
   '/navrhy': typeof NavrhyRoute
+  '/ucet': typeof UcetRoute
   '/vydani': typeof VydaniRoute
 }
 export interface FileRoutesById {
@@ -70,15 +78,24 @@ export interface FileRoutesById {
   '/glosar': typeof GlosarRoute
   '/import': typeof ImportRoute
   '/navrhy': typeof NavrhyRoute
+  '/ucet': typeof UcetRoute
   '/vydani': typeof VydaniRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/editor' | '/glosar' | '/import' | '/navrhy' | '/vydani'
+  fullPaths:
+    '/' | '/editor' | '/glosar' | '/import' | '/navrhy' | '/ucet' | '/vydani'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/editor' | '/glosar' | '/import' | '/navrhy' | '/vydani'
+  to: '/' | '/editor' | '/glosar' | '/import' | '/navrhy' | '/ucet' | '/vydani'
   id:
-    '__root__' | '/' | '/editor' | '/glosar' | '/import' | '/navrhy' | '/vydani'
+    | '__root__'
+    | '/'
+    | '/editor'
+    | '/glosar'
+    | '/import'
+    | '/navrhy'
+    | '/ucet'
+    | '/vydani'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +104,7 @@ export interface RootRouteChildren {
   GlosarRoute: typeof GlosarRoute
   ImportRoute: typeof ImportRoute
   NavrhyRoute: typeof NavrhyRoute
+  UcetRoute: typeof UcetRoute
   VydaniRoute: typeof VydaniRoute
 }
 
@@ -127,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NavrhyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ucet': {
+      id: '/ucet'
+      path: '/ucet'
+      fullPath: '/ucet'
+      preLoaderRoute: typeof UcetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/vydani': {
       id: '/vydani'
       path: '/vydani'
@@ -143,6 +168,7 @@ const rootRouteChildren: RootRouteChildren = {
   GlosarRoute: GlosarRoute,
   ImportRoute: ImportRoute,
   NavrhyRoute: NavrhyRoute,
+  UcetRoute: UcetRoute,
   VydaniRoute: VydaniRoute,
 }
 export const routeTree = rootRouteImport

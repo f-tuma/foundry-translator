@@ -1,0 +1,104 @@
+{# Adapted from Weblate 2026.9.1.2 accounts/profile.html; GPL-3.0-or-later, Weblate contributors. #}
+{% load authnames i18n icons otp_webauthn translations %}
+<div class="card">
+          <div class="card-header">
+            <h4 class="card-title">
+              
+              {% translate "Two-factor authentication" %}
+            </h4>
+          </div>
+          <div class="card-body second-factor">
+            <p class="help-block">
+              {% translate "Two-factor authentication adds another layer of security to your account by requiring more than just a password to sign in." %}
+            </p>
+
+            <div class="row">
+              <div class="col-sm-4">
+                <h5>{% translate "Security keys (WebAuthn)" %}</h5>
+                {% if not webauthn_keys %}
+                  <p>
+                    <em>{% translate "No WebAuthn keys registered yet." %}</em>
+                  </p>
+                {% else %}
+                  <ul class="list-group">
+                    {% for key in webauthn_keys %}
+                      <li class="list-group-item">
+                        <a href=""
+                           class="btn btn-danger float-end link-post"
+                           data-href="{% url "webauthn-detail" pk=key.id %}"
+                           data-params='{"delete": 1}'>{% translate "Remove" %}</a>
+                        {% key_name key %}
+                        <div class="clearfix"></div>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+
+                <template id="passkey-registration-available-template">
+                  <div class="form-inline">
+                    <input type="text"
+                           class="textinput form-control"
+                           name="passkey-device-name"
+                           maxlength="64"
+                           data-href="{% url "webauthn-detail" pk="000000" %}"
+                           placeholder="{% translate "Name your security key" %}" />
+                    <button type="button" class="btn btn-primary" id="passkey-register-button">
+                      {% translate "Register new security key" %}
+                    </button>
+                    <div id="passkey-register-status-message"></div>
+                  </div>
+                </template>
+
+                <template id="passkey-registration-unavailable-template">
+                  <p>{% translate "Your web browser lacks WebAuthn support." %}</p>
+                </template>
+
+                <span id="passkey-registration-placeholder"></span>
+
+                {% render_otp_webauthn_register_scripts %}
+              </div>
+              <div class="col-sm-4">
+                <h5>{% translate "Authenticator apps (TOTP)" %}</h5>
+                {% if not totp_keys %}
+                  <p>
+                    <em>{% translate "No authenticator apps registered yet." %}</em>
+                  </p>
+                {% else %}
+                  <ul class="list-group">
+                    {% for key in totp_keys %}
+                      <li class="list-group-item">
+                        <a href=""
+                           class="btn btn-danger float-end link-post"
+                           data-href="{% url "totp-detail" pk=key.id %}"
+                           data-params='{"delete": 1}'>{% translate "Remove" %}</a>
+                        {% key_name key %}
+                        <div class="clearfix"></div>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+                <a href="{% url 'totp' %}" class="btn btn-primary">{% translate "Register new authenticator app" %}</a>
+              </div>
+              <div class="col-sm-4">
+                <h5>{% translate "Recovery codes" %}</h5>
+                {% if recovery_keys_count == 0 %}
+                  <p>
+                    <em>{% translate "No recovery codes generated yet." %}</em>
+                  </p>
+                  <a href=""
+                     data-href="{% url "recovery-codes" %}"
+                     class="btn btn-primary link-post">{% translate "Generate new recovery codes" %}</a>
+                {% else %}
+                  <p>
+                    {% blocktranslate count count=recovery_keys_count trimmed %}
+                      {{ count }} recovery code available.
+                    {% plural %}
+                      {{ count }} recovery codes available.
+                    {% endblocktranslate %}
+                  </p>
+                  <a href="{% url "recovery-codes" %}" class="btn btn-primary">{% translate "View recovery codes" %}</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
