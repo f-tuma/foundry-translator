@@ -36,6 +36,8 @@ export function Importer() {
       preview.reset();
       qc.invalidateQueries({ queryKey: ["books"] });
       qc.invalidateQueries({ queryKey: ["glossary"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["units"] });
     },
   });
   if (member?.role !== "admin")
@@ -54,11 +56,12 @@ export function Importer() {
       <label className="upload">
         <Upload size={30} />
         <strong>{name || "Vyberte soubor z Foundry"}</strong>
-        <span>JSON · nejvýše 25 MB</span>
+        <span>JSON · nejvýše 25 MiB</span>
         <input
           aria-label="Soubor exportu"
           type="file"
           accept=".json,application/json"
+          disabled={apply.isPending}
           onChange={async (e) => {
             const f = e.target.files?.[0];
             if (!f) return;

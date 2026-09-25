@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 from django.contrib.auth.decorators import login_not_required
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -211,6 +212,12 @@ def endpoint(request, action):
                 }
             elif action == "history":
                 # Events carry no source/proposal payload; native text history is linked separately.
+                allowed = visible_row_ids(books, ws)
+                subjects = [
+                    str(p.pk)
+                    for p in Proposal.objects.filter(workspace=ws)
+                    if visible_proposal(p, allowed)
+                ]
                 output = {
                     "events": [
                         {
@@ -219,7 +226,9 @@ def endpoint(request, action):
                             "author": e.actor.get_full_name() or e.actor.username,
                             "at": e.created_at.isoformat(),
                         }
-                        for e in Event.objects.filter(workspace=ws)
+                        for e in Event.objects.filter(
+                            workspace=ws, subject__in=subjects
+                        )
                         .select_related("actor")
                         .order_by("-created_at")[:100]
                     ]
@@ -227,7 +236,7 @@ def endpoint(request, action):
             else:
                 raise Problem(404, "Stránka neexistuje.")
         else:
-            if len(request.body) > 25 * 1024 * 1024:
+            if len(request.body) > 52 * 1024 * 1024:
                 raise Problem(413, "Soubor je příliš velký.")
             data = json.loads(request.body)
             if not isinstance(data, dict):
@@ -260,6 +269,14 @@ def endpoint(request, action):
         return JsonResponse(
             {"error": error.message, "details": error.details},
             status=error.status,
+            headers={"Cache-Control": "private, no-store"},
+        )
+    except subprocess.TimeoutExpired:
+        return JsonResponse(
+            {
+                "error": "Kontrola obsahu trvala příliš dlouho. Zkuste menší část exportu; změny nebyly uloženy."
+            },
+            status=503,
             headers={"Cache-Control": "private, no-store"},
         )
     except ObjectDoesNotExist:

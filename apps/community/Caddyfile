@@ -1,6 +1,12 @@
 :8080 {
   request_body {
-    max_size 25MB
+    # The 25 MiB file is a JSON string inside the request (up to 2x escaping).
+    max_size 52MiB
+  }
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy same-origin
+    X-Frame-Options SAMEORIGIN
   }
   handle /weblate/* {
     reverse_proxy weblate:8080 {

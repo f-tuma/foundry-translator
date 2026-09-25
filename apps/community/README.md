@@ -44,6 +44,8 @@ profilové změny se posílají výhradně přes úzce vymezený account endpoin
 
 ## Nasazení v Dokploy
 
+Přesný postup nasazení, zálohy a obnovy je v [DEPLOYMENT.md](DEPLOYMENT.md).
+
 1. Vytvořte službu Docker Compose z tohoto repozitáře. Cesta k souboru:
    `compose.community.yml`; build context musí zůstat kořen repozitáře.
 2. Do Environment vložte hodnoty podle [`.env.example`](../../.env.example)
@@ -143,12 +145,14 @@ verze se nikdy nemění. Migrace `0002` přidává pouze metadata kontroly glos�
 
 ## Aktualizace a zálohy
 
-Zálohujte **PostgreSQL i svazek `weblate-data`**, který obsahuje lokální Git
-repozitáře a Django secret. Snapshot pouze jednoho z nich není úplná záloha.
-Pro konzistentní souborovou zálohu zastavte zapisující studio/Weblate; databázový
-export udělejte přes `pg_dump`. Zálohy obsahují soukromé originály a účty.
+Zálohujte **PostgreSQL, `weblate-data` i Redis** jako jeden celek. Použijte
+`scripts/community-backup.sh` a postup obnovy v [DEPLOYMENT.md](DEPLOYMENT.md).
+Skript krátce zastaví zapisující služby, uloží databázi, lokální Git repozitáře,
+Django secret a frontu úloh a znovu služby spustí. Zálohy obsahují soukromé
+originály a účty; patří do chráněného úložiště mimo server.
 
-Weblate je připnutý na image 2026.9.1.2 i digest. Rozšíření používá jeho interní
+Základní Docker images jsou připnuté na otestované digests. Weblate používá
+2026.9.1.2. Rozšíření používá jeho interní
 Python API a musí se před upgradem Weblate znovu integračně otestovat. Nedělejte
 samostatnou automatickou aktualizaci image. Veřejná vydání mají SHA-256/ETag;
 nejde o kryptografický podpis autora. Foundry obsah znovu validuje.

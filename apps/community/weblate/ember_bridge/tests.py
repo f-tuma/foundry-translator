@@ -2,6 +2,7 @@
 
 import copy
 import json
+import subprocess
 import tempfile
 import uuid
 from unittest.mock import patch
@@ -748,3 +749,65 @@ class EditorialTests(TestCase):
         self.assertEqual(data["totals"]["reviewed"], 1)
         self.assertEqual(data["glossary"]["total"], len(terms))
         self.assertEqual(data["glossary"]["reviewed"], 0)
+
+    def test_reviewer_cannot_reject_or_retry_hidden_document_proposals(self):
+        args, _ = self.approved()
+        with patch.object(User, "can_access_component", return_value=False):
+            self.assert_problem(
+                403, transition, self.reviewer, {**args, "action": "reject"}
+            )
+            self.assert_problem(
+                403, transition, self.reviewer, {**args, "action": "merge"}
+            )
+        self.assertEqual(Proposal.objects.get(pk=args["id"]).status, "approved")
+
+    def test_rejection_does_not_require_valid_translation_content(self):
+        args, _ = self.approved()
+        with patch(
+            "ember_bridge.service.content_engine",
+            side_effect=ValueError("Invalid content"),
+        ):
+            transition(self.reviewer, {**args, "action": "reject"})
+        self.assertEqual(Proposal.objects.get(pk=args["id"]).status, "rejected")
+
+    def test_history_respects_component_visibility(self):
+        self.approved()
+        client = Client()
+        client.force_login(self.reviewer)
+        self.assertTrue(client.get("/weblate/foundry/history").json()["events"])
+        with patch("ember_bridge.views.accessible_books", return_value=[]):
+            self.assertFalse(client.get("/weblate/foundry/history").json()["events"])
+
+    def test_import_limit_counts_file_bytes_not_escaped_request(self):
+        client = Client()
+        client.force_login(self.admin)
+        large = fixture()
+        large["ignored"] = "\\" * (9 * 1024 * 1024)
+        text = json.dumps(large)
+        body = json.dumps({"json": text})
+        self.assertLess(len(text.encode()), 25 * 1024 * 1024)
+        self.assertGreater(len(body.encode()), 25 * 1024 * 1024)
+        response = client.post(
+            "/weblate/foundry/import/preview",
+            data=body,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content[:500])
+        self.assert_problem(413, import_preview, self.admin, "ž" * (13 * 1024 * 1024))
+
+    def test_content_timeout_returns_retryable_error_and_keeps_proposal(self):
+        client = Client()
+        client.force_login(self.reviewer)
+        args, _ = self.approved()
+        with patch(
+            "ember_bridge.service.content_engine",
+            side_effect=subprocess.TimeoutExpired("node", 45),
+        ):
+            response = client.post(
+                "/weblate/foundry/proposals/transition",
+                data={**args, "action": "merge"},
+                content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(Proposal.objects.get(pk=args["id"]).status, "approved")
+        self.assertEqual(rows_for_books([self.book])[0][0]["value"], ["Příručka"])

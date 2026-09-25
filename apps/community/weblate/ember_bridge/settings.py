@@ -14,7 +14,7 @@ DEFAULT_ACCESS_CONTROL = 100
 DEFAULT_TRANSLATION_REVIEW = True
 DEFAULT_SHARED_TM = False
 REGISTRATION_OPEN = True  # required by native invitation registration
-DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52 * 1024 * 1024
 # Keep login's redirect to the studio on this same host.
 LOGIN_REDIRECT_URL = "/prehled"
 # Use native credential views with a separate presentation layer. The loader is

@@ -1,24 +1,56 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   gateway:
-    image: caddy:2.11-alpine
+    build:
+      context: .
+      dockerfile: apps/community/Dockerfile.gateway
     restart: unless-stopped
+    logging: *logging
     environment:
       COMMUNITY_SCHEME: ${COMMUNITY_SCHEME:-https}
-    volumes:
-      - ./apps/community/Caddyfile:/etc/caddy/Caddyfile:ro
     expose: ["8080"]
-    depends_on: [studio, weblate]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:8080/vydani && wget -q -O /dev/null http://127.0.0.1:8080/weblate/healthz/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      studio: { condition: service_healthy }
+      weblate: { condition: service_healthy }
   studio:
     build:
       context: .
       dockerfile: apps/community/Dockerfile
     restart: unless-stopped
+    logging: *logging
     expose: ["3000"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/vydani',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
   weblate:
     build:
       context: .
       dockerfile: apps/community/Dockerfile.weblate
     restart: unless-stopped
+    logging: *logging
     environment:
       WEBLATE_SITE_DOMAIN: ${COMMUNITY_HOST:?Set COMMUNITY_HOST}
       WEBLATE_SITE_TITLE: Ember — Český překlad
@@ -54,8 +86,9 @@ services:
       database: { condition: service_healthy }
       redis: { condition: service_healthy }
   database:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: weblate
       POSTGRES_USER: weblate
@@ -67,8 +100,9 @@ services:
       timeout: 5s
       retries: 20
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:ba6e394f6acc2a695ef1b6944f161b9ca813711739be68319fa0db3470673f1d
     restart: unless-stopped
+    logging: *logging
     command: ["redis-server", "--appendonly", "yes"]
     volumes: ["redis-data:/data"]
     healthcheck:
@@ -76,6 +110,19 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  maintenance:
+    profiles: ["maintenance"]
+    image: redis:8-alpine@sha256:ba6e394f6acc2a695ef1b6944f161b9ca813711739be68319fa0db3470673f1d
+    network_mode: none
+    volumes:
+      - type: volume
+        source: weblate-data
+        target: /restore/weblate
+        volume: { nocopy: true }
+      - type: volume
+        source: redis-data
+        target: /restore/redis
+        volume: { nocopy: true }
 volumes:
   weblate-data:
   postgres-data:

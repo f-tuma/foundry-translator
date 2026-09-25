@@ -34,8 +34,12 @@ jobs:
       SMTP_TLS: "0"
     steps:
       - uses: actions/checkout@v6
-      - name: Start isolated Weblate and database
-        run: docker compose -f compose.community.yml up -d --build --wait --wait-timeout 300 weblate
+      - name: Validate deployment configuration
+        run: |
+          bash -n scripts/community-backup.sh
+          docker compose -f compose.community.yml config --quiet
+      - name: Build and start the complete isolated deployment
+        run: docker compose -f compose.community.yml up -d --build --wait --wait-timeout 300
       - name: Test native permissions, transactions and releases
         run: >-
           docker compose -f compose.community.yml exec -T weblate
