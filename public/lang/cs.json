@@ -563,5 +563,7 @@
   "FOUNDRY_TRANSLATE.Review.ProjectImport": "Import redakce",
   "FOUNDRY_TRANSLATE.Review.CommunityInvalid": "Neplatný komunitní soubor překladu (maximum 50 MB).",
   "FOUNDRY_TRANSLATE.Review.CommunitySourceMissing": "Originální dokument není v této instalaci dostupný",
-  "FOUNDRY_TRANSLATE.Review.CommunitySourceChanged": "Originál se liší od komunitního vydání; import nic nezapsal"
+  "FOUNDRY_TRANSLATE.Review.CommunitySourceChanged": "Originál se liší od komunitního vydání; import nic nezapsal",
+  "FOUNDRY_TRANSLATE.Settings.CzechFonts.Name": "Písma s českou diakritikou",
+  "FOUNDRY_TRANSLATE.Settings.CzechFonts.Hint": "Při českém rozhraní nebo cílovém jazyku používá v nadpisech a ozdobných textech Foundry, Emberu a Crucible písmo Vollkorn s úplnou českou sadou. Nastavení platí jen pro tento prohlížeč."
 }

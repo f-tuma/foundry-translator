@@ -5,6 +5,7 @@ interface FoundryModuleRecord {
 }
 
 declare const CONFIG: {
+  JournalEntryPage?: { documentClass?: { prototype: object } };
   Actor?: { documentClass?: { prototype: object } };
   Item?: { documentClass?: { prototype: object } };
 };
@@ -18,6 +19,7 @@ interface FoundryGame {
   };
   modules: Map<string, FoundryModuleRecord>;
   i18n: {
+    lang?: string;
     localize(key: string): string;
   };
   settings: {
@@ -149,6 +151,7 @@ interface FoundryItemWorldDocument extends FoundryItemDocument {
 }
 
 interface FoundrySettingConfig {
+  onChange?: (value: unknown) => void;
   name: string;
   hint: string;
   scope: "client" | "world" | "user";

@@ -2,7 +2,12 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.29.0** adds validated community-release imports and a separate
+Version **0.29.1** reuses saved translations of embedded journal text pages when
+viewing translated documents, including guides translated later. It also bundles
+Czech-complete Vollkorn fonts for Foundry, Ember and Crucible, with a per-browser
+opt-out in module settings.
+
+Version **0.29.0** added validated community-release imports and a separate
 [Weblate-backed community editor](apps/community/README.md), deployable as one
 Docker Compose stack in Dokploy. Accounts and permissions remain native Weblate.
 

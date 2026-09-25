@@ -12,6 +12,8 @@ import { organizeExistingStoragePacks } from "./storage/compendium-folder";
 import { registerCrucibleEmbedLabels } from "./translation/crucible-embed-labels";
 import { registerEmberRuntimeBridge } from "./translation/ember-runtime-bridge";
 import { registerDisplayTextView } from "./translation/display-text-view";
+import { registerTranslatedJournalEmbeds } from "./translation/translated-journal-embeds";
+import { applyCzechFonts } from "./ui/czech-fonts";
 
 import { registerReviewHeaderControl } from "./review/header-control";
 import { registerUiOverrides } from "./review/ui-catalog";
@@ -42,6 +44,8 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
   ready = true;
   registerCrucibleEmbedLabels();
+  registerTranslatedJournalEmbeds();
+  applyCzechFonts();
   registerEmberRuntimeBridge();
   registerTranslatedLinkNavigation();
   registerDisplayTextView();
