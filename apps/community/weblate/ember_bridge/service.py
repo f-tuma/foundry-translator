@@ -166,6 +166,7 @@ def book_titles(books):
 
 def import_preview(user, json_text):
     ws = workspace(user, "project.edit")
+    validate_import_size(json_text)
     parsed = content_engine("normalize", json=json_text)
     existing = {b.pk: b for b in Book.objects.filter(workspace=ws)}
     conflicts = [
@@ -184,6 +185,13 @@ def import_preview(user, json_text):
     }
 
 
+def validate_import_size(json_text):
+    if not isinstance(json_text, str):
+        raise Problem(400, "Export musí být textový JSON soubor.")
+    if len(json_text.encode("utf-8")) > 25 * 1024 * 1024:
+        raise Problem(413, "Soubor je příliš velký (nejvýše 25 MiB).")
+
+
 def import_commit(user, json_text, expected):
     prepared = []
     try:
@@ -199,6 +207,7 @@ def import_commit(user, json_text, expected):
 @transaction.atomic
 def _import_commit(user, json_text, expected, prepared):
     ws = workspace(user, "project.edit", lock=True)
+    validate_import_size(json_text)
     if digest(json_text) != expected:
         raise Problem(409, "Soubor se změnil. Připravte nový náhled.")
     parsed = content_engine("normalize", json=json_text)
@@ -426,6 +435,15 @@ def transition(user, data):
     action = data.get("action")
     if action not in ("submit", "approve", "merge", "reject", "rebase"):
         raise Problem(400, "Neznámá operace.")
+    # Even rejection and retry acknowledgements require current document access.
+    wanted = {c["unitId"] for c in p.changes}
+    touched = [
+        b
+        for b in Book.objects.filter(workspace=ws).select_related("component__project")
+        if any(r["id"] in wanted for r in b.rows)
+    ]
+    if any(not user.can_access_component(b.component) for b in touched):
+        raise Problem(403, "Chybí přístup k dokumentům návrhu.")
     reviewer = user.has_perm("unit.review", language_scope(ws))
     if action == "merge" and p.status == "merged" and reviewer:
         return {"id": str(p.pk), "duplicate": True}
@@ -476,6 +494,13 @@ def transition(user, data):
         elif action == "reject":
             if p.status not in ("submitted", "approved"):
                 raise Problem(409, "Návrh již nelze zamítnout.")
+            # Rejection must remain possible even when text/structure is invalid.
+            parts = Unit.objects.filter(
+                translation__component_id__in=[b.component_id for b in touched],
+                translation__language__code="cs",
+            ).select_related("translation__component__project")
+            if any(not user.has_perm("unit.review", part) for part in parts):
+                raise Problem(403, "Chybí oprávnění ke kontrole oddílů návrhu.")
             p.status = "rejected"
             p.approval = None
         else:
