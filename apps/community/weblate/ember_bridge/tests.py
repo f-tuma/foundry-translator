@@ -228,6 +228,39 @@ class EditorialTests(TestCase):
         altered["title"] = "Other"
         self.assert_problem(409, save_proposal, self.author, altered)
 
+    def test_reference_movement_survives_review_merge_and_release(self):
+        bundle = fixture()
+        doc = bundle["documents"][0]
+        doc["sourceUuid"] = "JournalEntry.references"
+        doc["patches"][1]["source"] = '<p>Meet @UUID[Actor.a]{A} before @Embed[JournalEntry.b inline]{B}.</p>'
+        doc["patches"][1]["translation"] = '<p>Potkej @UUID[Actor.a]{Áčko} před @Embed[JournalEntry.b inline]{Béčko}.</p>'
+        text = json.dumps(bundle)
+        import_commit(self.admin, text, import_preview(self.admin, text)["digest"])
+        book = Book.objects.get(workspace=self.ws, template__sourceUuid="JournalEntry.references")
+        book.component.create_translations_immediate(force=True)
+        rows, _ = rows_for_books([book])
+        row = next(r for r in rows if "@UUID" in r["value"][0])
+        after = '@Embed[JournalEntry.b inline]{Béčka} potkáš před @UUID[Actor.a]{Áčkem}.'
+        data = dict(requestId=str(uuid.uuid4()), title="Přesun odkazů", changes=[dict(
+            unitId=row["id"], baseRevision=row["revision"], before=row["value"], after=[after])])
+        bad = copy.deepcopy(data)
+        bad["changes"][0]["after"] = [after.replace("Actor.a", "Actor.wrong")]
+        with self.assertRaisesRegex(ValueError, "references or commands"):
+            save_proposal(self.author, bad)
+        saved = save_proposal(self.author, data)
+        args = dict(id=saved["id"], revision=1)
+        transition(self.author, {**args, "action": "submit"})
+        transition(self.reviewer, {**args, "action": "approve"})
+        transition(self.reviewer, {**args, "action": "merge"})
+        updated, _ = rows_for_books([book])
+        result = next(r for r in updated if r["id"] == row["id"])
+        self.assertEqual(result["value"], [after])
+        self.assertTrue(result["approval"])
+        publish(self.admin, dict(id="reference-order", title="Odkazy", notes=""))
+        payload = Release.objects.get(pk="reference-order").payload
+        translated = next(d for d in payload["bundle"]["documents"] if d["sourceUuid"] == doc["sourceUuid"])
+        self.assertEqual(translated["patches"][1]["translation"], "<p>" + after + "</p>")
+
     def test_external_native_edit_blocks_entire_merge(self):
         args, _ = self.approved(2)
         unit = self.native[self.rows[1]["id"]][0]

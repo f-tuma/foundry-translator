@@ -1,7 +1,7 @@
 import type { GlossaryEntry } from "../glossary/types";
 import { isGlossaryCategory, isGlossaryMode } from "../glossary/types";
 import { validateGlossary } from "../glossary/protection";
-import { protectFoundrySyntax } from "../translation/foundry-syntax";
+import { FOUNDRY_EXPRESSION, protectFoundrySyntax } from "../translation/foundry-syntax";
 import { planMarkdownTranslation } from "../translation/markdown";
 import type { BundleDocumentKind, FieldFormat, PortableField } from "./fields";
 import { isProviderId, type ProviderId } from "../settings/settings";
@@ -121,17 +121,27 @@ function htmlStructure(value: string): string {
 /** Import prose only: reject changes to markup, URLs, UUIDs, rolls and macros. */
 export function assertPortableText(source: string, translation: string, format: FieldFormat): void {
   requireValue(!/__FT[NGS]_/iu.test(translation), "unrestored protection token.");
-  const syntax = (text: string) => {
-    // An implicit document name may gain a translated display label. Compare
-    // its UUID/options unchanged, and never hide commands inside a new label.
-    const references = text.replace(/(@(?:UUID|Embed)\[[^\]\r\n]*\])\{([^}\r\n]*)\}/giu,
-      (expression, reference: string, label: string) => /@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(label) ? expression : reference);
-    return JSON.stringify(protectFoundrySyntax(references, { nonce: "BUNDLE" }).tokens.map((t) => t.source));
-  };
+  const syntax = (text: string) => JSON.stringify([...text.matchAll(FOUNDRY_EXPRESSION)].map(([expression]) => {
+    // Compare complete commands as a multiset. Sorting protection fragments would
+    // let options or UUIDs migrate between different commands unnoticed.
+    const reference = expression.replace(/(@(?:UUID|Embed)\[[^\]\r\n]*\])\{([^}\r\n]*)\}/giu,
+      (whole, command: string, label: string) => /@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(label) ? whole : command);
+    // Reject nested executable syntax in any editable label or embed caption.
+    const prose = protectFoundrySyntax(reference, { nonce: "BUNDLE" });
+    requireValue(!/@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(prose.text), "nested Foundry commands in a label.");
+    return JSON.stringify(prose.tokens.map(t => t.source));
+  }).sort());
   requireValue(syntax(source) === syntax(translation), "Foundry references or commands were changed.");
   if (format === "html" || format === "text") requireValue(htmlStructure(source) === htmlStructure(translation), "HTML structure or attributes were changed.");
   if (format === "markdown") {
-    const skeleton = (text: string) => { const p = planMarkdownTranslation(text); return p.apply(p.units.map((u) => u.map(() => "TEXT"))); };
+    let marker = "PORTABLEPROSE";
+    while (source.includes(marker) || translation.includes(marker)) marker += "X";
+    const skeleton = (text: string) => {
+      const p = planMarkdownTranslation(text);
+      // Moving a Foundry reference can join or split adjacent prose spans.
+      // Normalize those spans, while retaining code, destinations and markup.
+      return p.apply(p.units.map(u => u.map(() => marker))).replace(new RegExp(`(?:${marker})+`, "gu"), marker);
+    };
     requireValue(skeleton(source) === skeleton(translation), "Markdown structure or destinations were changed.");
   }
 }

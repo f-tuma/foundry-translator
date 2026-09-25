@@ -13,9 +13,21 @@ import {
   RotateCcw,
 } from "lucide-react";
 import {
-  maskReviewReferences,
-  restoreReviewReferences,
+  maskReviewParts,
+  type ReviewTextDraft,
 } from "../../../../src/review/text-plan";
+import {
+  changeWithDraft,
+  compileChanges,
+  editorDraft,
+  referenceDraftError,
+  validEditorDraft,
+} from "../review-draft";
+import {
+  RowReferences,
+  SourceParts,
+  TranslationParts,
+} from "./reference-editor";
 import { api, useSession } from "../api";
 import type { Change, Doc, Proposal, Unit } from "../shared";
 import { useGlossary } from "./glossary";
@@ -37,7 +49,8 @@ function useDrafts(userId: string) {
             Array.isArray(c.after) &&
             c.before.length === c.after.length &&
             c.before.every((v: unknown) => typeof v === "string") &&
-            c.after.every((v: unknown) => typeof v === "string"),
+            c.after.every((v: unknown) => typeof v === "string") &&
+            (!c.editor || validEditorDraft(c.editor)),
         ),
       ) as Record<string, Change>;
     } catch {
@@ -79,157 +92,6 @@ function useDrafts(userId: string) {
       setDrafts({});
     },
   };
-}
-function ReferenceFields({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange?: (value: string) => void;
-  label: string;
-}) {
-  const masked = maskReviewReferences(value);
-  const [error, setError] = useState("");
-  return (
-    <>
-      {masked.references.map((reference, index) => (
-        <label key={reference.marker}>
-          <span className="reference-marker">{reference.marker}</span>
-          {onChange && reference.editable ? (
-            <input
-              aria-label={`${label} — název odkazu ${index + 1}`}
-              value={reference.label}
-              onChange={(event) => {
-                try {
-                  onChange(
-                    restoreReviewReferences(
-                      masked.text,
-                      masked.references.map((item, i) =>
-                        i === index
-                          ? { ...item, label: event.target.value }
-                          : item,
-                      ),
-                    ),
-                  );
-                  setError("");
-                } catch {
-                  setError("Popisek odkazu obsahuje nepovolené znaky.");
-                }
-              }}
-            />
-          ) : (
-            <span>{reference.label || "Chráněný příkaz"}</span>
-          )}
-        </label>
-      ))}
-      <Notice error={error} />
-    </>
-  );
-}
-
-function RowReferences({
-  source,
-  target,
-  row,
-  onChange,
-}: {
-  source: string[];
-  target: string[];
-  row: number;
-  onChange: (parts: string[]) => void;
-}) {
-  const count = Math.max(
-    ...[source, target].map((parts) =>
-      parts.reduce(
-        (n, part) => n + maskReviewReferences(part).references.length,
-        0,
-      ),
-    ),
-  );
-  if (!count) return null;
-  return (
-    <details className="reference-labels row-references">
-      <summary>
-        <ChevronRight size={14} className="disclosure-arrow" />
-        <LockKeyhole size={12} />
-        Odkazy ({count})
-      </summary>
-      <div className="reference-columns">
-        <div>
-          <h3>Originál</h3>
-          {source.map((value, index) => (
-            <ReferenceFields
-              key={index}
-              value={value}
-              label={`Originál ${row}.${index + 1}`}
-            />
-          ))}
-        </div>
-        <div>
-          <h3>Český překlad</h3>
-          {target.map((value, index) => (
-            <ReferenceFields
-              key={index}
-              value={value}
-              label={`Překlad ${row}.${index + 1}`}
-              onChange={(next) =>
-                onChange(target.map((part, i) => (i === index ? next : part)))
-              }
-            />
-          ))}
-        </div>
-      </div>
-    </details>
-  );
-}
-
-export function TextPart({
-  value,
-  onChange,
-  label,
-  showReferences = true,
-}: {
-  value: string;
-  onChange?: (value: string) => void;
-  label: string;
-  showReferences?: boolean;
-}) {
-  const masked = maskReviewReferences(value);
-  const [error, setError] = useState("");
-  const update = (text: string, references = masked.references) => {
-    try {
-      onChange?.(restoreReviewReferences(text, references));
-      setError("");
-    } catch {
-      setError("Značky odkazů musí zůstat zachované a ve stejném pořadí.");
-    }
-  };
-  return (
-    <>
-      {onChange ? (
-        <textarea
-          aria-label={label}
-          className="prose-input"
-          value={masked.text}
-          rows={Math.max(2, Math.min(12, Math.ceil(masked.text.length / 48)))}
-          onChange={(e) => update(e.target.value)}
-        />
-      ) : (
-        <p className="prose">{masked.text}</p>
-      )}
-      {showReferences && masked.references.length ? (
-        <details className="reference-labels">
-          <summary>
-            <LockKeyhole size={12} />
-            Odkazy ({masked.references.length})
-          </summary>
-          <ReferenceFields value={value} onChange={onChange} label={label} />
-        </details>
-      ) : null}
-      <Notice error={error} />
-    </>
-  );
 }
 export function Editor({
   initial = {},
@@ -296,7 +158,7 @@ export function Editor({
       const result = await api<{ id: string }>("proposals/save", {
         requestId,
         title,
-        changes,
+        changes: compileChanges(changes),
       });
       if (submit === "submit") {
         const saved = await api<{ proposal: Proposal }>(
@@ -318,22 +180,31 @@ export function Editor({
       navigate({ to: "/navrhy", search: { id: r.id } });
     },
   });
-  function update(unit: Unit, parts: string[]) {
+  const invalidDrafts = changes.some(
+    (c) => c.editor && referenceDraftError(c.editor),
+  );
+  function update(unit: Unit, editor: ReviewTextDraft) {
     setDrafts((old) => {
-      const next = { ...old };
-      if (JSON.stringify(parts) === JSON.stringify(unit.value))
-        delete next[unit.id];
-      else
-        next[unit.id] = {
+      const change = changeWithDraft(
+        old[unit.id] ?? {
           unitId: unit.id,
-          baseRevision: old[unit.id]?.baseRevision ?? unit.revision,
-          before: old[unit.id]?.before ?? unit.value,
-          after: parts,
-        };
+          baseRevision: unit.revision,
+          before: unit.value,
+          after: unit.value,
+        },
+        editor,
+      );
+      const next = { ...old, [unit.id]: change };
+      if (
+        !referenceDraftError(editor) &&
+        JSON.stringify(change.after) === JSON.stringify(unit.value)
+      )
+        delete next[unit.id];
       return next;
     });
   }
   function prepare(mode: "draft" | "submit") {
+    if (invalidDrafts) return;
     setTitle(currentDoc ? `Úpravy: ${currentDoc.title}` : "Úpravy překladu");
     setRequestId(crypto.randomUUID());
     save.reset();
@@ -348,7 +219,7 @@ export function Editor({
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  }, [changes.length, currentDoc?.title]);
+  }, [changes.length, invalidDrafts, currentDoc?.title]);
   useEffect(() => {
     if (submit) dialog.current?.showModal();
     else dialog.current?.close();
@@ -458,7 +329,9 @@ export function Editor({
         <div className="translation-rows">
           {rows.data?.rows.map((unit, index) => {
             const change = drafts[unit.id],
-              parts = change?.after ?? unit.value;
+              parts = change
+                ? editorDraft(change)
+                : maskReviewParts(unit.value);
             return (
               <section
                 className={`translation-row ${active?.id === unit.id ? "is-selected" : ""}`}
@@ -475,36 +348,21 @@ export function Editor({
                       {unit.document_title} / {unit.label}
                     </small>
                   ) : null}
-                  {unit.source.map((p, i) => (
-                    <TextPart
-                      key={i}
-                      value={p}
-                      showReferences={false}
-                      label={`Originál ${offset + index + 1}.${i + 1}`}
-                    />
-                  ))}
+                  <SourceParts parts={unit.source} />
                 </div>
                 <div className="target-text">
-                  {parts.map((part, i) => (
-                    <TextPart
-                      key={i}
-                      value={part}
-                      showReferences={false}
-                      label={`Překlad ${offset + index + 1}.${i + 1}`}
-                      onChange={(value) =>
-                        update(
-                          unit,
-                          parts.map((p, j) => (i === j ? value : p)),
-                        )
-                      }
-                    />
-                  ))}
+                  <TranslationParts
+                    draft={parts}
+                    showReferences={false}
+                    label={`Překlad ${offset + index + 1}`}
+                    onChange={(draft) => update(unit, draft)}
+                  />
                 </div>
                 <RowReferences
                   source={unit.source}
                   target={parts}
-                  row={offset + index + 1}
-                  onChange={(value) => update(unit, value)}
+                  label={`Překlad ${offset + index + 1}`}
+                  onChange={(draft) => update(unit, draft)}
                 />
                 <div className="row-status">
                   {change ? (
@@ -664,9 +522,9 @@ export function Editor({
               <LockKeyhole size={20} />
               <span>Odkazy jsou chráněné</span>
               <Help>
-                Upravovat lze text a zobrazené názvy odkazů. UUID, příkazy,
-                makra a strukturu dokumentu kontroluje stejný validátor jako ve
-                Foundry.
+                Značky odkazů můžete přesouvat v rámci odstavce a jejich popisky
+                upravovat pod textem. UUID, příkazy, makra a strukturu dokumentu
+                kontroluje stejný validátor jako ve Foundry.
               </Help>
             </div>
           </>
@@ -713,19 +571,24 @@ export function Editor({
                 : "Vše připraveno ke čtení"}
             </strong>
             <small>
-              {storageError
-                ? "Koncept není uložený v prohlížeči"
-                : "Koncepty se průběžně ukládají v tomto prohlížeči."}
+              {invalidDrafts
+                ? "Před uložením doplňte chybějící značky nebo opravte popisky odkazů."
+                : storageError
+                  ? "Koncept není uložený v prohlížeči"
+                  : "Koncepty se průběžně ukládají v tomto prohlížeči."}
             </small>
           </span>
         </div>
         <div>
-          <button disabled={!changes.length} onClick={() => prepare("draft")}>
+          <button
+            disabled={!changes.length || invalidDrafts}
+            onClick={() => prepare("draft")}
+          >
             Uložit návrh
           </button>
           <button
             className="primary"
-            disabled={!changes.length}
+            disabled={!changes.length || invalidDrafts}
             onClick={() => prepare("submit")}
           >
             Odeslat ke kontrole

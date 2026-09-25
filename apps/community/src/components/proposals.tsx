@@ -6,7 +6,14 @@ import { Check, GitMerge, ArrowLeft, MessageSquare } from "lucide-react";
 import { api, useSession } from "../api";
 import type { Proposal, Unit, Change } from "../shared";
 import { Notice, Help } from "./shell";
-import { TextPart } from "./editor";
+import { TranslationParts } from "./reference-editor";
+import {
+  changeWithDraft,
+  compileChanges,
+  editorDraft,
+  referenceDraftError,
+  validEditorDraft,
+} from "../review-draft";
 import {
   GlossaryFields,
   glossaryLabels,
@@ -303,6 +310,12 @@ export function Proposals() {
               );
             })}
           </div>
+          {editing ? (
+            <p className="muted">
+              Před odesláním ke kontrole uložte novou revizi nebo zavřete
+              koncept.
+            </p>
+          ) : null}
           <div className="review-actions">
             {p.author_id === who.id &&
             p.status !== "merged" &&
@@ -319,7 +332,7 @@ export function Proposals() {
                     opravami.
                   </label>
                   <button
-                    disabled={!rebaseConfirm || action.isPending}
+                    disabled={!rebaseConfirm || action.isPending || editing}
                     onClick={() => action.mutate("rebase")}
                   >
                     Použít opravy jako nový koncept
@@ -328,7 +341,7 @@ export function Proposals() {
               ) : p.status === "draft" ? (
                 <button
                   className="primary"
-                  disabled={action.isPending}
+                  disabled={action.isPending || editing}
                   onClick={() => action.mutate("submit")}
                 >
                   Odeslat ke kontrole
@@ -344,7 +357,7 @@ export function Proposals() {
                 {p.status === "submitted" ? (
                   <button
                     className="primary"
-                    disabled={action.isPending}
+                    disabled={action.isPending || editing}
                     onClick={() => action.mutate("approve")}
                   >
                     <Check size={16} />
@@ -354,7 +367,7 @@ export function Proposals() {
                 {p.status === "approved" ? (
                   <button
                     className="primary"
-                    disabled={action.isPending}
+                    disabled={action.isPending || editing}
                     onClick={() => action.mutate("merge")}
                   >
                     <GitMerge size={16} />
@@ -363,7 +376,7 @@ export function Proposals() {
                 ) : null}
                 {["submitted", "approved"].includes(p.status) ? (
                   <button
-                    disabled={action.isPending}
+                    disabled={action.isPending || editing}
                     onClick={() => action.mutate("reject")}
                   >
                     Zamítnout návrh
@@ -486,7 +499,8 @@ function EditProposal({
             proposal.changes.some((old) => old.unitId === c.unitId) &&
             Array.isArray(c.before) &&
             Array.isArray(c.after) &&
-            [...c.before, ...c.after].every((v) => typeof v === "string"),
+            [...c.before, ...c.after].every((v) => typeof v === "string") &&
+            (!c.editor || validEditorDraft(c.editor)),
         )
       )
         return saved;
@@ -512,7 +526,12 @@ function EditProposal({
     }
   }, [draft, storageKey]);
   const save = useMutation({
-    mutationFn: () => api("proposals/save", { id: proposal.id, ...draft }),
+    mutationFn: () =>
+      api("proposals/save", {
+        id: proposal.id,
+        ...draft,
+        changes: compileChanges(draft.changes),
+      }),
     onSuccess: () => {
       try {
         localStorage.removeItem(storageKey);
@@ -584,36 +603,32 @@ function EditProposal({
               }
             />
           ) : (
-            c.after.map((v, i) => (
-              <TextPart
-                key={i}
-                value={v}
-                label={`Oprava oddílu ${changeIndex + 1}.${i + 1}`}
-                onChange={(value) =>
-                  setDraft({
-                    ...draft,
-                    requestId: crypto.randomUUID(),
-                    changes: draft.changes.map((change) =>
-                      change.unitId === c.unitId
-                        ? {
-                            ...change,
-                            after: change.after.map((part, j) =>
-                              i === j ? value : part,
-                            ),
-                          }
-                        : change,
-                    ),
-                  })
-                }
-              />
-            ))
+            <TranslationParts
+              draft={editorDraft(c)}
+              label={`Oprava oddílu ${changeIndex + 1}`}
+              onChange={(editor) =>
+                setDraft({
+                  ...draft,
+                  requestId: crypto.randomUUID(),
+                  changes: draft.changes.map((change) =>
+                    change.unitId === c.unitId
+                      ? changeWithDraft(change, editor)
+                      : change,
+                  ),
+                })
+              }
+            />
           )}
         </section>
       ))}
       <Notice error={storageError || save.error} />
       <button
         className="primary"
-        disabled={save.isPending || draft.revision !== proposal.revision}
+        disabled={
+          save.isPending ||
+          draft.revision !== proposal.revision ||
+          draft.changes.some((c) => c.editor && !!referenceDraftError(c.editor))
+        }
       >
         {save.isPending ? "Ukládám…" : "Uložit novou revizi"}
       </button>

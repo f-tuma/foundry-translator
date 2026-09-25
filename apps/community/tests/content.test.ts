@@ -166,13 +166,11 @@ describe("Foundry community bridge", () => {
     vi.stubGlobal("game", { system: { id: "crucible" } });
     vi.stubGlobal(
       "fromUuid",
-      vi
-        .fn()
-        .mockResolvedValue({
-          uuid: "JournalEntry.guide",
-          documentName: "JournalEntry",
-          toObject: () => data,
-        }),
+      vi.fn().mockResolvedValue({
+        uuid: "JournalEntry.guide",
+        documentName: "JournalEntry",
+        toObject: () => data,
+      }),
     );
     const result = await readEditorialFile(JSON.stringify(payload));
     expect(result.bundle.documents[0]!.patches[0]!.source).toBe(
@@ -192,12 +190,10 @@ describe("Foundry community bridge", () => {
     vi.stubGlobal("game", { system: { id: "crucible" } });
     vi.stubGlobal(
       "fromUuid",
-      vi
-        .fn()
-        .mockResolvedValue({
-          documentName: "JournalEntry",
-          toObject: () => ({ name: "Private Original", pages: [] }),
-        }),
+      vi.fn().mockResolvedValue({
+        documentName: "JournalEntry",
+        toObject: () => ({ name: "Private Original", pages: [] }),
+      }),
     );
     const payload = release();
     payload.bundle.documents[0]!.patches[0]!.translation = "@Macro[evil]";
@@ -213,4 +209,64 @@ describe("Foundry community bridge", () => {
     b.documents[0]!.patches[1]!.translation = "<script>evil()</script>";
     expect(() => parseImport(JSON.stringify(b))).toThrow();
   });
+});
+
+it("roundtrips reordered references and corrected labels through import, review, public release and Foundry import", async () => {
+  const b = fixture(),
+    doc = b.documents[0]!;
+  const source =
+    "<p>Meet @UUID[Actor.a]{A} <strong>before</strong> @UUID[Actor.b]{B}.</p>";
+  doc.patches[1]!.source = source;
+  doc.patches[1]!.translation =
+    "<p>Potkej @UUID[Actor.a]{Áčko} <strong>před</strong> @UUID[Actor.b]{Béčko}.</p>";
+  const original = {
+    name: doc.patches[0]!.source,
+    pages: [
+      { _id: "page", type: "text", text: { content: source, format: 1 } },
+    ],
+  };
+  // This fixture uses both structural text parts and a real source fingerprint.
+  const { journalSourceHash } =
+    await import("../../../src/translation/journal");
+  doc.sourceFingerprint = await journalSourceHash(original as any);
+  const parsed = parseImport(JSON.stringify(b)).bundle;
+  const units = unitsForDocument(parsed.documents[0]!).map((u) => ({
+    ...u,
+    revision: "r1",
+    approval: null,
+  })) as Unit[];
+  const row = units.find((u) => u.value.length === 3)!;
+  row.value = [
+    "@UUID[Actor.b]{Béčka} potkáš ",
+    "před",
+    " @UUID[Actor.a]{Áčkem}.",
+  ];
+  const rebuilt = rebuildDocument(parsed.documents[0]!, units);
+  expect(rebuilt.patches[1]!.translation).toContain(
+    "@UUID[Actor.b]{Béčka} potkáš <strong>před</strong> @UUID[Actor.a]{Áčkem}",
+  );
+  const published = publicRelease(
+    parsed,
+    parsed.documents,
+    units,
+    "Opravy odkazů",
+    "",
+    "links",
+  );
+  vi.stubGlobal("game", { system: { id: "crucible" } });
+  vi.stubGlobal(
+    "fromUuid",
+    vi
+      .fn()
+      .mockResolvedValue({
+        documentName: "JournalEntry",
+        toObject: () => original,
+      }),
+  );
+  const imported = await readEditorialFile(JSON.stringify(published));
+  expect(imported.bundle.documents[0]!.patches[1]!.translation).toBe(
+    rebuilt.patches[1]!.translation,
+  );
+  row.value[2] = " @UUID[Actor.changed].";
+  expect(() => rebuildDocument(parsed.documents[0]!, units)).toThrow();
 });

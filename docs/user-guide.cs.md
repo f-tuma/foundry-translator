@@ -76,6 +76,13 @@ Formátované úseky odstavce mají samostatná pole, aby se neztratilo zvýrazn
 nebo formátování. Značky jako `⟦1⟧` chrání odkazy a herní příkazy. Popisek
 odkazu upravíte v samostatném poli pod textem; prázdný popisek použije název
 propojeného dokumentu. UUID a herní pravidla tím neměníte.
+Od **0.29.2** lze značky vyjmout a vložit na jiné místo v témže odstavci, včetně
+přesunu mezi jeho formátovanými textovými poli. Každá značka musí zůstat právě
+jednou; původní pořadí se nekontroluje. Pod textem lze upravit popisky `@UUID`
+i `@Embed`. Chybějící či zdvojená značka blokuje uložení, ale rozepsaný text
+zůstane zachovaný. Totéž funguje ve webovém editoru od **0.3.2**, i při úpravě
+existujícího návrhu. Při novém otevření uloženého textu se značky znovu očíslují
+podle pořadí v daném sloupci; příslušný název vždy uvidíte pod textem.
 
 Ověření platí pro konkrétní uložený text a původní kontext. Při změně překladu
 nebo zdroje se již nezobrazuje jako platné; ověření můžete také ručně zrušit.

@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-09-23
-- Current code/release metadata: `v0.28.0`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
+- Updated: 2026-09-25
+- Current code/release metadata: `v0.29.2`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
 - Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,24 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-25, reference editing (Foundry 0.29.2 / community 0.3.2): whole Foundry
+  commands compare as multisets, never sorted protection fragments. The editors
+  allow moving markers within one paragraph, including between formatted parts.
+  UUID and Embed labels edit below prose. Incomplete cuts remain recoverable local
+  drafts and block saving/submission. The shared service/import/export guard still
+  rejects changed destinations, command options, counts, markup and nested commands.
+  Legacy per-part Foundry draft markers migrate without dropping Embed captions.
+  Tests include real Weblate save/review/merge/release and both rendered editors;
+  see [QA record](benchmarks/reference-editing-2026-09-25.md).
+- Community readiness 0.3.1 was merged as PR #40, including full deployment and
+  backup/restore verification. [Deployment guide](../apps/community/DEPLOYMENT.md).
+  The private QA stack remains on localhost:3101; no production community deployment
+  was performed. Version 0.3.2 also isolates Weblate component names by document ID
+  so identical visible document titles can import without a unique-name collision.
+- Foundry 0.29.1 was published from PR #41: translated journal embeds and Czech
+  Vollkorn font fallback. [QA record](benchmarks/embeds-fonts-2026-09-25.md).
+  Production Foundry was inspected read-only; installing updates is user-managed.
 
 - 2026-09-23, recovery and editorial projects (0.28.0): **Recovery** persists
   document paragraph/link-label drafts, notes and UI overrides locally per

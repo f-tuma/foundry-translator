@@ -1,3 +1,4 @@
+import type { ReviewTextDraft } from "../../../src/review/text-plan";
 export type Role = "admin" | "reviewer" | "translator";
 export interface Account {
   id: string;
@@ -37,6 +38,8 @@ export interface Unit {
   document_title?: string;
 }
 export interface Change {
+  /** Local-only editing state. Stripped before sending to the server. */
+  editor?: ReviewTextDraft;
   unitId: string;
   baseRevision: string;
   before: string[];

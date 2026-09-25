@@ -45,3 +45,17 @@ it("previews changed translations and blocks changed originals without any write
   expect((await previewRecovery(saved, "cs")).blocked).toBe(true);
   expect(values.size).toBe(0);
 });
+it("migrates legacy per-fragment marker numbers without losing unfinished edits", () => {
+  const old = { ...payload, kind: 'text' as const, baseline: ['@UUID[Actor.a]', 'and @UUID[Actor.b]'], text: ['⟦1⟧', 'a ⟦1⟧'], labels: [['Áčko'], ['Béčko']] };
+  const recovered = recoverText(old);
+  expect(recovered.text).toEqual(['⟦1⟧', 'a ⟦2⟧']);
+  expect(recovered.references[1]![0]!.label).toBe('Béčko');
+  const modern = recoverText({ ...old, referenceScope: 'row', text: ['⟦2⟧ a ⟦1⟧', 'zbytek'] });
+  expect(modern.text).toEqual(['⟦2⟧ a ⟦1⟧', 'zbytek']);
+});
+
+it("retains embed captions from old drafts that did not yet expose them as editable", () => {
+  const old = { ...payload, kind: 'text' as const, baseline: ['@Embed[JournalEntry.a inline]{Původní popisek}'], text: ['Přečti ⟦1⟧.'], labels: [['']] };
+  expect(recoverText(old).references[0]![0]!.label).toBe('Původní popisek');
+  expect(recoverText({ ...old, referenceScope: 'row' }).references[0]![0]!.label).toBe('');
+});

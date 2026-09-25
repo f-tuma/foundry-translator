@@ -737,6 +737,12 @@ small {
 .row-references[open] > summary .disclosure-arrow {
   transform: rotate(90deg);
 }
+.reference-help {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+}
 .reference-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

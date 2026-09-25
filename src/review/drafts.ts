@@ -1,14 +1,13 @@
 import { MODULE_ID } from "../constants";
 import type { EditorialRecord, EditorialState } from "./editorial";
 import type { ReviewRow, ReviewSnapshot } from "./service";
-import { maskReviewReferences, type ReviewReference } from "./text-plan";
+import { maskReviewReferences, maskReviewParts, type ReviewTextDraft } from "./text-plan";
 import type { UiRow, UiScope } from "./ui-catalog";
 import { labelFor } from "./labels";
 
-export interface TextDraft { text: string[]; references: ReviewReference[][] }
+export type TextDraft = ReviewTextDraft;
 export function draftFor(row: Pick<ReviewRow, "translation">): TextDraft {
-  const parts = row.translation.map(maskReviewReferences);
-  return { text: parts.map(part => part.text), references: parts.map(part => part.references) };
+  return maskReviewParts(row.translation);
 }
 interface DocumentDraft {
   uuid: string; sourceUuid: string; rowId: string; group: string; name: string;
@@ -16,7 +15,7 @@ interface DocumentDraft {
   section?: string;
 }
 export type DraftPayload = (DocumentDraft & (
-  { kind: "text"; text: string[]; labels: string[][] } |
+  { kind: "text"; text: string[]; labels: string[][]; referenceScope?: "row" } |
   { kind: "note"; baselineNote: EditorialRecord | null; state: EditorialState; note: string }
 )) | { kind: "ui"; scope: UiScope; key: string; source: string; baseline: string; value: string };
 export interface SavedDraft { version: 1; id: string; at: string; payload: DraftPayload }
@@ -27,15 +26,21 @@ export function documentDraft(snapshot: ReviewSnapshot, row: ReviewRow) {
     source: snapshot.fields.find(field => field.id === row.fieldId)!.source, baseline: [...row.translation] };
 }
 export function textPayload(snapshot: ReviewSnapshot, row: ReviewRow, draft: TextDraft): DraftPayload {
-  return { ...documentDraft(snapshot, row), kind: "text", text: [...draft.text], labels: draft.references.map(parts => parts.map(part => part.label)) };
+  return { ...documentDraft(snapshot, row), kind: "text", referenceScope: "row", text: [...draft.text], labels: draft.references.map(parts => parts.map(part => part.label)) };
 }
 export function uiPayload(row: UiRow, value: string): DraftPayload { return { kind: "ui", scope: row.scope, key: row.key, source: row.source, baseline: row.value, value }; }
 export function recoverText(payload: Extract<DraftPayload, { kind: "text" }>): TextDraft {
   // Commands always come from the saved baseline, never from editable labels.
   const draft = draftFor({ translation: payload.baseline });
   if (draft.text.length !== payload.text.length || draft.references.some((parts, index) => parts.length !== payload.labels[index]?.length)) throw new Error("Review.DraftInvalid");
-  draft.text = [...payload.text];
-  draft.references.forEach((parts, index) => parts.forEach((part, n) => { if (part.editable) part.label = payload.labels[index]![n]!; }));
+  // Version 1 drafts numbered each text fragment separately. Migrate markers in
+  // one pass; this also keeps incomplete cut/paste drafts recoverable.
+  draft.text = payload.referenceScope === "row" ? [...payload.text] : payload.text.map((text, index) => {
+    const legacy = maskReviewReferences(payload.baseline[index]!);
+    const markers = new Map(legacy.references.map((ref, n) => [ref.marker, draft.references[index]![n]!.marker]));
+    return text.replace(/⟦+[^⟦⟧]*⟧+/gu, marker => markers.get(marker) ?? marker);
+  });
+  draft.references.forEach((parts, index) => parts.forEach((part, n) => { if (part.editable && (payload.referenceScope === "row" || /^@UUID\[/iu.test(part.command))) part.label = payload.labels[index]![n]!; }));
   return draft;
 }
 function valid(value: unknown): value is SavedDraft {
