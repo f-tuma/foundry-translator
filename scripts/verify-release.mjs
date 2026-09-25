@@ -15,6 +15,16 @@ const sourceVersion = constantsSource.match(/MODULE_VERSION = "([^"]+)"/)?.[1];
 
 const failures = [];
 
+for (const asset of ["vollkorn.woff2", "vollkorn-italic.woff2", "OFL.txt"]) {
+  try {
+    const original = await readFile(`public/fonts/vollkorn/${asset}`);
+    const built = await readFile(`dist/fonts/vollkorn/${asset}`);
+    if (!built.equals(original)) failures.push(`Bundled font asset ${asset} differs from the source`);
+  } catch {
+    failures.push(`Bundled font asset ${asset} is missing`);
+  }
+}
+
 for (const language of moduleJson.languages ?? []) {
   try {
     const original = await readFile(`public/${language.path}`, "utf8");

@@ -43,6 +43,21 @@ překlady se využijí pro odkazy. Pro přípravu celé knihy včetně navázan�
 postav a předmětů použijte překlad celého deníku. Průběh i bezpečné zrušení
 najdete v přehledu překladů.
 
+Od verze 0.29.1 se také vložené textové stránky (například úvod hráčské
+příručky v příručce vypravěče) při otevření přeloženého dokumentu načtou
+z hotového překladu stejného jazyka. Totéž platí pro vložené popisy míst,
+lore a původu postav z Emberu. Funguje to i tehdy, když odkazovanou
+knihu přeložíte později; původní deník není nutné překládat znovu. Zavřete
+a znovu otevřete příručku. Chybějící, nejednoznačný či nedokončený překlad
+vložené stránky zůstane v originále. Speciální herní karty a události tato
+oprava nepřesměrovává.
+
+V **Nastavení → Foundry Translate → Písma s českou diakritikou** lze zapnout
+nebo vypnout náhradu ozdobných písem. Výchozí nastavení používá Vollkorn
+s úplnou českou sadou, pokud je české rozhraní nebo cílový jazyk překladu.
+Písmo je součástí modulu a funguje bez internetu. Náhrada platí pouze
+v daném prohlížeči a nemění texty, velikost písmen ani ikony.
+
 Při změně glosáře nebo modelu se nově přeloží vybraná stránka, ostatní
 přeložené stránky zůstanou čitelné. Pokud se změnila samotná zdrojová kniha,
 modul vyžádá obnovu celého deníku, aby nepřepsal zbývající překlady zdrojem.

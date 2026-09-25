@@ -6,6 +6,7 @@ import { JournalTranslationApplication } from "../translation/journal-translatio
 import { ActiveTranslationsApplication } from "../translation/active-translations-app";
 import { BundleApplication } from "../bundles/bundle-app";
 import { TranslationDesk } from "../ui/translation-desk";
+import { applyCzechFonts } from "../ui/czech-fonts";
 
 export function registerSettings(): void {
   game.settings.registerMenu(MODULE_ID, "desk", {
@@ -71,6 +72,7 @@ export function registerSettings(): void {
   });
 
   game.settings.register(MODULE_ID, SETTINGS.TARGET_LANGUAGE, {
+    onChange: applyCzechFonts,
     name: "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Name",
     hint: "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Hint",
     scope: "world",
@@ -86,6 +88,13 @@ export function registerSettings(): void {
     config: true,
     type: Boolean,
     default: true,
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.CZECH_FONTS, {
+    name: "FOUNDRY_TRANSLATE.Settings.CzechFonts.Name",
+    hint: "FOUNDRY_TRANSLATE.Settings.CzechFonts.Hint",
+    scope: "client", config: true, type: Boolean, default: true,
+    onChange: applyCzechFonts,
   });
 
   game.settings.register(MODULE_ID, SETTINGS.GLOSSARY_CANDIDATES, {

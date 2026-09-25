@@ -563,5 +563,7 @@
   "FOUNDRY_TRANSLATE.Review.ProjectImport": "Editorial import",
   "FOUNDRY_TRANSLATE.Review.CommunityInvalid": "Invalid community translation file (maximum 50 MB).",
   "FOUNDRY_TRANSLATE.Review.CommunitySourceMissing": "The original document is unavailable in this installation",
-  "FOUNDRY_TRANSLATE.Review.CommunitySourceChanged": "The original differs from the community release; nothing was imported"
+  "FOUNDRY_TRANSLATE.Review.CommunitySourceChanged": "The original differs from the community release; nothing was imported",
+  "FOUNDRY_TRANSLATE.Settings.CzechFonts.Name": "Fonts with Czech diacritics",
+  "FOUNDRY_TRANSLATE.Settings.CzechFonts.Hint": "When the interface or translation language is Czech, use Vollkorn for Foundry, Ember and Crucible headings and decorative text. This browser only."
 }

@@ -10,6 +10,7 @@ export const SETTINGS = {
   OPENAI_API_KEY: "openAiApiKey",
   WORLD_CONTEXT: "worldContext",
   AUTO_OPEN_TRANSLATIONS: "autoOpenTranslations",
+  CZECH_FONTS: "czechFonts",
 } as const;
 
 export type ProviderId = "chrome-local" | "google-cloud-basic" | "openai-compatible";
