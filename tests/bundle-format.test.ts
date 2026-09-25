@@ -75,3 +75,18 @@ describe("portable translation format", () => {
     expect(mapped.id).toBe('JournalEntry.a');
   });
 });
+
+it.each(["html", "text", "markdown"] as const)("accepts reference permutations but preserves their multiset in %s", format => {
+  const source = 'First @UUID[Actor.a]{A}, then @UUID[Actor.b]{B}.';
+  const translated = '@UUID[Actor.b]{Béčko} přijde před @UUID[Actor.a]{Ačko}.';
+  expect(() => assertPortableText(source, translated, format)).not.toThrow();
+  for (const invalid of [translated.replace('@UUID[Actor.a]{Ačko}', ''), translated + ' @UUID[Actor.a]', translated.replace('Actor.a', 'Actor.changed')]) {
+    expect(() => assertPortableText(source, invalid, format)).toThrow();
+  }
+});
+it("compares complete embed commands, never a sorted bag of protected fragments", () => {
+  const source = '@Embed[JournalEntry.a caption="First" inline] @Embed[JournalEntry.b caption="Second" cited]';
+  expect(() => assertPortableText(source, '@Embed[JournalEntry.b caption="Druhý" cited] @Embed[JournalEntry.a caption="První" inline]', 'text')).not.toThrow();
+  expect(() => assertPortableText(source, '@Embed[JournalEntry.a caption="První" cited] @Embed[JournalEntry.b caption="Druhý" inline]', 'text')).toThrow();
+  expect(() => assertPortableText('@UUID[Actor.a]{A}', '@UUID[Actor.a]{@Macro[evil]}', 'text')).toThrow();
+});

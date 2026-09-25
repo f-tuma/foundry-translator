@@ -39,8 +39,8 @@ it("protects UUIDs, rolls, URLs and code but finds editable link labels", () => 
   expect(segments.map(segment => segment.text).join(" ")).not.toMatch(/Actor|https:|Embed|\[\[/u);
   const snapshot = view("a"); snapshot.rows[0]!.translation = parts; snapshot.rows[0]!.format = "markdown" as any;
   const hits = searchReviews({ snapshots: [snapshot], skipped: [] }, "Rychlý", false);
-  expect(hits).toHaveLength(3);
-  expect(replaceHits(snapshot.rows[0]!, hits.map(hit => ({ hit, replacement: "Hbitý" })))[0]).toBe('Hbitý @UUID[Actor.Rychly]{Hbitý} @Embed[Actor.Rychly]{Rychlý} [[Rychly]] `Rychlý` [Hbitý](https://Rychly.test)');
+  expect(hits).toHaveLength(4);
+  expect(replaceHits(snapshot.rows[0]!, hits.map(hit => ({ hit, replacement: "Hbitý" })))[0]).toBe('Hbitý @UUID[Actor.Rychly]{Hbitý} @Embed[Actor.Rychly]{Hbitý} [[Rychly]] `Rychlý` [Hbitý](https://Rychly.test)');
 });
 it("skips incomplete pages and keeps blocked results read only", () => {
   const snapshot = view("a"); snapshot.rows.push({ ...row, id: "pending", blocked: "Untranslated" }, { ...row, id: "locked", blocked: "Locked" });

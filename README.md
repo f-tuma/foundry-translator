@@ -2,6 +2,11 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.29.2** lets reviewers move Foundry link markers within a paragraph,
+including across formatted text fragments. Link counts, destinations and command
+options remain protected. Both editors retain unfinished cut/paste drafts and
+allow editing UUID and Embed display labels below the text.
+
 Version **0.29.1** reuses saved translations of embedded journal text pages when
 viewing translated documents, including guides translated later. It also bundles
 Czech-complete Vollkorn fonts for Foundry, Ember and Crucible, with a per-browser

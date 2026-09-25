@@ -1,6 +1,6 @@
 import { GlossaryIntegrityError } from "../glossary/protection";
 
-const FOUNDRY_EXPRESSION =
+export const FOUNDRY_EXPRESSION =
   /@[A-Za-z][A-Za-z0-9]*\[[^\]\r\n]*\](?:\{[^}\r\n]*\})?|\[\[[^\]\r\n]*\]\]/gu;
 const EMBED_EXPRESSION =
   /^@Embed\[(?<config>[^\]\r\n]*)\](?:\{(?<label>[^}\r\n]*)\})?$/iu;

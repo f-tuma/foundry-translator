@@ -1,3 +1,4 @@
+import { FOUNDRY_EXPRESSION } from "../translation/foundry-syntax";
 import type { FieldFormat } from "../bundles/fields";
 
 export interface ReviewTextUnit { id: string; parts: string[]; heading: boolean; attribute?: string }
@@ -55,33 +56,47 @@ export function planReviewText(value: string, format: FieldFormat): ReviewTextPl
   };
 }
 
-const COMMAND = /@[A-Za-z][A-Za-z0-9]*\[[^\]\r\n]*\](?:\{[^}\r\n]*\})?|\[\[[^\]\r\n]*\]\]/gu;
 export interface ReviewReference { marker: string; command: string; label: string; editable: boolean }
+export interface ReviewTextDraft { text: string[]; references: ReviewReference[][] }
+const MARKER = /⟦+[^⟦⟧]*⟧+/gu;
+
+/** Number across the whole paragraph, including its formatted text fragments. */
+export function maskReviewParts(values: readonly string[]): ReviewTextDraft {
+  let number = 0;
+  const literal = values.join("\n");
+  const parts = values.map(value => {
+    const references: ReviewReference[] = [];
+    const text = value.replace(FOUNDRY_EXPRESSION, command => {
+      let marker = `⟦${++number}⟧`;
+      while (literal.includes(marker)) marker = `⟦${marker}⟧`;
+      const match = /^(@(?:UUID|Embed)\[[^\]\r\n]*\])(?:\{([^}\r\n]*)\})?$/iu.exec(command);
+      references.push({ marker, command, label: match?.[2] ?? "", editable: !!match });
+      return marker;
+    });
+    return { text, references };
+  });
+  return { text: parts.map(part => part.text), references: parts.map(part => part.references) };
+}
 /** Friendly link markers keep UUIDs and executable syntax out of the editing surface. */
 export function maskReviewReferences(value: string): { text: string; references: ReviewReference[] } {
-  const references: ReviewReference[] = [];
-  const text = value.replace(COMMAND, command => {
-    let marker = `⟦${references.length + 1}⟧`;
-    while (value.includes(marker)) marker = `⟦${marker}⟧`;
-    const match = /^(@UUID\[[^\]\r\n]*\])(?:\{([^}\r\n]*)\})?$/iu.exec(command);
-    references.push({ marker, command, label: match?.[2] ?? "", editable: !!match });
-    return marker;
-  });
-  return { text, references };
+  const draft = maskReviewParts([value]);
+  return { text: draft.text[0]!, references: draft.references[0]! };
 }
 
-export function restoreReviewReferences(text: string, references: readonly ReviewReference[]): string {
-  let position = -1;
-  for (const reference of references) {
-    const index = text.indexOf(reference.marker);
-    if (index <= position || index < 0 || text.indexOf(reference.marker, index + reference.marker.length) >= 0) throw new Error("Review.ReferenceChanged");
-    position = index;
-  }
-  // Replace in one pass: a label cannot manufacture another reference marker.
+/** Validate complete markers, not substrings or original positions. Restore once,
+ * so labels cannot manufacture another marker or a nested Foundry command. */
+export function restoreReviewParts(draft: ReviewTextDraft): string[] {
+  const references = draft.references.flat();
+  const counts = new Map<string, number>();
+  for (const text of draft.text) for (const [marker] of text.matchAll(MARKER)) counts.set(marker, (counts.get(marker) ?? 0) + 1);
   const replacements = new Map(references.map(reference => {
-    if (/[{}\r\n]/u.test(reference.label)) throw new Error("Review.ReferenceChanged");
+    if (counts.get(reference.marker) !== 1 || /[{}\r\n]|@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(reference.label)) throw new Error("Review.ReferenceChanged");
     const command = reference.editable ? reference.command.replace(/\{[^}\r\n]*\}$/u, "") + (reference.label ? `{${reference.label}}` : "") : reference.command;
     return [reference.marker, command];
   }));
-  return text.replace(/⟦+[^⟦⟧]*⟧+/gu, marker => replacements.get(marker) ?? marker);
+  if (replacements.size !== references.length) throw new Error("Review.ReferenceChanged");
+  return draft.text.map(text => text.replace(MARKER, marker => replacements.get(marker) ?? marker));
+}
+export function restoreReviewReferences(text: string, references: readonly ReviewReference[]): string {
+  return restoreReviewParts({ text: [text], references: [[...references]] })[0]!;
 }

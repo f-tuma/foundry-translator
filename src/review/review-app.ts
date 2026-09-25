@@ -14,7 +14,7 @@ import type { PanelHost } from "./elements";
 import { getTranslatorSettings } from "../settings/settings";
 import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
 import { loadReview, reviewCatalog, updateReview, type ReviewDocument, type ReviewRow, type ReviewSnapshot } from "./service";
-import { maskReviewReferences, restoreReviewReferences } from "./text-plan";
+import { maskReviewParts, restoreReviewParts } from "./text-plan";
 
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Review.${key}`);
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] => {
@@ -275,8 +275,9 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     tr.addEventListener("focusin", () => this.#remember(row)); tr.dataset.fieldId = row.fieldId;
     const original = el("td", "ft-review__original"), translated = el("td", "ft-review__translation"), actions = el("td", "ft-review__actions");
     original.setAttribute("data-label", t("Original")); translated.setAttribute("data-label", t("Translation")); actions.setAttribute("data-label", t("Review"));
-    for (const part of row.source) {
-      const masked = maskReviewReferences(part); const text = el("p", "", masked.text);
+    const source = maskReviewParts(row.source);
+    for (const [index, part] of source.text.entries()) {
+      const masked = { text: part, references: source.references[index]! }; const text = el("p", "", masked.text);
       original.append(text);
       for (const ref of masked.references) original.append(el("small", "ft-review__reference", `${ref.marker} ${ref.label || t("LinkedDocument")}`));
     }
@@ -297,15 +298,20 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
       input.addEventListener("focus", () => { original.querySelectorAll("p").forEach((p, i) => p.classList.toggle("is-focused", i === index)); });
       input.addEventListener("blur", () => { original.querySelectorAll("p").forEach(p => p.classList.remove("is-focused")); });
       translated.append(input);
-      for (const reference of draft.references[index] ?? []) {
+    });
+    if (draft.references.some(parts => parts.length)) {
+      const help = el("div", "ft-review__reference-help");
+      help.innerHTML = renderHelpTooltip(t("ReferenceHelp"), t("LinkLabel")); translated.append(help);
+    }
+    for (const reference of draft.references.flat()) {
         const label = el("label", "ft-review__reference", `${reference.marker} ${t("LinkLabel")}`);
         if (reference.editable) {
-          const name = el("input"); name.type = "text"; name.value = reference.label; name.placeholder = t("AutomaticLabel"); name.disabled = !!row.blocked;
+          const name = el("input"); name.type = "text"; name.value = reference.label; name.placeholder = t("AutomaticLabel"); name.setAttribute("aria-label", `${reference.marker} ${t("LinkLabel")}`); name.disabled = !!row.blocked;
           name.addEventListener("input", () => { reference.label = name.value; changed(); }); label.append(name);
         } else label.append(el("span", "", t("ProtectedCommand")));
         translated.append(label);
-      }
-    });
+    }
+    const validation = el("p", "ft-review__error"); validation.dataset.referenceError = ""; validation.setAttribute("role", "status"); translated.append(validation);
     const status = el("span", "ft-review__badge"); status.dataset.rowStatus = ""; actions.append(status);
     actions.append(button(t("Context"), () => void this.#run(async () => { await this.#contextPanel.load(); this.#contextVisible = true; this.#remember(row); this.#focusRow = row.id; })));
     if (row.editorial?.state && row.editorial.state !== "none") actions.append(el("small", "ft-review__warning", t(row.editorial.state === "discussion" ? "EditorialDiscussion" : "EditorialMeaning")));
@@ -314,7 +320,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     else {
       const save = button(t("Save"), () => void this.#run(async () => {
         const current = this.#drafts.get(row.id); if (!current) return;
-        const parts = current.text.map((text, index) => restoreReviewReferences(text, current.references[index]!));
+        const parts = restoreReviewParts(current);
         this.#snapshot = await updateReview(this.#snapshot!, row.id, { type: "save", parts });
         this.#clearDraft("text", row.id); this.#drafts.delete(row.id); this.#searchPanel.invalidate(true); this.#status(t("Saved"));
       })); save.dataset.reviewSave = "";
@@ -329,13 +335,18 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   }
 
   #updateRowState(tr: HTMLElement, row: ReviewRow): void {
-    const dirty = this.#drafts.has(row.id);
+    const draft = this.#drafts.get(row.id), dirty = !!draft;
+    let invalid = false;
+    if (draft) { try { restoreReviewParts(draft); } catch { invalid = true; } }
+    const error = tr.querySelector<HTMLElement>("[data-reference-error]");
+    if (error) { error.textContent = invalid ? t("ReferenceChanged") : ""; error.hidden = !invalid; }
+    for (const input of tr.querySelectorAll("textarea")) input.setAttribute("aria-invalid", String(invalid));
     tr.classList.toggle("is-dirty", dirty); tr.classList.toggle("is-verified", !!row.verified && !dirty);
     const status = tr.querySelector<HTMLElement>("[data-row-status]")!;
     status.textContent = t(dirty ? "Unsaved" : row.blocked ? "Unavailable" : row.verified ? "Verified" : "NeedsReview");
     status.title = row.verified ? `${row.verified.importedAt ? `${t("ImportedVerification")} · ` : ""}${row.verified.userName} · ${new Date(row.verified.at).toLocaleString()}` : "";
     if (row.verified?.importedAt && !dirty) status.textContent = t("ImportedVerification");
-    const save = tr.querySelector<HTMLButtonElement>("[data-review-save]"); if (save) { save.disabled = !dirty; save.hidden = !dirty; }
+    const save = tr.querySelector<HTMLButtonElement>("[data-review-save]"); if (save) { save.disabled = !dirty || invalid; save.hidden = !dirty; }
     const verify = tr.querySelector<HTMLButtonElement>("[data-review-verify]"); if (verify) { verify.disabled = dirty; verify.title = dirty ? t("SaveFirst") : ""; }
     const discard = tr.querySelector<HTMLButtonElement>("[data-review-discard-row]"); if (discard) discard.hidden = !dirty;
   }

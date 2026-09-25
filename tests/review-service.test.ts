@@ -244,3 +244,18 @@ it("rejects notes when the underlying document changed since opening", async () 
   await expect(updateReview(view, textRow(view).id, { type: "editorial", state: "meaning", note: "note" })).rejects.toThrow("Conflict");
   expect(game.settings.set).not.toHaveBeenCalled();
 });
+it("saves, verifies and undoes reference movement across formatted text fragments", async () => {
+  source.pages[0]!.text!.content = '<p>Meet @UUID[Actor.a]{A} <strong>before</strong> @Embed[JournalEntry.b inline]{B}.</p>';
+  copy.pages[0]!.text!.content = '<p>Potkej @UUID[Actor.a]{Áčko} <strong>před</strong> @Embed[JournalEntry.b inline]{Béčko}.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const original = JSON.stringify(source), before = copy.pages[0]!.text!.content;
+  let view = await snapshot(); const row = textRow(view);
+  view = await saveReviewRows(view, [{ rowId: row.id, parts: ['@Embed[JournalEntry.b inline]{Béčka} potkáš ', 'před', ' @UUID[Actor.a]{Áčkem}.'] }], { id: 'move-links' });
+  expect(textRow(view).blocked).toBeNull();
+  expect(copy.pages[0]!.text!.content).toBe('<p>@Embed[JournalEntry.b inline]{Béčka} potkáš <strong>před</strong> @UUID[Actor.a]{Áčkem}.</p>');
+  view = await updateReview(view, row.id, { type: 'verify' });
+  expect(textRow(view).verified).toBeTruthy();
+  await undoReview(view.entry, 'move-links');
+  expect(copy.pages[0]!.text!.content).toBe(before);
+  expect(JSON.stringify(source)).toBe(original);
+});

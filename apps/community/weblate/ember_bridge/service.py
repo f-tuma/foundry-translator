@@ -243,7 +243,9 @@ def _import_commit(user, json_text, expected, prepared):
         )
         component = Component(
             project=ws.project,
-            name=title[:100],
+            # Visible book titles may repeat. Weblate component names must not.
+            # Bind the internal name to the complete stable document identity.
+            name=f"{title[:32]} · {doc['id']}",
             slug=f"book-{doc['id'][:24]}",
             vcs="local",
             repo="local:",

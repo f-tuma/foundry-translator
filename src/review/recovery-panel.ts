@@ -1,5 +1,5 @@
 import { draftIdentity, recoverText, type LocalReviewDrafts, type SavedDraft } from "./drafts";
-import { restoreReviewReferences } from "./text-plan";
+import { restoreReviewParts } from "./text-plan";
 import { button, diffText, downloadJson, el, t, type PanelHost } from "./elements";
 import { loadReview, reviewCatalog, type ReviewSnapshot } from "./service";
 import { loadUiCatalog, type UiCatalog, type UiRow } from "./ui-catalog";
@@ -20,7 +20,7 @@ export async function previewRecovery(saved: SavedDraft, language: string): Prom
   const sameSource = snapshot.fields.find(field => field.id === row.fieldId)?.source === p.source;
   let draft: string[];
   if (p.kind === "note") draft = [t(p.state === "meaning" ? "EditorialMeaning" : p.state === "discussion" ? "EditorialDiscussion" : "EditorialNone"), p.note];
-  else { try { const text = recoverText(p); draft = text.text.map((part, index) => restoreReviewReferences(part, text.references[index]!)); } catch { draft = p.text; } }
+  else { try { const text = recoverText(p); draft = restoreReviewParts(text); } catch { draft = p.text; } }
   return { saved, snapshot, blocked: !!row.blocked || !sameSource || row.translation.length !== p.baseline.length,
     conflict: !sameSource || JSON.stringify(row.translation) !== JSON.stringify(p.baseline) || (p.kind === "note" && JSON.stringify(row.editorial ?? null) !== JSON.stringify(p.baselineNote)),
     current: p.kind === "note" ? [t(row.editorial?.state === "meaning" ? "EditorialMeaning" : row.editorial?.state === "discussion" ? "EditorialDiscussion" : "EditorialNone"), row.editorial?.note ?? ""] : row.translation,
