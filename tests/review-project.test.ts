@@ -6,6 +6,7 @@ import { journalSourceHash } from "../src/translation/journal";
 import { translatedOutputHash } from "../src/translation/output-hash";
 import { loadReview, reviewCatalog, updateReview } from "../src/review/service";
 import { editorialKey } from "../src/review/editorial";
+import { sha256 } from "../src/translation/hash";
 
 const state = vi.hoisted(() => ({ saved: new Map<string, any>(), writes: 0, serial: 0, afterWrite: null as (() => void) | null }));
 vi.mock("../src/glossary/compendium-repository", () => ({ GlossaryCompendiumRepository: class { async loadExisting() { return []; } async saveEntries() {} } }));
@@ -29,6 +30,15 @@ function pack() {
   } };
 }
 async function snapshot() { return loadReview((await reviewCatalog("cs"))[0]!); }
+async function correctionProject() {
+  const { project } = await exportEditorialProject("cs");
+  project.version = 2;
+  project.baseTranslations = await Promise.all(project.bundle.documents.map(async doc => ({ sourceUuid: doc.sourceUuid,
+    fields: await Promise.all(doc.patches.map(async patch => ({ path: [...patch.path], translationHash: await sha256(patch.translation) }))),
+  })));
+  project.bundle.documents[0]!.patches.find(patch => patch.format === "html")!.translation = '<p>Přečti @UUID[JournalEntry.source]{Průvodce}.</p><p>Více.</p>';
+  return parseEditorialProject(JSON.stringify(project));
+}
 const paragraph = (snapshot: Awaited<ReturnType<typeof loadReview>>) => snapshot.rows.find(row => row.label === "text.content")!;
 beforeEach(async () => {
   sources.clear(); settings.clear(); state.saved.clear(); state.writes = 0; state.serial = 1; state.afterWrite = null;
@@ -44,6 +54,37 @@ beforeEach(async () => {
   state.saved.set("JournalEntry.source", copy);
 });
 afterEach(() => vi.unstubAllGlobals());
+it("imports guarded corrections once, preserves original sources and clears changed verification", async () => {
+  const view = await snapshot(); await updateReview(view, paragraph(view).id, { type: "verify" });
+  const project = await correctionProject(), original = JSON.stringify(sources.get("JournalEntry.source").toObject());
+  let plan = await planEditorialProject(project); expect(plan.documents[0]!.state).toBe("update");
+  expect(plan.documents[0]!.skippedMetadata).toBe(1);
+  const selection = { documents: ["JournalEntry.source"], ui: [], glossary: false };
+  expect((await importEditorialProject(plan, selection)).issues).toEqual([]);
+  expect(paragraph(await snapshot()).translation[0]).toContain("Přečti"); expect(paragraph(await snapshot()).verified).toBeNull();
+  expect(JSON.stringify(sources.get("JournalEntry.source").toObject())).toBe(original);
+  plan = await planEditorialProject(project); expect(plan.documents[0]!.changes).toEqual([]);
+  state.writes = 0; await importEditorialProject(plan, selection); expect(state.writes).toBe(0);
+});
+it("blocks stale corrections including edits to unchanged fields and detects edits after preview", async () => {
+  const project = await correctionProject(), initial = await planEditorialProject(project);
+  // Root name was untouched by AI but is still carried in the document export.
+  state.saved.get("JournalEntry.source").name = "Ručně Opravená Příručka";
+  const plan = await planEditorialProject(project);
+  expect(plan.documents[0]).toMatchObject({ state: "blocked", detail: "Review.ProjectBaselineConflict" });
+  state.writes = 0;
+  await expect(importEditorialProject(initial, { documents: ["JournalEntry.source"], ui: [], glossary: false })).rejects.toThrow("Conflict");
+  expect(state.writes).toBe(0);
+});
+it("requires complete, unique baselines for v2 and refuses silently downgrading guarded projects", async () => {
+  const project = await correctionProject();
+  const missing = structuredClone(project); missing.baseTranslations![0]!.fields.pop();
+  expect(() => parseEditorialProject(JSON.stringify(missing))).toThrow("ProjectInvalid");
+  const duplicate = structuredClone(project); duplicate.baseTranslations![0]!.fields[1] = duplicate.baseTranslations![0]!.fields[0]!;
+  expect(() => parseEditorialProject(JSON.stringify(duplicate))).toThrow("ProjectInvalid");
+  const downgrade = structuredClone(project); downgrade.version = 1;
+  expect(() => parseEditorialProject(JSON.stringify(downgrade))).toThrow("ProjectInvalid");
+});
 it("roundtrips translations, notes and verification across new copy IDs without changing originals; repeat import is a no-op", async () => {
   let view = await snapshot(), row = paragraph(view);
   view = await updateReview(view, row.id, { type: "save", parts: [row.translation[0]!.replace("Čti", "Přečti")] });

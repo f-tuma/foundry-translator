@@ -557,6 +557,7 @@
   "FOUNDRY_TRANSLATE.Review.ImportedVerification": "Imported attestation",
   "FOUNDRY_TRANSLATE.Review.NoteStale": "Note refers to earlier text",
   "FOUNDRY_TRANSLATE.Review.ProjectInvalid": "Invalid project file (maximum 100 MB).",
+  "FOUNDRY_TRANSLATE.Review.ProjectBaselineConflict": "This translation changed since the correction export. Export its current version and review the suggestions again; nothing was overwritten.",
   "FOUNDRY_TRANSLATE.Review.ProjectPartial": "Import stopped. Some changes may already be saved; reopen the file for a fresh preview.",
   "FOUNDRY_TRANSLATE.Review.ProjectPreviewChanged": "A document or editorial record changed after the preview. Reopen the project file; this import made no writes.",
   "FOUNDRY_TRANSLATE.Review.ProjectWriteConflict": "Import stopped because a document or editorial record changed concurrently.",

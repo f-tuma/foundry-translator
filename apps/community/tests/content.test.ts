@@ -85,6 +85,15 @@ function release() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Foundry community bridge", () => {
+  it("does not discard correction baselines through the community import path", () => {
+    const bundle = fixture();
+    const project = { format: "foundry-translate-editorial", version: 2, bundle, reviews: [], ui: [],
+      baseTranslations: bundle.documents.map(doc => ({ sourceUuid: doc.sourceUuid,
+        fields: doc.patches.map(p => ({ path: p.path, translationHash: hash(p.translation) })),
+      })),
+    };
+    expect(() => parseImport(JSON.stringify(project))).toThrow("importujte v editoru Foundry");
+  });
   it("keeps stable paragraph identities across edits and preserves all multi-row replacements", () => {
     const { bundle, units } = setup();
     units[1]!.value = ["Zvěd vyčkává. @UUID[Actor.scout]{Průzkumník}"];

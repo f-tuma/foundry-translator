@@ -11,9 +11,12 @@ export interface PortableReviewMetadata {
   editorial?: { state: EditorialState; note: string; stale: boolean; at: string; userName: string };
 }
 export interface EditorialProject {
-  format: typeof PROJECT_FORMAT; version: 1; bundle: TranslationBundle;
+  format: typeof PROJECT_FORMAT; version: 1 | 2; bundle: TranslationBundle;
   reviews: { sourceUuid: string; rows: PortableReviewMetadata[] }[];
   ui: UiOverride[];
+  /** Version 2 corrections require the exact translation that was exported (or
+   * the already-applied result). Older importers must reject the new version. */
+  baseTranslations?: { sourceUuid: string; fields: { path: (string | number)[]; translationHash: string }[] }[];
 }
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const text = (v: unknown, max = 500): v is string => typeof v === "string" && v.length <= max;
@@ -23,8 +26,28 @@ function requireValue(value: unknown): asserts value { if (!value) throw new Err
 export function parseEditorialProject(json: string): EditorialProject {
   requireValue(new TextEncoder().encode(json).length <= MAX_PROJECT_BYTES);
   const value: unknown = JSON.parse(json);
-  requireValue(record(value) && value.format === PROJECT_FORMAT && value.version === 1);
+  requireValue(record(value) && value.format === PROJECT_FORMAT && (value.version === 1 || value.version === 2));
   const bundle = parseTranslationBundle(JSON.stringify(value.bundle));
+  let baseTranslations: EditorialProject["baseTranslations"];
+  if (value.version === 2) {
+    requireValue(Array.isArray(value.baseTranslations) && value.baseTranslations.length === bundle.documents.length);
+    const seen = new Set<string>();
+    baseTranslations = value.baseTranslations.map(raw => {
+      requireValue(record(raw) && typeof raw.sourceUuid === "string" && !seen.has(raw.sourceUuid)); seen.add(raw.sourceUuid);
+      const doc = bundle.documents.find(doc => doc.sourceUuid === raw.sourceUuid);
+      requireValue(doc && Array.isArray(raw.fields) && raw.fields.length === doc.patches.length);
+      const paths = new Set<string>();
+      const fields = raw.fields.map(field => {
+        requireValue(record(field) && Array.isArray(field.path) && hash(field.translationHash));
+        const key = JSON.stringify(field.path), patch = doc.patches.find(patch => JSON.stringify(patch.path) === key);
+        requireValue(patch && !paths.has(key)); paths.add(key);
+        return { path: [...patch.path], translationHash: field.translationHash as string };
+      });
+      return { sourceUuid: raw.sourceUuid, fields };
+    });
+    // Corrections currently cover document prose only; no unguarded UI changes.
+    requireValue(Array.isArray(value.ui) && value.ui.length === 0);
+  } else requireValue(value.baseTranslations === undefined);
   requireValue(Array.isArray(value.reviews) && value.reviews.length <= bundle.documents.length);
   const sources = new Set(bundle.documents.map(doc => doc.sourceUuid)), seen = new Set<string>(); let rowCount = 0;
   const reviews = value.reviews.map(item => {
@@ -54,5 +77,5 @@ export function parseEditorialProject(json: string): EditorialProject {
     requireValue(raw.verified === undefined || hash(raw.verified));
     return { scope: raw.scope as UiOverride["scope"], key: raw.key, source: raw.source, base: raw.base, value: raw.value, at: raw.at, userName: raw.userName, ...(raw.verified ? { verified: raw.verified as string } : {}) };
   });
-  return { format: PROJECT_FORMAT, version: 1, bundle, reviews, ui };
+  return { format: PROJECT_FORMAT, version: value.version, bundle, reviews, ui, ...(baseTranslations ? { baseTranslations } : {}) };
 }

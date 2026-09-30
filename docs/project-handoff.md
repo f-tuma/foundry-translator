@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-09-25
-- Current code/release metadata: `v0.29.2`; verify publication in GitHub Releases. Prior release `v0.25.0` was PR #29. Production installation is user-managed.
+- Updated: 2026-09-30
+- Current code/release metadata: `v0.30.0`; verify publication in GitHub Releases. Production installation is user-managed.
 - Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,29 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-09-30, local translation polish MCP (`apps/polish-mcp`, 0.1.0): official
+  MCP SDK 2.2, stdio, 11 tools plus a conservative correction prompt. User chose
+  export-based review. It reads only a dedicated input folder, exposes original
+  paragraphs, adjacent excerpts, headings, available linked documents and glossary,
+  and persists unverified proposals with revisions/reasons. Explicit selected IDs
+  produce immutable HTML comparison/audit JSON and a guarded Foundry project v2.
+  Existing v1 projects remain supported. v2 hashes **all** carried translation
+  fields; current text must equal the baseline or already-applied result. Stale
+  imports block, repeated application is a no-op, changed rows lose old proofs.
+  Community 0.3.3 rejects v2 corrections instead of discarding baseline guards.
+  [Workflow and setup](../apps/polish-mcp/README.md).
+- Registered local Codex MCP `foundry-polish`, command `/usr/bin/node`, built entry
+  at `apps/polish-mcp/dist/index.cjs`, workspace `.polish-workspace/` (gitignored).
+  User must provide a fresh export for a real language-quality pilot; no model
+  correction of their current adventure has been performed. Current chat may need
+  MCP reconnection to discover the newly registered server. Production untouched.
+- Validation: 510 module tests (four optional LM tests skipped), 14 community tests,
+  15 MCP tests including a real stdio client/tool roundtrip, build/typecheck and
+  release metadata check. MCP subprocess smoke requires a sandbox that permits
+  spawning Node (this environment returned EPERM until escalated). No new native
+  Weblate/Foundry browser run; regression service tests exercise actual project
+  import, stale-baseline rejection, proof invalidation and repeat no-op behavior.
 
 - 2026-09-25, reference editing (Foundry 0.29.2 / community 0.3.2): whole Foundry
   commands compare as multisets, never sorted protection fragments. The editors

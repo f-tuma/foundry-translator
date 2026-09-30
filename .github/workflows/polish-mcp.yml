@@ -1,0 +1,22 @@
+name: Translation polish MCP
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  polish-mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/polish-mcp/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: apps/polish-mcp
+      - run: npm run check
+        working-directory: apps/polish-mcp
