@@ -557,6 +557,7 @@
   "FOUNDRY_TRANSLATE.Review.ImportedVerification": "Převzaté ověření",
   "FOUNDRY_TRANSLATE.Review.NoteStale": "Poznámka ke staršímu textu",
   "FOUNDRY_TRANSLATE.Review.ProjectInvalid": "Neplatný pracovní soubor (maximum 100 MB).",
+  "FOUNDRY_TRANSLATE.Review.ProjectBaselineConflict": "Překlad se od exportu pro korekturu změnil. Exportuj aktuální verzi a návrhy znovu porovnej; nic se nepřepsalo.",
   "FOUNDRY_TRANSLATE.Review.ProjectPartial": "Import se zastavil. Některé změny již mohou být uložené; otevři soubor znovu pro nový náhled.",
   "FOUNDRY_TRANSLATE.Review.ProjectPreviewChanged": "Od vytvoření náhledu se změnil dokument nebo redakce. Otevři pracovní soubor znovu; import nic nezapsal.",
   "FOUNDRY_TRANSLATE.Review.ProjectWriteConflict": "Import se zastavil kvůli souběžné změně dokumentu nebo redakce.",

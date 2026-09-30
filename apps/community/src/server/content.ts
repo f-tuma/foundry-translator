@@ -37,6 +37,8 @@ export function parseImport(json: string) {
     raw.format === "foundry-translate-editorial"
       ? parseEditorialProject(json)
       : null;
+  if (project?.version === 2)
+    throw new Problem(400, "Korekturní soubor s kontrolou původního překladu importujte v editoru Foundry.");
   const bundle = project?.bundle ?? parseTranslationBundle(json);
   if (bundle.targetLanguage !== "cs")
     throw new Problem(400, "Tato redakce přijímá český překlad.");

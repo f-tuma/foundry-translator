@@ -91,6 +91,23 @@ export async function planEditorialProject(project: EditorialProject): Promise<P
       if (!entry) throw new Error("Review.IdentityChanged");
       const snapshot = await loadReview(entry); result.snapshot = snapshot;
       if (snapshot.warning) throw new Error(`Review.${snapshot.warning}`);
+      if (project.version === 2) {
+        const source = await fromUuid(item.entry.sourceUuid) as PortableDocument, data = source.toObject();
+        const baseline = project.baseTranslations!.find(base => base.sourceUuid === item.entry.sourceUuid)!;
+        for (const patch of item.entry.patches) {
+          const stable = [...patch.path];
+          if (typeof stable[1] === "number") {
+            const member = (data[stable[0]!] as { _id?: string; id?: string }[])[stable[1]];
+            if (!member || !(member._id ?? member.id)) throw new Error("Review.ProjectCoverageConflict");
+            stable[1] = String(member._id ?? member.id);
+          }
+          const current = snapshot.fields.find(field => field.id === JSON.stringify(stable));
+          if (!current) throw new Error("Review.ProjectCoverageConflict");
+          const canonical = remapBundleReferences(current.translation, snapshot.reverse, true);
+          const before = baseline.fields.find(field => JSON.stringify(field.path) === JSON.stringify(patch.path))!;
+          if (canonical !== patch.translation && await sha256(canonical) !== before.translationHash) throw new Error("Review.ProjectBaselineConflict");
+        }
+      }
       for (const row of incoming) {
         const current = snapshot.rows.find(current => current.id === row.id);
         if (!current || current.blocked) throw new Error("Review.ProjectCoverageConflict");

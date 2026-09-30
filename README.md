@@ -2,6 +2,13 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.30.0** adds a separate [local MCP correction workflow](apps/polish-mcp/README.md).
+An MCP-capable assistant reads a private export with English originals, surrounding
+paragraphs, references and the reviewed glossary, then saves unverified suggestions.
+Selected corrections produce a comparison report and a guarded project import:
+changed translations block stale imports, and AI edits never inherit human verification.
+The MCP does not connect to a running Foundry world or run a model itself.
+
 Version **0.29.2** lets reviewers move Foundry link markers within a paragraph,
 including across formatted text fragments. Link counts, destinations and command
 options remain protected. Both editors retain unfinished cut/paste drafts and
