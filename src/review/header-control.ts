@@ -11,6 +11,14 @@ export function openReviewEditor(uuid?: string): void {
   const action = uuid ? editor.openAt(uuid) : editor.render({ force: true });
   void action.catch(error => { logger.warn("Review editor could not be opened.", error); ui.notifications.warn(game.i18n.localize(error instanceof Error && error.message.startsWith("Review.") ? `FOUNDRY_TRANSLATE.${error.message}` : "FOUNDRY_TRANSLATE.Review.TranslationMissing")); });
 }
+export function openReviewProject(): void {
+  if (!game.user?.isGM) return;
+  editor ??= new TranslationReviewApplication();
+  void editor.openProject().catch(error => {
+    logger.warn("Review project could not be opened.", error);
+    ui.notifications.warn(game.i18n.localize(error instanceof Error && error.message.startsWith("Review.") ? `FOUNDRY_TRANSLATE.${error.message}` : "FOUNDRY_TRANSLATE.Review.TranslationMissing"));
+  });
+}
 interface ReviewSheet {
   document?: { uuid?: string; documentName?: string }; entry?: { uuid?: string; documentName?: string };
   pageId?: string; pageIndex?: number; _pages?: { _id?: string }[]; pagesInView?: { dataset?: { pageId?: string } }[];

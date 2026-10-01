@@ -7,8 +7,17 @@ import { ActiveTranslationsApplication } from "../translation/active-translation
 import { BundleApplication } from "../bundles/bundle-app";
 import { TranslationDesk } from "../ui/translation-desk";
 import { applyCzechFonts } from "../ui/czech-fonts";
+import { McpGuideApplication } from "../polish/mcp-guide-app";
+import { DEFAULT_MCP_PATHS, POLISH_MCP_SETTING } from "../polish/mcp-guide";
 
 export function registerSettings(): void {
+  game.settings.register(MODULE_ID, POLISH_MCP_SETTING, {
+    name: "FOUNDRY_TRANSLATE.Mcp.Connection", hint: "FOUNDRY_TRANSLATE.Mcp.PathsHelp", scope: "client", config: false, type: Object, default: DEFAULT_MCP_PATHS,
+  });
+  game.settings.registerMenu(MODULE_ID, "polishMcp", {
+    name: "FOUNDRY_TRANSLATE.Mcp.Title", label: "FOUNDRY_TRANSLATE.Mcp.Title", hint: "FOUNDRY_TRANSLATE.Mcp.Intro",
+    icon: "fa-solid fa-plug", type: McpGuideApplication, restricted: true,
+  });
   game.settings.registerMenu(MODULE_ID, "desk", {
     name: "FOUNDRY_TRANSLATE.Desk.Title", label: "FOUNDRY_TRANSLATE.Desk.Title", hint: "FOUNDRY_TRANSLATE.Desk.Intro",
     icon: "fa-solid fa-language", type: TranslationDesk, restricted: true,

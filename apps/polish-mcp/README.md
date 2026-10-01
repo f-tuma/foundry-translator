@@ -15,6 +15,18 @@ na mezeru. Návrh stále zachovává členění aktuálního překladu, cíle od
 a všechny chráněné části. Po aktualizaci sestav server znovu a obnov jeho
 připojení v MCP klientu.
 
+## Návod přímo ve Foundry
+
+Od Foundry Translate **0.30.2** otevři **Foundry Translate → Korektura přes MCP**.
+Stejné okno je i v nastavení modulu. Obsahuje základní postup, zkratku na export
+a import, cesty k procesu a složce `input/`, konfiguraci pro Codex (`config.toml`)
+nebo jiný klient (JSON) a zadání pro asistenta. Cesty se ukládají pouze jako
+předvolby tohoto prohlížeče; konfiguraci je nutné vložit do MCP klienta.
+
+MCP nemá webovou adresu: jde o lokální proces přes STDIO. Cesty patří počítači
+asistenta, nikoli serveru Foundry. Okno nepotvrzuje stav připojení ani neověřuje
+instalaci. Přístup do živého světa není potřeba.
+
 ## Spuštění
 
 Vyžaduje Node.js 22.12+ a tento repozitář. Z kořene repozitáře:
@@ -40,7 +52,7 @@ Pro jiného klienta použij stejný příkaz `node` a argumenty jako stdio serve
 
 ## Práce s překladem
 
-1. V **Foundry Translate → Editor překladu → Projekt** exportuj aktuální pracovní
+1. V **Foundry Translate → Editor překladu → Pracovní soubor** exportuj aktuální pracovní
    soubor JSON. Podporován je i soukromý balíček překladů; pracovní soubor navíc
    zachová poznámky a platná ověření u nezměněných odstavců.
 2. Vlož export do `input/` zvoleného pracovního adresáře. Pro související kontext
@@ -60,7 +72,7 @@ Pro jiného klienta použij stejný příkaz `node` a argumenty jako stdio serve
    - `review.html`: původní angličtina, současná čeština, návrh, důvod a upozornění;
    - `suggestions.json`: audit změn včetně textu před úpravou;
    - `corrections.json`: pracovní soubor pro import v editoru Foundry.
-6. Ve **Foundry Translate 0.30.0+** otevři **Editor překladu → Projekt → Import**,
+6. Ve **Foundry Translate 0.30.0+** otevři **Editor překladu → Pracovní soubor → Import**,
    porovnej náhled a zvol dokumenty. Potvrzení „ověřeno“ proveď samostatně.
 
 ## Co se kontroluje
