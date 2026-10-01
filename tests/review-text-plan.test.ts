@@ -25,6 +25,16 @@ it("aligns structural addresses regardless of paragraph length and escapes typed
   expect(edited).toContain('&lt;img');
   expect(edited).not.toContain('<img');
 });
+it("merges entity text boundaries while preserving inline element boundaries", () => {
+  const source = '<p>A &amp; B meet <strong>Swift</strong> near the bridge.</p>';
+  const translated = '<p>A a B potkají <strong>Rychlého</strong> u mostu.</p>';
+  expect(() => assertPortableText(source, translated, "html")).not.toThrow();
+  const sourcePlan = planReviewText(source, "html"), targetPlan = planReviewText(translated, "html");
+  expect(sourcePlan.units[0]!.parts).toEqual(['A & B meet ', 'Swift', ' near the bridge.']);
+  expect(sourcePlan.units.map(u => [u.id, u.parts.length])).toEqual(targetPlan.units.map(u => [u.id, u.parts.length]));
+  expect(() => assertPortableText(source, translated.replace('<strong>', '<em>').replace('</strong>', '</em>'), "html")).toThrow();
+  expect(() => assertPortableText('<code>A &amp; B</code>', '<code>A a B</code>', "html")).toThrow();
+});
 it("masks references, edits display labels and preserves UUIDs and rolls", () => {
   const masked = maskReviewReferences('Meet @UUID[Actor.swift]{Swift}, then [[/r 1d6]].');
   expect(masked.text).toBe('Meet ⟦1⟧, then ⟦2⟧.');

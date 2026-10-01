@@ -9,6 +9,12 @@ v Codexu. Server nepotřebuje API klíč, LM Studio ani otevřený síťový por
 Text vrácený nástroji dostává připojený model; lokální MCP tedy samo o sobě
 neznamená, že inference probíhá lokálně.
 
+Verze 0.1.1 sjednocuje čtení HTML entit s prohlížečem a umožňuje načíst
+odstavce, ve kterých se oddělovací čárka mezi zvýrazněnými výrazy přeložila
+na mezeru. Návrh stále zachovává členění aktuálního překladu, cíle odkazů
+a všechny chráněné části. Po aktualizaci sestav server znovu a obnov jeho
+připojení v MCP klientu.
+
 ## Spuštění
 
 Vyžaduje Node.js 22.12+ a tento repozitář. Z kořene repozitáře:

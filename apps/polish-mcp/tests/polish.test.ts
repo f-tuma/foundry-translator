@@ -104,8 +104,29 @@ it("does not overwrite another MCP client's saved proposals", async () => {
   expect(workspace.current().suggestions.map(s => s.id)).toContain(first.id);
   expect(workspace.status().suggestions).toBe(2);
 });
-it("rejects public releases without originals and unaligned or mechanically altered exports", () => {
+it("rejects public releases without originals or mechanically altered exports", () => {
   expect(() => new PolishContent(JSON.stringify({ format: "foundry-translate-community" }))).toThrow("English source");
   const f = fixture(); f.documents[0]!.patches[2]!.translation = f.documents[0]!.patches[2]!.translation.replace("<strong>", "<em>").replace("</strong>", "</em>");
   expect(() => new PolishContent(JSON.stringify(f))).toThrow("HTML structure");
+});
+it("aligns paragraphs when a translated inline separator becomes whitespace", () => {
+  const f = fixture(), patch = f.documents[0]!.patches[2]!;
+  patch.source = '<p>Read <strong>one</strong>, <strong>two</strong>.</p>';
+  patch.translation = '<p>Čti <strong>jedna</strong> <strong>dva</strong>.</p>';
+  const content = new PolishContent(JSON.stringify(f)), unit = content.units.find(u => u.translation[0] === 'Čti ')!;
+  const context = content.context(unit.id, 0);
+  expect(context.source).toHaveLength(5);
+  expect(context.translation).toHaveLength(4);
+  const s = content.propose({ unitId: unit.id, revision: unit.revision, text: ['Čti ', 'první', 'druhé', '.'], labels: [], reason: 'Oprava českých tvarů.', category: 'grammar' });
+  expect(content.export([s]).bundle.documents[0]!.patches[2]!.translation).toBe('<p>Čti <strong>první</strong> <strong>druhé</strong>.</p>');
+  expect(() => content.propose({ unitId: unit.id, revision: unit.revision, text: ['Čti ', 'první', ', ', 'druhé', '.'], labels: [], reason: 'Přidaný fragment.', category: 'grammar' })).toThrow('formatted parts');
+});
+it("indexes and corrects source entities without manufacturing extra formatted parts", () => {
+  const f = fixture(), patch = f.documents[0]!.patches[2]!;
+  patch.source = '<p>The scout &amp; the travellers arrived.</p>';
+  patch.translation = '<p>Zvěd i poutníci dorazil.</p>';
+  const content = new PolishContent(JSON.stringify(f)), unit = content.units.find(u => u.translation[0]?.includes('dorazil'))!;
+  expect(content.context(unit.id, 0).source).toEqual(['The scout & the travellers arrived.']);
+  const s = content.propose({ unitId: unit.id, revision: unit.revision, text: ['Zvěd i poutníci dorazili.'], labels: [], reason: 'Shoda podmětu a přísudku.', category: 'grammar' });
+  expect(content.export([s]).bundle.documents[0]!.patches[2]!.translation).toBe('<p>Zvěd i poutníci dorazili.</p>');
 });

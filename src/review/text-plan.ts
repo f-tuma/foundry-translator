@@ -19,6 +19,9 @@ export function planReviewText(value: string, format: FieldFormat): ReviewTextPl
   };
   const template = document.createElement("template");
   template.innerHTML = value;
+  // Keep paragraph parts/addresses identical in native and inert server DOMs.
+  // linkedom otherwise splits e.g. A &amp; B into several adjacent Text nodes.
+  template.content.normalize();
   const groups = new Map<string, { unit: ReviewTextUnit; setters: ((value: string) => void)[] }>();
   const address = new Map<Node, string>();
   const visit = (node: Node, path: string): void => {

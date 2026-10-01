@@ -49,7 +49,11 @@ export class PolishContent {
     doc.patches.forEach((patch, fieldIndex) => {
       assertPortableText(patch.source, patch.translation, patch.format);
       const source = planReviewText(patch.source, patch.format), target = planReviewText(patch.translation, patch.format);
-      if (!same(source.units.map(u => [u.id, u.parts.length]), target.units.map(u => [u.id, u.parts.length])))
+      // Align paragraphs by structural address, not by the number of prose
+      // fragments. A translated comma between inline elements may be a space;
+      // the review planner omits whitespace-only parts. Edits still retain the
+      // target's complete part layout and pass the shared HTML validator.
+      if (!same(source.units.map(u => u.id), target.units.map(u => u.id)))
         throw new Error(`Unaligned paragraphs in ${doc.sourceName}: ${JSON.stringify(patch.path)}`);
       const pageIndex = patch.path[0] === "pages" ? patch.path[1] : null;
       const section = doc.patches.find(p => same(p.path, ["pages", pageIndex, "name"]))?.translation ?? patch.path.join(".");

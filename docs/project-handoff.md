@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
-- Updated: 2026-09-30
-- Current code/release metadata: `v0.30.0`; verify publication in GitHub Releases. Production installation is user-managed.
+- Updated: 2026-10-01
+- Current code/release metadata: `v0.30.1`; verify publication in GitHub Releases. Production installation is user-managed.
 - Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,25 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-10-01, real export pilot: user's private translation bundle contains 1,805
+  documents, 29,398 review units and 776 glossary entries. Complete Players' and
+  Gamemaster's Guide documents are absent; references to them are present. Ten
+  contextual correction proposals are saved privately under `.polish-workspace/`,
+  with a separate comparison preview in `pilot-2026-10-01/`. Original export and
+  production remain untouched; no correction import was prepared or approved.
+  A second wording variant exists for one proposal; the preview JSON identifies
+  the ten recommended IDs. Next step: user selects proposal numbers, then MCP
+  `export_corrections` builds the guarded import. Do not treat proposals as proofs.
+- Real input exposed two server/parser assumptions: linkedom splits entities into
+  adjacent Text nodes (131 falsely rejected fields), and inline punctuation can
+  translate to whitespace (17 fields had different nonblank part counts). Shared
+  HTML validation/review planning now normalize adjacent nodes. MCP aligns units
+  by paragraph address while proposals preserve the target's own part layout.
+  Whole-field HTML/reference validation still runs. The full export loads without
+  changing its bytes or dropping documents. Native browser planning already merges
+  entity text nodes. Validation: 511 module tests, four optional LM tests skipped;
+  17 MCP tests including a real stdio roundtrip; build and typecheck passed.
 
 - 2026-09-30, local translation polish MCP (`apps/polish-mcp`, 0.1.0): official
   MCP SDK 2.2, stdio, 11 tools plus a conservative correction prompt. User chose
@@ -25,9 +44,9 @@ and the recommended implementation order.
   [Workflow and setup](../apps/polish-mcp/README.md).
 - Registered local Codex MCP `foundry-polish`, command `/usr/bin/node`, built entry
   at `apps/polish-mcp/dist/index.cjs`, workspace `.polish-workspace/` (gitignored).
-  User must provide a fresh export for a real language-quality pilot; no model
-  correction of their current adventure has been performed. Current chat may need
-  MCP reconnection to discover the newly registered server. Production untouched.
+  Real language-quality pilot supplied on 2026-10-01 (see above). Current chat may
+  need MCP reconnection after rebuilding; a fresh official SDK stdio client was
+  used for the pilot because the existing process retained old code. Production untouched.
 - Validation: 510 module tests (four optional LM tests skipped), 14 community tests,
   15 MCP tests including a real stdio client/tool roundtrip, build/typecheck and
   release metadata check. MCP subprocess smoke requires a sandbox that permits
