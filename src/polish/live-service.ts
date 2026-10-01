@@ -6,13 +6,28 @@ import { diagnosePortableText } from "../bundles/format";
 import { loadReview, portableReviewText, readReviewHistory, reviewCatalog, saveReviewRows, undoReview, validateReviewCorrection, type ReviewSnapshot } from "../review/service";
 import { displayParts, findTextMatches } from "../review/search";
 import { maskReviewParts } from "../review/text-plan";
-import { referenceRepairDraft } from "../review/reference-repair";
+import { referenceRepairDraft, type ReferenceRepairDraft } from "../review/reference-repair";
 import { correctionParts, correctionWarnings, sourceNumberRepair } from "./quality-guards";
 import { parseLiveRequest, type LiveResult } from "./live-protocol";
 
 const page = <T>(items: T[], offset: number, limit: number) => ({ total: items.length, items: items.slice(offset, offset + limit), nextOffset: offset + limit < items.length ? offset + limit : null });
 const excerpt = (row: ReviewSnapshot["rows"][number]) => ({ id: row.id, group: row.group, label: row.label, heading: row.heading,
   source: displayParts(row.source).slice(0, 600), translation: displayParts(row.translation).slice(0, 600), blocked: row.blocked, verified: !!row.verified });
+
+/** Only resolve targets derived from the source and the already-bound parent.
+ * No caller-supplied UUIDs or extra document contents are exposed. */
+async function repairTargets(draft: ReferenceRepairDraft | null | undefined) {
+  const targets: { marker: string; target: string; exists: boolean }[] = [];
+  for (const change of draft?.targetChanges ?? []) {
+    const target = /^@UUID\[([^\]]+)\]/u.exec(change.after)![1]!.split("#")[0]!;
+    const kind = /\.(Item|JournalEntryPage)\.[^.]+$/u.exec(target)?.[1];
+    let exists = false;
+    try { const document = await fromUuid(target); exists = document?.uuid === target && document.documentName === kind; }
+    catch { /* Missing/inaccessible targets cannot be restored safely. */ }
+    targets.push({ marker: change.marker, target, exists });
+  }
+  return targets;
+}
 
 /** One explicit browser pairing grants access only to this world's translated
  * text allowlist. No arbitrary UUID reads, original updates, macros or eval. */
@@ -91,8 +106,11 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         const draft = maskReviewParts(row.translation);
         const integrityDetails = field.integrity ?? diagnosePortableText(field.source, portableReviewText(snapshot, field, field.translation), field.format);
         const integrity = integrityDetails?.message ?? null;
+        const repair = referenceRepairDraft(snapshot, row), targets = await repairTargets(repair);
+        check();
         return { ok: true, value: { documentId, rowId, revision, fieldId, section: snapshot.groups.find(group => group.id === row.group)?.name,
-          format: row.format, source: row.source, translation: row.translation, edit: draft, referenceRepairEdit: referenceRepairDraft(snapshot, row), nearby,
+          format: row.format, source: row.source, translation: row.translation, edit: draft,
+          referenceRepairEdit: targets.every(target => target.exists) ? repair : null, referenceRepairTargets: targets, nearby,
           headings: siblings.slice(0, index + 1).filter(item => item.heading).slice(-4).map(excerpt),
           glossary: terms.slice(0, 60).map(({ id: _, sourceUuid: __, ...g }) => ({ ...g, rule: g.mode === "inflect" ? "INFLECT" : "EXACT" })), glossaryMatches: terms.length,
           relatedDocuments: catalog.filter(candidate => candidate.uuid !== entry.uuid && draft.references.flat().some(ref => ref.command.includes(candidate.uuid) || ref.command.includes(candidate.sourceUuid)))
@@ -113,13 +131,17 @@ export function createLiveHandler(language: string, connected: () => boolean) {
       if (revision !== args.revision) throw new Error("Review.Conflict");
       const repair = args.restoreSourceReferences ? referenceRepairDraft(snapshot, row) : undefined;
       if (args.restoreSourceReferences && !repair) throw new Error("Live.InvalidReferenceRepair");
+      const targets = await repairTargets(repair);
+      check();
+      if (targets.some(target => !target.exists)) throw new Error("Live.ReferenceTargetMissing");
       const parts = correctionParts(row.translation, args.text!, args.labels ?? [], repair ?? undefined);
       validateReviewCorrection(snapshot, row.id, parts, undefined, !!args.restoreSourceReferences);
       const warnings = correctionWarnings(row.translation, parts, glossary);
       const numberRepair = sourceNumberRepair(row.source, row.translation, parts);
       if (args.restoreSourceNumbers && !numberRepair.allowed) throw new Error("Live.InvalidNumberRepair");
       if (request.method === "validate_correction") return { ok: true, value: { documentId, rowId, revision, before: row.translation, after: parts, warnings,
-        numberRepair: { ...numberRepair, requested: !!args.restoreSourceNumbers }, willVerify: false } };
+        numberRepair: { ...numberRepair, requested: !!args.restoreSourceNumbers },
+        referenceRepair: { requested: !!args.restoreSourceReferences, targetChanges: repair?.targetChanges ?? [], targets }, willVerify: false } };
       if (warnings.some(warning => warning.startsWith("Numbers changed")) && !args.restoreSourceNumbers) throw new Error("Live.NumbersChanged");
       if (JSON.stringify(parts) === JSON.stringify(row.translation)) throw new Error("Live.NoChange");
       if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict");
