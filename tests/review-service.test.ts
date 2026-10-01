@@ -330,3 +330,82 @@ it('aligns source/target paragraphs when an inline comma becomes whitespace with
   const saved = await saveReviewRows(s, [{ rowId: row.id, parts: ['Zdravím ', 'hrdino', 'příteli', '.'] }]);
   expect(saved.rows.find(r => r.id === row.id)?.blocked).toBeNull();
 });
+
+it('MCP explicitly restores wrong chapter numbers only to the complete source multiset, with history and retry binding', async () => {
+  source.pages[0]!.text!.content = '<p>Unlike Chapter 2, Chapter 3 quests can occur simultaneously.</p>';
+  copy.pages[0]!.text!.content = '<p>Na rozdíl od 3. kapitoly mohou úkoly probíhat současně.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), text = ['Na rozdíl od 2. kapitoly mohou úkoly 3. kapitoly probíhat současně.'];
+  const args = { ...f.args, text, restoreSourceNumbers: true, reason: 'Originál rozlišuje kapitoly 2 a 3; překlad nesprávně obsahoval jen 3.' };
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true, value: { numberRepair: { allowed: true, requested: true, source: ['2', '3'], before: ['3'], after: ['2', '3'] } } });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('save_correction', { ...args, restoreSourceNumbers: false })).toMatchObject({ ok: false, error: { code: 'Live.NumbersChanged' } });
+  expect(await f.call('save_correction', { ...args, text: ['Kapitoly 2 a 4.'] })).toMatchObject({ ok: false, error: { code: 'Live.InvalidNumberRepair' } });
+  expect(writes).toHaveLength(0);
+  const original = JSON.stringify(source);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toContain(text[0]);
+  expect(JSON.stringify(source)).toBe(original);
+  expect(readReviewHistory(copy.flags)[0]?.label).toContain(args.reason);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(await f.call('save_correction', { ...args, restoreSourceNumbers: false })).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+});
+
+it('MCP cannot use source-number repair to change correct quantities or executable rolls', async () => {
+  source.pages[0]!.text!.content = '<p>Damage 3. [[/r 2d6]]</p>';
+  copy.pages[0]!.text!.content = '<p>Poškození 3. [[/r 2d6]]</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture();
+  expect(await f.call('save_correction', { ...f.args, restoreSourceNumbers: true, text: ['Poškození činí 4. ⟦1⟧'] })).toMatchObject({ ok: false, error: { code: 'Live.InvalidNumberRepair' } });
+  expect(await f.call('save_correction', { ...f.args, restoreSourceNumbers: true, text: ['Poškození činí 3. [[/r 3d6]]'] })).toMatchObject({ ok: false, error: { code: 'Review.ReferenceChanged' } });
+  expect(writes).toHaveLength(0);
+});
+
+it('MCP reports exact field integrity differences without unblocking or writing damaged fields', async () => {
+  source.pages[0]!.text!.content = '<p>@UUID[Actor.a] @UUID[Actor.a]</p>';
+  copy.pages[0]!.text!.content = '<p class="changed">@UUID[Actor.b]</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture();
+  const context = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id });
+  expect(context).toMatchObject({ ok: true, value: { blocked: 'StructureChanged', integrityDetails: {
+    commands: { missing: [{ command: '@UUID[Actor.a]', count: 2 }], extra: [{ command: '@UUID[Actor.b]', count: 1 }] },
+    markup: expect.arrayContaining([expect.objectContaining({ path: expect.stringContaining('html/'), translation: ['class', 'changed'] })]) } } });
+  expect(await f.call('save_correction', { ...f.args, text: ['⟦1⟧ Oprava.'] })).toMatchObject({ ok: false, error: { code: 'Review.StructureChanged' } });
+  expect(writes).toHaveLength(0);
+});
+
+it('MCP deliberately restores a missing source reference, unblocks the field, preserves mechanics and safely undoes', async () => {
+  source.pages[0]!.text!.content = '<p>The device has AC 20 and a &reference[damage threshold] of 10.</p><p>Next paragraph.</p>';
+  copy.pages[0]!.text!.content = '<p>Zařízení má AC 20 a práh poškození 10.</p><p>Další odstavec.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), original = JSON.stringify(source);
+  const context = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id });
+  expect(context).toMatchObject({ ok: true, value: { blocked: 'StructureChanged', referenceRepairEdit: {
+    text: ['Zařízení má AC 20 a práh poškození 10.'], references: [[{ marker: '⟦1⟧', command: '&reference[damage threshold]', editable: false }]] } } });
+  const args = { ...f.args, restoreSourceReferences: true, text: ['Zařízení má AC 20 a ⟦1⟧ ve výši 10.'], reason: 'Obnova vynechaného původního příkazu pravidla, čísla beze změny.' };
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('save_correction', { ...args, text: ['Zařízení má AC 20 a ⟦1⟧ ⟦1⟧ ve výši 10.'] })).toMatchObject({ ok: false, error: { code: 'Review.ReferenceChanged' } });
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(textRow(await snapshot()).blocked).toBeNull();
+  expect(copy.pages[0]!.text!.content).toContain('&amp;reference[damage threshold]');
+  expect(readReviewHistory(copy.flags)[0]?.referenceRepair).toBe(true);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: args.operationId })).toMatchObject({ ok: true, value: { undone: true } });
+  expect(copy.pages[0]!.text!.content).toBe('<p>Zařízení má AC 20 a práh poškození 10.</p><p>Další odstavec.</p>');
+  expect(textRow(await snapshot()).blocked).toBe('StructureChanged');
+  expect(JSON.stringify(source)).toBe(original);
+});
+
+it('MCP does not offer source-reference repair for changed destinations or damaged markup', async () => {
+  source.pages[0]!.text!.content = '<p>@UUID[Actor.a]</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  for (const invalid of ['<p>@UUID[Actor.b]</p>', '<p class="wrong">Chybí.</p>']) {
+    copy.pages[0]!.text!.content = invalid;
+    const f = await liveFixture();
+    const context = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id });
+    expect(context).toMatchObject({ ok: true, value: { referenceRepairEdit: null } });
+    expect(await f.call('save_correction', { ...f.args, restoreSourceReferences: true, text: ['⟦1⟧'] })).toMatchObject({ ok: false, error: { code: 'Live.InvalidReferenceRepair' } });
+  }
+  expect(writes).toHaveLength(0);
+});

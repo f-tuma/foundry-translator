@@ -120,3 +120,24 @@ it("opens the working file from MCP but refuses to interrupt unsaved text or a r
   finish(); await vi.waitFor(() => expect(app.element.querySelector('textarea')!.disabled).toBe(false));
   await app.openProject(); expect(app.element.textContent).toContain('Review.ProjectNotice');
 });
+
+it("bounds large sections, searches all pages, retains off-page drafts and opens a bookmark on its page", async () => {
+  const { app, Event, snapshot } = await fixture();
+  for (let i = 0; i < 220; i++) snapshot.rows.push({ ...snapshot.rows[0]!, id: `large-${i}`, source: [`Passage ${i}`], translation: [`Pasáž ${i}`] });
+  await app.render(true);
+  expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
+  const input = app.element.querySelector('textarea')!; input.value = 'Rozepsáno mimo stránku'; input.dispatchEvent(new Event('input'));
+  app.element.querySelector<HTMLButtonElement>('[data-review-next-page]')!.click();
+  expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
+  expect(app.element.querySelector('textarea')!.value).not.toBe('Rozepsáno mimo stránku');
+  const search = app.element.querySelector<HTMLInputElement>('input[type=search]')!;
+  search.value = 'Pasáž 219'; search.dispatchEvent(new Event('input'));
+  await vi.waitFor(() => expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(1));
+  expect(app.element.querySelector('textarea')!.value).toBe('Pasáž 219');
+  search.value = ''; search.dispatchEvent(new Event('input'));
+  await vi.waitFor(() => expect(app.element.querySelector('textarea')!.value).toBe('Rozepsáno mimo stránku'));
+  app.element.querySelector<HTMLButtonElement>('[data-review-discard]')!.click();
+  await app.openAt(snapshot.entry.uuid, 'document', 'large-219');
+  expect(app.element.querySelector('[data-review-row="large-219"]')).toBeTruthy();
+  expect(app.element.querySelectorAll('[data-review-row]').length).toBeLessThanOrEqual(50);
+});

@@ -58,7 +58,7 @@ Kontext zahrnuje originál, okolní odstavce, glosář a související dostupné
 Odkazy lze přesouvat uvnitř odstavce, jejich cíle a chráněné části zůstanou zachované.
 
 Překlad musí být dokončený nebo pozastavený před korekturou. Změněné UUID,
-parametry příkazů, HTML struktura či číselné hodnoty se odmítnou. Každá oprava
+parametry příkazů, HTML struktura či číselné hodnoty se běžně odmítnou. Každá oprava
 má `operationId`. Po ztracené odpovědi nejprve zkontroluj `live_list_history`:
 zápis mohl být dokončen. Most zápisy automaticky neopakuje. Ruční opakování se
 stejným ID a přesně stejnými argumenty nevytvoří další změnu. Konflikt vyžaduje
@@ -68,6 +68,33 @@ nové načtení kontextu; nelze slepě použít starou revizi.
 `nextOffset`. Deterministické kontroly nezaručují správnost významu, kterou
 posuzuje člověk. Foundry neposkytuje serverové compare-and-swap; souběžný zápis
 jiného GM ve stejném okamžiku nelze plně vyloučit. Používej jednoho zapisujícího GM.
+
+### Diagnostika a řízené opravy od 0.32.1 / MCP 0.3.1
+
+`live_get_context` vrací také `integrityDetails`: chybějící a nadbytečné chráněné
+příkazy s počty výskytů a cesty změněné HTML struktury či atributů. Diagnostika
+je omezená velikostí; příznak zkrácení neznamená úplný seznam problémů.
+
+Pokud originál obsahuje číslice, které překlad změnil nebo vynechal, lze v náhledu
+a zápisu výslovně použít `restoreSourceNumbers: true`. Povolí se pouze oprava,
+která vrátí celý soubor číselných hodnot dané pasáže na hodnoty originálu, včetně
+počtu opakování. Čísla v chráněných příkazech se tím měnit nesmějí. Kontrola
+neposuzuje slovně zapsaná čísla ani jejich přiřazení k významu věty; to stále
+musí ověřit agent podle kontextu.
+
+U pole, kde chybějí pouze původní chráněné příkazy, může kontext nabídnout
+`referenceRepairEdit`. Obsahuje stávající editovatelný text a přesné chybějící
+příkazy z originálu jako nové značky. Agent značky umístí do správné části věty
+a použije `restoreSourceReferences: true` v náhledu i zápisu. Značky nelze
+vynechat, zdvojit ani změnit jejich cíle. Výsledné celé pole musí odpovídat
+struktuře a příkazům originálu; pokud chybí odkazy i v jiné pasáži téhož pole,
+jedna oprava nestačí a zápis zůstane zablokovaný. Změněný cíl, nadbytečný příkaz,
+poškozené HTML nebo neúplná diagnostika tuto možnost vůbec nenabídnou.
+
+Obě opravy vyžadují aktuální revizi a důvod, ukládají se do stejné historie
+a zůstávají neověřené. Lze je vrátit; vrácení obnovy odkazu může znovu zablokovat
+původně poškozené pole. Po aktualizaci modulu zkopíruj nový MCP JSON a restartuj
+MCP klienta, aby použil odpovídající verzi mostu.
 
 Most poslouchá pouze na 127.0.0.1, ověřuje Host i přesný Origin a API klíč.
 Token pro konkrétní relaci je pouze v paměti. Po timeoutu se relace ukončí;

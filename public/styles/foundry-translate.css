@@ -1358,3 +1358,11 @@ body.ft-czech-fonts :is(.application, .app, .ember, .crucible, .journal-entry-pa
 .ft-mcp__key .ft-mcp__renew { margin-left: auto; width: 28px; min-height: 28px; padding: 4px; }
 .ft-mcp__key .ft-mcp__renew i { margin: 0; }
 .ft-mcp details > .ft-field { margin-top: 8px; }
+
+.ft-review__pagination { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 16px 8px; border-top: 1px solid var(--ft-color-border); }
+.ft-review__pagination button { width: auto; }
+.ft-review__pagination span { color: var(--ft-color-text-muted); font-size: 12px; }
+
+.ft-editorial__integrity { margin: 12px 0; color: var(--ft-color-text-muted); }
+.ft-editorial__integrity summary { cursor: pointer; padding: 8px 0; }
+.ft-editorial__integrity pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; max-height: 180px; overflow: auto; }

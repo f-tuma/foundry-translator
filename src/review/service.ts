@@ -4,7 +4,7 @@ import { hasManualOutputEdits } from "../translation/output-hash";
 import { isEditorProtected, readEditorProtection, recordEditorProtection } from "../translation/editor-protection";
 import { MODULE_ID } from "../constants";
 import { portableFields, type BundleDocumentKind, type FieldFormat, type PortableDocument } from "../bundles/fields";
-import { assertPortableText } from "../bundles/format";
+import { assertPortableText, diagnosePortableText, type PortableTextDiagnostics } from "../bundles/format";
 import { remapBundleReferences } from "../bundles/service";
 import { ACTOR_TRANSLATIONS_PACK_ID } from "../translation/compendium-actor-translation-repository";
 import { ITEM_TRANSLATIONS_PACK_ID } from "../translation/compendium-item-translation-repository";
@@ -37,7 +37,7 @@ export interface ReviewRow {
 }
 export interface ReviewField {
   id: string; source: string; translation: string; format: FieldFormat; targetPath: HtmlFieldPath; displayPlain: boolean;
-  referenceContext?: string;
+  referenceContext?: string; integrity?: PortableTextDiagnostics | null;
 }
 export interface ReviewSnapshot {
   entry: ReviewDocument; sourceName: string; rows: ReviewRow[]; fields: ReviewField[];
@@ -153,14 +153,15 @@ export async function loadReview(entry: ReviewDocument, knownCatalog?: ReviewDoc
     if (typeof translated !== "string") { translated = ""; blocked ??= "MissingField"; }
     const translation = translated as string;
     const context = referenceContext(current.sourceUuid, data, field.path);
-    try { assertPortableText(original, sourceReferenceNotation(original, remapBundleReferences(translation, reverse), context), field.format); }
-    catch { blocked ??= "StructureChanged"; }
+    const integrity = diagnosePortableText(original, sourceReferenceNotation(original, remapBundleReferences(translation, reverse), context), field.format);
+    if (integrity) blocked ??= "StructureChanged";
     const originalPlan = planReviewText(original, field.format), translatedPlan = planReviewText(translation, field.format);
     const labelPath = embedded ? field.path.slice(2) : field.path;
     const label = labelPath.join(".");
-    snapshot.fields.push({ id: fieldId, source: original, translation, format: field.format, targetPath: target, displayPlain: !!display && field.format === "text", referenceContext: context });
+    snapshot.fields.push({ id: fieldId, source: original, translation, format: field.format, targetPath: target, displayPlain: !!display && field.format === "text", referenceContext: context, integrity });
+    const translatedUnits = new Map(translatedPlan.units.map(unit => [unit.id, unit]));
     for (const unit of originalPlan.units) {
-      const translatedUnit = translatedPlan.units.find(candidate => candidate.id === unit.id);
+      const translatedUnit = translatedUnits.get(unit.id);
       const parts = translatedUnit?.parts ?? [translation];
       // Whitespace-only prose parts are omitted by the planner. Source and
       // translation may therefore have different part counts despite identical
@@ -278,6 +279,7 @@ export async function importReviewMetadata(snapshot: ReviewSnapshot, records: Po
 export interface ReviewHistoryEntry {
   id: string; at: string; userName: string; sourceHash: string; label: string;
   agentRequestHash?: string;
+  referenceRepair?: true;
   rows: { rowId: string; before: string[]; after: string[]; label: string; group: string }[];
   undoneAt?: string;
 }
@@ -298,7 +300,7 @@ export async function reviewHistory(language: string): Promise<ReviewHistoryDocu
 
 /** Compile only schema-allowed text updates. One document update includes its embedded
  * changes and undo record, so a lost response can be resolved from persistent history. */
-export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; canWrite?: () => boolean } = {}): Promise<ReviewSnapshot> {
+export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; canWrite?: () => boolean } = {}): Promise<ReviewSnapshot> {
   gmOnly();
   if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   const fresh = await loadReview(snapshot.entry);
@@ -309,23 +311,28 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   const target = await pack.getDocument(fresh.entry.id) as WritableReviewDocument | undefined;
   if (!target) fail("Conflict");
   const data = target.toObject(), staged = structuredClone(data), fieldValues = new Map<string, string>();
+  const undo = options.undoId ? readReviewHistory(target.flags).find(item => item.id === options.undoId) : undefined;
+  const undoReferences = !!undo?.referenceRepair && !undo.undoneAt && undo.sourceHash === fresh.sourceHash && undo.rows.length === changes.length &&
+    undo.rows.every(saved => changes.some(change => change.rowId === saved.rowId && JSON.stringify(change.parts) === JSON.stringify(saved.before)) &&
+      JSON.stringify(fresh.rows.find(row => row.id === saved.rowId)?.translation) === JSON.stringify(saved.after));
   const history: ReviewHistoryEntry = { id: options.id ?? crypto.randomUUID(), at: new Date().toISOString(), userName: (game.user as { name?: string }).name ?? "GM",
     sourceHash: fresh.sourceHash, label: options.label ?? "Correction", rows: [] };
   if (options.agentRequestHash !== undefined) {
     if (!/^[a-f0-9]{64}$/u.test(options.agentRequestHash)) fail("MissingField");
     history.agentRequestHash = options.agentRequestHash;
   }
+  if (options.repairReferences) history.referenceRepair = true;
   if (!/^[a-zA-Z0-9-]{1,80}$/u.test(history.id) || (options.undoId && !/^[a-zA-Z0-9-]{1,80}$/u.test(options.undoId))) fail("MissingField");
   if (readReviewHistory(target.flags).some(item => item.id === history.id)) fail("Conflict");
   const patch: Record<string, unknown> = {};
   for (const change of changes) {
     const row = fresh.rows.find(row => row.id === change.rowId);
     if (!row) fail("MissingField");
-    if (row.blocked) fail(row.blocked);
+    if (row.blocked && !(options.repairReferences && row.blocked === "StructureChanged")) fail(row.blocked);
     if (JSON.stringify(change.parts) === JSON.stringify(row.translation)) continue;
     const field = fresh.fields.find(field => field.id === row.fieldId)!;
     const previous = fieldValues.get(field.id) ?? field.translation;
-    const value = validateReviewCorrection(fresh, row.id, change.parts, previous);
+    const value = validateReviewCorrection(fresh, row.id, change.parts, previous, !!options.repairReferences, undoReferences);
     fieldValues.set(field.id, value);
     history.rows.push({ rowId: row.id, before: row.translation, after: [...change.parts], label: row.label, group: row.group });
     patch[`flags.${MODULE_ID}.review.entries.${row.id}`] = null;
@@ -370,14 +377,29 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
 }
 
 /** Preview and persistence share the same paragraph/markup/reference checks. */
-export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string, parts: string[], previous?: string): string {
+export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string, parts: string[], previous?: string, repairReferences = false, undoReferences = false): string {
   const row = snapshot.rows.find(row => row.id === rowId);
   if (!row) fail("MissingField");
-  if (row.blocked) fail(row.blocked);
+  if (row.blocked && !(repairReferences && row.blocked === "StructureChanged")) fail(row.blocked);
   if (parts.length !== row.translation.length || parts.some(part => typeof part !== "string" || !part.trim())) fail("EmptyText");
   const field = snapshot.fields.find(field => field.id === row.fieldId)!;
   const value = planReviewText(previous ?? field.translation, field.format).replace(row.unitId, parts);
-  try { assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format); assertPortableText(field.translation, value, field.format); }
+  try {
+    if (repairReferences || undoReferences) {
+      const missingOnly = (text: string) => {
+        const details = diagnosePortableText(field.source, portableReviewText(snapshot, field, text), field.format);
+        return details && details.commands.missing.length > 0 && !details.commands.extra.length && !details.commands.truncated && !details.markup.length && !details.markupTruncated;
+      };
+      if (repairReferences && !missingOnly(field.translation)) throw new Error("Only missing source commands can be repaired.");
+      if (undoReferences) {
+        // Reachable only through a guard-checked, exact persistent undo record.
+        if (!missingOnly(value)) throw new Error("Invalid reference repair undo.");
+      } else assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
+    } else {
+      assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
+      assertPortableText(field.translation, value, field.format);
+    }
+  }
   catch (error) { throw new Error("Review.ProtectedText", { cause: error }); }
   return value;
 }

@@ -43,6 +43,18 @@ export class ReviewContextPanel {
     const header = el("header", "ft-heading-with-help"); header.append(el("h3", "", t("Context")));
     const help = el("span"); help.innerHTML = renderHelpTooltip(t("EditorialHelp"), t("Context")); header.append(help, button(t("HideContext"), callbacks.close)); root.append(header);
     root.append(el("p", "ft-editorial__selected", displayParts(row.translation)));
+    const integrity = snapshot.fields.find(field => field.id === row.fieldId)?.integrity;
+    if (integrity) {
+      const details = el("details", "ft-editorial__integrity");
+      details.append(el("summary", "", t("IntegrityDetails")), el("p", "", integrity.message));
+      for (const [list, label] of [[integrity.commands.missing, "MissingCommands"], [integrity.commands.extra, "ExtraCommands"]] as const) {
+        if (list.length) details.append(el("h4", "", t(label)));
+        for (const item of list) details.append(el("pre", "", `${item.count} × ${item.command}`));
+      }
+      for (const change of integrity.markup) details.append(el("pre", "", `${change.path}\n${t("Original")}: ${JSON.stringify(change.source).slice(0, 800)}\n${t("Translation")}: ${JSON.stringify(change.translation).slice(0, 800)}`));
+      if (integrity.commands.truncated || integrity.markupTruncated) details.append(el("p", "", t("IntegrityTruncated")));
+      root.append(details);
+    }
     const stateLabel = el("label", "", t("EditorialState"));
     const save = button(t("SaveNote"), callbacks.save); save.dataset.editorialSave = "";
     const discard = button(t("Discard"), callbacks.discard);

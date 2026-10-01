@@ -4,13 +4,15 @@ export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_co
 export interface LiveArgs {
   documentId?: string; rowId?: string; revision?: string; operationId?: string;
   text?: string[]; labels?: { marker: string; label: string }[]; reason?: string;
+  restoreSourceNumbers?: boolean;
+  restoreSourceReferences?: boolean;
   offset: number; limit: number; query: string; radius: number; fuzzy: boolean;
 }
 export interface LiveRequest { id: string; method: LiveMethod; args: Record<string, unknown> }
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
 const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "list_history", "undo_correction"];
-const keys = new Set(["documentId", "rowId", "revision", "operationId", "text", "labels", "reason", "offset", "limit", "query", "radius", "fuzzy"]);
+const keys = new Set(["documentId", "rowId", "revision", "operationId", "text", "labels", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
   const fail = (): never => { throw new Error("Live.InvalidRequest"); };
@@ -18,6 +20,10 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   const request = value as unknown as LiveRequest, input = request.args;
   if (Object.keys(input).some(key => !keys.has(key))) fail();
   const args: LiveArgs = { offset: 0, limit: 20, query: "", radius: 2, fuzzy: false };
+  for (const key of ["restoreSourceNumbers", "restoreSourceReferences"] as const) if (input[key] !== undefined) {
+    if (typeof input[key] !== "boolean" || !["validate_correction", "save_correction"].includes(request.method)) fail();
+    args[key] = input[key] as boolean;
+  }
   for (const key of ["offset", "limit", "radius"] as const) if (input[key] !== undefined) {
     const n = input[key]; if (typeof n !== "number" || !Number.isSafeInteger(n) || n < (key === "limit" ? 1 : 0) || n > (key === "limit" ? 50 : key === "radius" ? 5 : 100000)) fail();
     args[key] = n as number;

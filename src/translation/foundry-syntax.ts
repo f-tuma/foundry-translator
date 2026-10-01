@@ -1,7 +1,7 @@
 import { GlossaryIntegrityError } from "../glossary/protection";
 
 export const FOUNDRY_EXPRESSION =
-  /(?:@[A-Za-z][A-Za-z0-9]*|&(?:amp;)?Reference)\[[^\]\r\n]*\](?:\{[^}\r\n]*\})?|\[\[[^\]\r\n]*\]\]/gu;
+  /(?:@[A-Za-z][A-Za-z0-9]*|&(?:amp;)?[Rr]eference)\[[^\]\r\n]*\](?:\{[^}\r\n]*\})?|\[\[[^\]\r\n]*\]\]/gu;
 const EMBED_EXPRESSION =
   /^@Embed\[(?<config>[^\]\r\n]*)\](?:\{(?<label>[^}\r\n]*)\})?$/iu;
 const TRANSLATABLE_EMBED_OPTION =

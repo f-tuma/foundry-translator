@@ -45,6 +45,9 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   #message = "";
   #error = false;
   #scrollTop = 0;
+  #page = 0;
+  #filterTimer: ReturnType<typeof setTimeout> | undefined;
+  static readonly PAGE_SIZE = 50;
   #mode: "documents" | "search" | "interface" | "history" | "names" | "queue" | "recovery" | "project" = "documents";
   #focusRow: string | undefined;
   #host: PanelHost = {
@@ -109,7 +112,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     if (!target) throw new Error("Review.TranslationMissing");
     const next = await loadReview(target.entry);
     if (rowId && !next.rows.some(row => row.id === rowId)) throw new Error("Review.BookmarkMissing");
-    this.#snapshot = next; this.#group = group ?? target.group;
+    this.#snapshot = next; this.#group = group ?? target.group; this.#page = 0;
     this.#selectedRow = rowId; this.#contextVisible = !!rowId;
     if (rowId) { const row = next.rows.find(row => row.id === rowId)!; saveBookmark(next.entry, row); await this.#contextPanel.load(); }
     this.#status(""); this.#focusRow = rowId; this.#mode = "documents"; this.#search = ""; this.#onlyUnverified = false; this.#scrollTop = 0;
@@ -121,12 +124,14 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
       return this;
     }
     if (typeof window !== "undefined") window.removeEventListener("beforeunload", this.#beforeUnload);
+    clearTimeout(this.#filterTimer);
     this.#watchingUnload = false;
     return super.close(options);
   }
 
   async #run(action: () => Promise<void>): Promise<void> {
     if (this.#busy) return;
+    clearTimeout(this.#filterTimer);
     this.#busy = true;
     this.#scrollTop = this.element.querySelector(".ft-review__scroll")?.scrollTop ?? 0;
     this.element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement | HTMLSelectElement>(".ft-review input,.ft-review textarea,.ft-review button,.ft-review select").forEach(input => { input.disabled = true; });
@@ -154,6 +159,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
   }
 
   protected async _renderHTML(): Promise<HTMLElement> {
+    clearTimeout(this.#filterTimer);
     const root = el("section", "ft-review");
     root.addEventListener("keydown", event => this.#shortcut(event));
     const header = el("header", "ft-review__header");
@@ -204,7 +210,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     select.addEventListener("change", () => {
       if (!this.#canNavigate()) { select.value = this.#snapshot?.entry.uuid ?? ""; return; }
       const entry = this.#catalog!.find(entry => entry.uuid === select.value);
-      if (entry) void this.#run(async () => { this.#snapshot = await loadReview(entry); this.#selectedRow = undefined; this.#contextVisible = false; this.#group = "document"; this.#scrollTop = 0; this.#search = ""; this.#status(""); });
+      if (entry) void this.#run(async () => { this.#snapshot = await loadReview(entry, this.#catalog!); this.#selectedRow = undefined; this.#contextVisible = false; this.#group = "document"; this.#page = 0; this.#scrollTop = 0; this.#search = ""; this.#status(""); });
     });
     documentLabel.append(select); controls.append(documentLabel);
     controls.append(button(t("Refresh"), () => {
@@ -226,9 +232,12 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     header.append(controls); root.append(header);
     const filters = el("div", "ft-review__filters");
     const search = el("input"); search.type = "search"; search.placeholder = t("Search"); search.setAttribute("aria-label", t("Search")); search.value = this.#search;
-    search.addEventListener("input", () => { this.#search = search.value; this.#applyFilters(root); });
+    search.addEventListener("input", () => {
+      this.#search = search.value; this.#page = 0; clearTimeout(this.#filterTimer);
+      this.#filterTimer = setTimeout(() => { this.#applyFilters(root); this.#sizeTextareas(root); }, 150);
+    });
     const label = el("label"); const checkbox = el("input"); checkbox.type = "checkbox"; checkbox.checked = this.#onlyUnverified;
-    checkbox.addEventListener("change", () => { this.#onlyUnverified = checkbox.checked; this.#applyFilters(root); });
+    checkbox.addEventListener("change", () => { this.#onlyUnverified = checkbox.checked; this.#page = 0; this.#applyFilters(root); this.#sizeTextareas(root); });
     label.append(checkbox, document.createTextNode(t("OnlyUnverified")));
     filters.append(search, label, el("span", "ft-review__progress", this.#counts())); root.append(filters);
     if (this.#snapshot?.warning) root.append(el("p", "ft-review__warning", t(this.#snapshot.warning)));
@@ -239,7 +248,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     if (!groups.some(group => group.id === this.#group)) this.#group = groups[0]?.id ?? "document";
     for (const group of groups) {
       const rows = this.#snapshot!.rows.filter(row => row.group === group.id);
-      const item = button("", () => { this.#group = group.id; this.#selectedRow = undefined; this.#contextVisible = false; this.#scrollTop = 0; void this.render({ force: true }); });
+      const item = button("", () => { this.#group = group.id; this.#page = 0; this.#selectedRow = undefined; this.#contextVisible = false; this.#scrollTop = 0; void this.render({ force: true }); });
       item.classList.toggle("is-current", group.id === this.#group); item.setAttribute("aria-current", group.id === this.#group ? "true" : "false");
       const ready = rows.filter(row => !row.blocked).length;
       item.append(el("span", "", group.id === "document" ? t("DocumentDetails") : group.name), el("small", "", ready ? `${rows.filter(row => row.verified).length} / ${ready}` : t("Pending")));
@@ -251,15 +260,9 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const thead = el("thead"), headers = el("tr");
     for (const key of ["Original", "Translation", "Review"]) { const th = el("th", "", t(key)); th.scope = "col"; headers.append(th); }
     thead.append(headers); table.append(thead);
-    const body = el("tbody"); let lastField = "";
-    for (const row of this.#snapshot?.rows.filter(row => row.group === this.#group) ?? []) {
-      if (row.fieldId !== lastField) {
-        const field = el("tr", "ft-review__field"); field.dataset.fieldId = row.fieldId;
-        const th = el("th", "", labelFor(row.label)); th.colSpan = 3; th.scope = "rowgroup"; field.append(th); body.append(field); lastField = row.fieldId;
-      }
-      body.append(this.#row(row));
-    }
+    const body = el("tbody"); body.dataset.reviewBody = "";
     table.append(body); main.append(table);
+    const pager = el("nav", "ft-review__pagination"); pager.dataset.reviewPagination = ""; pager.setAttribute("aria-label", t("Pagination")); main.append(pager);
     const empty = el("p", "ft-review__empty", this.#snapshot ? t("NoMatches") : t("Empty")); empty.dataset.reviewEmpty = ""; main.append(empty);
     layout.append(nav, main);
     const selected = this.#snapshot?.rows.find(row => row.id === this.#selectedRow);
@@ -405,23 +408,48 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     node?.querySelector<HTMLButtonElement>(save ? "[data-review-save]" : "[data-review-verify]")?.click();
   }
   #applyFilters(root: HTMLElement): void {
-    const query = this.#search.trim().toLocaleLowerCase(); let visible = 0;
-    for (const node of root.querySelectorAll<HTMLElement>("[data-review-row]")) {
-      const row = this.#snapshot?.rows.find(row => row.id === node.dataset.reviewRow);
-      const text = row ? [...row.source, ...(this.#drafts.get(row.id)?.text ?? row.translation)].join(" ") : "";
-      node.hidden = !row || (!!row.verified && this.#onlyUnverified && !this.#drafts.has(row.id)) || !text.toLocaleLowerCase().includes(query);
-      if (!node.hidden) visible += 1;
+    const body = root.querySelector<HTMLElement>("[data-review-body]"); if (!body) return;
+    const query = this.#search.trim().toLocaleLowerCase();
+    const rows = (this.#snapshot?.rows ?? []).filter(row => row.group === this.#group &&
+      !(row.verified && this.#onlyUnverified && !this.#drafts.has(row.id)) &&
+      (!query || [...row.source, ...(this.#drafts.get(row.id)?.text ?? row.translation)].join(" ").toLocaleLowerCase().includes(query)));
+    const size = TranslationReviewApplication.PAGE_SIZE;
+    const focus = this.#focusRow ? rows.findIndex(row => row.id === this.#focusRow) : -1;
+    if (focus >= 0) this.#page = Math.floor(focus / size);
+    this.#page = Math.max(0, Math.min(this.#page, Math.ceil(rows.length / size) - 1));
+    const start = this.#page * size, fragment = document.createDocumentFragment(); let lastField = "";
+    for (const row of rows.slice(start, start + size)) {
+      if (row.fieldId !== lastField) {
+        const field = el("tr", "ft-review__field"); field.dataset.fieldId = row.fieldId;
+        const th = el("th", "", labelFor(row.label)); th.colSpan = 3; th.scope = "rowgroup"; field.append(th); fragment.append(field); lastField = row.fieldId;
+      }
+      fragment.append(this.#row(row));
     }
-    for (const field of root.querySelectorAll<HTMLElement>(".ft-review__field")) {
-      field.hidden = ![...root.querySelectorAll<HTMLElement>("[data-review-row]")].some(row => !row.hidden && row.dataset.fieldId === field.dataset.fieldId);
+    body.replaceChildren(fragment);
+    if (root.isConnected) activateHelpTooltips(body);
+    const pager = root.querySelector<HTMLElement>("[data-review-pagination]");
+    if (pager) {
+      const move = (direction: number) => { this.#page += direction; this.#scrollTop = 0; this.#applyFilters(root); this.#sizeTextareas(root); const scroll = root.querySelector(".ft-review__scroll"); if (scroll) scroll.scrollTop = 0; };
+      const previous = button(t("PreviousPage"), () => move(-1)); previous.disabled = start === 0; previous.dataset.reviewPreviousPage = "";
+      const next = button(t("NextPage"), () => move(1)); next.disabled = start + size >= rows.length; next.dataset.reviewNextPage = "";
+      const count = t("PageRange").replace("{start}", String(rows.length ? start + 1 : 0)).replace("{end}", String(Math.min(start + size, rows.length))).replace("{total}", String(rows.length));
+      pager.replaceChildren(previous, el("span", "", count), next); pager.hidden = rows.length <= size;
     }
-    const empty = root.querySelector<HTMLElement>("[data-review-empty]"); if (empty) empty.hidden = visible > 0;
+    const empty = root.querySelector<HTMLElement>("[data-review-empty]"); if (empty) empty.hidden = rows.length > 0;
+  }
+  // Write all heights, then measure all, then apply all: one layout pass instead
+  // of forcing a fresh layout for every textarea in a large guide.
+  #sizeTextareas(root: HTMLElement): void {
+    const inputs = [...root.querySelectorAll<HTMLTextAreaElement>("textarea")];
+    inputs.forEach(input => { input.style.height = "auto"; });
+    const heights = inputs.map(input => Math.max(58, input.scrollHeight + 2));
+    inputs.forEach((input, i) => { input.style.height = `${heights[i]}px`; });
   }
   #grow(input: HTMLTextAreaElement): void { input.style.height = "auto"; input.style.height = `${Math.max(58, input.scrollHeight + 2)}px`; }
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }
   protected _onRender(): void {
     if (typeof window !== "undefined" && !this.#watchingUnload) { window.addEventListener("beforeunload", this.#beforeUnload); this.#watchingUnload = true; }
-    this.element.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(input => this.#grow(input));
+    this.#sizeTextareas(this.element);
     const scroll = this.element.querySelector(".ft-review__scroll"); if (scroll) scroll.scrollTop = this.#scrollTop;
     if (this.#focusRow) {
       const row = [...this.element.querySelectorAll<HTMLElement>("[data-review-row]")].find(row => row.dataset.reviewRow === this.#focusRow);
