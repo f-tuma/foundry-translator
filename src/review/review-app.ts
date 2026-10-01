@@ -96,6 +96,12 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     finally { this.#busy = false; }
     await this.render({ force: true });
   }
+  async openProject(): Promise<void> {
+    if (this.#busy) throw new Error("Review.Working");
+    if (this.#hasDrafts()) throw new Error("Review.UnsavedNavigation");
+    this.#mode = "project"; this.#scrollTop = 0;
+    await this.render({ force: true });
+  }
   async #selectDocument(uuid: string, group?: string, rowId?: string): Promise<void> {
     if (this.#drafts.size || this.#noteDrafts.size) throw new Error("Review.UnsavedNavigation");
     this.#catalog = await reviewCatalog(getTranslatorSettings().targetLanguage);

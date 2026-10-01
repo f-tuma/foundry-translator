@@ -1,7 +1,7 @@
 # Foundry Translate — project handoff
 
 - Updated: 2026-10-01
-- Current code/release metadata: `v0.30.1`; verify publication in GitHub Releases. Production installation is user-managed.
+- Current code/release metadata: `v0.30.2`; verify publication in GitHub Releases. Production installation is user-managed.
 - Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
@@ -11,6 +11,17 @@ documentation; this document records technical decisions, verified findings,
 and the recommended implementation order.
 
 ## Current work log
+
+- 2026-10-01, in-Foundry MCP guide: Translation Desk and module settings now offer
+  **Korektura přes MCP / MCP proofreading**. The guide generates Codex TOML and
+  generic JSON stdio configurations from explicit assistant-computer paths, saves
+  only client preferences, offers clipboard fallback and a context-aware assistant
+  prompt, and opens the Working file panel without losing unsaved drafts or
+  interrupting writes. No HTTP endpoint or connection status is implied. Local
+  isolated Foundry v14 Ember QA verified desk launch, copying both formats,
+  path persistence and the export/import shortcut. Root check: 524 passing tests,
+  four optional LM tests skipped; release metadata verified for v0.30.2. Production
+  remains user-managed and the ten existing polish proposals are still unapproved.
 
 - 2026-10-01, real export pilot: user's private translation bundle contains 1,805
   documents, 29,398 review units and 776 glossary entries. Complete Players' and

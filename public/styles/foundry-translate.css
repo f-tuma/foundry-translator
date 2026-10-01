@@ -1325,3 +1325,23 @@ body.ft-czech-fonts :is(.application, .app, .ember, .crucible, .journal-entry-pa
   --font-serif: "Foundry Translate Vollkorn", serif;
   --font-quote: "Foundry Translate Vollkorn", serif;
 }
+.ft-mcp__section { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--ft-color-border); padding-top: 16px; }
+.ft-mcp__section h3 { margin: 0; border: 0; }
+.ft-mcp__transport { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px; background: var(--ft-color-surface-raised); border: 1px solid var(--ft-color-border); }
+.ft-mcp__transport span, .ft-mcp__steps li > span { color: var(--ft-color-text-muted); }
+.ft-mcp__steps { margin: 0; padding-left: 24px; display: flex; flex-direction: column; gap: 16px; }
+.ft-mcp__steps li { padding-left: 6px; line-height: 1.5; }
+.ft-mcp__steps li > strong, .ft-mcp__steps li > span { display: block; margin-bottom: 4px; }
+.ft-mcp__steps button, .ft-mcp__section > button { align-self: flex-start; width: auto; }
+.ft-mcp details summary { cursor: pointer; padding: 4px 0; color: var(--ft-color-accent); }
+.ft-mcp pre, .ft-mcp textarea, .ft-mcp code { font-family: monospace; font-size: 12px; line-height: 1.5; }
+.ft-mcp pre { margin: 8px 0 0; padding: 12px; background: var(--ft-color-bg); border: 1px solid var(--ft-color-border); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ft-mcp textarea { width: 100%; min-height: 120px; resize: vertical; padding: 10px; background: var(--ft-color-bg); color: var(--ft-color-text); border: 1px solid var(--ft-color-border); }
+.ft-mcp__path { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.ft-mcp__path code { color: var(--ft-color-text-muted); overflow-wrap: anywhere; user-select: text; }
+.ft-mcp__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ft-mcp__actions button { width: auto; }
+.ft-mcp__status { margin: 0; color: var(--ft-color-accent); line-height: 1.5; }
+.ft-mcp__status:empty { display: none; }
+.ft-mcp .ft-settings__actions { flex-wrap: wrap; gap: 12px; }
+.ft-mcp .ft-settings__actions span { font-size: 12px; color: var(--ft-color-text-muted); }

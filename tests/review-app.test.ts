@@ -107,3 +107,16 @@ it("scopes shortcuts to the selected row, saves before verifying and never toggl
   await vi.waitFor(() => expect(app.element.querySelector("textarea")!.disabled).toBe(false));
   key("Enter"); expect(save).toHaveBeenCalledTimes(2);
 });
+
+it("opens the working file from MCP but refuses to interrupt unsaved text or a running save", async () => {
+  const { app, Event, save } = await fixture();
+  const input = app.element.querySelector('textarea')!; input.value = 'Rozepsaná oprava'; input.dispatchEvent(new Event('input'));
+  await expect(app.openProject()).rejects.toThrow('Review.UnsavedNavigation');
+  expect(app.element.querySelector('textarea')!.value).toBe('Rozepsaná oprava');
+  let finish!: () => void;
+  save.mockImplementationOnce(async view => { await new Promise<void>(resolve => { finish = resolve; }); return view; });
+  app.element.querySelector<HTMLButtonElement>('[data-review-save]')!.click();
+  await expect(app.openProject()).rejects.toThrow('Review.Working');
+  finish(); await vi.waitFor(() => expect(app.element.querySelector('textarea')!.disabled).toBe(false));
+  await app.openProject(); expect(app.element.textContent).toContain('Review.ProjectNotice');
+});

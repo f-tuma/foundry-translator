@@ -9,6 +9,7 @@ import { openActiveTranslationsOverview } from "../translation/active-translatio
 import { TRANSLATIONS_PACK_ID, TRANSLATION_FLAG_PATH } from "../translation/compendium-translation-repository";
 import { readJournalTranslationFlag } from "../translation/journal";
 import { openReviewEditor } from "../review/header-control";
+import { McpGuideApplication } from "../polish/mcp-guide-app";
 
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Desk.${key}`);
 export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
@@ -27,6 +28,7 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
         <button type="button" data-desk-action="settings"><i class="fa-solid fa-plug" aria-hidden="true"></i><span><strong>${t("Settings")}</strong><small>${t("SettingsHint")}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-desk-action="glossary"><i class="fa-solid fa-book-bookmark" aria-hidden="true"></i><span><strong>${t("Glossary")}</strong><small>${t("GlossaryHint").replace("{count}", String(glossary.filter((e) => e.enabled !== false).length))}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-desk-action="review"><i class="fa-solid fa-list-check" aria-hidden="true"></i><span><strong>${t("Review")}</strong><small>${t("ReviewHint")}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+        <button type="button" data-desk-action="mcp"><i class="fa-solid fa-plug" aria-hidden="true"></i><span><strong>${t("Mcp")}</strong><small>${t("McpHint")}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-desk-action="bundles"><i class="fa-solid fa-box-archive" aria-hidden="true"></i><span><strong>${t("Bundles")}</strong><small>${t("BundlesHint").replace("{count}", String(count))}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
       </div>
       <footer class="ft-settings__actions"><button type="button" class="ft-button ft-button--secondary" data-desk-action="active">${t("Active")}</button><button type="button" class="ft-button ft-button--primary" data-desk-action="journal">${t("Journal")}</button></footer>`;
@@ -42,7 +44,7 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
       return child.render(true);
     };
     const actions: Record<string, () => unknown> = { settings: () => open(new TranslatorSettingsApplication()), glossary: () => open(new GlossaryApplication()),
-      bundles: () => open(new BundleApplication()), review: () => openReviewEditor(), active: openActiveTranslationsOverview, journal: () => open(new JournalTranslationApplication()) };
+      bundles: () => open(new BundleApplication()), review: () => openReviewEditor(), mcp: () => open(new McpGuideApplication()), active: openActiveTranslationsOverview, journal: () => open(new JournalTranslationApplication()) };
     for (const button of this.element.querySelectorAll<HTMLElement>("[data-desk-action]")) {
       button.addEventListener("click", () => actions[button.dataset.deskAction ?? ""]?.());
     }
