@@ -29,7 +29,11 @@ and the recommended implementation order.
   Whole-field HTML/reference validation still runs. The full export loads without
   changing its bytes or dropping documents. Native browser planning already merges
   entity text nodes. Validation: 511 module tests, four optional LM tests skipped;
-  17 MCP tests including a real stdio roundtrip; build and typecheck passed.
+  17 MCP tests including a real stdio roundtrip, 16 community tests; build and
+  typecheck passed. Community 0.3.4 uses the same paragraph alignment. Its old
+  markup test relied accidentally on linkedom's entity splitting to reject safely
+  escaped text. Regression now verifies escaped script text is inert, while
+  executable markup in HTML-rendered tooltip attributes remains rejected.
 
 - 2026-09-30, local translation polish MCP (`apps/polish-mcp`, 0.1.0): official
   MCP SDK 2.2, stdio, 11 tools plus a conservative correction prompt. User chose

@@ -114,10 +114,34 @@ describe("Foundry community bridge", () => {
       expect(() => rebuildDocument(bundle.documents[0]!, units)).toThrow();
     },
   );
-  it("rejects unsafe markup typed into a text node", () => {
+  it("escapes typed markup as inert text without creating executable elements", () => {
     const { bundle, units } = setup();
     units[2]!.value = ["<script>alert(1)</script>"];
-    expect(() => rebuildDocument(bundle.documents[0]!, units)).toThrow();
+    const rebuilt = rebuildDocument(bundle.documents[0]!, units);
+    expect(rebuilt.patches[1]!.translation).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(rebuilt.patches[1]!.translation).not.toContain("<script>");
+    expect(() => parseImport(JSON.stringify({ ...bundle, documents: [rebuilt] }))).not.toThrow();
+  });
+  it("rejects executable markup introduced into an HTML-rendered tooltip attribute", () => {
+    const bundle = fixture(), patch = bundle.documents[0]!.patches[1]!;
+    patch.source = '<p title="Safe">Text</p>';
+    patch.translation = '<p title="Bezpečné">Text</p>';
+    const units = unitsForDocument(bundle.documents[0]!).map(u => ({ ...u, revision: "test", approval: null })) as Unit[];
+    units.find(u => u.unit_key.endsWith('@title'))!.value = ['<script>alert(1)</script>'];
+    expect(() => rebuildDocument(bundle.documents[0]!, units)).toThrow("HTML structure");
+  });
+  it("imports entity prose and different inline separator fragments without changing paragraph identity", () => {
+    const bundle = fixture(), patch = bundle.documents[0]!.patches[1]!;
+    patch.source = '<p>A &amp; B: <strong>one</strong>, <strong>two</strong>.</p>';
+    patch.translation = '<p>A a B: <strong>jedna</strong> <strong>dva</strong>.</p>';
+    const parsed = parseImport(JSON.stringify(bundle)).bundle;
+    const units = unitsForDocument(parsed.documents[0]!).map(u => ({ ...u, revision: "test", approval: null })) as Unit[];
+    expect(units[1]!.source).toHaveLength(5);
+    expect(units[1]!.value).toHaveLength(4);
+    units[1]!.value = ['A a B: ', 'první', 'druhé', '.'];
+    const rebuilt = rebuildDocument(parsed.documents[0]!, units);
+    expect(rebuilt.patches[1]!.translation).toBe('<p>A a B: <strong>první</strong> <strong>druhé</strong>.</p>');
+    expect(unitsForDocument(rebuilt).map(u => u.id)).toEqual(units.map(u => u.id));
   });
   it("exports translations and hashes without original prose, notes or account IDs", () => {
     const payload = release(),
