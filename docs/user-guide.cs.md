@@ -1,4 +1,29 @@
-# Foundry Translate 0.25.0 — stručný návod
+# Foundry Translate 0.31.0 — stručný návod
+
+## Korektura přímo přes MCP
+
+Otevřete **Překlady dobrodružství → Korektura přes MCP** a zvolte
+**Přímo v otevřeném světě**. Zadejte cestu k sestavenému MCP na počítači
+asistenta; menu vygeneruje konfiguraci s přesnou adresou vašeho Foundry.
+Sestavení a oba režimy popisuje [návod MCP](../apps/polish-mcp/README.md).
+
+Po spuštění MCP požádejte asistenta o `live_connection`. Jeho jednorázový
+párovací kód vložte do menu a připojte se. Kód nepatří do URL ani do souboru
+konfigurace. Asistent musí před první opravou zkontrolovat svět a jazyk přes
+`live_status` a načíst originál, kontext a glosář přes `live_get_context`.
+
+Opravy se rovnou ukládají do přeložených kopií. V **Editoru překladů → Historie
+oprav** uvidíte původní a nové znění a můžete opravu vrátit; historie zůstává
+i po odpojení. **Ověřit** zůstává samostatný ruční krok. V již otevřeném editoru
+použijte **Načíst znovu**, abyste viděli novou opravu. Rozpracované změny se
+nepřepisují; zastaralý zápis je odmítnut.
+
+Menu můžete zavřít, GM kartu ponechte otevřenou. **Odpojit** nebo obnovení
+stránky relaci zruší. Po výpadku nejprve zkontrolujte historii: zápis mohl být
+uložen i bez doručené odpovědi. Opakování stejného požadavku vyžaduje stejné
+`operationId` a argumenty. Nepouštějte současně více zapisujících GM klientů
+nad jedním dokumentem. Exportní režim zůstává dostupný pro práci bez běžícího
+světa.
 
 ## České rozhraní
 

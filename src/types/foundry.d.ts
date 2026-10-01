@@ -34,8 +34,8 @@ interface FoundryGame {
   journal: { contents: FoundryJournalWorldDocument[] };
   folders: { contents: FoundryFolder[] };
   packs: Map<string, FoundryCompendiumCollection>;
-  user?: { isGM: boolean };
-  world?: { title?: string; description?: string };
+  user?: { isGM: boolean; id?: string; name?: string };
+  world?: { id?: string; title?: string; description?: string };
   system?: { id?: string; title?: string; version?: string };
 }
 

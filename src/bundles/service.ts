@@ -18,6 +18,7 @@ import { translatedOutputHash } from "../translation/output-hash";
 import { glossaryFingerprint } from "../translation/unit-translator";
 import { portableFields, type PortableDocument, type BundleDocumentKind } from "./fields";
 import { BUNDLE_FORMAT, assertPortableText, parseTranslationBundle, type BundleDocument, type TranslationBundle } from "./format";
+import { referenceContext, sourceReferenceNotation } from "./reference-notation";
 
 const SPECS = [
   { kind: "JournalEntry", pack: TRANSLATIONS_PACK_ID, flagPath: TRANSLATION_FLAG_PATH, flagKey: "translation", read: readJournalTranslationFlag },
@@ -151,8 +152,10 @@ export async function exportTranslationBundle(language: string, onProgress?: (me
           if (typeof translation !== "string") throw new Error(`Invalid translated field: ${field.path.join(".")}`);
         } else translation = translatedField(data, translated, field.path);
         if (typeof original !== "string" || typeof translation !== "string" || original === translation) return [];
-        assertPortableText(original, translation, field.format);
-        return [{ ...field, source: original, translation }];
+        const portableTranslation = sourceReferenceNotation(original, translation, referenceContext(source.uuid, data, field.path));
+        try { assertPortableText(original, portableTranslation, field.format); }
+        catch (error) { throw new Error(`${field.path.join(".")}: ${error instanceof Error ? error.message : String(error)}`); }
+        return [{ ...field, source: original, translation: portableTranslation }];
       });
       const journalFlag = item.kind === "JournalEntry" ? readJournalTranslationFlag(item.document.flags) : null;
       documents.push({ kind: item.kind, sourceUuid: source.uuid, sourceName: String(data.name), sourceFingerprint: await bundleFingerprint(item.kind, data), patches,

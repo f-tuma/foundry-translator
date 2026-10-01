@@ -5,6 +5,12 @@ import { renderMcpGuide } from "../src/polish/mcp-guide-view";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("MCP connection configuration", () => {
+  it("generates explicit live mode with a single permitted origin and fixed loopback port", () => {
+    const result = mcpConnection({ ...DEFAULT_MCP_PATHS, repositoryPath: '/repo', mode: 'live', origin: 'https://ember.example.cz', port: 3112 });
+    expect(JSON.parse(result.json).mcpServers['foundry-polish'].args).toEqual(['/repo/apps/polish-mcp/dist/index.cjs', '--live', '--origin', 'https://ember.example.cz', '--port', '3112']);
+    expect(() => mcpConnection({ ...DEFAULT_MCP_PATHS, repositoryPath: '/repo', mode: 'live', origin: 'https://user:secret@example.cz', port: 3112 })).toThrow();
+    expect(() => mcpConnection({ ...DEFAULT_MCP_PATHS, repositoryPath: '/repo', mode: 'live', origin: 'https://example.cz', port: 80 })).toThrow();
+  });
   it("generates argument arrays, preserving spaces, quotes and backslashes without shell evaluation", () => {
     const result = mcpConnection({ nodeCommand: 'C:\\Program Files\\node.exe', repositoryPath: 'C:\\My "repo"\\', workspacePath: 'C:\\Private work\\' });
     const entry = JSON.parse(result.json).mcpServers["foundry-polish"];

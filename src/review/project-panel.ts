@@ -26,7 +26,13 @@ export class EditorialProjectPanel {
         this.#plan = await planEditorialProject(await readEditorialFile(await selected.text()));
       });
     }); label.append(file); toolbar.append(label); root.append(toolbar);
-    for (const issue of this.#report) root.append(el("p", "ft-workbench__warning", issue === "Review.Conflict" ? t("ProjectWriteConflict") : issue.startsWith("Review.") ? t(issue.slice(7)) : issue));
+    if (this.#report.length) {
+      root.append(el("p", "ft-workbench__warning", t("ExportSkippedHelp")));
+      const details = el("details", "ft-project__report");
+      details.append(el("summary", "", t("ExportSkippedDetails").replace("{count}", String(this.#report.length))));
+      for (const issue of this.#report) details.append(el("p", "ft-workbench__warning", issue === "Review.Conflict" ? t("ProjectWriteConflict") : issue.startsWith("Review.") ? t(issue.slice(7)) : issue));
+      root.append(details);
+    }
     const plan = this.#plan;
     if (!plan) { root.append(el("p", "ft-workbench__notice", t("ProjectNotice"))); return root; }
     root.append(el("p", "ft-workbench__notice", t("ProjectPreviewNotice")));

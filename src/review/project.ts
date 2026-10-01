@@ -7,7 +7,7 @@ import { activeTranslations } from "../translation/active-translations";
 import { readEditorial } from "./editorial";
 import { labelFor } from "./labels";
 import { PROJECT_FORMAT, parseEditorialProject, type EditorialProject, type PortableReviewMetadata } from "./project-format";
-import { importReviewMetadata, loadReview, portableReviewBinding, reviewCatalog, saveReviewRows, type ReviewChange, type ReviewSnapshot } from "./service";
+import { importReviewMetadata, loadReview, portableReviewBinding, portableReviewText, reviewCatalog, saveReviewRows, type ReviewChange, type ReviewSnapshot } from "./service";
 import { planReviewText } from "./text-plan";
 import { importUiProject, loadUiCatalog, previewUiProject, type UiImport } from "./ui-catalog";
 
@@ -103,7 +103,7 @@ export async function planEditorialProject(project: EditorialProject): Promise<P
           }
           const current = snapshot.fields.find(field => field.id === JSON.stringify(stable));
           if (!current) throw new Error("Review.ProjectCoverageConflict");
-          const canonical = remapBundleReferences(current.translation, snapshot.reverse, true);
+          const canonical = portableReviewText(snapshot, current, current.translation);
           const before = baseline.fields.find(field => JSON.stringify(field.path) === JSON.stringify(patch.path))!;
           if (canonical !== patch.translation && await sha256(canonical) !== before.translationHash) throw new Error("Review.ProjectBaselineConflict");
         }

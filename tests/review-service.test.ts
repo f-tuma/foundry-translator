@@ -12,6 +12,8 @@ import { actorSourceHash, type ActorData } from "../src/translation/actor";
 import { itemSourceHash, type ItemData } from "../src/translation/item";
 import { ACTOR_TRANSLATIONS_PACK_ID } from "../src/translation/compendium-actor-translation-repository";
 import { ITEM_TRANSLATIONS_PACK_ID } from "../src/translation/compendium-item-translation-repository";
+import { createLiveHandler } from "../src/polish/live-service";
+import { GlossaryCompendiumRepository } from "../src/glossary/compendium-repository";
 
 let source: JournalData, copy: JournalData, locked = false;
 let writes: { kind: string; patch: any }[];
@@ -43,7 +45,7 @@ function install(): void {
   sourceDocument = { id: "source", uuid: "JournalEntry.source", documentName: "JournalEntry", toObject: () => structuredClone(source) };
   const pack = { collection: packId, get locked() { return locked; }, getDocument: async () => copyDocument,
     getIndex: async () => new Map([["copy", { _id: "copy", name: copy.name, flags: copy.flags }]]) };
-  vi.stubGlobal("game", { user: { isGM: true, id: "gm", name: "Reviewer" }, i18n: { localize: (key: string) => key }, packs: new Map([[packId, pack]]) });
+  vi.stubGlobal("game", { user: { isGM: true, id: "gm", name: "Reviewer" }, world: { id: "test-world", title: "Test world" }, settings: { get: () => undefined }, i18n: { localize: (key: string) => key }, packs: new Map([[packId, pack]]) });
   vi.stubGlobal("fromUuid", async () => sourceDocument);
   vi.stubGlobal("Hooks", { callAll: vi.fn() });
 }
@@ -64,6 +66,7 @@ beforeEach(async () => {
 afterEach(() => {
   for (const run of activeTranslations.list()) activeTranslations.finish(run.id);
   activeTranslations.clearFinished(); vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 it("saves only the translated paragraph, separately verifies it, preserves original and manual-edit protection", async () => {
@@ -258,4 +261,72 @@ it("saves, verifies and undoes reference movement across formatted text fragment
   await undoReview(view.entry, 'move-links');
   expect(copy.pages[0]!.text!.content).toBe(before);
   expect(JSON.stringify(source)).toBe(original);
+});
+
+async function liveFixture() {
+  vi.spyOn(GlossaryCompendiumRepository.prototype, 'loadExisting').mockResolvedValue([]);
+  let connected = true;
+  const handle = createLiveHandler('cs', () => connected);
+  const s = await snapshot(), row = textRow(s);
+  const call = (method: string, args: Record<string, unknown> = {}) => handle({ id: crypto.randomUUID(), method, args });
+  const context = await call('get_context', { documentId: s.entry.uuid, rowId: row.id });
+  expect(context.ok).toBe(true);
+  const args = { documentId: s.entry.uuid, rowId: row.id, revision: (context.value as any).revision,
+    text: ['Tříprsté nohy.'], labels: [], reason: 'Přesnější anatomický význam původní věty.', operationId: crypto.randomUUID() };
+  return { s, row, call, args, disconnect: () => { connected = false; } };
+}
+it('MCP previews and directly saves with history, resolves lost-response retries, and safely undoes', async () => {
+  const original = JSON.stringify(source), f = await liveFixture();
+  const preview = await f.call('validate_correction', f.args); expect(preview.ok).toBe(true); expect(writes).toHaveLength(0);
+  const saved = await f.call('save_correction', f.args); expect(saved).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toContain('Tříprsté nohy.');
+  const count = writes.length;
+  expect(await f.call('save_correction', f.args)).toMatchObject({ ok: true, value: { alreadyApplied: true } }); expect(writes).toHaveLength(count);
+  const history = readReviewHistory(copy.flags); expect(history[0]).toMatchObject({ id: f.args.operationId, agentRequestHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
+  expect(await f.call('save_correction', { ...f.args, text: ['Úplně jiná věta.'] })).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: f.args.operationId })).toMatchObject({ ok: true, value: { undone: true } });
+  expect(copy.pages[0]!.text!.content).toContain('Třínohé končetiny.');
+  const afterUndo = writes.length;
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: f.args.operationId })).toMatchObject({ ok: true, value: { alreadyUndone: true } });
+  expect(writes).toHaveLength(afterUndo); expect(JSON.stringify(source)).toBe(original);
+});
+it('MCP refuses stale revisions, arbitrary original reads, invalid links, and revoked world access', async () => {
+  const f = await liveFixture();
+  expect(await f.call('get_context', { documentId: 'JournalEntry.source', rowId: f.row.id })).toMatchObject({ ok: false, error: { code: 'Review.TranslationMissing' } });
+  expect(await f.call('save_correction', { ...f.args, text: ['Nohy. @Macro[delete]'] })).toMatchObject({ ok: false, error: { code: 'Review.ProtectedText', fieldId: f.row.fieldId } });
+  copy.pages[0]!.text!.content = '<p>Ruční oprava.</p><p>Druhý odstavec.</p>';
+  expect(await f.call('save_correction', f.args)).toMatchObject({ ok: false, error: { code: 'Review.Conflict' } });
+  expect(writes).toHaveLength(0); f.disconnect();
+  expect(await f.call('list_documents')).toMatchObject({ ok: false, error: { code: 'Live.Disconnected' } });
+});
+it('MCP retains EXACT terms and refuses numeric changes and active translation writes', async () => {
+  const f = await liveFixture();
+  vi.mocked(GlossaryCompendiumRepository.prototype.loadExisting).mockResolvedValue([{ source: 'Three-toed', replacement: 'Třínohé', category: 'term', aliases: [] }]);
+  const context = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id });
+  const args = { ...f.args, revision: (context.value as any).revision };
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: false, error: { code: 'Live.InvalidCorrection' } });
+  expect(await f.call('save_correction', { ...args, text: ['Třínohé končetiny mají 4 prsty.'] })).toMatchObject({ ok: false, error: { code: 'Live.NumbersChanged' } });
+  activeTranslations.start('Guide', 'cs');
+  expect(await f.call('save_correction', { ...args, text: ['Třínohé končetiny poutníka.'] })).toMatchObject({ ok: false, error: { code: 'Review.PauseFirst' } });
+  expect(writes).toHaveLength(0);
+});
+it('MCP undo refuses later manual corrections, and disconnect is checked immediately before persistence', async () => {
+  const f = await liveFixture();
+  await expect(saveReviewRows(f.s, [{ rowId: f.row.id, parts: ['Nohy.'] }], { canWrite: () => false })).rejects.toThrow('Live.Disconnected');
+  expect(writes).toHaveLength(0);
+  expect((await f.call('save_correction', f.args)).ok).toBe(true);
+  copy.pages[0]!.text!.content = '<p>Ruční pozdější oprava.</p><p>Druhý odstavec.</p>';
+  const count = writes.length;
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: f.args.operationId })).toMatchObject({ ok: false, error: { code: 'Review.UndoConflict' } });
+  expect(await f.call('save_correction', f.args)).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+  expect(writes).toHaveLength(count);
+});
+it('aligns source/target paragraphs when an inline comma becomes whitespace without changing markup', async () => {
+  source.pages[0]!.text!.content = '<p>Hello <strong>hero</strong>,<em>friend</em>.</p>';
+  copy.pages[0]!.text!.content = '<p>Ahoj <strong>hrdino</strong> <em>příteli</em>.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const s = await snapshot(), row = textRow(s);
+  expect(row.source).toHaveLength(5); expect(row.translation).toHaveLength(4); expect(row.blocked).toBeNull();
+  const saved = await saveReviewRows(s, [{ rowId: row.id, parts: ['Zdravím ', 'hrdino', 'příteli', '.'] }]);
+  expect(saved.rows.find(r => r.id === row.id)?.blocked).toBeNull();
 });

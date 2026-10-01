@@ -5,7 +5,7 @@ okolní odstavce, glosář a dostupné související dokumenty. Asistent navrhne
 opravy se zdůvodněním. Vybrané návrhy lze importovat zpět do Foundry.
 
 MCP samo nespouští model. Použiješ model v připojeném MCP klientu, například
-v Codexu. Server nepotřebuje API klíč, LM Studio ani otevřený síťový port.
+v Codexu. Server nepotřebuje API klíč ani LM Studio. Exportní režim neotevírá síťový port; přímý režim otevře chráněný port pouze na 127.0.0.1.
 Text vrácený nástroji dostává připojený model; lokální MCP tedy samo o sobě
 neznamená, že inference probíhá lokálně.
 
@@ -23,9 +23,53 @@ a import, cesty k procesu a složce `input/`, konfiguraci pro Codex (`config.tom
 nebo jiný klient (JSON) a zadání pro asistenta. Cesty se ukládají pouze jako
 předvolby tohoto prohlížeče; konfiguraci je nutné vložit do MCP klienta.
 
-MCP nemá webovou adresu: jde o lokální proces přes STDIO. Cesty patří počítači
-asistenta, nikoli serveru Foundry. Okno nepotvrzuje stav připojení ani neověřuje
-instalaci. Přístup do živého světa není potřeba.
+Od **Foundry Translate 0.31.0 / MCP 0.2.0** lze v tomto okně zvolit také
+**Přímo v otevřeném světě**. Exportní a přímý režim mají samostatné konfigurace;
+jedna instance MCP používá právě jeden z nich. Cesty vždy patří počítači asistenta,
+na kterém je také otevřený prohlížeč Foundry.
+
+## Přímá práce v otevřeném světě
+
+1. Sestav MCP podle příkazů níže. V menu MCP vyber **Přímo v otevřeném světě**,
+   vyplň cestu k repozitáři a vlož zobrazenou konfiguraci do MCP klienta.
+   Proces používá například:
+   `node /cesta/foundry-translator/apps/polish-mcp/dist/index.cjs --live --origin https://ember.example.cz --port 3112`.
+   `--origin` musí přesně odpovídat adrese Foundry (včetně případného portu).
+2. Restartuj připojení MCP v klientu. Nástroj `live_connection` vrátí adresu
+   `http://127.0.0.1:3112` a jednorázový 256bitový párovací kód platný 5 minut.
+   Vlož ho do menu Foundry a klikni **Připojit a povolit opravy**. Kód není v URL,
+   předvolbách ani logu; po připojení se spotřebuje a karta používá nový token
+   pouze v paměti. Prohlížeč může požádat o přístup k místní síti.
+3. Nech kartu vypravěče otevřenou. `live_status` musí ukázat správný svět a jazyk.
+   Zavření či obnovení stránky nepřipojí agenta znovu automaticky. **Odpojit**
+   odebere možnost dalších zápisů; po 60 sekundách bez kontaktu relace vyprší.
+4. Agent používá `live_get_context`, poté `live_validate_correction` a
+   `live_save_correction`. Zapisuje pouze existující překlad a ukládá důvod do
+   historie. Neoznačuje ho jako ověřený. `live_list_glossary` je jen pro čtení.
+   Hledání `live_search_passages` prochází nanejvýš 5 dokumentů na požadavek;
+   pro celý svět je nutné pokračovat přes `nextOffset`.
+5. Opravu lze vrátit v historii editoru nebo přes `live_undo_correction`.
+   Vrácení odmítne následnou změnu dotčeného odstavce nebo originálu.
+   Nelze přes něj spouštět makra, upravovat původní herní dokumenty,
+   mechanické hodnoty či glosář, ani automaticky potvrzovat ověření.
+
+Každá oprava má `operationId`. Při ztracené odpovědi zkontroluj
+`live_list_history`; zápis mohl být dokončen. Opakování se stejným ID a přesně
+stejnými argumenty neuloží druhou změnu. Jiný text se stejným ID nebo následné
+ruční úpravy vyvolají konflikt. Nekopíruj slepě starou revizi do nového kontextu.
+Po timeoutu most relaci ukončí; nové spárování vyžaduje aktuální kód.
+
+Most neotevírej do veřejné sítě. Má pevnou vazbu na 127.0.0.1, kontrolu HTTP Host
+proti DNS rebindingu, přesný povolený Origin, jednorázové spárování a novou relaci
+pro jednu kartu, svět, vypravěče a jazyk. Originály se pouze čtou prostřednictvím
+povolených přeložených dokumentů; žádný nástroj nepřijímá libovolnou zapisovací
+cestu ani JavaScript. Překlad musí být pozastavený nebo dokončený před korekturou.
+Změněná UUID, parametry příkazů, HTML nebo číselné hodnoty se při zápisu odmítají.
+
+Kontrola před zápisem zachytí mezilehlé změny, ale Foundry nemá serverové
+compare-and-swap: současný zápis jiného vypravěče v přesně stejném okamžiku
+nelze plně vyloučit. Při korektuře používej jednoho zapisujícího vypravěče.
+Deterministické kontroly nezaručují správnost významu; ověření provádí člověk.
 
 ## Spuštění
 

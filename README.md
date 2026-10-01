@@ -2,14 +2,21 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.30.2** adds an in-Foundry **MCP proofreading** guide with copyable
-connection configuration, an assistant task and a guarded export/import shortcut
-for the [local correction workflow](apps/polish-mcp/README.md).
-An MCP-capable assistant reads a private export with English originals, surrounding
-paragraphs, references and the reviewed glossary, then saves unverified suggestions.
-Selected corrections produce a comparison report and a guarded project import:
-changed translations block stale imports, and AI edits never inherit human verification.
-The MCP does not connect to a running Foundry world or run a model itself.
+Version **0.31.0** adds direct **MCP proofreading** in an open GM world.
+Open **Adventure translation → MCP proofreading**, choose the live mode and
+follow the pairing/configuration guide. The [local MCP server](apps/polish-mcp/README.md)
+reads source sentences, nearby context and the reviewed glossary, then saves
+corrections directly to translation copies with persistent history and undo.
+Stale revisions, changed references, markup and numerical changes block writes.
+AI saves never mark a passage human-verified. A loopback bridge connects only
+one explicitly paired GM tab; closing its guide keeps the connection alive,
+but reloading or disconnecting revokes it. Coordinate one writer per document.
+The export/import workflow remains available for offline review. MCP supplies
+tools to your assistant; it does not run a language model itself.
+
+Export now recognizes equivalent absolute/relative Foundry UUID notation while
+retaining anchors and embedded targets. Actual missing or changed references
+remain rejected with a field-specific explanation.
 
 Version **0.29.2** lets reviewers move Foundry link markers within a paragraph,
 including across formatted text fragments. Link counts, destinations and command

@@ -1,0 +1,67 @@
+import { afterEach, expect, it } from "vitest";
+import { request } from "node:http";
+import { LiveBridge, allowedOrigin } from "../src/live-bridge";
+import { parseLiveRequest } from "../../../src/polish/live-protocol";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { fileURLToPath } from "node:url";
+
+const origin = "https://foundry.example.cz";
+const claim = { protocol: 1, worldId: "fixture", worldName: "Synthetic test world", userId: "gm", language: "cs", systemId: "crucible", moduleVersion: "test", clientId: "browser-1" };
+let bridge: LiveBridge | undefined;
+afterEach(async () => { await bridge?.close(); bridge = undefined; });
+async function fixture() {
+  bridge = await new LiveBridge(origin, 0).start(); const connection = bridge.connection();
+  const call = async (path: string, token: string, body?: unknown, from = origin) => fetch(`${connection.address}${path}`, { method: body === undefined ? "GET" : "POST", headers: { Origin: from, Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const response = await call('/connect', connection.pairingCode!, claim); expect(response.status).toBe(200);
+  const { sessionToken } = await response.json() as { sessionToken: string };
+  return { connection, call, sessionToken };
+}
+it("rejects missing authentication, other origins, reused pairing codes, and DNS rebinding", async () => {
+  const { connection, call, sessionToken } = await fixture();
+  expect((await call('/poll', '')).status).toBe(401);
+  expect((await call('/poll', sessionToken, undefined, 'https://evil.example')).status).toBe(403);
+  expect((await call('/connect', connection.pairingCode!, claim)).status).toBe(401);
+  const status = await new Promise<number>(resolve => { const req = request(`${connection.address}/poll`, { headers: { Host: 'evil.example', Origin: origin, Authorization: `Bearer ${sessionToken}` } }, res => { res.resume(); resolve(res.statusCode!); }); req.end(); });
+  expect(status).toBe(403);
+  expect(bridge!.connection()).not.toHaveProperty('pairingCode');
+  expect(JSON.stringify(bridge!.connection())).not.toContain(sessionToken);
+});
+it("delivers one request, reports validation errors immediately, and revokes pending requests on disconnect", async () => {
+  const { call, sessionToken } = await fixture();
+  const result = bridge!.request('get_context', { documentId: 'translated', rowId: 'a'.repeat(64) });
+  const poll = await call('/poll', sessionToken), message = await poll.json() as { id: string; method: string };
+  expect(message.method).toBe('get_context');
+  const reply = { ok: false, error: { code: 'Review.StructureChanged', message: 'Missing reference', fieldId: 'intro' } };
+  expect((await call('/reply', sessionToken, { id: message.id, result: reply })).status).toBe(200);
+  expect(await result).toEqual(reply);
+  expect((await call('/reply', sessionToken, { id: message.id, result: reply })).status).toBe(409);
+  const pending = bridge!.request('status', {}); const rejection = expect(pending).rejects.toThrow('may have committed');
+  bridge!.disconnect(); await rejection;
+  expect((await call('/poll', sessionToken)).status).toBe(401);
+  expect(bridge!.connection().pairingCode).not.toBeUndefined();
+});
+it("fails closed on unsafe method/args and on mismatched origin formats", () => {
+  expect(() => allowedOrigin('https://example.cz/path')).toThrow();
+  expect(() => allowedOrigin('https://user:password@example.cz')).toThrow();
+  expect(() => parseLiveRequest({ id: '1', method: 'eval', args: { code: 'delete' } })).toThrow();
+  expect(() => parseLiveRequest({ id: '1', method: 'save_correction', args: { documentId: 'x', path: ['system', 'health'] } })).toThrow();
+  expect(() => parseLiveRequest({ id: '1', method: 'search_passages', args: { query: 'Hero', limit: 100000 } })).toThrow();
+  expect(() => parseLiveRequest({ id: '1', method: 'status', args: { labels: Array.from({ length: 31 }, () => ({ marker: '⟦1⟧', label: 'x'.repeat(2000) })) } })).toThrow();
+});
+it("exposes live tools through the actual STDIO SDK and forwards browser results without an export", async () => {
+  const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../dist/index.cjs', import.meta.url)), '--live', '--origin', origin, '--port', '0'], stderr: 'pipe' });
+  const client = new Client({ name: 'live-integration-test', version: '1' });
+  try {
+    await client.connect(transport);
+    const tools = await client.listTools(); expect(tools.tools.map(t => t.name)).toContain('live_save_correction'); expect(tools.tools.map(t => t.name)).not.toContain('export_corrections');
+    const result = await client.callTool({ name: 'live_connection', arguments: {} });
+    const connection = JSON.parse((result.content as { text: string }[])[0]!.text);
+    const connect = await fetch(`${connection.address}/connect`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${connection.pairingCode}`, 'Content-Type': 'application/json' }, body: JSON.stringify(claim) });
+    const { sessionToken } = await connect.json() as { sessionToken: string };
+    const pending = client.callTool({ name: 'live_status', arguments: {} });
+    const request = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as { id: string };
+    await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: request.id, result: { ok: true, value: { language: 'cs', documents: 1 } } }) });
+    const response = await pending; expect(JSON.parse((response.content as { text: string }[])[0]!.text)).toEqual({ ok: true, value: { language: 'cs', documents: 1 } });
+  } finally { await client.close(); }
+});

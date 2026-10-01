@@ -1,7 +1,35 @@
 # Foundry Translate — project handoff
 
+## 2026-10-01 — 0.31.0: živé MCP a integrita exportu
+
+- MCP 0.2.0 ponechává exportní režim a přidává `--live --origin ... --port 3112`.
+  STDIO komunikace s asistentem, pouze loopback HTTP dlouhý polling s přesným
+  Origin/Host, jednorázovým kódem a paměťovou relací jedné GM karty.
+- Ve Foundry menu jsou režimy, konfigurace, adresa mostu, spárování, stav,
+  poslední odpověď a odpojení. Reload nikdy automaticky znovu nespáruje.
+- Přímé opravy používají editorové saveReviewRows, revizi zdroje/výstupu/glosáře,
+  stejnou kontrolu formátování/odkazů, historii, idempotentní operationId a undo.
+  Agent nemění originály, herní hodnoty ani ověření. Numerické změny odmítá.
+- Export obnoví ekvivalentní relativní zápis UUID pomocí kontextu původního
+  pole a embedded ID, bez ztráty suffixu či kotvy. Stejná normalizace se používá
+  pro editor a přenosné vazby ověření/importu. Nejednoznačné zápisy fail closed.
+- Odkaz na neexistující embedded dokument se už nepřepisuje na jeho rodiče.
+  Starší takto změněné odkazy zůstávají blokované; bez náhledu je neopravovat.
+- Chráněny jsou i staré `&Reference[...]` příkazy; UUID/Embed case je ekvivalentní,
+  ostatní názvy příkazů zůstávají přesné. Exportní chyby uvádějí pole a jsou v
+  rozbalovacím souhrnu. Soukromé příběhy/audity zůstávají mimo Git.
+
+- QA: 534 module tests passed (four optional LM tests skipped), 21 MCP tests
+  including real SDK STDIO/loopback, and 16 community tests. Typechecks/builds
+  and release metadata passed. MCP tests require a sandbox allowing loopback.
+- Isolated native Foundry v14 Ember QA used synthetic text only: context, preview,
+  invalid macro rejection, saved before/after history, idempotent retry, undo and
+  repeated undo, unverified status, export of equivalent relative UUID, disconnect.
+  No foundry-translate console errors. Production was inspected read-only and
+  never paired or updated. Existing source-missing embedded links remain rejected.
+
 - Updated: 2026-10-01
-- Current code/release metadata: `v0.30.2`; verify publication in GitHub Releases. Production installation is user-managed.
+- Current code/release metadata: `v0.31.0`; verify publication in GitHub Releases. Production installation is user-managed.
 - Production version is user-managed; do not infer it from the local QA version.
 - Repository: <https://github.com/f-tuma/foundry-translator>
 
