@@ -1,170 +1,100 @@
-# Kontextová korektura přes MCP
+# Korektura přímo ve Foundry přes MCP
 
-Lokální MCP poskytuje asistentovi existující překlady, anglické originály,
-okolní odstavce, glosář a dostupné související dokumenty. Asistent navrhne drobné
-opravy se zdůvodněním. Vybrané návrhy lze importovat zpět do Foundry.
+Od **Foundry Translate 0.32.0 / MCP 0.3.0** agent čte a opravuje překlady
+přímo v otevřeném světě. Není potřeba Docker, klon repozitáře, sestavování,
+ruční spuštění služby ani export/import.
 
-MCP samo nespouští model. Použiješ model v připojeném MCP klientu, například
-v Codexu. Server nepotřebuje API klíč ani LM Studio. Exportní režim neotevírá síťový port; přímý režim otevře chráněný port pouze na 127.0.0.1.
-Text vrácený nástroji dostává připojený model; lokální MCP tedy samo o sobě
-neznamená, že inference probíhá lokálně.
+## Připojení
 
-Verze 0.1.1 sjednocuje čtení HTML entit s prohlížečem a umožňuje načíst
-odstavce, ve kterých se oddělovací čárka mezi zvýrazněnými výrazy přeložila
-na mezeru. Návrh stále zachovává členění aktuálního překladu, cíle odkazů
-a všechny chráněné části. Po aktualizaci sestav server znovu a obnov jeho
-připojení v MCP klientu.
+1. Na počítači, kde používáš prohlížeč s Foundry, musí být **Node.js 22.12+**
+   dostupný jako `node`. MCP klient musí podporovat spouštění lokálních STDIO serverů.
+   Foundry samotné může běžet na vzdáleném serveru.
+2. Ve Foundry jako GM otevři **Překlady dobrodružství → Korektura přes MCP**.
+   Klíč se vytvoří automaticky. Klikni **Uložit a povolit přístup**.
+3. Klikni **Zkopírovat MCP JSON** a vlož konfiguraci do svého MCP klienta.
+   Klient most automaticky spustí. Při prvním spuštění stáhne konkrétní vydání
+   `foundry-polish.cjs` z GitHubu a ověří jeho SHA-256; další spuštění používá
+   znovu ověřenou soukromou místní kopii. Node spouští přímo, bez shellu či npm instalace.
+4. Foundry se připojí automaticky; případně povol prohlížeči přístup k místní síti.
+   Nech GM kartu světa otevřenou. `live_connection` ukáže spojení a `live_status`
+   musí potvrdit správný svět a jazyk před první opravou.
+5. Asistent načte `live_get_context`, zkontroluje návrh přes
+   `live_validate_correction` a uloží jej přes `live_save_correction`.
+   Výsledek a případné chyby dostane okamžitě.
 
-## Návod přímo ve Foundry
+JSON obsahuje přístupový klíč v `env.FOUNDRY_MCP_API_KEY`. Konfiguraci nesdílej.
+Klíč se ukládá do klientských předvoleb tvého Foundry prohlížeče a do konfigurace
+MCP klienta; nástroje jej nevracejí. Přístup je vázaný na přesný původ Foundry,
+ID světa, účet GM a jazyk. Port 3112 používá pouze tento místní most, nikoliv
+LM Studio. V pokročilém nastavení lze zvolit jiný neprivilegovaný port na 127.0.0.1.
+Stejný JSON neumožní propojení jiného světa či GM. Kopíruj jej znovu po změně
+jazyka, světa, účtu, klíče, portu nebo aktualizaci verze modulu a restartuj MCP.
 
-Od Foundry Translate **0.30.2** otevři **Foundry Translate → Korektura přes MCP**.
-Stejné okno je i v nastavení modulu. Obsahuje základní postup, zkratku na export
-a import, cesty k procesu a složce `input/`, konfiguraci pro Codex (`config.toml`)
-nebo jiný klient (JSON) a zadání pro asistenta. Cesty se ukládají pouze jako
-předvolby tohoto prohlížeče; konfiguraci je nutné vložit do MCP klienta.
+Klient musí běžet na stejném počítači jako prohlížeč. Vzdálené či čistě webové
+MCP klienty bez místního STDIO procesu tato varianta nepodporuje.
+MCP samo nespouští model ani nevyžaduje LM Studio. Obsah vrácený nástroji dostane
+model připojeného klienta; místní most neznamená automaticky místní inferenci.
 
-Od **Foundry Translate 0.31.0 / MCP 0.2.0** lze v tomto okně zvolit také
-**Přímo v otevřeném světě**. Exportní a přímý režim mají samostatné konfigurace;
-jedna instance MCP používá právě jeden z nich. Cesty vždy patří počítači asistenta,
-na kterém je také otevřený prohlížeč Foundry.
+## Obnovení spojení a vypnutí
 
-## Přímá práce v otevřeném světě
+Uložený a povolený přístup se obnoví při načtení stejného světa stejným GM
+ve stejném jazyce. Když klient neběží, Foundry čeká a zkouší spojení každých
+5 sekund. Nesprávný klíč či změna rozsahu další pokusy zastaví. Druhá GM karta
+nemůže převzít aktivní relaci; ta bez kontaktu vyprší po 60 sekundách.
 
-1. Sestav MCP podle příkazů níže. V menu MCP vyber **Přímo v otevřeném světě**,
-   vyplň cestu k repozitáři a vlož zobrazenou konfiguraci do MCP klienta.
-   Proces používá například:
-   `node /cesta/foundry-translator/apps/polish-mcp/dist/index.cjs --live --origin https://ember.example.cz --port 3112`.
-   `--origin` musí přesně odpovídat adrese Foundry (včetně případného portu).
-2. Restartuj připojení MCP v klientu. Nástroj `live_connection` vrátí adresu
-   `http://127.0.0.1:3112` a jednorázový 256bitový párovací kód platný 5 minut.
-   Vlož ho do menu Foundry a klikni **Připojit a povolit opravy**. Kód není v URL,
-   předvolbách ani logu; po připojení se spotřebuje a karta používá nový token
-   pouze v paměti. Prohlížeč může požádat o přístup k místní síti.
-3. Nech kartu vypravěče otevřenou. `live_status` musí ukázat správný svět a jazyk.
-   Zavření či obnovení stránky nepřipojí agenta znovu automaticky. **Odpojit**
-   odebere možnost dalších zápisů; po 60 sekundách bez kontaktu relace vyprší.
-4. Agent používá `live_get_context`, poté `live_validate_correction` a
-   `live_save_correction`. Zapisuje pouze existující překlad a ukládá důvod do
-   historie. Neoznačuje ho jako ověřený. `live_list_glossary` je jen pro čtení.
-   Hledání `live_search_passages` prochází nanejvýš 5 dokumentů na požadavek;
-   pro celý svět je nutné pokračovat přes `nextOffset`.
-5. Opravu lze vrátit v historii editoru nebo přes `live_undo_correction`.
-   Vrácení odmítne následnou změnu dotčeného odstavce nebo originálu.
-   Nelze přes něj spouštět makra, upravovat původní herní dokumenty,
-   mechanické hodnoty či glosář, ani automaticky potvrzovat ověření.
+**Vypnout přístup** zastaví spojení i automatické navazování. Nástroj
+`live_disconnect` odpojí a zablokuje přístup do restartu MCP procesu; potom
+znovu povol přístup v menu Foundry.
+Nový klíč vyžaduje uložení přístupu, nový JSON a restart klienta.
+Zavření okna s návodem neodpojuje; zavření celé GM karty znemožní další práci.
 
-Každá oprava má `operationId`. Při ztracené odpovědi zkontroluj
-`live_list_history`; zápis mohl být dokončen. Opakování se stejným ID a přesně
-stejnými argumenty neuloží druhou změnu. Jiný text se stejným ID nebo následné
-ruční úpravy vyvolají konflikt. Nekopíruj slepě starou revizi do nového kontextu.
-Po timeoutu most relaci ukončí; nové spárování vyžaduje aktuální kód.
+## Opravy, historie a bezpečné opakování
 
-Most neotevírej do veřejné sítě. Má pevnou vazbu na 127.0.0.1, kontrolu HTTP Host
-proti DNS rebindingu, přesný povolený Origin, jednorázové spárování a novou relaci
-pro jednu kartu, svět, vypravěče a jazyk. Originály se pouze čtou prostřednictvím
-povolených přeložených dokumentů; žádný nástroj nepřijímá libovolnou zapisovací
-cestu ani JavaScript. Překlad musí být pozastavený nebo dokončený před korekturou.
-Změněná UUID, parametry příkazů, HTML nebo číselné hodnoty se při zápisu odmítají.
+Agent zapisuje jen existující přeložený text, s důvodem a historií. V
+**Editoru překladů → Historie oprav** lze změnu vrátit; již otevřený editor
+obnov tlačítkem **Načíst znovu**. Ověření zůstává samostatný ruční krok.
+Originály, makra, herní mechaniky a glosář nejsou přes MCP zapisovatelné.
+Kontext zahrnuje originál, okolní odstavce, glosář a související dostupné dokumenty.
+Odkazy lze přesouvat uvnitř odstavce, jejich cíle a chráněné části zůstanou zachované.
 
-Kontrola před zápisem zachytí mezilehlé změny, ale Foundry nemá serverové
-compare-and-swap: současný zápis jiného vypravěče v přesně stejném okamžiku
-nelze plně vyloučit. Při korektuře používej jednoho zapisujícího vypravěče.
-Deterministické kontroly nezaručují správnost významu; ověření provádí člověk.
+Překlad musí být dokončený nebo pozastavený před korekturou. Změněné UUID,
+parametry příkazů, HTML struktura či číselné hodnoty se odmítnou. Každá oprava
+má `operationId`. Po ztracené odpovědi nejprve zkontroluj `live_list_history`:
+zápis mohl být dokončen. Most zápisy automaticky neopakuje. Ruční opakování se
+stejným ID a přesně stejnými argumenty nevytvoří další změnu. Konflikt vyžaduje
+nové načtení kontextu; nelze slepě použít starou revizi.
 
-## Spuštění
+`live_search_passages` prochází nejvýše 5 dokumentů na požadavek: pokračuj přes
+`nextOffset`. Deterministické kontroly nezaručují správnost významu, kterou
+posuzuje člověk. Foundry neposkytuje serverové compare-and-swap; souběžný zápis
+jiného GM ve stejném okamžiku nelze plně vyloučit. Používej jednoho zapisujícího GM.
 
-Vyžaduje Node.js 22.12+ a tento repozitář. Z kořene repozitáře:
+Most poslouchá pouze na 127.0.0.1, ověřuje Host i přesný Origin a API klíč.
+Token pro konkrétní relaci je pouze v paměti. Po timeoutu se relace ukončí;
+automatické nové spojení neopakuje nejistý zápis. MCP nikdy nepřijímá libovolnou
+zapisovací cestu ani JavaScript od agenta.
+
+## Vývoj
 
 ```sh
 npm ci
-npm --prefix apps/polish-mcp ci
-npm --prefix apps/polish-mcp run build
-node apps/polish-mcp/dist/index.cjs --workspace /absolutni/cesta/korektury
-```
-
-Proces komunikuje přes stdio, takže obvykle jej spouští přímo MCP klient.
-Server vytvoří pouze `input/`, `sessions/` a `output/` ve zvolené složce.
-Příkaz pro registraci do Codexu (nahraď obě absolutní cesty):
-
-```sh
-codex mcp add foundry-polish -- node /cesta/foundry-translator/apps/polish-mcp/dist/index.cjs --workspace /cesta/korektury
-codex mcp get foundry-polish
-```
-
-Pro jiného klienta použij stejný příkaz `node` a argumenty jako stdio server.
-[Oficiální konfigurace MCP v Codexu](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
-
-## Práce s překladem
-
-1. V **Foundry Translate → Editor překladu → Pracovní soubor** exportuj aktuální pracovní
-   soubor JSON. Podporován je i soukromý balíček překladů; pracovní soubor navíc
-   zachová poznámky a platná ověření u nezměněných odstavců.
-2. Vlož export do `input/` zvoleného pracovního adresáře. Pro související kontext
-   exportuj i propojené dokumenty, ne pouze jednu knihu. Původní soubor zůstane beze změny.
-3. Připojenému asistentovi zadej například:
-
-   > Použij foundry-polish. Otevři export, načti glosář a projdi nejprve deset
-   > odstavců Příručky Vypravěče. Navrhni jen opravy gramatiky, významových chyb
-   > a nepřirozených formulací. U každé dohledávej okolní kontext a související
-   > postavy. Ponech schválené názvosloví. Ukaž mi návrhy s důvody; zatím nic neimportuj.
-
-4. Asistent používá `get_context` před úpravou, `search_passages` pro další
-   výskyty a `propose_correction` pro uložení neověřeného návrhu. Není nutné opravovat
-   každý odstavec. Návrhy se průběžně ukládají; znovuotevření stejného exportu je obnoví.
-5. Po výběru návrhů zavolá `export_corrections` s jejich konkrétními ID.
-   Každý výstup vznikne v nové složce v `output/`:
-   - `review.html`: původní angličtina, současná čeština, návrh, důvod a upozornění;
-   - `suggestions.json`: audit změn včetně textu před úpravou;
-   - `corrections.json`: pracovní soubor pro import v editoru Foundry.
-6. Ve **Foundry Translate 0.30.0+** otevři **Editor překladu → Pracovní soubor → Import**,
-   porovnej náhled a zvol dokumenty. Potvrzení „ověřeno“ proveď samostatně.
-
-## Co se kontroluje
-
-- Každý odkaz a herní příkaz zůstane přítomen se stejným cílem, parametry a počtem.
-  Markery lze ve větě přesouvat, včetně přesunu mezi částmi s odlišným formátováním.
-  Texty odkazů UUID a Embed lze upravovat zvlášť. HTML struktura zůstává stejná.
-- Již přítomné pevné názvy `EXACT` se nesmějí ztratit ani změnit. `INFLECT` dovoluje
-  skloňování se shodou celé věty. Glosář je přes MCP jen ke čtení.
-- Změny čísel a výrazné změny délky dostanou upozornění. Význam a správnost
-  skloňování posuzuje model a člověk; tyto kontroly nejsou důkazem správného překladu.
-- Návrhy se vážou k přesné revizi exportu. Současně otevřený druhý klient nesmí
-  přepsat novější uložené návrhy; při konfliktu znovu otevři export.
-- Import v2 porovná otisky všech nesených polí s aktuálním překladem, včetně polí,
-  která AI neměnila. Jakákoli novější odlišná oprava import dokumentu zablokuje.
-  Již aplikovaný výsledek je povolen, takže opakování nevytváří další změny.
-- Starší Foundry Translate odmítne formát v2. Nepřepisuj číslo verze souboru ani
-  neodstraňuj kontrolní otisky. Při konfliktu exportuj aktuální projekt a návrh znovu zkontroluj.
-- Změněný text nepřevezme původní lidské ověření. Import zachová historii editoru
-  a používá jeho běžné kontroly; nejde o transakci přes celý svět.
-
-## Rozsah a omezení
-
-První verze upravuje pouze text dokumentů. UI překlady jsou z korekturního výstupu
-vynechány a glosář se nepřejmenovává. Veřejná komunitní vydání neobsahují anglické
-originály, proto jako vstup nestačí. Korekturní výstup importuj ve Foundry;
-komunitní editor jej odmítá, aby neobešel kontrolu mezitím změněného překladu.
-
-Kontext je omezen obsahem exportu. Nedostupné dokumenty jsou označené a MCP je
-nestahuje z internetu. Vyhledávání je doslovné bez rozlišení velikosti písmen.
-Dlouhé okolní odstavce jsou v přehledu zkrácené, jejich úplný text lze vyžádat přes
-`get_context`. Samotný odstavec má limit 60 000 znaků. Přesuny mezi odstavci a
-změny HTML struktury jsou mimo rozsah.
-
-Celé soukromé exporty ani audit nesdílej jako veřejné vydání; obsahují původní
-texty. MCP otevře jen běžné JSON soubory v určeném `input/`, odmítá průchod mimo
-složku a symbolické odkazy. Stav a výstupy mají oprávnění pouze pro vlastníka.
-Po pádu při ukládání může zůstat soubor `sessions/*.lock`: teprve po zavření všech
-klientů jej lze odstranit a export znovu otevřít. Při poškození stavu se návrhy
-automaticky nemažou.
-
-## Vývoj a ověření
-
-```sh
+npm ci --prefix apps/polish-mcp
 npm --prefix apps/polish-mcp run check
+npm run check
+npm run release:verify
 ```
 
-Testy ověřují i skutečnou inicializaci MCP a celý tok přes stdio klienta.
-Sandbox musí povolovat lokální podproces Node. Nástroje jsou postavené na
-[oficiálním MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-a sdílejí validátory formátu a odkazů s modulem Foundry.
+Sestavení modulu vytvoří i SHA-256 metadata pro konkrétní vydání mostu. Release
+publikuje samostatný `foundry-polish.cjs` a modul používá jeho neměnnou adresu,
+nikoliv odkaz na nejnovější verzi. Vývojář může připravený soubor spustit přímo:
+
+```sh
+FOUNDRY_MCP_API_KEY="$FOUNDRY_MCP_API_KEY" node apps/polish-mcp/dist/index.cjs \
+  --live --origin https://foundry.example.cz --world WORLD --user GM --language cs
+```
+
+Testy ověřují skutečný STDIO klient, autentizaci, obnovu spojení, ochranu relace,
+stažení s kontrolním součtem a odmítnutí změněného spustitelného souboru.
+Starší explicitní CLI exportní režim zůstává interně kompatibilní; ve Foundry MCP
+menu není nabídnut. Běžné sdílení překladů a glosáře přes export/import zůstává
+součástí editoru pro komunitní práci, nezávisle na MCP.

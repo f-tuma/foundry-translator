@@ -24,11 +24,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install MCP dependencies
+        run: npm ci --prefix apps/polish-mcp
+
       - name: Check and build module
         run: npm run check
 
       - name: Verify tag and manifest metadata
         run: npm run release:verify -- "$GITHUB_REF_NAME"
+
+      - name: Prepare standalone MCP asset
+        run: cp apps/polish-mcp/dist/index.cjs apps/polish-mcp/dist/foundry-polish.cjs
 
       - name: Package Foundry module
         working-directory: dist
@@ -41,6 +47,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME"
           foundry-translate.zip
           dist/module.json
+          apps/polish-mcp/dist/foundry-polish.cjs
           --title "$GITHUB_REF_NAME"
           --generate-notes
           --verify-tag

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import process from "node:process";
 
 const repository = "f-tuma/foundry-translator";
@@ -71,6 +72,15 @@ try {
 } catch {
   failures.push(`Build the module first: dist/${expectedStyle} must exist`);
 }
+
+try {
+  const runtime = JSON.parse(await readFile("src/polish/mcp-runtime.json", "utf8"));
+  const bytes = await readFile("apps/polish-mcp/dist/index.cjs");
+  const builtModule = await readFile(`dist/${expectedScript}`, "utf8");
+  if (!builtModule.includes(runtime.sha256) || !builtModule.includes(runtime.url)) failures.push("Built module does not embed the current MCP release and checksum");
+  if (runtime.url !== `https://github.com/${repository}/releases/download/${expectedTag}/foundry-polish.cjs`) failures.push("MCP executable must use this immutable release URL");
+  if (runtime.sha256 !== createHash("sha256").update(bytes).digest("hex")) failures.push("MCP executable checksum does not match module configuration");
+} catch { failures.push("Build the MCP executable and runtime metadata first"); }
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`Release validation failed: ${failure}`);

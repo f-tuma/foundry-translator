@@ -1,3 +1,4 @@
+import { startRememberedMcp } from "./polish/live-client";
 import { registerEditorial } from "./review/editorial";
 import { registerNameForms } from "./review/name-consistency";
 import { createApi } from "./api";
@@ -46,6 +47,7 @@ Hooks.once("ready", () => {
   registerCrucibleEmbedLabels();
   registerTranslatedJournalEmbeds();
   applyCzechFonts();
+  startRememberedMcp();
   registerEmberRuntimeBridge();
   registerTranslatedLinkNavigation();
   registerDisplayTextView();

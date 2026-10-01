@@ -1,33 +1,27 @@
+import { liveBridgeAddress } from "./live-protocol";
+import { mcpLauncher } from "./mcp-launcher";
+import runtime from "./mcp-runtime.json";
 export const POLISH_MCP_SETTING = "polishMcpPaths";
-export interface McpPaths { nodeCommand: string; repositoryPath: string; workspacePath: string; mode?: "live"; origin?: string; port?: number }
-export const DEFAULT_MCP_PATHS: McpPaths = { nodeCommand: "node", repositoryPath: "", workspacePath: "" };
-
-export function readMcpPaths(value: unknown): McpPaths {
+export interface McpPreferences { address: string; apiKey: string; enabled: boolean; worldId: string; userId: string; language: string }
+export const DEFAULT_MCP_PREFERENCES: McpPreferences = { address: "http://127.0.0.1:3112", apiKey: "", enabled: false, worldId: "", userId: "", language: "cs" };
+/** Migrate only public address preferences; old pairing codes were never saved. */
+export function readMcpPreferences(value: unknown): McpPreferences {
   const stored = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const text = (key: "nodeCommand" | "repositoryPath" | "workspacePath") => typeof stored[key] === "string" ? stored[key] as string : DEFAULT_MCP_PATHS[key];
-  return { nodeCommand: text("nodeCommand"), repositoryPath: text("repositoryPath"), workspacePath: text("workspacePath"),
-    ...(stored.mode === "live" ? { mode: "live" as const, origin: typeof stored.origin === "string" ? stored.origin : "", port: typeof stored.port === "number" ? stored.port : 3112 } : {}) };
+  const text = (key: "address" | "apiKey" | "worldId" | "userId" | "language") => typeof stored[key] === "string" ? stored[key] as string : DEFAULT_MCP_PREFERENCES[key];
+  return { address: text("address"), apiKey: text("apiKey"), enabled: stored.enabled === true, worldId: text("worldId"), userId: text("userId"), language: text("language") };
 }
-const absolute = (path: string) => path.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(path) || /^\\\\[^\\]+\\[^\\]+/u.test(path);
-
-/** This is client configuration data, never a shell command or an executable URL. */
-export function mcpConnection(paths: McpPaths) {
-  const nodeCommand = paths.nodeCommand.trim(), repositoryPath = paths.repositoryPath.trim();
-  const workspacePath = paths.workspacePath.trim() || `${repositoryPath.replace(/[\\/]+$/u, "")}/.polish-workspace`;
-  if (!nodeCommand || !absolute(repositoryPath) || !absolute(workspacePath) ||
-    [nodeCommand, repositoryPath, workspacePath].some(path => path.length > 2000 || /[\u0000-\u001f\u007f]/u.test(path)))
-    throw new Error("Mcp.InvalidPaths");
-  const script = `${repositoryPath.replace(/[\\/]+$/u, "")}/apps/polish-mcp/dist/index.cjs`;
-  let args = [script, "--workspace", workspacePath];
-  if (paths.mode === "live") {
-    const origin = new URL(paths.origin ?? "");
-    const port = paths.port ?? 3112;
-    if (!["http:", "https:"].includes(origin.protocol) || origin.pathname !== "/" || origin.search || origin.hash || origin.username || origin.password || !Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("Mcp.InvalidPaths");
-    args = [script, "--live", "--origin", origin.origin, "--port", String(port)];
-  }
-  return {
-    script, workspacePath, inputPath: `${workspacePath.replace(/[\\/]+$/u, "")}/input`,
-    toml: `[mcp_servers.foundry-polish]\ncommand = ${JSON.stringify(nodeCommand)}\nargs = ${JSON.stringify(args)}\n`,
-    json: JSON.stringify({ mcpServers: { "foundry-polish": { command: nodeCommand, args } } }, null, 2),
-  };
+export function mcpConnection(preferences: McpPreferences, origin: string) {
+  const address = liveBridgeAddress(preferences.address), apiKey = preferences.apiKey.trim();
+  const foundry = new URL(origin);
+  if (!/^[a-zA-Z0-9_-]{32,512}$/u.test(apiKey)) throw new Error("Live.InvalidCode");
+  if (!["https:", "http:"].includes(foundry.protocol) || foundry.username || foundry.password || foundry.pathname !== "/" || foundry.search || foundry.hash) throw new Error("Live.InvalidAddress");
+  if ([preferences.worldId, preferences.userId, preferences.language].some(value => !value.trim() || value.length > 500) || !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/iu.test(preferences.language)) throw new Error("Live.ScopeChanged");
+  const port = Number(new URL(address).port);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("Live.InvalidAddress");
+  const entry = { command: "node", args: ["-e", mcpLauncher(runtime), "--", "--live", "--origin", foundry.origin, "--port", String(port), "--world", preferences.worldId, "--user", preferences.userId, "--language", preferences.language], env: { FOUNDRY_MCP_API_KEY: apiKey } };
+  return { address, json: JSON.stringify({ mcpServers: { "foundry-polish": entry } }, null, 2) };
+}
+export function generateMcpKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
 }

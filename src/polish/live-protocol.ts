@@ -47,7 +47,8 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   return { request, args };
 }
 export function liveBridgeAddress(value: string): string {
-  const url = new URL(value);
+  let url: URL;
+  try { url = new URL(value); } catch { throw new Error("Live.InvalidAddress"); }
   if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || !url.port || url.pathname !== "/" || url.search || url.hash || url.username || url.password) throw new Error("Live.InvalidAddress");
   return url.origin;
 }
