@@ -1,4 +1,4 @@
-import { POLISH_MCP_SETTING, readMcpPreferences, type McpPreferences } from "./mcp-guide";
+import { POLISH_MCP_SETTING, generateMcpKey, readMcpPreferences, type McpPreferences } from "./mcp-guide";
 import { MODULE_ID, MODULE_VERSION } from "../constants";
 import { createLiveHandler } from "./live-service";
 import { LIVE_PROTOCOL, liveBridgeAddress, type LiveClaim } from "./live-protocol";
@@ -11,7 +11,7 @@ export class LiveClient {
   private transition = 0;
   private automatic: McpPreferences | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
-  private clientId = crypto.randomUUID();
+  private clientId = "";
   private scopeMatches(p: McpPreferences) { return !!game.user?.isGM && p.worldId === game.world?.id && p.userId === game.user?.id && p.language === String(game.settings.get(MODULE_ID, "targetLanguage") ?? "cs"); }
   async enable(preferences: McpPreferences) {
     if (!preferences.enabled || !this.scopeMatches(preferences)) throw new Error("Live.ScopeChanged");
@@ -59,8 +59,10 @@ export class LiveClient {
   }
   private tabId(): string {
     try { const key = `${MODULE_ID}:mcp-tab:${game.world?.id}:${game.user?.id}`;
-      const id = sessionStorage.getItem(key) ?? this.clientId; sessionStorage.setItem(key, id); return id;
-    } catch { return this.clientId; }
+      const stored = sessionStorage.getItem(key);
+      const id = stored && /^[a-zA-Z0-9-]{1,80}$/u.test(stored) ? stored : this.clientId || (this.clientId = generateMcpKey());
+      sessionStorage.setItem(key, id); return id;
+    } catch { return this.clientId || (this.clientId = generateMcpKey()); }
   }
   async disconnect(stopAutomatic = true) {
     this.transition++;

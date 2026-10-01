@@ -50,3 +50,9 @@ it('uses the same per-tab identity after reload and sends the API key only in th
   client=new LiveClient(); await client.enable(preferences); const connections=fetch.mock.calls.filter(([url]) => url.endsWith('/connect'));
   expect(JSON.parse(connections[0]![1].body as string).clientId).toBe(JSON.parse(connections[1]![1].body as string).clientId);
 });
+
+it('does not require secure-context randomUUID during module startup or a loopback connection', async () => {
+  const fill=crypto.getRandomValues.bind(crypto); vi.stubGlobal('crypto',{getRandomValues:fill});
+  client=new LiveClient(); const fetch=network();vi.stubGlobal('fetch',fetch); await client.enable(preferences);
+  expect(client.state.status).toBe('connected'); expect(JSON.parse(fetch.mock.calls[0]![1].body as string).clientId).toMatch(/^[a-f0-9]{64}$/u);
+});
