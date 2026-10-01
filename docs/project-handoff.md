@@ -1868,3 +1868,17 @@ late results. Navigation/closing remain available during the read. Closed diffs
 are lazy; expanded operations page their changed passages in groups of 20.
 Complete-only export and existing guarded undo are retained. Validation and
 native-Foundry limits: `docs/benchmarks/history-2026-10-01.md`.
+
+### 2026-10-01 — 0.32.3 source-derived embedded UUID repair
+
+Live MCP 0.3.2 can explicitly restore uniquely identified Item/Page links that
+legacy translations collapsed to their parent. It preserves the bound translated
+parent and source child suffix, exposes a target-change preview, and checks actual
+embedded target existence at context/preview/new save. Ambiguous targets, missing
+children, unrelated commands and markup damage remain blocked. Revision, full-field
+validation, idempotency, persistent history/undo and unverified saves are retained.
+Validation: 571 module tests passed / 4 optional LM tests skipped; 30 MCP tests
+passed; native isolated Foundry exercised save/retry/undo and dead-target rejection.
+Details and confirmed missing original `luminousTransit0` ability:
+`docs/benchmarks/reference-target-repair-2026-10-01.md`. User updates production;
+new MCP JSON/client restart required for the new immutable bridge binary.

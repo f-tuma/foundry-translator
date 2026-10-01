@@ -49,7 +49,7 @@ function install(): void {
   vi.stubGlobal("fromUuid", async () => sourceDocument);
   vi.stubGlobal("Hooks", { callAll: vi.fn() });
 }
-async function snapshot(): Promise<ReviewSnapshot> { return loadReview((await reviewCatalog("cs"))[0]!); }
+async function snapshot(): Promise<ReviewSnapshot> { return loadReview((await reviewCatalog("cs")).find(item => item.pack === packId && item.id === "copy")!); }
 function textRow(s: ReviewSnapshot) { return s.rows.find(row => row.label === "text.content")!; }
 
 beforeEach(async () => {
@@ -407,6 +407,118 @@ it('MCP does not offer source-reference repair for changed destinations or damag
     expect(context).toMatchObject({ ok: true, value: { referenceRepairEdit: null } });
     expect(await f.call('save_correction', { ...f.args, restoreSourceReferences: true, text: ['⟦1⟧'] })).toMatchObject({ ok: false, error: { code: 'Live.InvalidReferenceRepair' } });
   }
+  expect(writes).toHaveLength(0);
+});
+
+it.each(['Item', 'JournalEntryPage'])('MCP restores an unambiguous collapsed %s link with preview, retry binding and guarded undo', async child => {
+  const root = child === 'Item' ? 'Actor.light' : 'JournalEntry.source';
+  const mapped = child === 'Item' ? 'Compendium.world.actors.Actor.copyLight' : copyDocument.uuid;
+  source.pages[0]!.text!.content = `<p>Use @UUID[${root}.${child}.ability#details]{Luminous Transit}.</p><p>Other text.</p>`;
+  copy.pages[0]!.text!.content = `<p>Použijte @UUID[${mapped}]{Světelný Přesun}.</p><p>Další text.</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  if (child === 'Item') {
+    game.packs.set('world.actors', { getIndex: async () => new Map([['copyLight', { _id: 'copyLight', name: 'Light', flags: { [MODULE_ID]: {
+      actorTranslation: { schemaVersion: 1, sourceUuid: root, sourceHash: 'x', targetLanguage: 'cs', sourceLanguage: 'en',
+        providerId: 'openai-compatible', translatedAt: '2026-10-01', translatedHtmlFields: 1 },
+    } } }]]) } as any);
+    // Use the module's managed actor compendium identity, not an arbitrary pack.
+    const actorPack = game.packs.get('world.actors')!;
+    game.packs.delete('world.actors'); game.packs.set(ACTOR_TRANSLATIONS_PACK_ID, actorPack);
+    copy.pages[0]!.text!.content = copy.pages[0]!.text!.content!.replace(mapped, `Compendium.${ACTOR_TRANSLATIONS_PACK_ID}.Actor.copyLight`);
+  }
+  const target = child === 'Item' ? `Compendium.${ACTOR_TRANSLATIONS_PACK_ID}.Actor.copyLight.${child}.ability#details` : `${mapped}.${child}.ability#details`;
+  vi.stubGlobal('fromUuid', async (uuid: string) => uuid === target.split('#')[0] ? { uuid, documentName: child } : sourceDocument);
+  const before = copy.pages[0]!.text!.content, original = JSON.stringify(source), f = await liveFixture();
+  const context = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id });
+  expect(context).toMatchObject({ ok: true, value: { referenceRepairEdit: { text: ['Použijte ⟦1⟧.'],
+    references: [[{ marker: '⟦1⟧', command: `@UUID[${target}]{Světelný Přesun}`, editable: true }]],
+    targetChanges: [{ marker: '⟦1⟧', after: `@UUID[${target}]{Světelný Přesun}` }],
+  } } });
+  const args = { ...f.args, restoreSourceReferences: true, text: ['Pomocí ⟦1⟧ se přesuňte.'], labels: [{ marker: '⟦1⟧', label: 'Světelného Přesunu' }] };
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true, value: { referenceRepair: { requested: true, targetChanges: [{ marker: '⟦1⟧' }] }, willVerify: false } });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('save_correction', { ...args, restoreSourceReferences: false })).toMatchObject({ ok: false });
+  expect(await f.call('save_correction', { ...args, text: [`Use @UUID[${root}.${child}.other].`] })).toMatchObject({ ok: false });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toContain(`@UUID[${target}]{Světelného Přesunu}`);
+  expect(textRow(await snapshot()).blocked).toBeNull();
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(await f.call('save_correction', { ...args, restoreSourceReferences: false })).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: args.operationId })).toMatchObject({ ok: true, value: { undone: true } });
+  expect(copy.pages[0]!.text!.content).toBe(before);
+  expect(textRow(await snapshot()).blocked).toBe('StructureChanged');
+  expect(JSON.stringify(source)).toBe(original);
+});
+
+it.each([
+  ['@UUID[Actor.a.Item.one]', '@UUID[Actor.b]'],
+  ['@UUID[Actor.a.Item.one] @UUID[Actor.a.Item.two]', '@UUID[Actor.a]'],
+  ['@UUID[Actor.a.Item.one] @UUID[Actor.a.Item.one]', '@UUID[Actor.a] @UUID[Actor.a]'],
+  ['@UUID[Actor.a.Item.one]', '@Embed[Actor.a]'],
+  ['@UUID[Actor.a.Item.one]', '@UUID[Actor.a#other]'],
+  ['@UUID[Actor.a.Item.one] [[/r 2d6]]', '@UUID[Actor.a] [[/r 3d6]]'],
+  ['@UUID[Actor.a.ActiveEffect.one]', '@UUID[Actor.a]'],
+])('MCP rejects ambiguous or unrelated target repair: %s -> %s', async (original, changed) => {
+  source.pages[0]!.text!.content = `<p>${original}</p>`;
+  copy.pages[0]!.text!.content = `<p>${changed}</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture();
+  expect(await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id })).toMatchObject({ ok: true, value: { referenceRepairEdit: null } });
+  expect(await f.call('save_correction', { ...f.args, restoreSourceReferences: true, text: ['⟦1⟧'] })).toMatchObject({ ok: false, error: { code: 'Live.InvalidReferenceRepair' } });
+  expect(writes).toHaveLength(0);
+});
+
+it('requires all remaining field damage to be fixed and rejects stale target repairs', async () => {
+  source.pages[0]!.text!.content = '<p>Use @UUID[Actor.a.Item.one].</p><p>Keep &Reference[exhaustion].</p>';
+  copy.pages[0]!.text!.content = '<p>Použijte @UUID[Actor.a].</p><p>Další text.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  vi.stubGlobal('fromUuid', async (uuid: string) => uuid === 'Actor.a.Item.one' ? { uuid, documentName: 'Item' } : sourceDocument);
+  const f = await liveFixture(), args = { ...f.args, restoreSourceReferences: true, text: ['Použijte ⟦1⟧.'] };
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: false, error: { code: 'Review.ProtectedText' } });
+  copy.pages[0]!.text!.content += '<p>Novější editace.</p>';
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: false, error: { code: 'Review.Conflict' } });
+  expect(writes).toHaveLength(0);
+});
+
+it('combines missing commands and collapsed targets across inline fragments, while undo preserves unrelated later edits', async () => {
+  source.pages[0]!.text!.content = '<p><strong>Use</strong> @UUID[Actor.a.Item.one] and &Reference[exhaustion].</p><p>Other paragraph.</p>';
+  copy.pages[0]!.text!.content = '<p><strong>Použijte</strong> @UUID[Actor.a] a únavu.</p><p>Další odstavec.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  vi.stubGlobal('fromUuid', async (uuid: string) => uuid === 'Actor.a.Item.one' ? { uuid, documentName: 'Item' } : sourceDocument);
+  const f = await liveFixture(), args = { ...f.args, restoreSourceReferences: true, text: ['Použijte', ' ⟦1⟧ a ⟦2⟧.'] };
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true });
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true });
+  let s = await snapshot();
+  const other = s.rows.find(row => row.label === 'text.content' && row.id !== f.row.id)!;
+  await saveReviewRows(s, [{ rowId: other.id, parts: ['Novější oprava jinde.'] }]);
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: args.operationId })).toMatchObject({ ok: true });
+  expect(copy.pages[0]!.text!.content).toBe('<p><strong>Použijte</strong> @UUID[Actor.a] a únavu.</p><p>Novější oprava jinde.</p>');
+  s = await snapshot();
+  const freshContext = await f.call('get_context', { documentId: s.entry.uuid, rowId: f.row.id });
+  const second = { ...args, revision: (freshContext.value as any).revision, operationId: crypto.randomUUID() };
+  expect(await f.call('save_correction', second)).toMatchObject({ ok: true });
+  copy.pages[0]!.text!.content = copy.pages[0]!.text!.content!.replace('Použijte', 'Využijte');
+  const count = writes.length;
+  expect(await f.call('undo_correction', { documentId: s.entry.uuid, operationId: second.operationId })).toMatchObject({ ok: false, error: { code: 'Review.UndoConflict' } });
+  expect(writes).toHaveLength(count);
+});
+
+it('reports a source-derived child that no longer exists and rechecks targets between preview and save', async () => {
+  source.pages[0]!.text!.content = '<p>Use @UUID[Actor.a.Item.oldAbility].</p>';
+  copy.pages[0]!.text!.content = '<p>Použijte @UUID[Actor.a].</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  let exists = false;
+  vi.stubGlobal('fromUuid', async (uuid: string) => uuid === 'Actor.a.Item.oldAbility' ? exists ? { uuid, documentName: 'Item' } : null : sourceDocument);
+  const f = await liveFixture(), args = { ...f.args, restoreSourceReferences: true, text: ['Použijte ⟦1⟧.'] };
+  expect(await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id })).toMatchObject({ ok: true, value: {
+    referenceRepairEdit: null, referenceRepairTargets: [{ target: 'Actor.a.Item.oldAbility', exists: false }],
+  } });
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: false, error: { code: 'Live.ReferenceTargetMissing' } });
+  exists = true;
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true });
+  exists = false;
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: false, error: { code: 'Live.ReferenceTargetMissing' } });
   expect(writes).toHaveLength(0);
 });
 

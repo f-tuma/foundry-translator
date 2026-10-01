@@ -88,8 +88,24 @@ příkazy z originálu jako nové značky. Agent značky umístí do správné �
 a použije `restoreSourceReferences: true` v náhledu i zápisu. Značky nelze
 vynechat, zdvojit ani změnit jejich cíle. Výsledné celé pole musí odpovídat
 struktuře a příkazům originálu; pokud chybí odkazy i v jiné pasáži téhož pole,
-jedna oprava nestačí a zápis zůstane zablokovaný. Změněný cíl, nadbytečný příkaz,
-poškozené HTML nebo neúplná diagnostika tuto možnost vůbec nenabídnou.
+jedna oprava nestačí a zápis zůstane zablokovaný.
+
+Od verze modulu 0.32.3 / mostu 0.3.2 lze stejně opravit také jednoznačný odkaz
+`@UUID`, který starší překlad zkrátil z vložené schopnosti (`Item`) nebo stránky
+(`JournalEntryPage`) na její rodičovský dokument. `referenceRepairEdit.targetChanges`
+a náhled `referenceRepair.targetChanges` ukazují původní a obnovený příkaz.
+Přidá se pouze přesná přípona z originálu; stávající přeložená kopie rodiče,
+kotva a popisek se zachovají. Agent může popisek dále upravit přes `labels`.
+`referenceRepairTargets` a náhled uvádějí také dostupnost obnovených cílů.
+Jejich existenci most ověří při načtení kontextu, náhledu i novém zápisu.
+Pokud dítě chybí nebo není dostupné, návrh se nenabídne a explicitní oprava
+vrátí `Live.ReferenceTargetMissing`. Ani odkaz v originálu není zárukou, že
+schopnost či stránka existuje. Agent nesmí hádat náhradní cíl.
+
+Oprava se nenabídne, pokud by rodiči odpovídalo více chybějících dětí, stejný
+odkaz chyběl opakovaně, odkaz byl v jiném odstavci, rodič byl relativní nebo
+se změnil jiný příkaz či HTML. Neobnovuje jiné cíle, vložené efekty ani změněné
+parametry pravidel. Celé pole musí po opravě projít původní přísnou validací.
 
 Obě opravy vyžadují aktuální revizi a důvod, ukládají se do stejné historie
 a zůstávají neověřené. Lze je vrátit; vrácení obnovy odkazu může znovu zablokovat

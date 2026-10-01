@@ -4,7 +4,8 @@ import { hasManualOutputEdits } from "../translation/output-hash";
 import { isEditorProtected, readEditorProtection, recordEditorProtection } from "../translation/editor-protection";
 import { MODULE_ID } from "../constants";
 import { portableFields, type BundleDocumentKind, type FieldFormat, type PortableDocument } from "../bundles/fields";
-import { assertPortableText, diagnosePortableText, type PortableTextDiagnostics } from "../bundles/format";
+import { assertPortableText, diagnosePortableText, syntaxExpressions, type PortableTextDiagnostics } from "../bundles/format";
+import { referenceRepairDraft } from "./reference-repair";
 import { remapBundleReferences } from "../bundles/service";
 import { ACTOR_TRANSLATIONS_PACK_ID } from "../translation/compendium-actor-translation-repository";
 import { ITEM_TRANSLATIONS_PACK_ID } from "../translation/compendium-item-translation-repository";
@@ -420,14 +421,18 @@ export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string
   const value = planReviewText(previous ?? field.translation, field.format).replace(row.unitId, parts);
   try {
     if (repairReferences || undoReferences) {
-      const missingOnly = (text: string) => {
-        const details = diagnosePortableText(field.source, portableReviewText(snapshot, field, text), field.format);
-        return details && details.commands.missing.length > 0 && !details.commands.extra.length && !details.commands.truncated && !details.markup.length && !details.markupTruncated;
-      };
-      if (repairReferences && !missingOnly(field.translation)) throw new Error("Only missing source commands can be repaired.");
+      if (repairReferences) {
+        const repair = referenceRepairDraft(snapshot, row);
+        if (!repair || JSON.stringify(syntaxExpressions(portableReviewText(snapshot, field, parts).join(""))) !==
+          JSON.stringify(syntaxExpressions(portableReviewText(snapshot, field, repair.references.flat().map(ref => ref.command)).join("")))) {
+          throw new Error("Only the source-derived reference repair can be applied.");
+        }
+      }
       if (undoReferences) {
         // Reachable only through a guard-checked, exact persistent undo record.
-        if (!missingOnly(value)) throw new Error("Invalid reference repair undo.");
+        const restored = { ...field, translation: value, integrity: null };
+        if (!referenceRepairDraft({ ...snapshot, fields: snapshot.fields.map(item => item.id === field.id ? restored : item) },
+          { ...row, translation: parts, blocked: "StructureChanged" })) throw new Error("Invalid reference repair undo.");
       } else assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
     } else {
       assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
