@@ -116,4 +116,5 @@ it('boots the actual MCP server from a verified downloaded asset through the sta
     await fetch(`${connection.address}/reply`,{method:'POST',headers:{Origin:origin,Authorization:`Bearer ${sessionToken}`,'Content-Type':'application/json'},body:JSON.stringify({id:request.id,result:{ok:true,value:{worldId:claim.worldId,language:'cs'}}})});
     expect(JSON.parse(((await pending).content as {text:string}[])[0]!.text)).toEqual({ok:true,value:{worldId:claim.worldId,language:'cs'}});
   } finally {await client.close();await rm(root,{recursive:true,force:true});}
-});
+// The SDK allows graceful shutdown of both launcher and server processes.
+}, 15000);
