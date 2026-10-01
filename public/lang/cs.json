@@ -452,6 +452,8 @@
   "FOUNDRY_TRANSLATE.Review.UiImportInvalid": "Neplatný soubor oprav rozhraní. Použij export JSON z tohoto editoru (nejvýše 10 MB).",
   "FOUNDRY_TRANSLATE.Review.UiImportSummary": "Změny k importu: {count} · Vynechaná nekompatibilní hesla: {skipped}",
   "FOUNDRY_TRANSLATE.Review.ExportHistory": "Export historie JSON",
+  "FOUNDRY_TRANSLATE.Review.HistoryLoading": "Načítám historii: {done} / {total} compendií",
+  "FOUNDRY_TRANSLATE.Review.HistoryStopped": "Načítání historie bylo zastaveno. Pro nové načtení použijte Obnovit.",
   "FOUNDRY_TRANSLATE.Review.HistoryEmpty": "Zatím žádné opravy uložené touto verzí editoru.",
   "FOUNDRY_TRANSLATE.Review.Passages": "Úseky",
   "FOUNDRY_TRANSLATE.Review.ShowChanges": "Zobrazit původní a nové znění",

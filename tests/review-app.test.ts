@@ -141,3 +141,17 @@ it("bounds large sections, searches all pages, retains off-page drafts and opens
   expect(app.element.querySelector('[data-review-row="large-219"]')).toBeTruthy();
   expect(app.element.querySelectorAll('[data-review-row]').length).toBeLessThanOrEqual(50);
 });
+
+
+it("keeps tabs and closing available while history is waiting for a compendium index", async () => {
+  const { app } = await fixture(); const service = await import("../src/review/service");
+  let complete!: (value: any) => void;
+  vi.spyOn(service, "reviewHistory").mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+  const tab = (key: string) => [...app.element.querySelectorAll<HTMLButtonElement>("[role=tab]")].find(button => button.textContent?.endsWith(key))!;
+  tab("History").click();
+  await vi.waitFor(() => expect(app.element.textContent).toContain("ExportHistory"));
+  expect(tab("Documents").disabled).toBe(false);
+  tab("Documents").click(); await vi.waitFor(() => expect(app.element.querySelector("textarea")).toBeTruthy());
+  complete([]); await Promise.resolve(); expect(app.element.querySelector("textarea")).toBeTruthy();
+  await app.close(); expect(app.element.isConnected).toBe(false);
+});

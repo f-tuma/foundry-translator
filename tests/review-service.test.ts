@@ -1,4 +1,4 @@
-import { saveReviewRows, readReviewHistory, undoReview } from "../src/review/service";
+import { saveReviewRows, readReviewHistory, reviewHistory, undoReview } from "../src/review/service";
 import { parseHTML } from "linkedom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { loadReview, reviewCatalog, updateReview, type ReviewSnapshot } from "../src/review/service";
@@ -408,4 +408,26 @@ it('MCP does not offer source-reference repair for changed destinations or damag
     expect(await f.call('save_correction', { ...f.args, restoreSourceReferences: true, text: ['⟦1⟧'] })).toMatchObject({ ok: false, error: { code: 'Live.InvalidReferenceRepair' } });
   }
   expect(writes).toHaveLength(0);
+});
+
+
+it("reads history from parent flags in the compendium index without hydrating unrelated documents", async () => {
+  const pack = game.packs.get(packId)!;
+  const getDocument = vi.spyOn(pack, "getDocument");
+  copy.flags![MODULE_ID]!.reviewHistory = { correction: { id: "correction", at: "2026-10-01", userName: "GM", sourceHash: "x", label: "Correction", rows: [] } };
+  const progress = vi.fn();
+  const history = await reviewHistory("cs", { progress });
+  expect(history).toHaveLength(1); expect(history[0]?.operations[0]?.id).toBe("correction");
+  expect(history[0]?.entry.uuid).toBe(`Compendium.${packId}.JournalEntry.copy`);
+  expect(getDocument).not.toHaveBeenCalled();
+  expect(await reviewHistory("de")).toEqual([]);
+  expect(progress).toHaveBeenLastCalledWith(1, 1);
+});
+it("lets history cancel a stalled index read immediately without late progress updates", async () => {
+  const controller = new AbortController(), pack = game.packs.get(packId)!;
+  let complete!: (value: any) => void;
+  vi.spyOn(pack, "getIndex").mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+  const progress = vi.fn(), pending = reviewHistory("cs", { signal: controller.signal, progress });
+  controller.abort(); await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  complete(new Map()); await Promise.resolve(); expect(progress).toHaveBeenCalledTimes(1);
 });

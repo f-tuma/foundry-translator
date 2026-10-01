@@ -452,6 +452,8 @@
   "FOUNDRY_TRANSLATE.Review.UiImportInvalid": "Invalid interface override file. Use a JSON export from this editor (up to 10 MB).",
   "FOUNDRY_TRANSLATE.Review.UiImportSummary": "{count} changes to import · {skipped} incompatible entries skipped",
   "FOUNDRY_TRANSLATE.Review.ExportHistory": "Export history JSON",
+  "FOUNDRY_TRANSLATE.Review.HistoryLoading": "Loading history: {done} / {total} compendiums",
+  "FOUNDRY_TRANSLATE.Review.HistoryStopped": "History loading stopped. Use Refresh to load it again.",
   "FOUNDRY_TRANSLATE.Review.HistoryEmpty": "No corrections saved by this version of the editor yet.",
   "FOUNDRY_TRANSLATE.Review.Passages": "passages",
   "FOUNDRY_TRANSLATE.Review.ShowChanges": "Show before and after",
