@@ -121,20 +121,21 @@ function htmlStructure(value: string): string {
   return JSON.stringify([...template.content.childNodes].map(walk));
 }
 
+export function syntaxExpressions(text: string): string[] { return [...text.matchAll(FOUNDRY_EXPRESSION)].map(([expression]) => {
+    // Compare complete commands as a multiset. Sorting protection fragments would
+    // let options or UUIDs migrate between different commands unnoticed.
+    const reference = expression.replace(/^&(?:amp;)?[Rr]eference\[/u, "&Reference[").replace(/^@(UUID|Embed)\[/iu, (_, kind: string) => `@${kind.toLowerCase() === "uuid" ? "UUID" : "Embed"}[`).replace(/(@(?:UUID|Embed)\[[^\]\r\n]*\])\{([^}\r\n]*)\}/giu,
+      (whole, command: string, label: string) => /@[A-Za-z][A-Za-z0-9]*\[|&(?:amp;)?[Rr]eference\[|\[\[/u.test(label) ? whole : command);
+    // Reject nested executable syntax in any editable label or embed caption.
+    const prose = protectFoundrySyntax(reference, { nonce: "BUNDLE" });
+    requireValue(!/@[A-Za-z][A-Za-z0-9]*\[|&(?:amp;)?[Rr]eference\[|\[\[/u.test(prose.text), "nested Foundry commands in a label.");
+    return JSON.stringify(prose.tokens.map(t => t.source));
+  }).sort(); }
+
 /** Import prose only: reject changes to markup, URLs, UUIDs, rolls and macros. */
 export function assertPortableText(source: string, translation: string, format: FieldFormat): void {
   requireValue(!/__FT[NGS]_/iu.test(translation), "unrestored protection token.");
-  const syntax = (text: string) => JSON.stringify([...text.matchAll(FOUNDRY_EXPRESSION)].map(([expression]) => {
-    // Compare complete commands as a multiset. Sorting protection fragments would
-    // let options or UUIDs migrate between different commands unnoticed.
-    const reference = expression.replace(/^&amp;Reference\[/u, "&Reference[").replace(/^@(UUID|Embed)\[/iu, (_, kind: string) => `@${kind.toLowerCase() === "uuid" ? "UUID" : "Embed"}[`).replace(/(@(?:UUID|Embed)\[[^\]\r\n]*\])\{([^}\r\n]*)\}/giu,
-      (whole, command: string, label: string) => /@[A-Za-z][A-Za-z0-9]*\[|&(?:amp;)?Reference\[|\[\[/u.test(label) ? whole : command);
-    // Reject nested executable syntax in any editable label or embed caption.
-    const prose = protectFoundrySyntax(reference, { nonce: "BUNDLE" });
-    requireValue(!/@[A-Za-z][A-Za-z0-9]*\[|&(?:amp;)?Reference\[|\[\[/u.test(prose.text), "nested Foundry commands in a label.");
-    return JSON.stringify(prose.tokens.map(t => t.source));
-  }).sort());
-  requireValue(syntax(source) === syntax(translation), "Foundry references or commands were changed.");
+  requireValue(JSON.stringify(syntaxExpressions(source)) === JSON.stringify(syntaxExpressions(translation)), "Foundry references or commands were changed.");
   if (format === "html" || format === "text") requireValue(htmlStructure(source) === htmlStructure(translation), "HTML structure or attributes were changed.");
   if (format === "markdown") {
     let marker = "PORTABLEPROSE";
@@ -146,5 +147,52 @@ export function assertPortableText(source: string, translation: string, format: 
       return p.apply(p.units.map(u => u.map(() => marker))).replace(new RegExp(`(?:${marker})+`, "gu"), marker);
     };
     requireValue(skeleton(source) === skeleton(translation), "Markdown structure or destinations were changed.");
+  }
+}
+
+
+export interface PortableTextDiagnostics {
+  message: string;
+  commands: { missing: { command: string; count: number }[]; extra: { command: string; count: number }[]; truncated: boolean };
+  markup: { path: string; source: unknown; translation: unknown }[];
+  markupTruncated: boolean;
+}
+/** Explain a rejection without relaxing the same validator used for writes.
+ * Counts retain command options and multiplicity; prose labels are not commands.
+ * Bounded details are untrusted document data, never repair instructions. */
+export function diagnosePortableText(source: string, translation: string, format: FieldFormat): PortableTextDiagnostics | null {
+  try { assertPortableText(source, translation, format); return null; }
+  catch (error) {
+    const result: PortableTextDiagnostics = { message: error instanceof Error ? error.message : String(error),
+      commands: { missing: [], extra: [], truncated: false }, markup: [], markupTruncated: false };
+    try {
+      const counts = (text: string) => { const map = new Map<string, number>(); for (const command of syntaxExpressions(text)) map.set(command, (map.get(command) ?? 0) + 1); return map; };
+      const before = counts(source), after = counts(translation);
+      for (const command of new Set([...before.keys(), ...after.keys()])) {
+        const difference = (before.get(command) ?? 0) - (after.get(command) ?? 0);
+        if (!difference) continue;
+        const list = difference > 0 ? result.commands.missing : result.commands.extra;
+        if (list.length < 20) {
+          const text = JSON.parse(command).join("") as string;
+          list.push({ command: text.slice(0, 2048), count: Math.abs(difference) });
+          if (text.length > 2048) result.commands.truncated = true;
+        }
+        else result.commands.truncated = true;
+      }
+    } catch { /* The main diagnostic already reports malformed/nested commands. */ }
+    if (format === "html" || format === "text") {
+      const diff = (a: unknown, b: unknown, path: string): void => {
+        if (JSON.stringify(a) === JSON.stringify(b)) return;
+        if (result.markup.length >= 20) { result.markupTruncated = true; return; }
+        if (Array.isArray(a) && Array.isArray(b)) {
+          for (let i = 0; i < Math.max(a.length, b.length); i++) diff(a[i], b[i], `${path}/${i}`);
+        } else {
+          const bounded = (value: unknown) => { const text = JSON.stringify(value ?? null); return text.length > 1000 ? { excerpt: text.slice(0, 800), characters: text.length } : value ?? null; };
+          result.markup.push({ path, source: bounded(a), translation: bounded(b) });
+        }
+      };
+      diff(JSON.parse(htmlStructure(source)), JSON.parse(htmlStructure(translation)), "html");
+    }
+    return result;
   }
 }

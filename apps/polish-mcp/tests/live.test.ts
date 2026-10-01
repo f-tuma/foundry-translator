@@ -49,6 +49,15 @@ it("fails closed on unsafe method/args and on mismatched origin formats", () => 
   expect(() => parseLiveRequest({ id: '1', method: 'search_passages', args: { query: 'Hero', limit: 100000 } })).toThrow();
   expect(() => parseLiveRequest({ id: '1', method: 'status', args: { labels: Array.from({ length: 31 }, () => ({ marker: '⟦1⟧', label: 'x'.repeat(2000) })) } })).toThrow();
 });
+it("accepts explicit source repairs only on correction requests with boolean flags", () => {
+  const args = { documentId: 'copy', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Restore from source', text: ['Oprava'], operationId: 'repair-1' };
+  for (const key of ['restoreSourceNumbers', 'restoreSourceReferences']) {
+    expect(parseLiveRequest({ id: '1', method: 'save_correction', args: {...args, [key]: true} }).args).toHaveProperty(key, true);
+    expect(parseLiveRequest({ id: '1', method: 'validate_correction', args: {...args, [key]: false} }).args).toHaveProperty(key, false);
+    expect(() => parseLiveRequest({ id: '1', method: 'save_correction', args: {...args, [key]: 'true'} })).toThrow();
+    expect(() => parseLiveRequest({ id: '1', method: 'get_context', args: { documentId: 'copy', rowId: args.rowId, [key]: true} })).toThrow();
+  }
+});
 it("exposes live tools through the actual STDIO SDK and forwards browser results without an export", async () => {
   const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../dist/index.cjs', import.meta.url)), '--live', '--origin', origin, '--port', '0'], stderr: 'pipe' });
   const client = new Client({ name: 'live-integration-test', version: '1' });

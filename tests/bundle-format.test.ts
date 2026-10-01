@@ -1,6 +1,6 @@
 import { parseHTML } from "linkedom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { assertPortableText, parseTranslationBundle, type TranslationBundle } from "../src/bundles/format";
+import { assertPortableText, diagnosePortableText, parseTranslationBundle, type TranslationBundle } from "../src/bundles/format";
 import { remapBundleReferences } from "../src/bundles/service";
 import { portableFields, type PortableDocument } from "../src/bundles/fields";
 
@@ -89,4 +89,14 @@ it("compares complete embed commands, never a sorted bag of protected fragments"
   expect(() => assertPortableText(source, '@Embed[JournalEntry.b caption="Druhý" cited] @Embed[JournalEntry.a caption="První" inline]', 'text')).not.toThrow();
   expect(() => assertPortableText(source, '@Embed[JournalEntry.a caption="První" cited] @Embed[JournalEntry.b caption="Druhý" inline]', 'text')).toThrow();
   expect(() => assertPortableText('@UUID[Actor.a]{A}', '@UUID[Actor.a]{@Macro[evil]}', 'text')).toThrow();
+  expect(() => assertPortableText('@UUID[Actor.a]{A}', '@UUID[Actor.a]{&reference[evil]}', 'text')).toThrow();
+});
+
+
+it("reports bounded integrity details while accepting movable labels and rejecting removed commands", () => {
+  expect(diagnosePortableText('<p>@UUID[Actor.a]{A} @UUID[Actor.b]{B}</p>', '<p>@UUID[Actor.b]{Béčko} @UUID[Actor.a]{Ačko}</p>', 'html')).toBeNull();
+  const source = Array.from({length: 30}, (_, i) => `@UUID[Actor.a${i}]`).join(' ');
+  const details = diagnosePortableText(source, 'Chybí odkazy.', 'text')!;
+  expect(details.commands.missing).toHaveLength(20); expect(details.commands.truncated).toBe(true);
+  expect(() => assertPortableText(source, 'Chybí odkazy.', 'text')).toThrow();
 });

@@ -1839,3 +1839,23 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
   variants/Unicode/inline splits, protected references, selection/preview gating,
   stale batch preflight, boundary stop, narrow multi-row commits and safe undo,
   header identity resolution, UI overrides/import/format/freshness and activation.
+
+
+## 2026-10-01 — 0.32.1 editor responsiveness and explicit MCP repairs
+
+- Document editor limits each page to 50 rows, searches the whole section and
+  retains drafts across pages/filters. Batch textarea layout and indexed unit
+  lookup remove the previous per-row layout and repeated array scans.
+- Integrity details identify complete missing/extra commands and bounded markup
+  differences in the context panel and MCP. Lowercase Crucible references are
+  protected. Normal validation remains strict.
+- Explicit MCP source-number repair requires all proposed digit values/counts
+  to match the source and current values to differ. Source-reference repair only
+  exposes exact missing commands when there is no extra command/markup damage;
+  the complete field must pass before committing. Fresh revision, operation-ID
+  binding, history/undo and unverified state remain mandatory.
+- See `docs/benchmarks/editor-integrity-2026-10-01.md` for automated and native QA.
+  Root: 553 passed / 4 optional LM tests skipped. MCP: 30 passed. Native synthetic
+  1,200-paragraph test passed on loopback Foundry using noCanvas; production was
+  not updated. Existing corrupt production fields still need fresh diagnostics
+  and individual correction after the user installs the patch and new MCP JSON.

@@ -88,3 +88,10 @@ describe("Foundry syntax protection", () => {
     expect(() => restoreFoundrySyntax(reversed, protection)).toThrow(/order/u);
   });
 });
+
+it('protects lowercase and entity-escaped Reference commands found in existing Ember prose', () => {
+  const input = '&reference[damage threshold] and &amp;Reference[prone]';
+  const protectedText = protectFoundrySyntax(input, { nonce: 'REFERENCECASE' });
+  expect(protectedText.text).not.toContain('damage threshold');
+  expect(protectedText.tokens.map(token => token.source).join(' ')).toContain('&reference[damage threshold]');
+});

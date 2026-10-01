@@ -338,6 +338,20 @@ na scéně a nesynchronizuje její životy. Některá automaticky otevřená okn
 texty generované přímo Emberem mohou stále zobrazit originál.
 
 
+## Plynulejší editor a diagnostika (0.32.1)
+
+Editor zobrazuje nejvýše 50 pasáží oddílu najednou. Pod tabulkou jsou tlačítka
+**Předchozí** a **Další** a rozsah výsledků. Hledání prochází celý
+vybraný oddíl, včetně pasáží mimo aktuální stránku. Rozepsané opravy zůstávají
+zachované při přepnutí stránky, oddílu i při změně hledání. Otevření konkrétního
+úseku nebo pokračování v kontrole zobrazí stránku, na které úsek leží.
+
+U blokovaného pole otevřete **Kontext a poznámky**. Podrobnosti kontroly ukážou
+chybějící či nadbytečné příkazy a rozdíly ve struktuře HTML. Samotný náhled
+nic neopravuje. Řízené obnovení původního chybějícího odkazu nebo chybné číselné
+hodnoty je dostupné přes MCP; postup je v jeho dokumentaci. Změněné cíle odkazů
+a poškozené HTML zůstávají zablokované. Uložení opravy není potvrzením ověření.
+
 ## Scény a aktivní efekty (0.23.0)
 
 V nastavení scény nebo efektu klikněte na **Přeložit text**. Překlad celého deníku
