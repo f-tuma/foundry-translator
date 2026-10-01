@@ -1,6 +1,6 @@
 {
   "name": "foundry-translate",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "private": true,
   "type": "module",
   "description": "Reliable, glossary-aware adventure translation for Foundry VTT v14.",
@@ -13,8 +13,10 @@
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run test && npm run build",
-    "release:verify": "node scripts/verify-release.mjs"
+    "check": "npm run mcp:prepare && npm run typecheck && npm run test && npm run build",
+    "release:verify": "node scripts/verify-release.mjs",
+    "mcp:prepare": "npm --prefix apps/polish-mcp run build && node scripts/prepare-mcp-runtime.mjs",
+    "prebuild": "npm run mcp:prepare"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

@@ -1,29 +1,27 @@
-# Foundry Translate 0.31.0 — stručný návod
+# Foundry Translate 0.32.0 — stručný návod
 
 ## Korektura přímo přes MCP
 
-Otevřete **Překlady dobrodružství → Korektura přes MCP** a zvolte
-**Přímo v otevřeném světě**. Zadejte cestu k sestavenému MCP na počítači
-asistenta; menu vygeneruje konfiguraci s přesnou adresou vašeho Foundry.
-Sestavení a oba režimy popisuje [návod MCP](../apps/polish-mcp/README.md).
+Jako GM otevři **Překlady dobrodružství → Korektura přes MCP**, klikni **Uložit
+a povolit přístup** a **Zkopírovat MCP JSON**. Vlož jej do MCP klienta na stejném
+počítači jako prohlížeč Foundry. Vyžaduje Node.js 22.12+, bez Dockeru či ručního
+sestavování. Klient automaticky stáhne konkrétní verzi mostu z GitHubu, ověří
+kontrolní součet a spustí jej. Foundry se připojí uloženým klíčem. Podrobnosti
+popisuje [návod MCP](../apps/polish-mcp/README.md).
 
-Po spuštění MCP požádejte asistenta o `live_connection`. Jeho jednorázový
-párovací kód vložte do menu a připojte se. Kód nepatří do URL ani do souboru
-konfigurace. Asistent musí před první opravou zkontrolovat svět a jazyk přes
-`live_status` a načíst originál, kontext a glosář přes `live_get_context`.
+Asistent musí před opravou potvrdit svět a jazyk přes `live_status` a načíst
+originál, kontext a glosář přes `live_get_context`. Opravy se rovnou ukládají
+s historií a možností vrácení v editoru. **Ověřit** zůstává samostatný ruční krok.
+V otevřeném editoru použij **Načíst znovu**; rozpracované změny se nepřepisují.
 
-Opravy se rovnou ukládají do přeložených kopií. V **Editoru překladů → Historie
-oprav** uvidíte původní a nové znění a můžete opravu vrátit; historie zůstává
-i po odpojení. **Ověřit** zůstává samostatný ruční krok. V již otevřeném editoru
-použijte **Načíst znovu**, abyste viděli novou opravu. Rozpracované změny se
-nepřepisují; zastaralý zápis je odmítnut.
+Menu můžeš zavřít, GM kartu nech otevřenou. Povolený přístup se po obnovení
+stránky či restartu MCP automaticky připojí znovu ve stejném světě, účtu a jazyce.
+**Vypnout přístup** zastaví i automatické navazování. JSON obsahuje klíč; nesdílej
+jej. Po změně klíče nebo aktualizaci modulu zkopíruj nový JSON a restartuj MCP.
 
-Menu můžete zavřít, GM kartu ponechte otevřenou. **Odpojit** nebo obnovení
-stránky relaci zruší. Po výpadku nejprve zkontrolujte historii: zápis mohl být
-uložen i bez doručené odpovědi. Opakování stejného požadavku vyžaduje stejné
-`operationId` a argumenty. Nepouštějte současně více zapisujících GM klientů
-nad jedním dokumentem. Exportní režim zůstává dostupný pro práci bez běžícího
-světa.
+Po výpadku zkontroluj historii: oprava mohla být uložená bez doručené odpovědi.
+Zápisy se automaticky neopakují; opakování vyžaduje stejné `operationId` a
+argumenty. Nad jedním dokumentem používej jednoho zapisujícího GM.
 
 ## České rozhraní
 

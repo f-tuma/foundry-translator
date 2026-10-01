@@ -65,3 +65,56 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     const response = await pending; expect(JSON.parse((response.content as { text: string }[])[0]!.text)).toEqual({ ok: true, value: { language: 'cs', documents: 1 } });
   } finally { await client.close(); }
 });
+
+it('uses a persistent API key bound to the configured world, GM and language, supports reload and keeps secrets out of tools', async () => {
+  const apiKey = 'b'.repeat(64);
+  bridge = await new LiveBridge(origin, 0, { apiKey, worldId: claim.worldId, userId: claim.userId, language: claim.language }).start();
+  const connection = bridge.connection(); expect(connection).not.toHaveProperty('pairingCode'); expect(JSON.stringify(connection)).not.toContain(apiKey);
+  const connect = (body = claim, key = apiKey) => fetch(`${connection.address}/connect`, {method:'POST',headers:{Origin:origin,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  expect((await connect(claim,'é'.repeat(64))).status).toBe(401);
+  for (const field of ['worldId','userId','language'] as const) expect((await connect({...claim,[field]:field==='language'?'de':'other'})).status).toBe(403);
+  const response = await connect(); expect(response.status).toBe(200); const token = (await response.json()).sessionToken;
+  const reload = await connect(); expect(reload.status).toBe(200); expect((await reload.json()).sessionToken).toBe(token);
+  expect((await connect({...claim,clientId:'second-tab'})).status).toBe(409);
+  bridge.disconnect(); expect((await connect()).status).toBe(200);
+  bridge.revoke(); expect((await connect()).status).toBe(403);
+});
+it('client automatically starts a persistent-key STDIO bridge; restarting the client needs no new pairing', async () => {
+  const key = 'c'.repeat(64);
+  const create = () => new StdioClientTransport({command:process.execPath,args:[fileURLToPath(new URL('../dist/index.cjs',import.meta.url)),'--live','--origin',origin,'--port','0','--world',claim.worldId,'--user',claim.userId,'--language',claim.language],env:{FOUNDRY_MCP_API_KEY:key},stderr:'pipe'});
+  for (let i=0;i<2;i++) {
+    const client = new Client({name:'persistent-test',version:'1'});
+    try {
+      await client.connect(create()); const result = await client.callTool({name:'live_connection',arguments:{}});
+      const connection = JSON.parse((result.content as {text:string}[])[0]!.text); expect(connection).not.toHaveProperty('pairingCode'); expect(JSON.stringify(connection)).not.toContain(key);
+      const response = await fetch(`${connection.address}/connect`,{method:'POST',headers:{Origin:origin,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(claim)});
+      expect(response.status).toBe(200);
+      const revoked = await client.callTool({name:'live_disconnect',arguments:{}}); expect(revoked.isError).not.toBe(true);
+      expect((await fetch(`${connection.address}/connect`,{method:'POST',headers:{Origin:origin,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(claim)})).status).toBe(403);
+    } finally { await client.close(); }
+  }
+});
+
+it('boots the actual MCP server from a verified downloaded asset through the standard client configuration', async () => {
+  const {mkdtemp,readFile,writeFile,rm} = await import('node:fs/promises');
+  const {tmpdir} = await import('node:os'); const {join} = await import('node:path'); const {createHash} = await import('node:crypto');
+  const {mcpLauncher} = await import('../../../src/polish/mcp-launcher');
+  const root=await mkdtemp(join(tmpdir(),'ft-actual-bootstrap-'));
+  const payload=fileURLToPath(new URL('../dist/index.cjs',import.meta.url)); const bytes=await readFile(payload); const sha256=createHash('sha256').update(bytes).digest('hex');
+  const preload=join(root,'download-fixture.cjs');
+  await writeFile(preload,`globalThis.fetch=async()=>new Response(require('node:fs').readFileSync(process.env.FOUNDRY_TEST_PAYLOAD));`);
+  const launcher=mcpLauncher({url:'https://github.com/f-tuma/foundry-translator/releases/download/v0.32.0/foundry-polish.cjs',sha256});
+  const key='d'.repeat(64),client=new Client({name:'bootstrap-integration',version:'1'});
+  const transport=new StdioClientTransport({command:process.execPath,args:['--require',preload,'-e',launcher,'--','--live','--origin',origin,'--port','0','--world',claim.worldId,'--user',claim.userId,'--language',claim.language],env:{FOUNDRY_MCP_API_KEY:key,FOUNDRY_MCP_CACHE_DIR:join(root,'cache'),FOUNDRY_TEST_PAYLOAD:payload},stderr:'pipe'});
+  try {
+    await client.connect(transport);const result=await client.callTool({name:'live_connection',arguments:{}});const connection=JSON.parse((result.content as {text:string}[])[0]!.text);
+    expect(connection).not.toHaveProperty('pairingCode');expect((await client.listTools()).tools.map(t=>t.name)).toContain('live_save_correction');
+    expect(await readFile(join(root,'cache',sha256+'.cjs'))).toEqual(bytes);
+    const connect=await fetch(`${connection.address}/connect`,{method:'POST',headers:{Origin:origin,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(claim)});expect(connect.status).toBe(200);
+    const {sessionToken}=await connect.json();const pending=client.callTool({name:'live_status',arguments:{}});
+    const request=await (await fetch(`${connection.address}/poll`,{headers:{Origin:origin,Authorization:`Bearer ${sessionToken}`}})).json();
+    await fetch(`${connection.address}/reply`,{method:'POST',headers:{Origin:origin,Authorization:`Bearer ${sessionToken}`,'Content-Type':'application/json'},body:JSON.stringify({id:request.id,result:{ok:true,value:{worldId:claim.worldId,language:'cs'}}})});
+    expect(JSON.parse(((await pending).content as {text:string}[])[0]!.text)).toEqual({ok:true,value:{worldId:claim.worldId,language:'cs'}});
+  } finally {await client.close();await rm(root,{recursive:true,force:true});}
+// The SDK allows graceful shutdown of both launcher and server processes.
+}, 15000);

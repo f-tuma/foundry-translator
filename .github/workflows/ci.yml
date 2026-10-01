@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install MCP dependencies
+        run: npm ci --prefix apps/polish-mcp
+
       - name: Validate module
         run: npm run check
 

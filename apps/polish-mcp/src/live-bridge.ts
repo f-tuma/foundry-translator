@@ -3,7 +3,8 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { LIVE_PROTOCOL, type LiveClaim, type LiveRequest, type LiveResult } from "../../../src/polish/live-protocol";
 
 const secret = () => randomBytes(32).toString("hex");
-const matches = (actual: string, expected: string) => actual.length === expected.length && timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
+const matches = (actual: string, expected: string) => { const a = Buffer.from(actual), b = Buffer.from(expected); return a.length === b.length && timingSafeEqual(a, b); };
+export interface BridgeOptions { apiKey?: string; worldId?: string; userId?: string; language?: string }
 export function allowedOrigin(value: string): string {
   const url = new URL(value);
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.pathname !== "/" || url.search || url.hash || url.origin === "null") throw new Error("Provide --origin with the exact Foundry origin, e.g. https://ember.example.cz");
@@ -20,7 +21,12 @@ export class LiveBridge {
   private pending: { request: LiveRequest; resolve: (result: LiveResult) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null;
   private delivered = false;
   private runningPort = 0;
-  constructor(readonly origin: string, readonly port: number) { allowedOrigin(origin); }
+  private revoked = false;
+  readonly origin: string;
+  constructor(origin: string, readonly port: number, private options: BridgeOptions = {}) {
+    this.origin = allowedOrigin(origin);
+    if (options.apiKey && (!/^[a-zA-Z0-9_-]{32,512}$/u.test(options.apiKey) || [options.worldId, options.userId, options.language].some(value => !value?.trim() || value.length > 500))) throw new Error("API key, world, GM and language are required");
+  }
   async start() {
     if (!Number.isInteger(this.port) || this.port < 0 || this.port > 65535) throw new Error("Invalid bridge port");
     this.server.requestTimeout = 30000; this.server.headersTimeout = 30000;
@@ -33,13 +39,13 @@ export class LiveBridge {
     this.expire();
     if (!this.session && this.codeExpires <= Date.now()) { this.code = secret(); this.codeExpires = Date.now() + 5 * 60_000; }
     return { address: `http://127.0.0.1:${this.runningPort}`, origin: this.origin, connected: !!this.session,
-      ...(this.session ? { world: this.session.claim, lastSeen: new Date(this.session.seen).toISOString() } : { pairingCode: this.code, expiresAt: new Date(this.codeExpires).toISOString() }),
-      instructions: "In Foundry Translate → MCP select Live world, enter this address and pairing code, and Connect. Keep that GM tab open. Pairing grants direct translation writes with history; verification remains manual. Do not place the code in a URL or commit it." };
+      ...(this.session ? { world: this.session.claim, lastSeen: new Date(this.session.seen).toISOString() } : this.options.apiKey ? {} : { pairingCode: this.code, expiresAt: new Date(this.codeExpires).toISOString() }),
+      instructions: this.options.apiKey ? "Foundry Translate → MCP: enter the service address and API key once, then Save and connect. Keep the GM world open. Corrections have history and undo; verification remains manual." : "In Foundry Translate → MCP select Live world, enter this address and pairing code, and Connect. Keep that GM tab open. Pairing grants direct translation writes with history; verification remains manual. Do not place the code in a URL or commit it." };
   }
   private expire() { if (this.session && Date.now() - this.session.seen > 60000) this.disconnect("Browser heartbeat expired. Read history before retrying a write."); }
   request(method: LiveRequest["method"], args: Record<string, unknown>): Promise<LiveResult> {
     this.expire();
-    if (!this.session) return Promise.reject(new Error("Foundry is not connected. Use live_connection and pair the GM tab."));
+    if (!this.session) return Promise.reject(new Error("Foundry is not connected. Open the configured GM world and enable MCP in its translation menu."));
     if (this.pending) return Promise.reject(new Error("Another Foundry request is in progress."));
     return new Promise((resolve, reject) => {
       const request = { id: randomUUID(), method, args };
@@ -68,6 +74,7 @@ export class LiveBridge {
     if (this.waiting) { clearTimeout(this.waiting.timer); this.json(this.waiting.res, 401, { error: "Disconnected" }); this.waiting = null; }
     if (this.pending) { clearTimeout(this.pending.timer); this.pending.reject(new Error(`${reason}. A write may have committed; inspect history before retrying.`)); this.pending = null; }
   }
+  revoke() { this.revoked = true; this.disconnect("MCP access revoked until the bridge restarts"); }
   async close() { this.disconnect(); this.server.closeAllConnections(); await new Promise<void>(resolve => this.server.close(() => resolve())); }
   private async body(req: IncomingMessage) {
     if (req.headers["content-type"] !== "application/json") throw new Error("Invalid content type");
@@ -80,6 +87,7 @@ export class LiveBridge {
     // preflight and failures; cookies and ambient browser auth are never used.
     if (req.headers.host !== `127.0.0.1:${this.runningPort}` || req.headers.origin !== this.origin) { this.json(res, 403, { error: "Origin or host rejected" }); return; }
     res.setHeader("Access-Control-Allow-Origin", this.origin); res.setHeader("Vary", "Origin");
+    res.setHeader("Cache-Control", "no-store");
     if (req.method === "OPTIONS") {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS"); res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
       res.setHeader("Access-Control-Allow-Private-Network", "true"); res.writeHead(204); res.end(); return;
@@ -87,12 +95,19 @@ export class LiveBridge {
     try {
       this.expire();
       if (req.method === "POST" && req.url === "/connect") {
+        if (this.revoked) { this.json(res, 403, { error: "Access revoked; restart MCP to enable it again" }); return; }
         const token = req.headers.authorization?.replace(/^Bearer /u, "") ?? "";
-        if (this.session || Date.now() > this.codeExpires || !matches(token, this.code)) { this.json(res, 401, { error: "Invalid or consumed pairing code" }); return; }
+        if (this.options.apiKey ? !matches(token, this.options.apiKey) : this.session || Date.now() > this.codeExpires || !matches(token, this.code)) { this.json(res, 401, { error: "Invalid or consumed pairing code" }); return; }
         const claim = await this.body(req) as unknown as LiveClaim;
+        if (this.revoked) { this.json(res, 403, { error: "Access revoked" }); return; }
         if (claim.protocol !== LIVE_PROTOCOL || [claim.worldId, claim.worldName, claim.userId, claim.language, claim.systemId, claim.moduleVersion, claim.clientId].some(s => typeof s !== "string" || !s || s.length > 500) || !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/iu.test(claim.language)) throw new Error("Invalid world claim");
+        if (this.options.apiKey && (claim.worldId !== this.options.worldId || claim.userId !== this.options.userId || claim.language !== this.options.language)) { this.json(res, 403, { error: "World rejected" }); return; }
+        // Reload of the same GM tab resumes its session; another tab cannot take over.
+        if (this.options.apiKey && this.session && ["clientId", "worldId", "userId", "language"].every(key => this.session!.claim[key as keyof LiveClaim] === claim[key as keyof LiveClaim])) {
+          this.session.seen = Date.now(); this.json(res, 200, { protocol: LIVE_PROTOCOL, sessionToken: this.session.token }); return;
+        }
         // Recheck after body parsing: concurrent connect attempts cannot both win.
-        if (this.session || !matches(token, this.code)) { this.json(res, 409, { error: "Already paired" }); return; }
+        if (this.session || (!this.options.apiKey && !matches(token, this.code))) { this.json(res, 409, { error: "Already paired" }); return; }
         this.session = { token: secret(), claim, seen: Date.now() }; this.code = secret();
         this.json(res, 200, { protocol: LIVE_PROTOCOL, sessionToken: this.session.token }); return;
       }
@@ -108,6 +123,7 @@ export class LiveBridge {
       }
       if (req.method === "POST" && req.url === "/reply") {
         const body = await this.body(req), pending = this.pending;
+        if (!this.session || !matches(token, this.session.token)) { this.json(res, 401, { error: "Session changed" }); return; }
         if (!pending || body.id !== pending.request.id || !body.result || typeof body.result !== "object" || typeof (body.result as LiveResult).ok !== "boolean") { this.json(res, 409, { error: "Unknown request" }); return; }
         clearTimeout(pending.timer); this.pending = null; pending.resolve(body.result as LiveResult); this.json(res, 200, { received: true }); return;
       }

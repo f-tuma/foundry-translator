@@ -2,17 +2,22 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.31.0** adds direct **MCP proofreading** in an open GM world.
-Open **Adventure translation → MCP proofreading**, choose the live mode and
-follow the pairing/configuration guide. The [local MCP server](apps/polish-mcp/README.md)
-reads source sentences, nearby context and the reviewed glossary, then saves
-corrections directly to translation copies with persistent history and undo.
-Stale revisions, changed references, markup and numerical changes block writes.
-AI saves never mark a passage human-verified. A loopback bridge connects only
-one explicitly paired GM tab; closing its guide keeps the connection alive,
-but reloading or disconnecting revokes it. Coordinate one writer per document.
-The export/import workflow remains available for offline review. MCP supplies
-tools to your assistant; it does not run a language model itself.
+Version **0.32.0** simplifies direct **MCP proofreading** to a saved access key
+and a copyable JSON configuration. Open **Adventure translation → MCP
+proofreading**, save and enable access, then paste the JSON into your MCP client.
+The client automatically downloads a pinned, SHA-256-verified bridge and starts
+it using Node.js 22.12+. No Docker, repository checkout, manual build, or
+export/import step is required. Keep the GM tab open on the same computer.
+See the [connection guide](apps/polish-mcp/README.md).
+
+Corrections update translated copies immediately, with persistent history,
+idempotent retries and guarded undo. Verification remains a separate human action.
+Connection restores after a client restart or page reload only for the configured
+world, GM and language. Disabling access stops automatic reconnect.
+
+MCP supplies context to the model in your chosen client; it does not itself
+run inference. Original documents and mechanics are not writable. Ordinary
+translation and glossary export/import remains available for community sharing.
 
 Export now recognizes equivalent absolute/relative Foundry UUID notation while
 retaining anchors and embedded targets. Actual missing or changed references
