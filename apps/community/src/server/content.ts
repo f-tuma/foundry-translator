@@ -62,6 +62,8 @@ export function unitsForDocument(
   doc.patches.forEach((patch, fieldIndex) => {
     const source = planReviewText(patch.source, patch.format),
       target = planReviewText(patch.translation, patch.format);
+    if (!same(source.units.map(u => u.id), target.units.map(u => u.id)))
+      throw new Problem(400, "Originál a překlad mají odlišné oddíly.");
     const pageIndex =
       patch.path[0] === "pages" && typeof patch.path[1] === "number"
         ? patch.path[1]
@@ -82,7 +84,9 @@ export function unitsForDocument(
             : "Text dokumentu");
     for (const unit of target.units) {
       const original = source.units.find((p) => p.id === unit.id);
-      if (!original || original.parts.length !== unit.parts.length)
+      // Whitespace-only separators are not editable fragments. Preserve the
+      // target layout even when the source used a comma between inline terms.
+      if (!original)
         throw new Problem(400, "Originál a překlad mají odlišné oddíly.");
       rows.push({
         id: hash(JSON.stringify([doc.sourceUuid, patch.path, unit.id])),

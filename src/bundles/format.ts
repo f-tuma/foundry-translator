@@ -106,6 +106,9 @@ const TEXT_ATTRIBUTES = new Set(["title", "alt", "aria-label", "data-tooltip", "
 function htmlStructure(value: string): string {
   const template = document.createElement("template");
   template.innerHTML = value;
+  // Inert server DOMs may expose entity boundaries as adjacent Text nodes;
+  // browsers merge them. Entity spelling is prose, not a structural boundary.
+  template.content.normalize();
   const walk = (node: Node): unknown => {
     if (node.nodeType === 3) return "#text";
     if (node.nodeType !== 1) return [node.nodeType, node.textContent];

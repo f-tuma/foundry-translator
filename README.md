@@ -2,7 +2,8 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
-Version **0.30.0** adds a separate [local MCP correction workflow](apps/polish-mcp/README.md).
+Version **0.30.1** fixes HTML entity and inline separator handling in the
+[local MCP correction workflow](apps/polish-mcp/README.md), introduced in 0.30.0.
 An MCP-capable assistant reads a private export with English originals, surrounding
 paragraphs, references and the reviewed glossary, then saves unverified suggestions.
 Selected corrections produce a comparison report and a guarded project import:
