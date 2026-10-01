@@ -65,7 +65,7 @@ describe("Journal translation service protections", () => {
     )).toBe("Compendium.ember.character.Item.soulbound");
   });
 
-  it("falls back to a translated root when a stale embedded page is also absent there", async () => {
+  it("retains the original reference when a stale embedded page is also absent in the copy", async () => {
     const source = {
       id: "source",
       uuid: "JournalEntry.source",
@@ -86,7 +86,7 @@ describe("Journal translation service protections", () => {
       source,
       translated,
       "JournalEntry.source.JournalEntryPage.removed",
-    )).resolves.toBe(translated.uuid);
+    )).resolves.toBeNull();
     expect(fromUuid).toHaveBeenCalledWith(`${translated.uuid}.JournalEntryPage.removed`);
   });
 
@@ -103,7 +103,7 @@ describe("Journal translation service protections", () => {
       uuid: "Compendium.world.translations.JournalEntry.translated",
       toObject: () => ({}),
     } satisfies FoundryJournalDocument;
-    vi.stubGlobal("fromUuid", vi.fn(async () => ({ id: "intro" })));
+    vi.stubGlobal("fromUuid", vi.fn(async () => ({ id: "intro", uuid: `${translated.uuid}.JournalEntryPage.intro` })));
 
     await expect(usableTranslatedDocumentReferenceUuid(
       source,

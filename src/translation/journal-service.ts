@@ -274,8 +274,8 @@ export function translatedDocumentReferenceUuid(
 
 /**
  * Builds a translated reference and avoids persisting a known-broken embedded
- * UUID. Root fallback resolution means the original embedded target no longer
- * exists; retain its suffix only when the translated document actually has it.
+ * UUID. A missing embedded target must never silently become a different link
+ * to its parent. Returning null leaves the original reference untouched.
  */
 export async function usableTranslatedDocumentReferenceUuid(
   resolved: FoundryUuidDocument,
@@ -299,13 +299,13 @@ export async function usableTranslatedDocumentReferenceUuid(
     return translatedUuid;
   }
   try {
-    return await fromUuid(translatedUuid) ? translatedUuid : translatedRoot.uuid;
+    return (await fromUuid(translatedUuid))?.uuid === translatedUuid ? translatedUuid : null;
   } catch (error) {
-    logger.warn("Translated embedded UUID validation failed; using its translated root.", {
+    logger.warn("Translated embedded UUID validation failed; retaining the original reference.", {
       translatedUuid,
       error,
     });
-    return translatedRoot.uuid;
+    return null;
   }
 }
 

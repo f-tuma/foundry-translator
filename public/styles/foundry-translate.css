@@ -1345,3 +1345,8 @@ body.ft-czech-fonts :is(.application, .app, .ember, .crucible, .journal-entry-pa
 .ft-mcp__status:empty { display: none; }
 .ft-mcp .ft-settings__actions { flex-wrap: wrap; gap: 12px; }
 .ft-mcp .ft-settings__actions span { font-size: 12px; color: var(--ft-color-text-muted); }
+.ft-mcp [hidden] { display: none !important; }
+.ft-mcp__operation { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.ft-project__report { padding: 12px; border: 1px solid var(--ft-color-border); }
+.ft-project__report summary { cursor: pointer; padding: 6px; }
+.ft-project__report p { overflow-wrap: anywhere; }

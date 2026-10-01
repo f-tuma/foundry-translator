@@ -1,3 +1,4 @@
+import { correctionWarnings } from "../../../src/polish/quality-guards";
 import { createHash } from "node:crypto";
 import { parseHTML } from "linkedom";
 import { assertPortableText, parseTranslationBundle, type BundleDocument, type TranslationBundle } from "../../../src/bundles/format";
@@ -22,10 +23,6 @@ export interface ProposalInput {
 }
 const fold = (s: string) => s.normalize("NFC").toLocaleLowerCase();
 const contains = (text: string, term: string) => fold(text).includes(fold(term));
-const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function occurrences(text: string, term: string) {
-  return [...text.matchAll(new RegExp(`(?<![\\p{L}\\p{N}_])${escaped(term)}(?![\\p{L}\\p{N}_])`, "gu"))].length;
-}
 function prose(parts: string[]) {
   const draft = maskReviewParts(parts);
   return draft.text.join("") + " " + draft.references.flat().map(ref => ref.label).join(" ");
@@ -127,15 +124,7 @@ export class PolishContent {
     const doc = this.doc(unit), patch = doc.patches[unit.fieldIndex]!;
     const value = planReviewText(patch.translation, patch.format).replace(unit.unitKey, parts);
     assertPortableText(patch.source, value, patch.format);
-    const before = prose(unit.translation), after = prose(parts), warnings: string[] = [];
-    for (const term of this.project.bundle.glossary.filter(g => g.enabled !== false && g.mode !== "inflect")) {
-      const count = occurrences(before, term.replacement);
-      if (count > occurrences(after, term.replacement)) throw new Error(`EXACT glossary term removed or changed: ${term.replacement}`);
-    }
-    const numbers = (s: string) => [...s.matchAll(/\p{N}+(?:[.,]\p{N}+)*/gu)].map(m => m[0]).sort();
-    if (!same(numbers(before), numbers(after))) warnings.push("Numbers changed. Compare quantities, dates and rules with the English source.");
-    if (after.length > before.length * 1.7 + 60 || after.length < before.length * 0.5 - 30) warnings.push("Substantial length change: check for added or omitted meaning.");
-    return warnings;
+    return correctionWarnings(unit.translation, parts, this.project.bundle.glossary);
   }
   export(suggestions: Suggestion[]): EditorialProject {
     if (!suggestions.length) throw new Error("Select at least one suggestion.");

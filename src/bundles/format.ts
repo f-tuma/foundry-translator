@@ -127,11 +127,11 @@ export function assertPortableText(source: string, translation: string, format: 
   const syntax = (text: string) => JSON.stringify([...text.matchAll(FOUNDRY_EXPRESSION)].map(([expression]) => {
     // Compare complete commands as a multiset. Sorting protection fragments would
     // let options or UUIDs migrate between different commands unnoticed.
-    const reference = expression.replace(/(@(?:UUID|Embed)\[[^\]\r\n]*\])\{([^}\r\n]*)\}/giu,
-      (whole, command: string, label: string) => /@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(label) ? whole : command);
+    const reference = expression.replace(/^&amp;Reference\[/u, "&Reference[").replace(/^@(UUID|Embed)\[/iu, (_, kind: string) => `@${kind.toLowerCase() === "uuid" ? "UUID" : "Embed"}[`).replace(/(@(?:UUID|Embed)\[[^\]\r\n]*\])\{([^}\r\n]*)\}/giu,
+      (whole, command: string, label: string) => /@[A-Za-z][A-Za-z0-9]*\[|&(?:amp;)?Reference\[|\[\[/u.test(label) ? whole : command);
     // Reject nested executable syntax in any editable label or embed caption.
     const prose = protectFoundrySyntax(reference, { nonce: "BUNDLE" });
-    requireValue(!/@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(prose.text), "nested Foundry commands in a label.");
+    requireValue(!/@[A-Za-z][A-Za-z0-9]*\[|&(?:amp;)?Reference\[|\[\[/u.test(prose.text), "nested Foundry commands in a label.");
     return JSON.stringify(prose.tokens.map(t => t.source));
   }).sort());
   requireValue(syntax(source) === syntax(translation), "Foundry references or commands were changed.");
