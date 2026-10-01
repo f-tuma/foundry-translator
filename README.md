@@ -490,16 +490,18 @@ reported as warnings instead of failing the whole translation.
 
 ## Development
 
-Requires Node.js 22 or newer.
+Requires Node.js 22.12 or newer.
 
 ```bash
 npm ci
+npm ci --prefix apps/polish-mcp
 npm run check
 ```
 
 The production module is generated in `dist/`. A release tag such as `v0.9.0`
 runs the checks, builds the module, packages the contents of `dist/`, and publishes
-both `module.json` and `foundry-translate.zip` as GitHub Release assets.
+`module.json`, `foundry-translate.zip` and the standalone `foundry-polish.cjs`
+as GitHub Release assets.
 
 ## Share translations without an AI model
 
