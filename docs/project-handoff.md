@@ -1859,3 +1859,12 @@ https://github.com/f-tuma/foundry-translator/releases/latest/download/module.jso
   1,200-paragraph test passed on loopback Foundry using noCanvas; production was
   not updated. Existing corrupt production fields still need fresh diagnostics
   and individual correction after the user installs the patch and new MCP JSON.
+
+### 2026-10-01 — 0.32.2 correction history responsiveness
+
+History now reads translation/history parent flags from compendium indexes,
+returns an interactive loading shell, supports stopping and ignores canceled
+late results. Navigation/closing remain available during the read. Closed diffs
+are lazy; expanded operations page their changed passages in groups of 20.
+Complete-only export and existing guarded undo are retained. Validation and
+native-Foundry limits: `docs/benchmarks/history-2026-10-01.md`.

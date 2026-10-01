@@ -125,6 +125,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     }
     if (typeof window !== "undefined") window.removeEventListener("beforeunload", this.#beforeUnload);
     clearTimeout(this.#filterTimer);
+    this.#historyPanel.invalidate();
     this.#watchingUnload = false;
     return super.close(options);
   }
@@ -172,6 +173,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     for (const [mode, label] of [["documents", "Documents"], ["queue", "Queue"], ["search", "GlobalSearch"], ["names", "NameConsistency"], ["interface", "Interface"], ["history", "History"], ["recovery", "Recovery"], ["project", "Project"]] as const) {
       const tab = button(t(label), () => {
         void this.#run(async () => {
+          if (mode !== "history") this.#historyPanel.invalidate();
           this.#mode = mode; this.#scrollTop = 0;
           if (mode === "queue") this.#queuePanel.invalidate();
           if (mode === "history") this.#historyPanel.invalidate();
@@ -186,7 +188,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     const draftWarning = el("p", "ft-review__error", this.#draftWarning); draftWarning.dataset.draftWarning = ""; draftWarning.hidden = !this.#draftWarning; header.append(draftWarning);
     if (this.#mode !== "documents") {
       root.append(header);
-      try { root.append(this.#mode === "project" ? this.#projectPanel.render() : this.#mode === "recovery" ? this.#recoveryPanel.render() : this.#mode === "queue" ? this.#queuePanel.render() : this.#mode === "search" ? this.#searchPanel.render() : this.#mode === "interface" ? await this.#uiPanel.render() : this.#mode === "names" ? this.#namePanel.render() : await this.#historyPanel.render()); }
+      try { root.append(this.#mode === "project" ? this.#projectPanel.render() : this.#mode === "recovery" ? this.#recoveryPanel.render() : this.#mode === "queue" ? this.#queuePanel.render() : this.#mode === "search" ? this.#searchPanel.render() : this.#mode === "interface" ? await this.#uiPanel.render() : this.#mode === "names" ? this.#namePanel.render() : this.#historyPanel.render()); }
       catch (error) { this.#message = String(error); this.#error = true; }
       root.append(this.#footer()); activateHelpTooltips(root); return root;
     }

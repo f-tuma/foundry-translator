@@ -288,14 +288,48 @@ export function readReviewHistory(flags: FoundryJournalDocument["flags"]): Revie
   const history = flags?.[MODULE_ID]?.reviewHistory as Record<string, ReviewHistoryEntry> | undefined;
   return Object.values(history ?? {}).filter(item => item && typeof item.id === "string" && typeof item.at === "string" && Array.isArray(item.rows));
 }
-export async function reviewHistory(language: string): Promise<ReviewHistoryDocument[]> {
+export async function reviewHistory(language: string, options: { signal?: AbortSignal; progress?: (done: number, total: number) => void } = {}): Promise<ReviewHistoryDocument[]> {
+  gmOnly();
   const result: ReviewHistoryDocument[] = [];
-  for (const entry of await reviewCatalog(language)) {
-    const doc = await game.packs.get(entry.pack)!.getDocument(entry.id);
-    const operations = readReviewHistory(doc?.flags);
-    if (operations.length) result.push({ entry, operations });
+  const specs = SPECS.filter(spec => game.packs.has(spec.pack));
+  options.progress?.(0, specs.length);
+  for (const [position, spec] of specs.entries()) {
+    options.signal?.throwIfAborted();
+    const pack = game.packs.get(spec.pack)!;
+    // History lives on the parent document. Index only its flags, never load every
+    // Actor/Item/Journal and all their embedded content just to find corrections.
+    const pending = pack.getIndex({ fields: [`flags.${MODULE_ID}.${spec.key}`, `flags.${MODULE_ID}.reviewHistory`] });
+    const index = await abortableHistoryRead(pending, options.signal);
+    let scanned = 0;
+    for (const item of index.values()) {
+      options.signal?.throwIfAborted();
+      const flag = spec.read(item.flags);
+      if (flag?.targetLanguage === language) {
+        const operations = readReviewHistory(item.flags);
+        if (operations.length) {
+          const kind = "documentType" in flag ? flag.documentType : spec.kind;
+          result.push({ entry: { id: item._id, pack: spec.pack, uuid: `Compendium.${spec.pack}.${displayKind(kind) ? "JournalEntry" : kind}.${item._id}`,
+            name: item.name ?? item._id, kind, sourceUuid: flag.sourceUuid, language }, operations });
+        }
+      }
+      if (++scanned % 100 === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+    options.progress?.(position + 1, specs.length);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
+  options.signal?.throwIfAborted();
   return result;
+}
+
+function abortableHistoryRead<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending;
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => { cleanup(); reject(signal.reason); };
+    const cleanup = () => signal.removeEventListener("abort", abort);
+    signal.addEventListener("abort", abort, { once: true });
+    pending.then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+  });
 }
 
 /** Compile only schema-allowed text updates. One document update includes its embedded
