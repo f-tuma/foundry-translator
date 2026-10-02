@@ -1,4 +1,4 @@
-export interface ReadingPlace { uuid: string; title: string; anchor?: string | undefined; scroll: number; ratio: number; width: number }
+export interface ReadingPlace { uuid: string; title: string; book?: string | undefined; anchor?: string | undefined; scroll: number; ratio: number; width: number }
 export interface ReaderTab { id: string; history: ReadingPlace[]; cursor: number }
 export interface ReaderState {
   version: 1; tabs: ReaderTab[]; active: string; bookmarks: ReadingPlace[];
@@ -11,7 +11,7 @@ function place(value: unknown): ReadingPlace | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Partial<ReadingPlace>;
   if (typeof v.uuid !== "string" || !/^[A-Za-z0-9_.-]{1,500}$/u.test(v.uuid) || typeof v.title !== "string") return null;
-  return { uuid: v.uuid, title: v.title.slice(0, 300), anchor: typeof v.anchor === "string" ? v.anchor.slice(0, 200) : undefined,
+  return { uuid: v.uuid, title: v.title.slice(0, 300), book: typeof v.book === "string" ? v.book.slice(0, 300) : undefined, anchor: typeof v.anchor === "string" ? v.anchor.slice(0, 200) : undefined,
     scroll: finite(v.scroll, 1e7), ratio: finite(v.ratio, 1), width: finite(v.width, 10000) };
 }
 /** Store identities and reading positions only, never document prose or secrets. */

@@ -2,6 +2,12 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.33.1** refines the reader with a folder-based library, chapter names
+and counts, keyboard navigation, localized Ember section headers, subtitles and
+static event outcomes. Callout icons and embedded portraits stay clear of prose
+on narrow screens and at larger text sizes; the contents panel keeps its close
+control visible while scrolling.
+
 Version **0.33.0** adds a fullscreen **Adventure Reader** for tablets. Open the
 book icon in a journal, actor or item header, or choose **Journal Notes →
 Adventure Reader**. Native Ember page sections and document links remain

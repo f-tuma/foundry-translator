@@ -1,23 +1,45 @@
 import { resolveTranslationReference, resolveSourceReference, parseDocumentReference, translationIdentity } from "../translation/document-identity";
 import { readJournalTranslationFlag } from "../translation/journal";
+import { isTranslatedEmberPage, translateOutcomeLabels } from "../translation/ember-runtime-bridge";
 import { MODULE_ID } from "../constants";
 import { SETTINGS } from "../settings/settings";
 
 interface ReaderDocument extends FoundryUuidDocument {
-  name?: string; type?: string; visible?: boolean; isOwner?: boolean; sort?: number; category?: string;
+  name?: string; type?: string; visible?: boolean; isOwner?: boolean; sort?: number; category?: string | null;
   text?: { content?: string }; src?: string; img?: string; system?: Record<string, any>;
   pages?: { contents: ReaderDocument[] }; categories?: { contents: { id: string; name: string; sort?: number }[] };
-  sheet?: any;
+  sheet?: any; title?: { level?: number };
   testUserPermission?(user: unknown, level: string): boolean;
 }
-export interface ReaderChapter { uuid: string; name: string; category: string }
-export interface ReaderContent {
-  uuid: string; title: string; book: string; html: string; chapters: ReaderChapter[]; kind: string; anchor?: string | undefined;
+export interface ReaderChapter { uuid: string; name: string; category: string; level: number }
+export interface ReaderPage { html: string; subtitle?: string | undefined; pronunciation?: string | undefined; unsupported?: boolean }
+export interface ReaderContent extends ReaderPage {
+  uuid: string; title: string; book: string; chapters: ReaderChapter[]; kind: string; anchor?: string | undefined;
   native: ReaderDocument;
 }
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Reader.${key}`);
 export const escapeReader = (text: string) => text.replace(/[&<>"']/gu, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const unsupportedPage = () => `<p class="ft-reader-notice">${escapeReader(t("Unsupported"))}</p><p class="ft-reader-notice">${escapeReader(t("NativeHint"))}</p>`;
+// The reader renders its own "Open in Foundry" control next to this notice.
+const unsupportedPage = (): ReaderPage => ({ html: `<p class="ft-reader-notice">${escapeReader(t("Unsupported"))}</p>`, unsupported: true });
+/** Ember 0.6.2 passes literal English section headers to its template. Map the
+ * known ones to reader strings; unknown/system-localized headers pass through. */
+const EMBER_HEADERS: Record<string, string> = {
+  "At a Glance": "AtAGlance", "Setting the Scene": "SettingTheScene", "Event Details": "EventDetails", "Journal Summary": "JournalSummary",
+  "Event Outcomes": "EventOutcomes", "Secret Lore": "SecretLore", "Gamemaster Information": "Gamemaster", "Ancestry Details": "AncestryDetails",
+  "Culture Details": "CultureDetails", "Biome Details": "BiomeDetails", "Location Details": "LocationDetails", "Quest Details": "QuestDetails",
+  "Biomes": "Biomes", "Locations": "Locations", "Notable Inhabitants": "NotableInhabitants", "Events": "Events", "Event Summary": "EventSummary",
+  "Related Locations": "RelatedLocations", "Involved Locations": "InvolvedLocations",
+};
+const sectionHeader = (header: string) => EMBER_HEADERS[header] ? t(`Section.${EMBER_HEADERS[header]}`) : game.i18n.localize(header);
+/** Translated event copies read outcome labels from the original's live event;
+ * localize them by outcome ID exactly as the native translated sheet does. */
+function localizedOutcomes(html: string, page: ReaderDocument): string {
+  const outcomes = (page.system as any)?._source?.outcomes;
+  if (!Array.isArray(outcomes) || !isTranslatedEmberPage(page as any)) return html;
+  const root = document.createElement("div"); root.innerHTML = html;
+  translateOutcomeLabels(root, outcomes);
+  return root.innerHTML;
+}
 
 export function canReadDocument(doc: ReaderDocument | null | undefined, level = "OBSERVER"): boolean {
   if (!doc) return false;
@@ -33,7 +55,10 @@ async function enrich(html: string, relativeTo: ReaderDocument, secrets: boolean
  * A separate view-only sheet is prepared, never rendered or submitted. No live
  * sheet options, event state or stored document data are changed. */
 export async function readerPageHtml(page: ReaderDocument, secrets: boolean): Promise<string> {
-  if (page.type === "image") return `<figure><img src="${escapeReader(page.src ?? "")}" alt="${escapeReader(page.name ?? "")}"></figure>`;
+  return (await readerPage(page, secrets)).html;
+}
+export async function readerPage(page: ReaderDocument, secrets: boolean): Promise<ReaderPage> {
+  if (page.type === "image") return { html: `<figure><img src="${escapeReader(page.src ?? "")}" alt="${escapeReader(page.name ?? "")}"></figure>` };
   if (page.type?.startsWith("ember.")) {
     const Sheet = page.sheet?.constructor;
     if (!Sheet || Sheet === Object) return unsupportedPage();
@@ -46,12 +71,19 @@ export async function readerPageHtml(page: ReaderDocument, secrets: boolean): Pr
     const html: string[] = [];
     for (const section of sections) {
       // Automation controls are not part of a reading surface.
-      if (!section.content || ["actions", "warnings"].includes(section.sectionClass ?? "")) continue;
-      if (!game.user?.isGM && ["gamemaster", "secrets"].includes(section.sectionClass ?? "")) continue;
-      const heading = section.header ? `<h2>${escapeReader(game.i18n.localize(section.header))}</h2>` : "";
-      html.push(`<section class="ft-reader-section ${escapeReader(section.contentClass ?? "")}">${heading}${await enrich(section.content, page, secrets)}</section>`);
+      const kind = section.sectionClass ?? "";
+      if (!section.content || ["actions", "warnings"].includes(kind)) continue;
+      if (!game.user?.isGM && ["gamemaster", "secrets"].includes(kind)) continue;
+      const heading = section.header ? `<h2>${escapeReader(sectionHeader(section.header))}</h2>` : "";
+      let body = await enrich(section.content, page, secrets);
+      if (kind === "outcomes") body = localizedOutcomes(body, page);
+      if (kind === "edict") body = body.replace(`<h4>Edict of ${page.name}</h4>`, () => `<h4>${escapeReader(t("Section.Edict").replace("{name}", page.name ?? ""))}</h4>`);
+      // Keep Ember's section/content classes: they distinguish read-aloud,
+      // creature lists, page summaries and event outcomes for reader styling.
+      html.push(`<section class="ft-reader-section ft-ember-${escapeReader(kind || "content")}">${heading}<div class="${escapeReader(section.contentClass ?? "")}">${body}</div></section>`);
     }
-    return html.join("");
+    const text = (value: unknown) => typeof value === "string" && value.trim() ? value.trim() : undefined;
+    return { html: html.join(""), subtitle: text(context.subtitle), pronunciation: text(context.pronunciation) };
   }
   if (page.type !== "text") return unsupportedPage();
   // Native text context also supports Markdown without guessing conversion.
@@ -60,19 +92,23 @@ export async function readerPageHtml(page: ReaderDocument, secrets: boolean): Pr
     const view = new Sheet({ document: page, mode: "view", editable: false, window: { frame: false } });
     let context = await view._prepareContext({});
     context = await view._preparePartContext("content", context, {});
-    if (typeof context.text?.enriched === "string") return context.text.enriched;
+    if (typeof context.text?.enriched === "string") return { html: context.text.enriched };
   }
-  return enrich(page.text?.content ?? "", page, secrets);
+  return { html: await enrich(page.text?.content ?? "", page, secrets) };
 }
 
+/** Same order as Foundry's journal sheet: categories by sort, then pages without
+ * a (valid) category under "Uncategorized"; title.level keeps sub-pages nested. */
 export function readerChapters(root: ReaderDocument, source: ReaderDocument): ReaderChapter[] {
   const categories = [...(root.categories?.contents ?? [])].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
   const order = new Map(categories.map((c, i) => [c.id, i]));
+  const uncategorized = categories.length ? game.i18n.localize("JOURNAL.Uncategorized") : "";
   return [...(root.pages?.contents ?? [])].filter(page => {
     const original = source.pages?.contents.find(p => p.id === page.id);
     return canReadDocument(page) && canReadDocument(original);
   }).sort((a, b) => (order.get(a.category ?? "") ?? categories.length) - (order.get(b.category ?? "") ?? categories.length) || (a.sort ?? 0) - (b.sort ?? 0))
-    .map(p => ({ uuid: p.uuid, name: p.name ?? "", category: categories.find(c => c.id === p.category)?.name ?? "" }));
+    .map(p => ({ uuid: p.uuid, name: p.name ?? "", category: categories.find(c => c.id === p.category)?.name ?? uncategorized,
+      level: Math.max(1, Math.min(3, Number(p.title?.level) || 1)) }));
 }
 
 export async function loadReaderContent(requested: string): Promise<ReaderContent> {
@@ -116,8 +152,8 @@ export async function loadReaderContent(requested: string): Promise<ReaderConten
     const selected = native.documentName === "JournalEntryPage" ? native : owner.pages?.contents.find(p => p.uuid === chapters[0]?.uuid);
     if (!selected || !chapters.some(c => c.uuid === selected.uuid)) throw new Error("Reader.Unavailable");
     const originalPage = sourceOwner.pages?.contents.find(p => p.id === selected.id);
-    const html = await readerPageHtml(selected, selected.isOwner === true && originalPage?.isOwner === true);
-    return { uuid: selected.uuid, title: selected.name ?? "", book: owner.name ?? "", html, chapters, kind: "JournalEntryPage", anchor, native: selected };
+    const page = await readerPage(selected, selected.isOwner === true && originalPage?.isOwner === true);
+    return { ...page, uuid: selected.uuid, title: selected.name ?? "", book: owner.name ?? "", chapters, kind: "JournalEntryPage", anchor, native: selected };
   }
   const data = native.toObject?.() ?? {}, system = data.system as any;
   const sections: string[] = [];
@@ -140,7 +176,7 @@ export async function loadReaderContent(requested: string): Promise<ReaderConten
   const image = native.img ?? (native.documentName === "Scene" ? (data.background as any)?.src ?? data.thumb : undefined);
   const figure = typeof image === "string" && image ? `<figure class="ft-reader-portrait"><img src="${escapeReader(image)}" alt="${escapeReader(native.name ?? "")}"></figure>` : "";
   return { uuid: native.uuid, title: native.name ?? "", book: t("Preview"), kind: native.documentName ?? "", chapters: [], anchor, native,
-    html: figure + (sections.length ? await enrich(sections.join("\n"), native, secrets) : `<p class="ft-reader-notice">${escapeReader(t("NativeHint"))}</p>`) };
+    unsupported: !sections.length, html: figure + (sections.length ? await enrich(sections.join("\n"), native, secrets) : `<p class="ft-reader-notice">${escapeReader(t("NativeHint"))}</p>`) };
 }
 
 /** Keep prose, artwork and native link metadata; strip executable UI/actions. */
@@ -153,7 +189,20 @@ export function prepareReaderProse(html: string): HTMLElement {
     for (const attr of [...embed.attributes]) if (attr.name !== "uuid") staticEmbed.setAttribute(attr.name, attr.value);
     staticEmbed.classList.add("ft-reader-static-embed"); staticEmbed.append(...embed.childNodes); embed.replaceWith(staticEmbed);
   }
-  root.querySelectorAll("script,style,iframe,object,embed,form,input,textarea,select,button").forEach(e => e.remove());
+  // Ember lists event outcomes as checkboxes inside a form. Keep the prose and
+  // the completion state as static text instead of dropping the whole section.
+  for (const box of root.querySelectorAll<HTMLInputElement>('input[type="checkbox"],input[type="radio"]')) {
+    const mark = document.createElement("span"), checked = box.hasAttribute("checked");
+    mark.className = `ft-reader-check${checked ? " is-checked" : ""}`;
+    mark.setAttribute("role", "img"); mark.setAttribute("aria-label", t(checked ? "OutcomeComplete" : "OutcomeOpen"));
+    mark.textContent = checked ? "✓" : "";
+    box.replaceWith(mark);
+  }
+  for (const form of root.querySelectorAll("form,fieldset")) {
+    const block = document.createElement("div");
+    block.className = `${form.getAttribute("class") ?? ""} ft-reader-${form.localName}`.trim(); block.append(...form.childNodes); form.replaceWith(block);
+  }
+  root.querySelectorAll("script,style,iframe,object,embed,input,textarea,select,button,code-mirror").forEach(e => e.remove());
   for (const el of root.querySelectorAll("*")) for (const attr of [...el.attributes]) {
     if (/^on/iu.test(attr.name) || ["srcdoc", "autofocus", "contenteditable", "data-action"].includes(attr.name)) el.removeAttribute(attr.name);
     if (["href", "src", "xlink:href"].includes(attr.name) && /^\s*(?:javascript|vbscript|file|data):/iu.test(attr.value)
