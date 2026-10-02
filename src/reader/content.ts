@@ -146,6 +146,13 @@ export async function loadReaderContent(requested: string): Promise<ReaderConten
 /** Keep prose, artwork and native link metadata; strip executable UI/actions. */
 export function prepareReaderProse(html: string): HTMLElement {
   const root = document.createElement("div"); root.className = "ft-reader-prose ember journal-page-content"; root.innerHTML = html;
+  // Foundry's custom document-embed calls Document#onEmbed on connection and
+  // can reattach gameplay handlers. Keep its prose as an inert ordinary div.
+  for (const embed of root.querySelectorAll("document-embed")) {
+    const staticEmbed = document.createElement("div");
+    for (const attr of [...embed.attributes]) if (attr.name !== "uuid") staticEmbed.setAttribute(attr.name, attr.value);
+    staticEmbed.classList.add("ft-reader-static-embed"); staticEmbed.append(...embed.childNodes); embed.replaceWith(staticEmbed);
+  }
   root.querySelectorAll("script,style,iframe,object,embed,form,input,textarea,select,button").forEach(e => e.remove());
   for (const el of root.querySelectorAll("*")) for (const attr of [...el.attributes]) {
     if (/^on/iu.test(attr.name) || ["srcdoc", "autofocus", "contenteditable", "data-action"].includes(attr.name)) el.removeAttribute(attr.name);

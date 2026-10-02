@@ -119,7 +119,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     // Bind to the replaced child, never the persistent application frame:
     // otherwise each chapter/tab render accumulates another action handler.
     const root = this.element.querySelector<HTMLElement>(".ft-reader")!;
-    root.addEventListener("click", event => { void this.onClick(event).catch(error => { logger.warn("Reader action failed.", error); ui.notifications.warn(t("Unavailable")); }); });
+    root.addEventListener("click", event => { void this.onClick(event).catch(error => { logger.warn("Reader action failed.", error); ui.notifications.warn(t("Unavailable")); }); }, { capture: true });
     root.addEventListener("keydown", event => this.onKey(event));
     const scroller = root.querySelector<HTMLElement>(".ft-reader-scroll")!;
     scroller.addEventListener("scroll", () => { if (!this.busy) this.remember(); this.updateProgress(); }, { passive: true });

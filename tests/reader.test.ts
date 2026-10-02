@@ -97,8 +97,10 @@ describe("reader content and access", () => {
   it("retains link identities while stripping actions and hidden GM content", () => {
     const {document,HTMLElement,Element}=parseHTML("<html><body></body></html>");
     vi.stubGlobal("document",document); vi.stubGlobal("HTMLElement",HTMLElement); vi.stubGlobal("Element",Element);
-    const prose=prepareReaderProse('<p>Hello <a class="content-link" data-uuid="Actor.hero" onclick="evil()">Hero</a></p><script>evil()</script><button data-action="run">Run</button><p class="gamemaster">SECRET</p><a href="javascript:evil()">Bad</a>');
+    const prose=prepareReaderProse('<p>Hello <a class="content-link" data-uuid="Actor.hero" onclick="evil()">Hero</a></p><script>evil()</script><button data-action="run">Run</button><p class="gamemaster">SECRET</p><a href="javascript:evil()">Bad</a><document-embed uuid="RollTable.table" class="block"><p>Embedded prose</p></document-embed>');
     expect(prose.querySelector('.content-link')?.getAttribute('data-uuid')).toBe("Actor.hero");
     expect(prose.innerHTML).not.toMatch(/onclick|script|button|SECRET|javascript:/u);
+    expect(prose.querySelector("document-embed")).toBeNull();
+    expect(prose.querySelector(".ft-reader-static-embed")?.textContent).toBe("Embedded prose");
   });
 });
