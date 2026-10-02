@@ -747,5 +747,6 @@
   "FOUNDRY_TRANSLATE.Reader.Section.EventSummary": "Přehled událostí",
   "FOUNDRY_TRANSLATE.Reader.Section.RelatedLocations": "Související místa",
   "FOUNDRY_TRANSLATE.Reader.Section.InvolvedLocations": "Zapojená místa",
-  "FOUNDRY_TRANSLATE.Reader.Section.Edict": "Edikt: {name}"
+  "FOUNDRY_TRANSLATE.Reader.Section.Edict": "Edikt: {name}",
+  "FOUNDRY_TRANSLATE.Reader.ReadAloud": "Číst nahlas"
 }

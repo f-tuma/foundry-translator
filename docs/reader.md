@@ -10,6 +10,9 @@ a document it resumes the previous reading session or opens the journal library.
   without a category under "Uncategorized". Sub-pages (`title.level` 2–3) are
   indented, the current chapter's headings are listed, and the panel opens
   scrolled to the current chapter.
+- Browser Back/Forward follows reader navigation and restores reading positions.
+  Back at the first reader page closes the reader; explicit close returns to the
+  browser entry from before opening it.
 - Previous/Next Chapter (footer, with the target chapter's name) and a card at
   the end of each chapter move through the book; the footer shows the chapter
   position (e.g. 7 / 75). With the text focused, ←/→ turn chapters.
@@ -41,7 +44,9 @@ sections supply lore, ancestry, location, event exposition and other Ember text,
 plus the page subtitle and pronunciation. Ember 0.6.2 passes English section
 headers ("At a Glance", "Setting the Scene", …); the reader localizes the known
 ones. Creature lists, related-page summaries, banners and event outcomes keep
-reader styling in every theme. Callout icons and embedded character portraits
+reader styling in every theme. Explicit `.readaloud` blocks carry a “Read aloud”
+label and a distinct green tint/border; ordinary quotes and GM notes are not
+labeled. Nested blocks get one label and empty embedded descriptions get none. Callout icons and embedded character portraits
 use normal document flow, leaving room for enlarged text. The contents panel
 keeps its close control visible while scrolling long chapter lists. Event outcomes are shown as static text with
 their reached/not reached state; translated event copies show outcome labels

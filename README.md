@@ -2,6 +2,11 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.33.2** marks Ember's explicit read-aloud passages with a visible label
+and a distinct reading surface in all themes. Browser Back/Forward traverses
+reader pages and restores their reading positions; closing the reader returns
+to the browser entry from before it was opened.
+
 Version **0.33.1** refines the reader with a folder-based library, chapter names
 and counts, keyboard navigation, localized Ember section headers, subtitles and
 static event outcomes. Callout icons and embedded portraits stay clear of prose

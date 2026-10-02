@@ -747,5 +747,6 @@
   "FOUNDRY_TRANSLATE.Reader.Section.EventSummary": "Event Summary",
   "FOUNDRY_TRANSLATE.Reader.Section.RelatedLocations": "Related Locations",
   "FOUNDRY_TRANSLATE.Reader.Section.InvolvedLocations": "Involved Locations",
-  "FOUNDRY_TRANSLATE.Reader.Section.Edict": "Edict of {name}"
+  "FOUNDRY_TRANSLATE.Reader.Section.Edict": "Edict of {name}",
+  "FOUNDRY_TRANSLATE.Reader.ReadAloud": "Read aloud"
 }

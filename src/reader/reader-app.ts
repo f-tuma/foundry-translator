@@ -1,6 +1,7 @@
 import { logger } from "../logger";
 import { escapeReader as esc, loadReaderContent, prepareReaderProse, type ReaderContent } from "./content";
-import { activeTab, closeReaderTab, currentPlace, freshReaderState, navigateTab, parseReaderState, type ReaderState, type ReadingPlace } from "./state";
+import { activeTab, closeReaderTab, currentPlace, freshReaderState, navigateTab, parseReaderState, MAX_TABS, type ReaderState, type ReadingPlace } from "./state";
+import { ReaderBrowserHistory, type ReaderHistoryLocation } from "./browser-history";
 
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Reader.${key}`);
 const icon = (name: string) => `<i class="fa-solid fa-${name}" aria-hidden="true"></i>`;
@@ -26,6 +27,9 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
   private previousFocus: HTMLElement | null = null;
   private libraryFilter = "";
   private attemptedUuid?: string;
+  private browserHistory = new ReaderBrowserHistory(location => {
+    void this.restoreBrowserLocation(location).catch(error => { logger.warn("Reader history failed.", error); ui.notifications.warn(t("Unavailable")); });
+  }, () => { void this.close(); });
   constructor() {
     super();
     try { this.state = parseReaderState(localStorage.getItem(storageKey())); } catch { this.state = freshReaderState(); }
@@ -34,19 +38,38 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     try { localStorage.setItem(storageKey(), JSON.stringify(this.state)); }
     catch { /* Reading remains possible with disabled browser storage. */ }
   }
-  private remember(): void {
+  private remember(syncBrowser = true): void {
     const place = currentPlace(this.state), scroller = this.element?.querySelector<HTMLElement>(".ft-reader-scroll");
     if (!place || !scroller || !this.content || place.uuid !== this.content.uuid) return;
     place.scroll = scroller.scrollTop; place.width = scroller.clientWidth;
     place.ratio = scroller.scrollHeight > scroller.clientHeight ? scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight) : 0;
+    const location = this.historyLocation(); if (syncBrowser && location) this.browserHistory.update(location);
     clearTimeout(this.saveTimer); this.saveTimer = setTimeout(() => this.save(), 350);
   }
   async open(uuid?: string): Promise<void> {
     this.previousFocus ??= document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.browserHistory.start();
     const current = currentPlace(this.state);
     if (uuid) await this.navigate(uuid);
     else if (current) await this.display(current);
-    else { this.panel = "library"; await this.render({ force: true }); }
+    else { this.panel = "library"; this.browserHistory.record(); await this.render({ force: true }); }
+  }
+  private historyLocation(): ReaderHistoryLocation | undefined {
+    const tab = activeTab(this.state), place = currentPlace(this.state);
+    return tab && place ? { tabId: tab.id, cursor: tab.cursor, place: { ...place } } : undefined;
+  }
+  private async restoreBrowserLocation(location?: ReaderHistoryLocation): Promise<void> {
+    this.remember(false);
+    if (!location) { ++this.sequence; this.busy = false; this.error = ""; this.panel = "library"; await this.render({ force: true }); return; }
+    let tab = this.state.tabs.find(tab => tab.id === location.tabId);
+    if (!tab && this.state.tabs.length < MAX_TABS) {
+      tab = { id: location.tabId, history: [{ ...location.place }], cursor: 0 }; this.state.tabs.push(tab);
+    }
+    if (tab) this.state.active = tab.id;
+    if (tab?.history[location.cursor]?.uuid === location.place.uuid) {
+      tab.cursor = location.cursor; Object.assign(tab.history[tab.cursor]!, location.place);
+    } else navigateTab(this.state, { ...location.place });
+    const place = currentPlace(this.state); if (place) await this.display(place, false);
   }
   private async navigate(uuid: string, newTab = false, place?: ReadingPlace): Promise<void> {
     this.remember();
@@ -61,6 +84,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
         : { uuid: content.uuid, title: content.title, book: content.book, anchor: content.anchor, scroll: 0, ratio: 0, width: 0 }, newTab);
       if (place) Object.assign(currentPlace(this.state)!, { scroll: place.scroll, ratio: place.ratio, width: place.width });
       this.content = content; this.panel = null; this.search = ""; this.busy = false; this.save();
+      this.browserHistory.record(this.historyLocation());
     } catch (error) {
       if (token !== this.sequence) return;
       const message = t(error instanceof Error && error.message.startsWith("Reader.") ? error.message.slice(7) : "Unavailable");
@@ -71,7 +95,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     }
     if (token === this.sequence) await this.render({ force: true });
   }
-  private async display(place: ReadingPlace): Promise<void> {
+  private async display(place: ReadingPlace, recordBrowser = true): Promise<void> {
     this.attemptedUuid = place.uuid + (place.anchor ? `#${place.anchor}` : "");
     const token = ++this.sequence; this.busy = true; this.error = "";
     await this.render({ force: true });
@@ -79,6 +103,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
       const content = await loadReaderContent(place.uuid + (place.anchor ? `#${place.anchor}` : ""));
       if (token !== this.sequence) return;
       this.content = content; place.uuid = content.uuid; place.title = content.title; place.book = content.book; this.panel = null; this.search = "";
+      if (recordBrowser) this.browserHistory.record(this.historyLocation());
     } catch (error) {
       if (token !== this.sequence) return;
       // Do not display another tab's prose under an inaccessible document name.
@@ -124,11 +149,11 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
   protected async _onRender(): Promise<void> {
     // Bind to the replaced child, never the persistent application frame:
     // otherwise each chapter/tab render accumulates another action handler.
-    const root = this.element.querySelector<HTMLElement>(".ft-reader")!;
+    const root = this.element?.querySelector<HTMLElement>(".ft-reader"); if (!root) return;
     root.addEventListener("click", event => { void this.onClick(event).catch(error => { logger.warn("Reader action failed.", error); ui.notifications.warn(t("Unavailable")); }); }, { capture: true });
     root.addEventListener("keydown", event => this.onKey(event));
     const scroller = root.querySelector<HTMLElement>(".ft-reader-scroll")!;
-    scroller.addEventListener("scroll", () => { if (!this.busy) this.remember(); this.updateProgress(); }, { passive: true });
+    scroller.addEventListener("scroll", () => { if (!root.isConnected) return; if (!this.busy) this.remember(); this.updateProgress(); }, { passive: true });
     const place = currentPlace(this.state);
     if (place && this.content?.uuid === place.uuid) {
       if (place.scroll > 0 || place.ratio > 0) scroller.scrollTop = place.width && Math.abs(place.width - scroller.clientWidth) > 10 ? place.ratio * (scroller.scrollHeight - scroller.clientHeight) : place.scroll;
@@ -137,7 +162,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
       // once, only if the user hasn't started scrolling in the meantime.
       const before = scroller.scrollTop;
       for (const image of root.querySelectorAll<HTMLImageElement>(".ft-reader-article img")) {
-        image.addEventListener("load", () => { if (scroller.scrollTop === before && place.ratio > 0) scroller.scrollTop = place.ratio * (scroller.scrollHeight - scroller.clientHeight); this.updateProgress(); }, { once: true });
+        image.addEventListener("load", () => { if (!root.isConnected) return; if (scroller.scrollTop === before && place.ratio > 0) scroller.scrollTop = place.ratio * (scroller.scrollHeight - scroller.clientHeight); this.updateProgress(); }, { once: true });
       }
     }
     this.updateProgress();
@@ -217,7 +242,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
   }
   private async onClick(event: MouseEvent): Promise<void> {
     if (!(event.target instanceof Element)) return;
-    const el = event.target.closest<HTMLElement>("button,a,.ft-reader-scrim"); if (!el || !this.element.contains(el)) return;
+    const el = event.target.closest<HTMLElement>("button,a,.ft-reader-scrim"); if (!el || !this.element?.contains(el)) return;
     if (el.closest("[data-reader-prose]")) {
       // Native document-link/roll handlers must not execute behind the reader.
       if (el.matches("a.content-link[data-uuid]")) {
@@ -249,7 +274,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
       closeReaderTab(this.state, el.dataset.readerCloseTab); this.save();
       const p = currentPlace(this.state);
       if (p) return this.display(p);
-      this.content = undefined; this.panel = "library"; return void await this.render({ force: true });
+      this.content = undefined; this.panel = "library"; this.browserHistory.record(); return void await this.render({ force: true });
     }
     if (el.dataset.readerBookmark !== undefined) {
       const p = this.state.bookmarks[Number(el.dataset.readerBookmark)]; if (p) return this.navigate(p.uuid + (p.anchor ? `#${p.anchor}` : ""), false, p);
@@ -316,14 +341,15 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     if (event.key === "Enter" && (event.target as Element)?.matches("[data-reader-find]")) { event.preventDefault(); this.selectMatch(event.shiftKey ? -1 : 1); }
     // Browser-style history (Alt+←/→) and book-style page turns while the text has focus.
     if (!this.panel && !this.busy && ["ArrowLeft", "ArrowRight"].includes(event.key) && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+      if (event.altKey) { event.preventDefault(); window.history.go(event.key === "ArrowLeft" ? -1 : 1); return; }
       const onText = (event.target as Element)?.matches?.(".ft-reader-scroll");
-      const action = event.altKey ? (event.key === "ArrowLeft" ? "back" : "forward") : onText ? (event.key === "ArrowLeft" ? "chapter-prev" : "chapter-next") : "";
+      const action = onText ? (event.key === "ArrowLeft" ? "chapter-prev" : "chapter-next") : "";
       const control = action && this.element.querySelector<HTMLButtonElement>(`[data-reader-action="${action}"]:not(:disabled)`);
       if (control) { event.preventDefault(); control.click(); }
     }
   }
   private goAnchor(anchor: string): void {
-    const article = this.element.querySelector<HTMLElement>(".ft-reader-article")!;
+    const article = this.element?.querySelector<HTMLElement>(".ft-reader-article"); if (!article) return;
     const target = [...article.querySelectorAll<HTMLElement>("[id]")].find(e => e.id === anchor)
       ?? [...article.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6")].find(e => {
         const slugify = (CONFIG.JournalEntryPage as any)?.documentClass?.slugifyHeading;
@@ -332,19 +358,19 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     target?.scrollIntoView({ block: "start" });
   }
   private updateProgress(): void {
-    const scroller = this.element.querySelector<HTMLElement>(".ft-reader-scroll"); if (!scroller) return;
+    const scroller = this.element?.querySelector<HTMLElement>(".ft-reader-scroll"); if (!scroller) return;
     const percent = Math.round(scroller.scrollHeight > scroller.clientHeight ? 100 * scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight) : 100);
     const output = this.element.querySelector("[data-reader-progress]"), progress = this.element.querySelector<HTMLProgressElement>("progress");
     if (output) output.textContent = `${Math.max(0, Math.min(100, percent))} %`; if (progress) progress.value = percent;
   }
   private highlight(): void {
-    const prose = this.element.querySelector<HTMLElement>("[data-reader-prose]")!;
+    const prose = this.element?.querySelector<HTMLElement>("[data-reader-prose]"); if (!prose) return;
     prose.querySelectorAll("mark[data-reader-match]").forEach(mark => mark.replaceWith(...mark.childNodes)); prose.normalize();
     this.matches = []; this.matchIndex = -1;
     const query = this.search.trim().toLocaleLowerCase();
     if (query) {
       const walker = document.createTreeWalker(prose, NodeFilter.SHOW_TEXT), nodes: Text[] = [];
-      while (walker.nextNode()) { const n = walker.currentNode as Text; if (!n.parentElement?.closest("code,pre,script,style,[hidden]")) nodes.push(n); }
+      while (walker.nextNode()) { const n = walker.currentNode as Text; if (!n.parentElement?.closest("code,pre,script,style,[hidden],.ft-reader-readaloud-label")) nodes.push(n); }
       for (const node of nodes) {
         const text = node.textContent ?? "", folded = text.toLocaleLowerCase(); let index = folded.indexOf(query), offset = 0;
         if (index < 0) continue;
@@ -369,6 +395,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
   }
   async close(options?: Record<string, unknown>): Promise<this> {
     this.remember(); clearTimeout(this.saveTimer); this.save(); ++this.sequence; this.busy = false;
+    await this.browserHistory.stop();
     if (this.fullscreenOwned && document.fullscreenElement) await document.exitFullscreen().catch(() => {});
     this.fullscreenOwned = false;
     // The fixed fullscreen frame cannot use Foundry's max-height minimize
