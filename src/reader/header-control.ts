@@ -1,5 +1,6 @@
 import { openAdventureReader } from "./reader-app";
 import { logger } from "../logger";
+import { registerReaderBrowserHistory } from "./browser-history";
 
 interface ReaderSheet {
   entry?: FoundryUuidDocument; document?: FoundryUuidDocument;
@@ -21,6 +22,7 @@ export function addReaderHeaderButton(app: ReaderSheet): void {
   frame.controls.before(button);
 }
 export function registerAdventureReader(): void {
+  registerReaderBrowserHistory();
   Hooks.on("renderApplicationV2", addReaderHeaderButton);
   Hooks.on("getSceneControlButtons", (controls: Record<string, { tools: Record<string, any> }>) => {
     const notes = controls.notes; if (!notes || notes.tools.foundryReader) return;

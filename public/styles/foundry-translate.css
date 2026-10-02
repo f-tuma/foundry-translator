@@ -1461,6 +1461,12 @@ body.ft-czech-fonts :is(.application, .app, .ember, .crucible, .journal-entry-pa
 .ft-reader .ft-reader-prose ul.complex-check { padding-left: 1.8em; }
 .ft-reader .ft-reader-prose ul.complex-check > li { position: relative; }
 .ft-reader .ft-reader-prose ul.complex-check > li::before { left: -1.8em; width: 1.3em; text-align: center; color: var(--reader-accent); }
+.ft-reader { --reader-readaloud-bg: #152825; --reader-readaloud-border: #68bca9; --reader-readaloud-label: #9bd3c4; }
+.ft-reader[data-theme="paper"] { --reader-readaloud-bg: #eaf2ee; --reader-readaloud-border: #337560; --reader-readaloud-label: #285f4e; }
+.ft-reader[data-theme="sepia"] { --reader-readaloud-bg: #e2e8d6; --reader-readaloud-border: #536d47; --reader-readaloud-label: #405736; }
+.ft-reader .ft-reader-prose .ft-reader-readaloud { background: var(--reader-readaloud-bg) !important; border-left: 3px solid var(--reader-readaloud-border); }
+.ft-reader .ft-reader-prose .ft-reader-readaloud-label { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; color: var(--reader-readaloud-label); font: 600 12px/1.5 system-ui,sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.ft-reader-readaloud-label i { flex: 0 0 auto; }
 .ft-reader-notice { font: 15px/1.5 system-ui,sans-serif; color: var(--reader-muted); }
 /* Ember page structures (its own sheet CSS is scoped to .ember.journal-entry). */
 .ft-reader-prose .ft-reader-section { margin: 0 0 1.6em; }

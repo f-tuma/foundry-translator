@@ -211,6 +211,16 @@ export function prepareReaderProse(html: string): HTMLElement {
   // Security follows native ownership AND the original; never expose GM blocks
   // from a publicly readable translated compendium to players.
   if (!game.user?.isGM) root.querySelectorAll(".gamemaster,.secret:not(.revealed),.secrets").forEach(e => e.remove());
+  // Only Ember's explicit read-aloud blocks, not ordinary quotations or GM
+  // notes. Keep labels outside the story text and avoid duplicate nested labels.
+  for (const block of root.querySelectorAll<HTMLElement>(".readaloud")) {
+    if (block.parentElement?.closest(".readaloud") || !block.textContent?.trim()) continue;
+    block.classList.add("ft-reader-readaloud");
+    const label = document.createElement("div"); label.className = "ft-reader-readaloud-label";
+    const icon = document.createElement("i"); icon.className = "fa-solid fa-comment-dots"; icon.setAttribute("aria-hidden", "true");
+    const text = document.createElement("span"); text.textContent = t("ReadAloud");
+    label.append(icon, text); block.prepend(label);
+  }
   for (const a of root.querySelectorAll<HTMLAnchorElement>("a[href]")) if (/^https?:/iu.test(a.getAttribute("href") ?? "")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
   return root;
 }

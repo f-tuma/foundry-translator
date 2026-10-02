@@ -146,4 +146,14 @@ describe("reader content and access", () => {
     expect([...prose.querySelectorAll(".ft-reader-check")].map(e=>e.classList.contains("is-checked"))).toEqual([true,false]);
     expect(prose.textContent).toContain("Spared the guard."); expect(prose.textContent).toContain("Fled.");
   });
+  it("labels explicit read-aloud prose once, without labeling quotations, notes or empty embeds", () => {
+    const {document,HTMLElement,Element}=parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document",document); vi.stubGlobal("HTMLElement",HTMLElement); vi.stubGlobal("Element",Element);
+    const prose=prepareReaderProse('<section class="block readaloud"><p>Speak this.</p><blockquote class="readaloud">Nested quotation.</blockquote><a class="content-link" data-uuid="Actor.hero">Hero</a></section><blockquote>Ordinary quote.</blockquote><section class="block gamemaster">SECRET</section><section class="readaloud"> </section>');
+    expect(prose.querySelectorAll(".ft-reader-readaloud-label")).toHaveLength(1);
+    expect(prose.querySelector(".ft-reader-readaloud-label")?.textContent).toBe("FOUNDRY_TRANSLATE.Reader.ReadAloud");
+    expect(prose.querySelectorAll(".ft-reader-readaloud")).toHaveLength(1);
+    expect(prose.querySelector("a")?.getAttribute("data-uuid")).toBe("Actor.hero");
+    expect(prose.textContent).toContain("Speak this."); expect(prose.textContent).not.toContain("SECRET");
+  });
 });
