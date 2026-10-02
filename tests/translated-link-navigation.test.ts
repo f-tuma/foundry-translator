@@ -142,4 +142,8 @@ it("installs link navigation once and leaves gameplay controls alone", () => {
   expect(add).toHaveBeenCalledTimes(1);
   expect(linkedDocumentUuid({ target: document.querySelector("span") } as unknown as MouseEvent)).toBe("Actor.hero");
   for (const node of document.querySelectorAll("button,div,a[data-action]")) expect(linkedDocumentUuid({ target: node } as unknown as MouseEvent)).toBeNull();
+  const reader = document.createElement("section"); reader.className = "ft-reader";
+  reader.innerHTML = '<a class="content-link" data-uuid="Actor.hero">Hero</a>'; document.body.append(reader);
+  const handler = add.mock.calls[0]![1] as (event: MouseEvent) => void;
+  expect(() => handler({ target: reader.firstElementChild } as MouseEvent)).not.toThrow();
 });

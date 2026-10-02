@@ -2,6 +2,17 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.33.0** adds a fullscreen **Adventure Reader** for tablets. Open the
+book icon in a journal, actor or item header, or choose **Journal Notes →
+Adventure Reader**. Native Ember page sections and document links remain
+readable; linked characters and items open as reading previews with Back/Forward
+history. Chapters, section headings, tabs, bookmarks, in-section search, font
+size, reading width and dark/paper/sepia themes are available with large touch
+controls. Reading positions and preferences stay in this browser for this
+account and world. The reader requires a live Foundry connection; it does not
+provide an offline copy. It never executes event actions, rolls or macros, and
+checks access to both originals and translated copies. See [reader details](docs/reader.md).
+
 Version **0.32.0** simplifies direct **MCP proofreading** to a saved access key
 and a copyable JSON configuration. Open **Adventure translation → MCP
 proofreading**, save and enable access, then paste the JSON into your MCP client.

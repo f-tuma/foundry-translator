@@ -71,6 +71,8 @@ export function linkedDocumentUuid(event: MouseEvent): string | null {
 }
 
 function onDocumentClick(event: MouseEvent): void {
+  // The fullscreen reader owns navigation/history and its read-only previews.
+  if (event.target instanceof Element && event.target.closest(".ft-reader")) return;
   if (game.settings.get(MODULE_ID, SETTINGS.AUTO_OPEN_TRANSLATIONS) === false
     || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
   const uuid = linkedDocumentUuid(event);

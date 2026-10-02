@@ -18,6 +18,7 @@ import { applyCzechFonts } from "./ui/czech-fonts";
 
 import { registerReviewHeaderControl } from "./review/header-control";
 import { registerUiOverrides } from "./review/ui-catalog";
+import { registerAdventureReader } from "./reader/header-control";
 
 let ready = false;
 
@@ -30,6 +31,7 @@ Hooks.once("init", () => {
   registerJournalTranslationHeaderControl();
   registerGlossaryCandidateHooks();
   registerTranslationDesk();
+  registerAdventureReader();
 
   const module = game.modules.get(MODULE_ID);
 
