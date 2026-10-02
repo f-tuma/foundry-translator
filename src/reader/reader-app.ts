@@ -57,13 +57,16 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     try {
       const content = await loadReaderContent(uuid);
       if (token !== this.sequence) return;
-      navigateTab(this.state, place ? { ...place, uuid: content.uuid, title: content.title, anchor: content.anchor ?? place.anchor }
-        : { uuid: content.uuid, title: content.title, anchor: content.anchor, scroll: 0, ratio: 0, width: 0 }, newTab);
+      navigateTab(this.state, place ? { ...place, uuid: content.uuid, title: content.title, book: content.book, anchor: content.anchor ?? place.anchor }
+        : { uuid: content.uuid, title: content.title, book: content.book, anchor: content.anchor, scroll: 0, ratio: 0, width: 0 }, newTab);
       if (place) Object.assign(currentPlace(this.state)!, { scroll: place.scroll, ratio: place.ratio, width: place.width });
       this.content = content; this.panel = null; this.search = ""; this.busy = false; this.save();
     } catch (error) {
       if (token !== this.sequence) return;
-      this.busy = false; this.error = t(error instanceof Error && error.message.startsWith("Reader.") ? error.message.slice(7) : "Unavailable");
+      const message = t(error instanceof Error && error.message.startsWith("Reader.") ? error.message.slice(7) : "Unavailable");
+      // A broken link or the tab limit must not replace the chapter being read.
+      if (this.content) ui.notifications.warn(message); else this.error = message;
+      this.busy = false;
       logger.warn("Reader could not open a document.", error);
     }
     if (token === this.sequence) await this.render({ force: true });
@@ -75,7 +78,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     try {
       const content = await loadReaderContent(place.uuid + (place.anchor ? `#${place.anchor}` : ""));
       if (token !== this.sequence) return;
-      this.content = content; place.uuid = content.uuid; place.title = content.title; this.panel = null; this.search = "";
+      this.content = content; place.uuid = content.uuid; place.title = content.title; place.book = content.book; this.panel = null; this.search = "";
     } catch (error) {
       if (token !== this.sequence) return;
       // Do not display another tab's prose under an inaccessible document name.
@@ -93,25 +96,28 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     root.innerHTML = `<header class="ft-reader-topbar">
       <div class="ft-reader-toolbar">${button("back", "Back", "arrow-left", !tab || tab.cursor <= 0)}${button("forward", "Forward", "arrow-right", !tab || tab.cursor >= tab.history.length - 1)}${button("contents", "Contents", "list", !this.content?.chapters.length)}</div>
       <div class="ft-reader-title"><small>${esc(this.content?.book ?? t("Title"))}</small><strong>${esc(place?.title ?? t("Library"))}</strong></div>
-      <div class="ft-reader-toolbar">${button("search", "Search", "magnifying-glass", !this.content)}${button("bookmarks", "Bookmarks", "bookmark")}${button("settings", "Settings", "text-height")}${button("close", "Close", "xmark")}</div></header>
+      <div class="ft-reader-toolbar">${button("search", "Search", "magnifying-glass", !this.content)}${button("bookmarks", "Bookmarks", "bookmark")}${button("settings", "Settings", "text-height")}${button("native", "OpenNative", "arrow-up-right-from-square", !this.content)}${button("close", "Close", "xmark")}</div></header>
       <div class="ft-reader-tabs" role="tablist" aria-label="${esc(t("Tabs"))}">${this.state.tabs.map(tab => `<div class="ft-reader-tab${tab.id === this.state.active ? " is-active" : ""}"><button type="button" role="tab" aria-selected="${tab.id === this.state.active}" data-reader-tab="${esc(tab.id)}">${esc(tab.history[tab.cursor]?.title ?? "")}</button><button type="button" data-reader-close-tab="${esc(tab.id)}" aria-label="${esc(t("CloseTab"))}">${icon("xmark")}</button></div>`).join("")}${button("library", "OpenDocument", "plus")}</div>
       <div class="ft-reader-search" hidden><label>${icon("magnifying-glass")}<input type="search" data-reader-find placeholder="${esc(t("FindPlaceholder"))}" aria-label="${esc(t("FindPlaceholder"))}"></label><output aria-live="polite" data-reader-find-count></output>${button("find-prev", "PreviousMatch", "chevron-up")}${button("find-next", "NextMatch", "chevron-down")}${button("search-close", "CloseSearch", "xmark")}</div>
       <main class="ft-reader-scroll" tabindex="0" aria-label="${esc(t("ReadingArea"))}"${this.busy ? ' aria-busy="true"' : ""}>
         ${this.busy ? `<div class="ft-reader-status" role="status">${icon("circle-notch")} ${esc(t("Loading"))}</div>` : ""}
-        ${this.error ? `<div class="ft-reader-status" role="alert">${esc(this.error)} ${button("retry", "Retry", "rotate-right")}</div>` : ""}
-        <article class="ft-reader-article"><header><small>${esc(this.content?.book ?? "")}</small><h1>${esc(this.content?.title ?? t("Welcome"))}</h1></header><div data-reader-prose></div></article>
+        ${this.error ? `<div class="ft-reader-status" role="alert">${esc(this.error)} ${button("retry", "Retry", "rotate-right")}${button("library", "Library", "book-open")}</div>` : ""}
+        <article class="ft-reader-article"><header><small>${esc(this.content?.book ?? "")}</small><h1>${esc(this.content?.title ?? t("Welcome"))}</h1>${this.content?.subtitle ? `<p class="ft-reader-subtitle">${esc(this.content.subtitle)}</p>` : ""}${this.content?.pronunciation ? `<p class="ft-reader-pronunciation">${esc(this.content.pronunciation)}</p>` : ""}</header><div data-reader-prose></div>${this.chapterEndHTML()}</article>
       </main>
-      <footer class="ft-reader-footer"><button type="button" data-reader-action="chapter-prev"${this.chapterOffset(-1) ? "" : " disabled"}>${icon("chevron-left")}<span>${esc(t("PreviousChapter"))}</span></button><div class="ft-reader-progress"><span data-reader-progress>0 %</span><progress max="100" value="0" aria-label="${esc(t("Progress"))}"></progress></div><button type="button" data-reader-action="chapter-next"${this.chapterOffset(1) ? "" : " disabled"}><span>${esc(t("NextChapter"))}</span>${icon("chevron-right")}</button></footer>
+      <footer class="ft-reader-footer">${this.chapterButton(-1)}<div class="ft-reader-progress"${this.content && !this.error ? "" : " hidden"}>${this.chapterPosition()}<span data-reader-progress>0 %</span><progress max="100" value="0" aria-label="${esc(t("Progress"))}"></progress></div>${this.chapterButton(1)}</footer>
       <div class="ft-reader-scrim"${this.panel ? "" : " hidden"}></div><aside class="ft-reader-panel" role="dialog" aria-modal="true" aria-label="${esc(t(this.panel === "contents" ? "Contents" : this.panel === "bookmarks" ? "Bookmarks" : this.panel === "settings" ? "Settings" : "Library"))}"${this.panel ? "" : " hidden"}></aside>`;
     const prose = root.querySelector<HTMLElement>("[data-reader-prose]")!;
     if (this.content && !this.error) {
       prose.append(prepareReaderProse(this.content.html));
       prose.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6").forEach((heading, i) => { heading.dataset.readerSection = String(i); });
+      // Outside the sanitized prose, so it is a reader control, not page content.
+      if (this.content.unsupported) prose.insertAdjacentHTML("afterend", `<p class="ft-reader-native-hint"><button type="button" data-reader-action="native">${icon("arrow-up-right-from-square")} ${esc(t("OpenNative"))}</button></p>`);
     }
     else if (!this.content && !this.error) prose.textContent = t("WelcomeHint");
     const panel = root.querySelector<HTMLElement>(".ft-reader-panel")!;
     panel.innerHTML = this.panelHTML();
     if (this.panel) root.querySelectorAll<HTMLElement>(".ft-reader-topbar,.ft-reader-tabs,.ft-reader-scroll,.ft-reader-footer,.ft-reader-search").forEach(e => { e.inert = true; });
+    root.dataset.panel = this.panel ?? "";
     return root;
   }
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }
@@ -137,17 +143,15 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     this.updateProgress();
     root.querySelector<HTMLInputElement>("[data-reader-find]")?.addEventListener("input", event => { this.search = (event.target as HTMLInputElement).value; this.highlight(); });
     const libraryInput = root.querySelector<HTMLInputElement>("[data-reader-library-filter]");
-    if (libraryInput) {
-      libraryInput.value = this.libraryFilter;
-      const query = this.libraryFilter.toLocaleLowerCase();
-      root.querySelectorAll<HTMLElement>("[data-reader-library]").forEach(e => { e.hidden = !(e.textContent ?? "").toLocaleLowerCase().includes(query); });
+    if (libraryInput) libraryInput.value = this.libraryFilter;
+    libraryInput?.addEventListener("input", event => { this.libraryFilter = (event.target as HTMLInputElement).value; this.filterLibrary(root); });
+    if (libraryInput) this.filterLibrary(root);
+    if (this.panel) {
+      // Long Ember journals (Deities, Gazetteers) list 50+ chapters: start at the current one.
+      const target = root.querySelector<HTMLElement>('.ft-reader-panel [aria-current="page"],.ft-reader-panel input')
+        ?? root.querySelector<HTMLElement>(".ft-reader-panel button");
+      target?.focus({ preventScroll: true }); target?.scrollIntoView({ block: "center" });
     }
-    libraryInput?.addEventListener("input", event => {
-      this.libraryFilter = (event.target as HTMLInputElement).value;
-      const query = this.libraryFilter.toLocaleLowerCase();
-      root.querySelectorAll<HTMLElement>("[data-reader-library]").forEach(e => { e.hidden = !(e.textContent ?? "").toLocaleLowerCase().includes(query); });
-    });
-    if (this.panel) root.querySelector<HTMLElement>(".ft-reader-panel button,.ft-reader-panel input")?.focus();
     else scroller.focus({ preventScroll: true });
   }
   private panelHTML(): string {
@@ -160,17 +164,56 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
       const headings = [...(outline?.querySelectorAll("h1,h2,h3,h4,h5,h6") ?? [])].slice(0, 100);
       return header + `<nav aria-label="${esc(t("Contents"))}">${this.content?.chapters.map(c => {
         const heading = c.category && c.category !== category ? `<h3>${esc(c.category)}</h3>` : ""; category = c.category;
-        return `${heading}<button type="button" data-reader-uuid="${esc(c.uuid)}"${c.uuid === this.content?.uuid ? ' aria-current="page"' : ""}>${esc(c.name)}</button>${c.uuid === this.content?.uuid ? `<div class="ft-reader-outline">${headings.map((h, i) => `<button type="button" data-reader-jump="${i}">${esc(h.textContent ?? "")}</button>`).join("")}</div>` : ""}`;
+        const current = c.uuid === this.content?.uuid;
+        return `${heading}<button type="button" class="ft-reader-level${c.level}" data-reader-uuid="${esc(c.uuid)}"${current ? ' aria-current="page"' : ""}>${esc(c.name)}</button>${current && headings.length ? `<div class="ft-reader-outline">${headings.map((h, i) => `<button type="button" class="ft-reader-${h.localName}" data-reader-jump="${i}">${esc(h.textContent?.trim() ?? "")}</button>`).join("")}</div>` : ""}`;
       }).join("") ?? ""}</nav>`;
     }
-    if (this.panel === "bookmarks") return header + `<button type="button" class="ft-reader-save-bookmark" data-reader-action="bookmark">${icon("bookmark")} ${esc(t("BookmarkHere"))}</button><nav>${this.state.bookmarks.map((p, i) => `<div class="ft-reader-bookmark"><button type="button" data-reader-bookmark="${i}">${esc(p.title)}<small>${Math.round(p.ratio * 100)} %</small></button><button type="button" data-reader-remove-bookmark="${i}" aria-label="${esc(t("RemoveBookmark"))}">${icon("trash")}</button></div>`).join("") || `<p>${esc(t("NoBookmarks"))}</p>`}</nav>`;
-    if (this.panel === "settings") return header + `<div class="ft-reader-preferences"><h3>${esc(t("FontSize"))}</h3><div class="ft-reader-size">${button("font-minus", "Smaller", "minus")}<output>${this.state.fontSize} px</output>${button("font-plus", "Larger", "plus")}</div><h3>${esc(t("Theme"))}</h3><div class="ft-reader-themes">${(["dark", "paper", "sepia"] as const).map(theme => `<button type="button" data-reader-theme="${theme}" aria-pressed="${theme === this.state.theme}">${esc(t({ dark: "Dark", paper: "Paper", sepia: "Sepia" }[theme]))}</button>`).join("")}</div><button type="button" data-reader-action="wide" aria-pressed="${this.state.wide}">${icon("arrows-left-right-to-line")} ${esc(t("Wide"))}</button><button type="button" data-reader-action="fullscreen">${icon("expand")} ${esc(t("Fullscreen"))}</button><button type="button" data-reader-action="native"${this.content ? "" : " disabled"}>${icon("arrow-up-right-from-square")} ${esc(t("OpenNative"))}</button><p>${esc(t("PreferenceHint"))}</p></div>`;
-    const journals = game.journal.contents.filter(j => game.user?.isGM || (j as any).testUserPermission?.(game.user, "OBSERVER") === true).sort((a, b) => a.name.localeCompare(b.name));
-    return header + `<label class="ft-reader-library-search">${icon("magnifying-glass")}<input type="search" data-reader-library-filter placeholder="${esc(t("LibrarySearch"))}" aria-label="${esc(t("LibrarySearch"))}"></label><nav>${journals.map(j => `<button type="button" data-reader-library data-reader-uuid="${esc(j.uuid)}" data-reader-new-tab="true">${icon("book-open")} ${esc(j.name)}</button>`).join("") || `<p>${esc(t("NoDocuments"))}</p>`}</nav><p>${esc(t("LibraryHint"))}</p>`;
+    if (this.panel === "bookmarks") return header + `<button type="button" class="ft-reader-save-bookmark" data-reader-action="bookmark">${icon("bookmark")} ${esc(t("BookmarkHere"))}</button><nav>${this.state.bookmarks.map((p, i) => `<div class="ft-reader-bookmark"><button type="button" data-reader-bookmark="${i}"${p.uuid === this.content?.uuid ? ' aria-current="page"' : ""}><span>${esc(p.title)}</span><small>${p.book ? `${esc(p.book)} · ` : ""}${Math.round(p.ratio * 100)} %</small></button><button type="button" data-reader-remove-bookmark="${i}" aria-label="${esc(t("RemoveBookmark"))}">${icon("trash")}</button></div>`).join("") || `<p>${esc(t("NoBookmarks"))}</p>`}</nav>`;
+    if (this.panel === "settings") return header + `<div class="ft-reader-preferences"><h3>${esc(t("FontSize"))}</h3><div class="ft-reader-size">${button("font-minus", "Smaller", "minus")}<output>${this.state.fontSize} px</output>${button("font-plus", "Larger", "plus")}</div><h3>${esc(t("Theme"))}</h3><div class="ft-reader-themes">${(["dark", "paper", "sepia"] as const).map(theme => `<button type="button" data-reader-theme="${theme}" aria-pressed="${theme === this.state.theme}">${esc(t({ dark: "Dark", paper: "Paper", sepia: "Sepia" }[theme]))}</button>`).join("")}</div><button type="button" data-reader-action="wide" aria-pressed="${this.state.wide}">${icon("arrows-left-right-to-line")} ${esc(t("Wide"))}</button><button type="button" data-reader-action="fullscreen">${icon("expand")} ${esc(t("Fullscreen"))}</button><p>${esc(t("PreferenceHint"))}</p></div>`;
+    // Group by the sidebar folder path (Ember: Quests › Chapter 2, Gazetteer, …).
+    const groups = new Map<string, { name: string; uuid: string }[]>();
+    for (const j of game.journal.contents as any[]) {
+      if (!(game.user?.isGM || j.testUserPermission?.(game.user, "OBSERVER") === true)) continue;
+      const folders = j.folder ? [...(j.folder.ancestors ?? []).slice().reverse(), j.folder] : [];
+      const path = folders.map((f: { name: string }) => f.name).join(" › ");
+      if (!groups.has(path)) groups.set(path, []);
+      groups.get(path)!.push({ name: j.name, uuid: j.uuid });
+    }
+    const sorted = [...groups].sort(([a], [b]) => (a ? 1 : 0) - (b ? 1 : 0) || a.localeCompare(b));
+    const list = sorted.map(([path, journals]) => `<div class="ft-reader-library-group">${path ? `<h3>${esc(path)}</h3>` : ""}${journals.sort((a, b) => a.name.localeCompare(b.name))
+      .map(j => `<button type="button" data-reader-library data-reader-uuid="${esc(j.uuid)}" data-reader-new-tab="true">${icon("book-open")} <span>${esc(j.name)}</span></button>`).join("")}</div>`).join("");
+    return header + `<label class="ft-reader-library-search">${icon("magnifying-glass")}<input type="search" data-reader-library-filter placeholder="${esc(t("LibrarySearch"))}" aria-label="${esc(t("LibrarySearch"))}"></label><nav>${list || `<p>${esc(t("NoDocuments"))}</p>`}<p data-reader-library-empty hidden>${esc(t("NoMatches"))}</p></nav><p>${esc(t("LibraryHint"))}</p>`;
   }
-  private chapterOffset(offset: number): string | undefined {
+  private filterLibrary(root: HTMLElement): void {
+    const query = this.libraryFilter.trim().toLocaleLowerCase();
+    let any = false;
+    for (const group of root.querySelectorAll<HTMLElement>(".ft-reader-library-group")) {
+      // A folder name match lists the whole folder ("kapitola 2", "gazetteer").
+      const folder = (group.querySelector("h3")?.textContent ?? "").toLocaleLowerCase().includes(query);
+      let visible = false;
+      group.querySelectorAll<HTMLElement>("[data-reader-library]").forEach(e => { e.hidden = !folder && !(e.textContent ?? "").toLocaleLowerCase().includes(query); visible ||= !e.hidden; });
+      group.hidden = !visible; any ||= visible;
+    }
+    const empty = root.querySelector<HTMLElement>("[data-reader-library-empty]"); if (empty) empty.hidden = any || !root.querySelector(".ft-reader-library-group");
+  }
+  private chapter(offset: number) {
     const chapters = this.content?.chapters ?? [], index = chapters.findIndex(p => p.uuid === this.content?.uuid);
-    return index >= 0 ? chapters[index + offset]?.uuid : undefined;
+    return index >= 0 ? chapters[index + offset] : undefined;
+  }
+  private chapterButton(offset: -1 | 1): string {
+    const target = this.chapter(offset), label = t(offset < 0 ? "PreviousChapter" : "NextChapter");
+    const text = `<span><small>${esc(label)}</small>${target ? `<strong>${esc(target.name)}</strong>` : ""}</span>`;
+    return `<button type="button" class="ft-reader-chapter-${offset < 0 ? "prev" : "next"}" data-reader-action="chapter-${offset < 0 ? "prev" : "next"}" aria-label="${esc(target ? `${label}: ${target.name}` : label)}"${target ? "" : " disabled"}>${offset < 0 ? icon("chevron-left") + text : text + icon("chevron-right")}</button>`;
+  }
+  private chapterPosition(): string {
+    const chapters = this.content?.chapters ?? [], index = chapters.findIndex(p => p.uuid === this.content?.uuid);
+    return index >= 0 && chapters.length > 1 ? `<span class="ft-reader-position" title="${esc(t("ChapterPosition"))}">${index + 1} / ${chapters.length}</span>` : "";
+  }
+  /** Book-like continuation at the end of the text, where a reader actually is. */
+  private chapterEndHTML(): string {
+    const next = this.chapter(1);
+    if (!this.content || this.error || !next) return "";
+    return `<nav class="ft-reader-chapter-end" aria-label="${esc(t("NextChapter"))}"><button type="button" data-reader-action="chapter-next"><span><small>${esc(t("NextChapter"))}${next.category ? ` · ${esc(next.category)}` : ""}</small><strong>${esc(next.name)}</strong></span>${icon("arrow-right")}</button></nav>`;
   }
   private async onClick(event: MouseEvent): Promise<void> {
     if (!(event.target instanceof Element)) return;
@@ -219,7 +262,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     if (action === "back" || action === "forward") {
       const tab = activeTab(this.state); if (tab) { const next = tab.cursor + (action === "back" ? -1 : 1); if (tab.history[next]) { tab.cursor = next; return this.display(tab.history[next]!); } }
     }
-    if (action === "chapter-prev" || action === "chapter-next") { const uuid = this.chapterOffset(action === "chapter-prev" ? -1 : 1); if (uuid) return this.navigate(uuid); }
+    if (action === "chapter-prev" || action === "chapter-next") { const uuid = this.chapter(action === "chapter-prev" ? -1 : 1)?.uuid; if (uuid) return this.navigate(uuid); }
     if (action === "search" || action === "search-close") {
       const bar = this.element.querySelector<HTMLElement>(".ft-reader-search")!;
       bar.hidden = action === "search-close" || !bar.hidden;
@@ -271,6 +314,13 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
     if (event.key === "Enter" && (event.target as Element)?.matches("[data-reader-find]")) { event.preventDefault(); this.selectMatch(event.shiftKey ? -1 : 1); }
+    // Browser-style history (Alt+←/→) and book-style page turns while the text has focus.
+    if (!this.panel && !this.busy && ["ArrowLeft", "ArrowRight"].includes(event.key) && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+      const onText = (event.target as Element)?.matches?.(".ft-reader-scroll");
+      const action = event.altKey ? (event.key === "ArrowLeft" ? "back" : "forward") : onText ? (event.key === "ArrowLeft" ? "chapter-prev" : "chapter-next") : "";
+      const control = action && this.element.querySelector<HTMLButtonElement>(`[data-reader-action="${action}"]:not(:disabled)`);
+      if (control) { event.preventDefault(); control.click(); }
+    }
   }
   private goAnchor(anchor: string): void {
     const article = this.element.querySelector<HTMLElement>(".ft-reader-article")!;

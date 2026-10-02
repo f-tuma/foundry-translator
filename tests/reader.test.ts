@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseHTML } from "linkedom";
 import { currentPlace, navigateTab, freshReaderState, parseReaderState, closeReaderTab } from "../src/reader/state";
-import { loadReaderContent, prepareReaderProse, readerPageHtml, readerChapters } from "../src/reader/content";
+import { loadReaderContent, prepareReaderProse, readerPage, readerPageHtml, readerChapters } from "../src/reader/content";
 
 const identities = vi.hoisted(() => ({ source: vi.fn(), target: vi.fn(), identity: vi.fn() }));
 vi.mock("../src/translation/document-identity", () => ({
@@ -50,7 +50,7 @@ describe("reader navigation", () => {
 describe("reader content and access", () => {
   it("keeps unsupported diagrams/media navigable with a native-view notice", async () => {
     expect(await readerPageHtml(doc("JournalEntry.j.JournalEntryPage.p", {type:"ember.questFlowchart"}), false)).toContain("Reader.Unsupported");
-    expect(await readerPageHtml(doc("JournalEntry.j.JournalEntryPage.p", {type:"pdf"}), false)).toContain("Reader.NativeHint");
+    expect(await readerPage(doc("JournalEntry.j.JournalEntryPage.p", {type:"pdf"}), false)).toMatchObject({unsupported: true});
   });
   it("reads Ember's view sections without rendering or changing the live sheet", async () => {
     const original = {mode:"edit"}, render = vi.fn();
@@ -62,12 +62,40 @@ describe("reader content and access", () => {
     const sheet = new Sheet(); const html = await readerPageHtml(doc("JournalEntry.j.JournalEntryPage.p",{type:"ember.lore",sheet}), false);
     expect(html).toContain("Story"); expect(html).not.toMatch(/SECRET|RUN/u); expect(sheet.options.mode).toBe("edit"); expect(render).not.toHaveBeenCalled();
   });
+  it("localizes Ember's literal headers and keeps subtitle, pronunciation and section classes", async () => {
+    class Sheet { constructor(public config: any = {}) {}
+      async _prepareContext() { return {subtitle:"The Shining", pronunciation:"SPEK-tra"}; }
+      async _preparePartContext(_part: string, context: any) { return {...context, sections:[{sectionClass:"overview",contentClass:"block readaloud",content:"<p>Intro</p>"},{sectionClass:"exposition",header:"Setting the Scene",content:"<p>Scene</p>"},{sectionClass:"concepts",header:"Custom Label",content:"<p>X</p>"}]}; }
+      _getSections() {}
+    }
+    const page = await readerPage(doc("JournalEntry.j.JournalEntryPage.p",{type:"ember.deity",sheet:new Sheet()}), false);
+    expect(page).toMatchObject({subtitle:"The Shining", pronunciation:"SPEK-tra"});
+    expect(page.html).toContain("FOUNDRY_TRANSLATE.Reader.Section.SettingTheScene"); expect(page.html).toContain("<h2>Custom Label</h2>");
+    expect(page.html).toContain('class="ft-reader-section ft-ember-overview"><div class="block readaloud"><p>Intro</p>');
+  });
   it("requires access to the original even when a translated actor is public", async () => {
     const translated = doc("Actor.cs",{toObject:()=>({system:{details:{biography:{public:"SPOILER"}}}})});
     const original = doc("Actor.source", {testUserPermission:()=>false});
     identities.source.mockResolvedValue(original.uuid);
     vi.stubGlobal("fromUuid", async (id:string)=>id===translated.uuid?translated:original);
     await expect(loadReaderContent(translated.uuid)).rejects.toThrow("Reader.Unavailable");
+  });
+  it("uses translated outcome labels by ID without changing live outcomes", async () => {
+    const {document,HTMLElement,Element}=parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document",document); vi.stubGlobal("HTMLElement",HTMLElement); vi.stubGlobal("Element",Element);
+    const outcomes = [{id:"spared",label:"Strážce byl ušetřen"}];
+    class Sheet {
+      async _prepareContext() { return {}; }
+      async _preparePartContext() { return {sections:[{sectionClass:"outcomes",content:'<form class="choices"><label><input class="event-outcome-checkbox" type="checkbox" value="spared" checked> Spared the guard.</label><label><input class="event-outcome-checkbox" type="checkbox" value="unknown"> Unknown outcome.</label></form>'}]}; }
+      _getSections() {}
+    }
+    const page = doc("JournalEntry.cs.JournalEntryPage.p", {type:"ember.questEvent",sheet:new Sheet(),parent:doc("JournalEntry.cs",{flags:flag()}),system:{_source:{outcomes}}});
+    const prose = prepareReaderProse((await readerPage(page, false)).html);
+    expect(prose.textContent).toContain("Strážce byl ušetřen.");
+    expect(prose.textContent).toContain("Unknown outcome.");
+    expect(prose.textContent).not.toContain("Spared the guard.");
+    expect(prose.querySelector(".ft-reader-check")?.classList.contains("is-checked")).toBe(true);
+    expect(outcomes).toEqual([{id:"spared",label:"Strážce byl ušetřen"}]);
   });
   it("shows only a portrait/name for LIMITED actors and no private biography", async () => {
     const actor = doc("Actor.hero",{testUserPermission:(_u:unknown,level:string)=>level==="LIMITED",img:"hero.png",toObject:()=>({system:{details:{biography:{public:"PUBLIC",private:"SECRET"}}}})});
@@ -94,6 +122,12 @@ describe("reader content and access", () => {
     const source=doc("JournalEntry.source",{pages:{contents:pages.map(p=>({...p,testUserPermission:()=>p.id!=="secret"}))}});
     expect(readerChapters(root,source).map(p=>p.category)).toEqual(["First","Second"]);
   });
+  it("lists uncategorized pages last under their own heading and keeps title levels", () => {
+    const pages=[doc("JournalEntry.a.JournalEntryPage.loose",{category:null,sort:0}),doc("JournalEntry.a.JournalEntryPage.room",{category:"c",sort:2,title:{level:2}}),doc("JournalEntry.a.JournalEntryPage.hall",{category:"c",sort:1})];
+    const root=doc("JournalEntry.a",{pages:{contents:pages},categories:{contents:[{id:"c",sort:1,name:"Main Level"}]}});
+    expect(readerChapters(root,root).map(p=>[p.name.split(".").at(-1),p.category,p.level])).toEqual([["hall","Main Level",1],["room","Main Level",2],["loose","JOURNAL.Uncategorized",1]]);
+    expect(readerChapters({...root,categories:{contents:[]}},root).map(p=>p.category)).toEqual(["","",""]);
+  });
   it("retains link identities while stripping actions and hidden GM content", () => {
     const {document,HTMLElement,Element}=parseHTML("<html><body></body></html>");
     vi.stubGlobal("document",document); vi.stubGlobal("HTMLElement",HTMLElement); vi.stubGlobal("Element",Element);
@@ -102,5 +136,14 @@ describe("reader content and access", () => {
     expect(prose.innerHTML).not.toMatch(/onclick|script|button|SECRET|javascript:/u);
     expect(prose.querySelector("document-embed")).toBeNull();
     expect(prose.querySelector(".ft-reader-static-embed")?.textContent).toBe("Embedded prose");
+  });
+  it("keeps Ember event outcomes readable as static state instead of dropping the form", () => {
+    const {document,HTMLElement,Element}=parseHTML("<html><body></body></html>");
+    vi.stubGlobal("document",document); vi.stubGlobal("HTMLElement",HTMLElement); vi.stubGlobal("Element",Element);
+    const prose=prepareReaderProse('<form class="choices open"><fieldset class="choice"><div class="outcome"><label class="checkbox"><input type="checkbox" class="event-outcome-checkbox" value="a" checked> Spared the guard.</label><p class="notes">Peace</p></div></fieldset><fieldset class="standalone outcome"><label><input type="checkbox" value="b"> Fled.</label></fieldset></form>');
+    expect(prose.querySelector("form,input,fieldset")).toBeNull();
+    expect(prose.querySelector(".choices .ft-reader-fieldset.choice .notes")?.textContent).toBe("Peace");
+    expect([...prose.querySelectorAll(".ft-reader-check")].map(e=>e.classList.contains("is-checked"))).toEqual([true,false]);
+    expect(prose.textContent).toContain("Spared the guard."); expect(prose.textContent).toContain("Fled.");
   });
 });
