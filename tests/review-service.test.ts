@@ -14,6 +14,7 @@ import { ACTOR_TRANSLATIONS_PACK_ID } from "../src/translation/compendium-actor-
 import { ITEM_TRANSLATIONS_PACK_ID } from "../src/translation/compendium-item-translation-repository";
 import { createLiveHandler } from "../src/polish/live-service";
 import { GlossaryCompendiumRepository } from "../src/glossary/compendium-repository";
+import { prepareReferenceRebuild, materializeReferenceRebuild } from "../src/review/reference-rebuild";
 
 let source: JournalData, copy: JournalData, locked = false;
 let writes: { kind: string; patch: any }[];
@@ -51,6 +52,21 @@ function install(): void {
 }
 async function snapshot(): Promise<ReviewSnapshot> { return loadReview((await reviewCatalog("cs")).find(item => item.pack === packId && item.id === "copy")!); }
 function textRow(s: ReviewSnapshot) { return s.rows.find(row => row.label === "text.content")!; }
+
+async function rebuildFixture() {
+  const root = `Compendium.${packId}.JournalEntry.copy`;
+  source.pages[0]!.text!.content = '<p>Read @UUID[JournalEntry.source.JournalEntryPage.two]{Later} and @UUID[JournalEntry.source.JournalEntryPage.one]{Arrival}.</p><p>They are &Reference[surprise]{surprised}.</p><p>Untouched.</p>';
+  copy.pages[0]!.text!.content = `<p>Přečti @UUID[${root}]{Úvod} a @UUID[${root}]{Později}.</p><p>Jsou &Odkaz[nepředvídané]{překvapení}.</p><p>Beze změny.</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  vi.stubGlobal('fromUuid', async (uuid: string) => uuid === 'JournalEntry.source' ? sourceDocument : { uuid, documentName: 'JournalEntryPage' });
+  const view = await snapshot(), row = textRow(view), plan = (await prepareReferenceRebuild(view, row.fieldId))!;
+  expect(plan.rows).toHaveLength(2);
+  const edits = plan.rows.map(row => ({ rowId: row.rowId, text: [...row.edit.text], labels: row.edit.references.flat().filter(ref => ref.editable).map(ref => ({ marker: ref.marker, label: `Název ${ref.marker.replace(/\D/gu, '')}` })) }));
+  // Labels must retain their original numerical multiset; avoid adding quantities.
+  for (const edit of edits) for (const label of edit.labels) label.label = 'Přeložený název';
+  const proposed = await materializeReferenceRebuild(view, plan, edits);
+  return { view, plan, proposed, options: { fieldId: plan.fieldId, proofHash: plan.proofHash } };
+}
 
 beforeEach(async () => {
   vi.stubGlobal("document", parseHTML("<html><body></body></html>").document);
@@ -943,4 +959,42 @@ it("edits embedded plain prose with history and guarded undo, rejects raw option
   const reverted = await undoReview(s.entry, "embed-prose");
   expect(reverted.rows.find(row => row.id === r.id)!.translation).toEqual(before);
   expect(writes).toHaveLength(2);
+});
+
+it('source-owned rebuild persists a whole damaged field once and undoes only exact recorded parts', async () => {
+  const f = await rebuildFixture(), original = JSON.stringify(source);
+  const saved = await saveReviewRows(f.view, f.proposed.changes, { id: 'source-owned-rebuild', referenceRebuild: f.options });
+  expect(writes).toHaveLength(1);
+  expect(saved.rows.filter(row => row.fieldId === f.plan.fieldId).every(row => !row.blocked && !row.verified)).toBe(true);
+  const receipt = readReviewHistory(copy.flags).find(operation => operation.id === 'source-owned-rebuild')!;
+  expect(receipt.referenceRebuild).toMatchObject({ version: 1, proofHash: f.plan.proofHash, beforeHash: f.plan.beforeHash });
+  expect(copy.pages[0]!.text!.content).toContain(`@UUID[Compendium.${packId}.JournalEntry.copy.JournalEntryPage.two]`);
+  expect(copy.pages[0]!.text!.content).not.toContain('&amp;Odkaz[');
+  const untouched = saved.rows.find(row => row.fieldId === f.plan.fieldId && row.translation[0] === 'Beze změny.')!;
+  await updateReview(saved, untouched.id, { type: 'save', parts: ['Pozdější oprava mimo obnovené části.'] });
+  const undone = await undoReview(saved.entry, 'source-owned-rebuild');
+  expect(copy.pages[0]!.text!.content).toContain('Pozdější oprava mimo obnovené části.');
+  expect(copy.pages[0]!.text!.content).toContain('&amp;Odkaz[nepředvídané]{překvapení}');
+  expect(undone.rows.filter(row => row.fieldId === f.plan.fieldId).every(row => row.blocked === 'StructureChanged')).toBe(true);
+  expect(JSON.stringify(source)).toBe(original);
+});
+it('does not authorize arbitrary service proposals, stale proofs, conflicting repair flags or altered rebuild receipts', async () => {
+  const f = await rebuildFixture();
+  await expect(saveReviewRows(f.view, f.proposed.changes)).rejects.toThrow('StructureChanged');
+  await expect(saveReviewRows(f.view, f.proposed.changes, { referenceRebuild: { ...f.options, proofHash: '0'.repeat(64) } })).rejects.toThrow('Conflict');
+  await expect(saveReviewRows(f.view, f.proposed.changes.slice(0, 1), { referenceRebuild: f.options })).rejects.toThrow();
+  await expect(saveReviewRows(f.view, f.proposed.changes, { referenceRebuild: f.options, repairReferences: true })).rejects.toThrow('ProtectedText');
+  const forged = structuredClone(f.proposed.changes); forged[0]!.parts[0] += ' @UUID[Actor.other]';
+  await expect(saveReviewRows(f.view, forged, { referenceRebuild: f.options })).rejects.toThrow();
+  const resolver = fromUuid;
+  vi.stubGlobal('fromUuid', async (uuid: string) => uuid === 'JournalEntry.source' ? sourceDocument : { uuid, documentName: 'Item' });
+  await expect(saveReviewRows(f.view, f.proposed.changes, { referenceRebuild: f.options })).rejects.toThrow('ReferenceTargetMissing');
+  vi.stubGlobal('fromUuid', resolver);
+  await expect(saveReviewRows(f.view, f.proposed.changes, { referenceRebuild: f.options, beforeWrite: async () => { throw new Error('Review.Conflict'); } })).rejects.toThrow('Conflict');
+  expect(writes).toHaveLength(0);
+  const saved = await saveReviewRows(f.view, f.proposed.changes, { id: 'receipt-proof', referenceRebuild: f.options });
+  const history = readReviewHistory(copy.flags).find(operation => operation.id === 'receipt-proof')!;
+  history.referenceRebuild!.proofHash = 'f'.repeat(64);
+  await expect(undoReview(saved.entry, 'receipt-proof')).rejects.toThrow('UndoConflict');
+  expect(writes).toHaveLength(1);
 });
