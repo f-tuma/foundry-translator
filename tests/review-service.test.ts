@@ -755,3 +755,95 @@ it('rechecks the authoritative source immediately before the atomic identifier p
   expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: false, error: { code: 'Review.Conflict' } });
   expect(writes).toHaveLength(0);
 });
+
+it('MCP batch reads complete ordered rows through the same context guards without writes or source mutation', async () => {
+  const longSource = 'The long source paragraph. '.repeat(40), longTarget = 'Dlouhý přeložený odstavec. '.repeat(40);
+  source.pages[0]!.text!.content = `<p>${longSource}</p><p>A <strong>formatted</strong> @UUID[Actor.source]{Guide}.</p>`;
+  copy.pages[0]!.text!.content = `<p>${longTarget}</p><p><strong>Formátovaný</strong> @UUID[Actor.source]{Průvodce}.</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), rows = f.s.rows.filter(row => row.label === 'text.content' && row.group === f.row.group);
+  expect(rows).toHaveLength(2);
+  const original = JSON.stringify(source), translated = JSON.stringify(copy), rowIds = rows.map(row => row.id).reverse();
+  const result = await f.call('get_context_batch', { documentId: f.s.entry.uuid, rowIds });
+  expect(result.ok).toBe(true);
+  const value = result.value as any;
+  expect(value.contexts.map((context: any) => context.rowId)).toEqual(rowIds);
+  expect(value.omittedRowIds).toEqual([]);
+  for (const context of value.contexts) {
+    const single = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: context.rowId, radius: 0 });
+    expect(context).toEqual(single.value);
+    expect(context.revision).toBe(value.revision);
+  }
+  expect(value.contexts[1].source).toEqual([longSource]);
+  expect(value.contexts[1].translation).toEqual([longTarget]);
+  expect(value.contexts[0].edit.references.flat()).toEqual([expect.objectContaining({ marker: '⟦1⟧', editable: true })]);
+  expect(writes).toHaveLength(0); expect(Hooks.callAll).not.toHaveBeenCalled();
+  expect(JSON.stringify(source)).toBe(original); expect(JSON.stringify(copy)).toBe(translated);
+});
+it('MCP batch rejects unknown documents, rows outside the document, and revoked scope without returning partial text', async () => {
+  const f = await liveFixture(), args = { documentId: f.s.entry.uuid, rowIds: [f.row.id] };
+  expect(await f.call('get_context_batch', { ...args, documentId: 'JournalEntry.source' })).toMatchObject({ ok: false, error: { code: 'Review.TranslationMissing' } });
+  const missing = await f.call('get_context_batch', { ...args, rowIds: [f.row.id, 'f'.repeat(64)] });
+  expect(missing).toMatchObject({ ok: false, error: { code: 'Review.MissingField', rowId: 'f'.repeat(64) } });
+  expect(missing).not.toHaveProperty('value');
+  f.disconnect();
+  expect(await f.call('get_context_batch', args)).toMatchObject({ ok: false, error: { code: 'Live.Disconnected' } });
+  expect(writes).toHaveLength(0);
+});
+it('MCP batch reports locked and damaged fields exactly as a single full context does', async () => {
+  const f = await liveFixture();
+  copy.pages[0]!.text!.content = '<p><em>Třínohé končetiny.</em></p><p>Druhý odstavec.</p>';
+  let batch = await f.call('get_context_batch', { documentId: f.s.entry.uuid, rowIds: [f.row.id] });
+  let single = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id, radius: 0 });
+  expect((batch.value as any).contexts).toEqual([single.value]);
+  expect((batch.value as any).contexts[0]).toMatchObject({ blocked: 'StructureChanged', integrityDetails: expect.any(Object) });
+  locked = true;
+  batch = await f.call('get_context_batch', { documentId: f.s.entry.uuid, rowIds: [f.row.id] });
+  single = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id, radius: 0 });
+  expect((batch.value as any).contexts).toEqual([single.value]);
+  expect((batch.value as any).contexts[0].blocked).toBe('Locked');
+  expect(writes).toHaveLength(0);
+});
+it('MCP batch bounds the entire response and explicitly omits whole paragraphs instead of truncating them', async () => {
+  const sourceParts = ['A'.repeat(20000), 'B'.repeat(20000), 'C'.repeat(20000), 'Short source.'];
+  const targetParts = ['Á'.repeat(20000), 'É'.repeat(20000), 'Í'.repeat(20000), 'Krátký překlad.'];
+  source.pages[0]!.text!.content = sourceParts.map(part => `<p>${part}</p>`).join('');
+  copy.pages[0]!.text!.content = targetParts.map(part => `<p>${part}</p>`).join('');
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), rows = f.s.rows.filter(row => row.label === 'text.content' && row.group === f.row.group);
+  const result = await f.call('get_context_batch', { documentId: f.s.entry.uuid, rowIds: rows.map(row => row.id) });
+  const value = result.value as any;
+  expect(result.ok).toBe(true); expect(JSON.stringify(result).length).toBeLessThanOrEqual(100000);
+  expect(value.omittedRowIds.length).toBeGreaterThan(0);
+  expect([...value.contexts.map((context: any) => context.rowId), ...value.omittedRowIds].sort()).toEqual(rows.map(row => row.id).sort());
+  expect(value.omitted.every((item: any) => item.reason === 'ResponseLimit')).toBe(true);
+  for (const context of value.contexts) {
+    const index = rows.findIndex(row => row.id === context.rowId);
+    expect(context.source).toEqual([sourceParts[index]]); expect(context.translation).toEqual([targetParts[index]]);
+  }
+  expect(value.contexts.at(-1).rowId).toBe(rows.at(-1)!.id);
+  const omitted = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: value.omittedRowIds[0], radius: 0 });
+  expect(omitted.ok).toBe(true); expect((omitted.value as any).source[0]).toHaveLength(20000);
+  expect(writes).toHaveLength(0);
+});
+it('MCP batch preserves the per-paragraph size guard and names oversized omissions', async () => {
+  source.pages[0]!.text!.content = `<p>${'S'.repeat(31000)}</p><p>Safe.</p>`;
+  copy.pages[0]!.text!.content = `<p>${'T'.repeat(31000)}</p><p>Bezpečné.</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  vi.spyOn(GlossaryCompendiumRepository.prototype, 'loadExisting').mockResolvedValue([]);
+  const s = await snapshot(), rows = s.rows.filter(row => row.label === 'text.content' && row.group === textRow(s).group);
+  const handle = createLiveHandler('cs', () => true);
+  const result = await handle({ id: 'batch', method: 'get_context_batch', args: { documentId: s.entry.uuid, rowIds: rows.map(row => row.id) } });
+  expect(result).toMatchObject({ ok: true, value: { omittedRowIds: [rows[0]!.id], omitted: [{ rowId: rows[0]!.id, reason: 'ContextTooLarge' }], contexts: [{ rowId: rows[1]!.id, source: ['Safe.'], translation: ['Bezpečné.'] }] } });
+  expect(await handle({ id: 'single', method: 'get_context', args: { documentId: s.entry.uuid, rowId: rows[0]!.id } })).toMatchObject({ ok: false, error: { code: 'Live.ContextTooLarge' } });
+  expect(JSON.stringify(result).length).toBeLessThanOrEqual(100000); expect(writes).toHaveLength(0);
+});
+it('MCP batch discards the result if permission is revoked during the shared context read', async () => {
+  vi.spyOn(GlossaryCompendiumRepository.prototype, 'loadExisting').mockResolvedValue([]);
+  const s = await snapshot(), rowIds = s.rows.slice(0, 2).map(row => row.id);
+  let checks = 0;
+  const handle = createLiveHandler('cs', () => ++checks < 5);
+  const result = await handle({ id: 'revoked-batch', method: 'get_context_batch', args: { documentId: s.entry.uuid, rowIds } });
+  expect(result).toMatchObject({ ok: false, error: { code: 'Live.Disconnected' } });
+  expect(result).not.toHaveProperty('value'); expect(writes).toHaveLength(0);
+});

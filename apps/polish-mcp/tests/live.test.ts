@@ -85,6 +85,11 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
       expect(tool).toBeDefined(); expect(tool.inputSchema.additionalProperties).toBe(false);
       expect(Object.keys(tool.inputSchema.properties ?? {})).not.toContain('text');
     }
+    const batchTool = tools.tools.find(t => t.name === 'live_get_context_batch')!;
+    expect(batchTool).toBeDefined(); expect(batchTool.annotations?.readOnlyHint).toBe(true);
+    expect(batchTool.inputSchema.additionalProperties).toBe(false);
+    expect(Object.keys(batchTool.inputSchema.properties ?? {}).sort()).toEqual(['documentId', 'rowIds']);
+    expect((batchTool.inputSchema.properties as any).rowIds).toMatchObject({ minItems: 1, maxItems: 10 });
     const result = await client.callTool({ name: 'live_connection', arguments: {} });
     const connection = JSON.parse((result.content as { text: string }[])[0]!.text);
     const connect = await fetch(`${connection.address}/connect`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${connection.pairingCode}`, 'Content-Type': 'application/json' }, body: JSON.stringify(claim) });
@@ -98,6 +103,13 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     expect(contextRequest).toMatchObject({ method: 'get_reference_context', args: { documentId: 'translated', rowId: 'a'.repeat(64), referenceIndex: 0, offset: 1, limit: 2 } });
     await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: contextRequest.id, result: { ok: true, value: { fields: [{ text: 'Original context' }], nextOffset: null } } }) });
     expect(JSON.parse(((await contextPending).content as { text: string }[])[0]!.text)).toMatchObject({ ok: true, value: { nextOffset: null } });
+    const batchArgs = { documentId: 'translated', rowIds: ['a'.repeat(64), 'b'.repeat(64)] };
+    const batchPending = client.callTool({ name: 'live_get_context_batch', arguments: batchArgs });
+    const batchRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
+    expect(batchRequest).toMatchObject({ method: 'get_context_batch', args: batchArgs });
+    const batchReply = { ok: true, value: { documentId: 'translated', contexts: [{ rowId: batchArgs.rowIds[0], source: ['Complete source.'], translation: ['Úplný překlad.'] }], omittedRowIds: [batchArgs.rowIds[1]], maxResponseChars: 100000 } };
+    await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: batchRequest.id, result: batchReply }) });
+    expect(JSON.parse(((await batchPending).content as { text: string }[])[0]!.text)).toEqual(batchReply);
     const repairArgs = { documentId: 'translated', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Restore exact source IDs', operationId: 'repair-1' };
     const repairPending = client.callTool({ name: 'live_restore_reference_identifiers', arguments: repairArgs });
     const repairRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
@@ -160,3 +172,17 @@ it('boots the actual MCP server from a verified downloaded asset through the sta
   } finally {await client.close();await rm(root,{recursive:true,force:true});}
 // The SDK allows graceful shutdown of both launcher and server processes.
 }, 15000);
+
+it('restricts batch context reads to ten unique stable rows from one catalog document with no write arguments', () => {
+  const args = { documentId: 'translated', rowIds: ['a'.repeat(64), 'b'.repeat(64)] };
+  expect(parseLiveRequest({ id: 'batch', method: 'get_context_batch', args }).args).toMatchObject(args);
+  const ten = Array.from({ length: 10 }, (_, i) => i.toString(16).padStart(64, '0'));
+  expect(parseLiveRequest({ id: 'ten', method: 'get_context_batch', args: { ...args, rowIds: ten } }).args.rowIds).toEqual(ten);
+  for (const rowIds of [[], ['a'.repeat(64), 'a'.repeat(64)], Array.from({ length: 11 }, (_, i) => i.toString(16).padStart(64, '0')), ['Actor.arbitrary'], [42]])
+    expect(() => parseLiveRequest({ id: 'batch', method: 'get_context_batch', args: { ...args, rowIds } })).toThrow('Live.InvalidRequest');
+  for (const extra of [{ rowId: 'a'.repeat(64) }, { radius: 0 }, { text: ['Replacement'] }, { reason: 'Read request' }, { revision: 'a'.repeat(64) }, { labels: [] }, { query: 'x' }, { operationId: 'save-1' }, { uuid: 'Actor.arbitrary' }, { restoreSourceReferences: true }])
+    expect(() => parseLiveRequest({ id: 'batch', method: 'get_context_batch', args: { ...args, ...extra } })).toThrow('Live.InvalidRequest');
+  expect(() => parseLiveRequest({ id: 'batch', method: 'get_context_batch', args: { rowIds: args.rowIds } })).toThrow();
+  expect(() => parseLiveRequest({ id: 'batch', method: 'get_context_batch', args: { documentId: args.documentId } })).toThrow();
+  expect(() => parseLiveRequest({ id: 'single', method: 'get_context', args: { documentId: args.documentId, rowId: args.rowIds[0], rowIds: args.rowIds } })).toThrow();
+});
