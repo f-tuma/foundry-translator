@@ -25,7 +25,7 @@ try {
       JSON.stringify({ ...input.meta, glossary: input.entries, documents: [] }),
     ).glossary;
   else if (input.action === "validate")
-    result = rebuildDocument(input.template, input.units);
+    result = rebuildDocument(input.template, input.units, input.beforeUnits);
   else if (input.action === "release")
     result = publicRelease(
       input.meta,

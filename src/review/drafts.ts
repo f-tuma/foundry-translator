@@ -6,6 +6,7 @@ import type { UiRow, UiScope } from "./ui-catalog";
 import { labelFor } from "./labels";
 
 export type TextDraft = ReviewTextDraft;
+export interface DraftReferenceOption { marker: string; key: "readaloud" | "caption" | "label"; value: string }
 export function draftFor(row: Pick<ReviewRow, "translation">): TextDraft {
   return maskReviewParts(row.translation);
 }
@@ -15,7 +16,7 @@ interface DocumentDraft {
   section?: string;
 }
 export type DraftPayload = (DocumentDraft & (
-  { kind: "text"; text: string[]; labels: string[][]; referenceScope?: "row" } |
+  { kind: "text"; text: string[]; labels: string[][]; referenceScope?: "row"; options?: DraftReferenceOption[] } |
   { kind: "note"; baselineNote: EditorialRecord | null; state: EditorialState; note: string }
 )) | { kind: "ui"; scope: UiScope; key: string; source: string; baseline: string; value: string };
 export interface SavedDraft { version: 1; id: string; at: string; payload: DraftPayload }
@@ -26,7 +27,7 @@ export function documentDraft(snapshot: ReviewSnapshot, row: ReviewRow) {
     source: snapshot.fields.find(field => field.id === row.fieldId)!.source, baseline: [...row.translation] };
 }
 export function textPayload(snapshot: ReviewSnapshot, row: ReviewRow, draft: TextDraft): DraftPayload {
-  return { ...documentDraft(snapshot, row), kind: "text", referenceScope: "row", text: [...draft.text], labels: draft.references.map(parts => parts.map(part => part.label)) };
+  return { ...documentDraft(snapshot, row), kind: "text", referenceScope: "row", text: [...draft.text], labels: draft.references.map(parts => parts.map(part => part.label)), options: draft.references.flatMap(parts => parts.flatMap(part => (part.options ?? []).map(option => ({ marker: part.marker, ...option })))) };
 }
 export function uiPayload(row: UiRow, value: string): DraftPayload { return { kind: "ui", scope: row.scope, key: row.key, source: row.source, baseline: row.value, value }; }
 export function recoverText(payload: Extract<DraftPayload, { kind: "text" }>): TextDraft {
@@ -41,7 +42,23 @@ export function recoverText(payload: Extract<DraftPayload, { kind: "text" }>): T
     return text.replace(/⟦+[^⟦⟧]*⟧+/gu, marker => markers.get(marker) ?? marker);
   });
   draft.references.forEach((parts, index) => parts.forEach((part, n) => { if (part.editable && (payload.referenceScope === "row" || /^@UUID\[/iu.test(part.command))) part.label = payload.labels[index]![n]!; }));
+  if (payload.options !== undefined) {
+    if (payload.referenceScope !== "row" || !validOptions(payload.options)) throw new Error("Review.DraftInvalid");
+    const references = new Map(draft.references.flat().map(ref => [ref.marker, ref]));
+    const seen = new Set<string>();
+    for (const option of payload.options) {
+      const reference = references.get(option.marker), baseline = reference?.options?.find(value => value.key === option.key);
+      const identity = JSON.stringify([option.marker, option.key]);
+      if (!baseline || seen.has(identity)) throw new Error("Review.DraftInvalid");
+      seen.add(identity); baseline.value = option.value;
+    }
+  }
   return draft;
+}
+function validOptions(value: unknown): value is DraftReferenceOption[] {
+  return Array.isArray(value) && value.length <= 5000 && value.every(option => option && typeof option === "object" &&
+    typeof option.marker === "string" && option.marker.length <= 120 && ["readaloud", "caption", "label"].includes(option.key) &&
+    typeof option.value === "string" && option.value.length <= 1_000_000);
 }
 function valid(value: unknown): value is SavedDraft {
   if (!value || typeof value !== "object") return false;
@@ -52,7 +69,7 @@ function valid(value: unknown): value is SavedDraft {
   if (p.kind === "ui") return ["core", "ember", "crucible"].includes(p.scope) && string(p.key) && string(p.baseline) && string(p.value);
   if (![p.uuid, p.sourceUuid, p.rowId, p.group, p.name].every(string) || !strings(p.baseline)) return false;
   if (p.kind === "note") return ["none", "discussion", "meaning"].includes(p.state) && string(p.note) && p.note.length <= 8000;
-  return p.kind === "text" && strings(p.text) && Array.isArray(p.labels) && p.labels.length === p.text.length && p.labels.every(strings);
+  return p.kind === "text" && (p.options === undefined || (p.referenceScope === "row" && validOptions(p.options))) && strings(p.text) && Array.isArray(p.labels) && p.labels.length === p.text.length && p.labels.every(strings);
 }
 
 /** One storage key per editor session and row: another tab cannot erase this tab's drafts. */

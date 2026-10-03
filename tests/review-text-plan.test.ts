@@ -114,3 +114,24 @@ it("preserves empty resolver fallback braces and leaves unlabeled expressions pr
   expect(() => assertPortableText('@ref[actor.name]{Creature}', '@ref[actor.name]{}', 'text')).not.toThrow();
   expect(maskReviewParts(['@ref[actor.name]']).references[0]![0]!.editable).toBe(false);
 });
+
+it("edits Embed options separately from its brace label while moving a single marker between formatted parts", () => {
+  const parts = ['Meet @Embed[Actor.a readaloud="A scout.\\nHe waits." caption="Scout" count=2]{Fallback}, ', 'then', ' @UUID[Actor.b]{B}.'];
+  const draft = maskReviewParts(parts);
+  expect(draft.references[0]![0]!.options).toEqual([{ key: 'readaloud', value: 'A scout.\\nHe waits.' }, { key: 'caption', value: 'Scout' }]);
+  expect(draft.text).toEqual(['Meet ⟦1⟧, ', 'then', ' ⟦2⟧.']);
+  draft.references[0]![0]!.options![0]!.value = 'Zvěd.\\nČeká.';
+  draft.references[0]![0]!.label = 'Jméno'; draft.text = ['⟦2⟧ potkáte ', 'poté', ' ⟦1⟧.'];
+  const after = restoreReviewParts(draft);
+  expect(after).toEqual(['@UUID[Actor.b]{B} potkáte ', 'poté', ' @Embed[Actor.a readaloud="Zvěd.\\nČeká." caption="Scout" count=2]{Jméno}.']);
+  expect(() => assertPortableText(parts.join(''), after.join(''), 'text')).not.toThrow();
+  expect(() => restoreReviewParts({ ...draft, text: ['⟦1⟧', ' ⟦1⟧ ', '⟦2⟧'] })).toThrow();
+});
+it("keeps legacy drafts without option state compatible and command-only units visible", () => {
+  const command = '@Embed[Actor.a readaloud="A scout." count=2]';
+  const draft = maskReviewParts([command]);
+  delete draft.references[0]![0]!.options;
+  expect(restoreReviewParts(draft)).toEqual([command]);
+  const plan = planReviewText(`<p>${command}</p>`, 'html');
+  expect(plan.units).toHaveLength(1); expect(plan.units[0]!.parts).toEqual([command]);
+});

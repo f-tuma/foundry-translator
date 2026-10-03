@@ -368,6 +368,78 @@ it('MCP previews and directly saves with history, resolves lost-response retries
   expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: f.args.operationId })).toMatchObject({ ok: true, value: { alreadyUndone: true } });
   expect(writes).toHaveLength(afterUndo); expect(JSON.stringify(source)).toBe(original);
 });
+it('MCP previews and saves existing Embed prose options with guarded history, retry identity and undo', async () => {
+  source.pages[0]!.text!.content = '<p>@Embed[JournalEntry.source caption="Arrival" readaloud="You see 3 doors." inline=false]</p>';
+  copy.pages[0]!.text!.content = '<p>@Embed[JournalEntry.source caption="Příchod" readaloud="Vy vidět 3 dveře." inline=false]</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const original = JSON.stringify(source), before = copy.pages[0]!.text!.content, f = await liveFixture();
+  const context = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id });
+  expect(context).toMatchObject({ ok: true, value: { edit: { references: [[{ marker: '⟦1⟧', options: [
+    { key: 'caption', value: 'Příchod' }, { key: 'readaloud', value: 'Vy vidět 3 dveře.' },
+  ] }]] } } });
+  const args = { ...f.args, text: ['⟦1⟧'], options: [{ marker: '⟦1⟧', key: 'readaloud', value: 'Vidíte 3 dveře.' }] };
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true, value: { optionChanges: [
+    { marker: '⟦1⟧', key: 'readaloud', before: 'Vy vidět 3 dveře.', after: 'Vidíte 3 dveře.' },
+  ], willVerify: false } });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toBe('<p>@Embed[JournalEntry.source caption="Příchod" readaloud="Vidíte 3 dveře." inline=false]</p>');
+  expect(readReviewHistory(copy.flags)[0]?.rows[0]).toMatchObject({ before: [before.replace(/^<p>|<\/p>$/gu, '')], after: [copy.pages[0]!.text!.content.replace(/^<p>|<\/p>$/gu, '')] });
+  const count = writes.length;
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(await f.call('save_correction', { ...args, options: [{ ...args.options[0], value: 'Spatříte 3 dveře.' }] })).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+  expect(await f.call('save_correction', { ...args, options: [] })).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+  expect(writes).toHaveLength(count);
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: args.operationId })).toMatchObject({ ok: true, value: { undone: true } });
+  expect(copy.pages[0]!.text!.content).toBe(before);
+  expect(JSON.stringify(source)).toBe(original);
+});
+it('MCP keeps legacy request identity when options are absent or empty', async () => {
+  const f = await liveFixture();
+  expect(await f.call('save_correction', f.args)).toMatchObject({ ok: true, value: { saved: true } });
+  const count = writes.length;
+  expect(await f.call('save_correction', { ...f.args, options: [] })).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(writes).toHaveLength(count);
+});
+it('MCP rejects unknown Embed option markers, keys and new options without writes', async () => {
+  source.pages[0]!.text!.content = '<p>@Embed[JournalEntry.source caption="Arrival" inline=false]</p>';
+  copy.pages[0]!.text!.content = '<p>@Embed[JournalEntry.source caption="Příchod" inline=false]</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), args = { ...f.args, text: ['⟦1⟧'] };
+  for (const option of [{ marker: '⟦2⟧', key: 'caption', value: 'Příjezd' }, { marker: '⟦1⟧', key: 'readaloud', value: 'Nový text' },
+    { marker: '⟦1⟧', key: 'uuid', value: 'JournalEntry.other' }, { marker: '⟦1⟧', key: 'caption', value: 'Příjezd', command: '@Embed[Other]' }]) {
+    expect(await f.call('validate_correction', { ...args, options: [option] })).toMatchObject({ ok: false });
+    expect(await f.call('save_correction', { ...args, options: [option] })).toMatchObject({ ok: false });
+  }
+  expect(writes).toHaveLength(0);
+});
+it('MCP restores incorrect Embed numbers only with per-option source proof, preserving target identity and guarded undo', async () => {
+  source.pages[0]!.text!.content = '<p>@Embed[JournalEntry.source readaloud="Wait 3 hours." inline=false]</p>';
+  copy.pages[0]!.text!.content = `<p>@Embed[Compendium.${packId}.JournalEntry.copy readaloud="Čekejte 4 hodiny." inline=false]</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const before = copy.pages[0]!.text!.content, f = await liveFixture(), args = { ...f.args, text: ['⟦1⟧'],
+    options: [{ marker: '⟦1⟧', key: 'readaloud', value: 'Čekejte 3 hodiny.' }], restoreSourceNumbers: true };
+  expect(await f.call('save_correction', { ...args, restoreSourceNumbers: false })).toMatchObject({ ok: false });
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true, value: { numberRepair: { allowed: true, requested: true } } });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toContain(`@Embed[Compendium.${packId}.JournalEntry.copy readaloud="Čekejte 3 hodiny." inline=false]`);
+  expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: args.operationId })).toMatchObject({ ok: true, value: { undone: true } });
+  expect(copy.pages[0]!.text!.content).toBe(before);
+});
+it('MCP fails closed on cross-option numeric swaps even with an unchanged aggregate and source repair enabled', async () => {
+  source.pages[0]!.text!.content = '<p>@Embed[JournalEntry.source readaloud="3 doors" caption="4 windows"]</p>';
+  copy.pages[0]!.text!.content = '<p>@Embed[JournalEntry.source readaloud="3 dveře" caption="4 okna"]</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), args = { ...f.args, text: ['⟦1⟧'], options: [
+    { marker: '⟦1⟧', key: 'readaloud', value: '4 dveře' }, { marker: '⟦1⟧', key: 'caption', value: '3 okna' },
+  ] };
+  for (const restoreSourceNumbers of [false, true]) {
+    expect(await f.call('validate_correction', { ...args, restoreSourceNumbers })).toMatchObject({ ok: false });
+    expect(await f.call('save_correction', { ...args, restoreSourceNumbers })).toMatchObject({ ok: false });
+  }
+  expect(writes).toHaveLength(0);
+});
 it('MCP reads only the original reference attached to the fresh paragraph, even without a translated copy', async () => {
   source.pages[0]!.text!.content = '<p>Read @UUID[Item.path]{Path}.</p>';
   copy.pages[0]!.text!.content = '<p>Přečtěte si @UUID[Item.wrong]{Cestu}.</p>';
@@ -846,4 +918,29 @@ it('MCP batch discards the result if permission is revoked during the shared con
   const result = await handle({ id: 'revoked-batch', method: 'get_context_batch', args: { documentId: s.entry.uuid, rowIds } });
   expect(result).toMatchObject({ ok: false, error: { code: 'Live.Disconnected' } });
   expect(result).not.toHaveProperty('value'); expect(writes).toHaveLength(0);
+});
+
+
+it("edits embedded plain prose with history and guarded undo, rejects raw option injection and numeric swaps", async () => {
+  const command = '@Embed[Actor.test readaloud="Guard waits 2 hours." caption="Guard 3" count=4]';
+  source.pages[0]!.text!.content = `<p>${command}</p>`;
+  copy.pages[0]!.text!.content = '<p>@Embed[Actor.test readaloud="Strážce čeká 2 hodiny." caption="Strážce 3" count=4]</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  (copy.flags![MODULE_ID]!.translation as any).outputHash = await translatedOutputHash(copy);
+  let s = await snapshot();
+  const r = textRow(s), before = [...r.translation];
+  for (const value of [
+    '@Embed[Actor.test readaloud="Strážce čeká 3 hodiny." caption="Strážce 2" count=4]',
+    '@Embed[Actor.test readaloud="Strážce čeká 2 hodiny. <script>evil</script>" caption="Strážce 3" count=4]',
+    '@Embed[Actor.test readaloud="Strážce čeká 2 hodiny." caption="Strážce 3" count=9]',
+  ]) await expect(updateReview(s, r.id, { type: "save", parts: [value] })).rejects.toThrow("ProtectedText");
+  expect(writes).toHaveLength(0);
+  s = await saveReviewRows(s, [{ rowId: r.id, parts: [before[0]!.replace("čeká", "hlídá")] }], { id: "embed-prose" });
+  expect(s.rows.find(row => row.id === r.id)!.translation[0]).toContain("hlídá 2 hodiny");
+  expect(s.rows.find(row => row.id === r.id)!.verified).toBeNull();
+  expect(writes).toHaveLength(1);
+  await expect(saveReviewRows(s, [{ rowId: r.id, parts: before }], { undoId: "missing" })).rejects.toThrow("UndoConflict");
+  const reverted = await undoReview(s.entry, "embed-prose");
+  expect(reverted.rows.find(row => row.id === r.id)!.translation).toEqual(before);
+  expect(writes).toHaveLength(2);
 });

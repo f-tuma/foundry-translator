@@ -1,5 +1,6 @@
 import type { FieldFormat } from "../bundles/fields";
 import { maskReviewReferences, restoreReviewReferences } from "./text-plan";
+import type { EmbedTextOptionKey } from "./embed-text-options";
 import { loadReview, reviewCatalog, type ReviewSnapshot, type ReviewDocument, type ReviewRow } from "./service";
 
 export const normalizeSearch = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase().normalize("NFC");
@@ -42,7 +43,7 @@ export function findTextMatches(text: string, query: string, fuzzy = false): Tex
   return result;
 }
 
-export interface SearchSegment { part: number; reference: number | null; start: number; end: number; text: string }
+export interface SearchSegment { part: number; reference: number | null; optionKey?: EmbedTextOptionKey; start: number; end: number; text: string }
 /** Exclude executable references, Markdown destinations/code and HTML embedded in text attributes. */
 export function searchableSegments(parts: readonly string[], format: FieldFormat): SearchSegment[] {
   const result: SearchSegment[] = [];
@@ -60,7 +61,10 @@ export function searchableSegments(parts: readonly string[], format: FieldFormat
       start = match.index! + match[0].length;
     }
     add(start, masked.text.length);
-    masked.references.forEach((ref, reference) => { if (ref.editable && ref.label) result.push({ part: index, reference, start: 0, end: ref.label.length, text: ref.label }); });
+    masked.references.forEach((ref, reference) => {
+      if (ref.editable && ref.label) result.push({ part: index, reference, start: 0, end: ref.label.length, text: ref.label });
+      for (const option of ref.options ?? []) result.push({ part: index, reference, optionKey: option.key, start: 0, end: option.value.length, text: option.value });
+    });
   });
   return result;
 }
@@ -89,7 +93,7 @@ export function searchReviews(index: SearchIndex, query: string, fuzzy: boolean,
     const rowHitsStart = hits.length;
     for (const segment of searchableSegments(side === "source" ? row.source : row.translation, row.format)) {
       for (const match of findTextMatches(segment.text, query, fuzzy)) hits.push({
-        id: `${snapshot.entry.uuid}:${row.id}:${segment.part}:${segment.reference}:${segment.start + match.start}:${side}`,
+        id: `${snapshot.entry.uuid}:${row.id}:${segment.part}:${segment.reference}${segment.optionKey ? `:${segment.optionKey}` : ""}:${segment.start + match.start}:${side}`,
         document: snapshot.entry, rowId: row.id, group: row.group, groupName: snapshot.groups.find(group => group.id === row.group)!.name,
         label: row.label, source: displayParts(row.source), translation: displayParts(row.translation), variant: match.text,
         score: match.score, verified: !!row.verified, blocked: row.blocked, segment, start: match.start, end: match.end,
@@ -124,26 +128,36 @@ export async function searchReviewsAsync(index: SearchIndex, query: string, fuzz
 }
 
 export function displayParts(parts: readonly string[]): string {
-  return parts.map(part => { const masked = maskReviewReferences(part); return masked.references.reduce((text, ref) => text.replace(ref.marker, ref.label || ref.marker), masked.text); }).join(" ");
+  return parts.map(part => {
+    const masked = maskReviewReferences(part);
+    return masked.references.reduce((text, ref) => text.replace(ref.marker,
+      [ref.label, ...(ref.options ?? []).map(option => option.value)].filter(Boolean).join(" · ") || ref.marker), masked.text);
+  }).join(" ");
 }
 export function replaceHits(row: ReviewRow, changes: readonly { hit: SearchHit; replacement: string }[]): string[] {
   const masked = row.translation.map(maskReviewReferences);
   const bySegment = new Map<string, { start: number; end: number; before: string; value: string }[]>();
   for (const { hit, replacement } of changes) {
     if (hit.rowId !== row.id || !replacement.trim()) throw new Error("Review.EmptyText");
-    const s = hit.segment, key = `${s.part}:${s.reference ?? "text"}`;
+    const s = hit.segment, key = `${s.part}:${s.reference ?? "text"}:${s.optionKey ?? ""}`;
     const replacements = bySegment.get(key) ?? [];
     replacements.push({ start: s.start + hit.start, end: s.start + hit.end, before: hit.variant, value: replacement }); bySegment.set(key, replacements);
   }
   for (const [key, changes] of bySegment) {
-    const [part, reference] = key.split(":"), current = masked[Number(part)]!;
-    let text = reference === "text" ? current.text : current.references[Number(reference)]!.label;
+    const [part, reference, optionKey] = key.split(":"), current = masked[Number(part)];
+    if (!current) throw new Error("Review.Conflict");
+    const ref = reference === "text" ? undefined : current.references[Number(reference)];
+    const option = optionKey ? ref?.options?.find(option => option.key === optionKey) : undefined;
+    if (reference !== "text" && (!ref || (optionKey && !option))) throw new Error("Review.Conflict");
+    let text = option ? option.value : reference === "text" ? current.text : ref!.label;
     let boundary = text.length;
     for (const change of changes.sort((a, b) => b.start - a.start)) {
       if (change.end > boundary || text.slice(change.start, change.end) !== change.before) throw new Error("Review.Conflict");
       text = text.slice(0, change.start) + change.value + text.slice(change.end); boundary = change.start;
     }
-    if (reference === "text") current.text = text; else current.references[Number(reference)]!.label = text;
+    if (option) option.value = text;
+    else if (reference === "text") current.text = text;
+    else ref!.label = text;
   }
   return masked.map(part => restoreReviewReferences(part.text, part.references));
 }

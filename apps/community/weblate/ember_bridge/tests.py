@@ -160,6 +160,43 @@ class EditorialTests(TestCase):
             fn(*args)
         self.assertEqual(caught.exception.status, status)
 
+    def test_embed_prose_keeps_current_numeric_slots_through_save_and_merge(self):
+        bundle = fixture()
+        doc = bundle["documents"][0]
+        doc["sourceUuid"] = "JournalEntry.synthetic-embed"
+        doc["patches"][1]["source"] = '<p>@Embed[Actor.scout readaloud="Scout waits 2 hours." caption="Scout 3" count=4]</p>'
+        doc["patches"][1]["translation"] = '<p>@Embed[Actor.scout readaloud="Zvěd čeká 2 hodiny." caption="Zvěd 3" count=4]</p>'
+        incoming = json.dumps(bundle, ensure_ascii=False)
+        preview = import_preview(self.admin, incoming)
+        import_commit(self.admin, incoming, preview["digest"])
+        book = Book.objects.get(workspace=self.ws, template__sourceUuid=doc["sourceUuid"])
+        book.component.create_translations_immediate(force=True)
+        rows, _ = rows_for_books([book])
+        row = next(r for r in rows if "@Embed[" in "".join(r["value"]))
+        data = dict(requestId=str(uuid.uuid4()), title="Oprava vloženého popisu", changes=[dict(
+            unitId=row["id"], baseRevision=row["revision"], before=row["value"],
+            after=[row["value"][0].replace("čeká", "hlídá")],
+        )])
+        for bad in [
+            '@Embed[Actor.scout readaloud="Zvěd čeká 3 hodiny." caption="Zvěd 2" count=4]',
+            '@Embed[Actor.other readaloud="Zvěd čeká 2 hodiny." caption="Zvěd 3" count=4]',
+        ]:
+            rejected = copy.deepcopy(data)
+            rejected["requestId"] = str(uuid.uuid4())
+            rejected["changes"][0]["after"] = [bad]
+            with self.assertRaises(ValueError):
+                save_proposal(self.author, rejected)
+        self.assertEqual(rows_for_books([book])[0], rows)
+        saved = save_proposal(self.author, data)
+        args = dict(id=saved["id"], revision=1)
+        transition(self.author, {**args, "action": "submit"})
+        transition(self.reviewer, {**args, "action": "approve"})
+        transition(self.reviewer, {**args, "action": "merge"})
+        current, _ = rows_for_books([book])
+        changed = next(r for r in current if r["id"] == row["id"])
+        self.assertEqual(changed["value"], data["changes"][0]["after"])
+        self.assertIsNotNone(changed["approval"])
+
     def test_import_is_idempotent_and_never_overwrites_changed_export(self):
         preview = import_preview(self.admin, self.input)
         self.assertEqual(

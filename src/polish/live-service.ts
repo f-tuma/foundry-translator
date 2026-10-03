@@ -7,7 +7,7 @@ import { loadReview, portableReviewText, readReviewHistory, reviewCatalog, saveR
 import { displayParts, findTextMatches } from "../review/search";
 import { maskReviewParts } from "../review/text-plan";
 import { referenceRepairDraft, type ReferenceRepairDraft } from "../review/reference-repair";
-import { correctionParts, correctionWarnings, sourceNumberRepair } from "./quality-guards";
+import { correctionOptionChanges, correctionParts, correctionWarnings, sourceNumberRepair } from "./quality-guards";
 import { parseLiveRequest, type LiveResult } from "./live-protocol";
 import { readSourceReferenceContext, sourceReferences } from "./reference-context";
 import { referenceIdentifierRepairDraft } from "../review/reference-identifier-repair";
@@ -189,7 +189,8 @@ export function createLiveHandler(language: string, connected: () => boolean) {
           revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash])), verified: false } };
       }
       const requestHash = await sha256(JSON.stringify([documentId, rowId, args.revision, args.text, args.labels ?? [], args.reason,
-        ...(args.restoreSourceNumbers ? [{ restoreSourceNumbers: true }] : []), ...(args.restoreSourceReferences ? [{ restoreSourceReferences: true }] : [])]));
+        ...(args.restoreSourceNumbers ? [{ restoreSourceNumbers: true }] : []), ...(args.restoreSourceReferences ? [{ restoreSourceReferences: true }] : []),
+        ...(args.options?.length ? [{ options: args.options }] : [])]));
       if (request.method === "save_correction") {
         const previous = history.find(item => item.id === args.operationId);
         if (previous) {
@@ -204,19 +205,20 @@ export function createLiveHandler(language: string, connected: () => boolean) {
       const targets = await repairTargets(repair);
       check();
       if (targets.some(target => !target.exists)) throw new Error("Live.ReferenceTargetMissing");
-      const parts = correctionParts(row.translation, args.text!, args.labels ?? [], repair ?? undefined);
-      validateReviewCorrection(snapshot, row.id, parts, undefined, !!args.restoreSourceReferences);
+      const optionChanges = correctionOptionChanges(row.translation, args.options ?? []);
+      const parts = correctionParts(row.translation, args.text!, args.labels ?? [], repair ?? undefined, args.options ?? []);
+      validateReviewCorrection(snapshot, row.id, parts, undefined, !!args.restoreSourceReferences, undefined, !!args.restoreSourceNumbers);
       const warnings = correctionWarnings(row.translation, parts, glossary);
-      const numberRepair = sourceNumberRepair(row.source, row.translation, parts);
+      const numberRepair = sourceNumberRepair(row.source, row.translation, parts, value => portableReviewText(snapshot, field, value));
       if (args.restoreSourceNumbers && !numberRepair.allowed) throw new Error("Live.InvalidNumberRepair");
       if (request.method === "validate_correction") return { ok: true, value: { documentId, rowId, revision, before: row.translation, after: parts, warnings,
         numberRepair: { ...numberRepair, requested: !!args.restoreSourceNumbers },
-        referenceRepair: { requested: !!args.restoreSourceReferences, targetChanges: repair?.targetChanges ?? [], targets }, willVerify: false } };
+        referenceRepair: { requested: !!args.restoreSourceReferences, targetChanges: repair?.targetChanges ?? [], targets }, optionChanges, willVerify: false } };
       if (warnings.some(warning => warning.startsWith("Numbers changed")) && !args.restoreSourceNumbers) throw new Error("Live.NumbersChanged");
       if (JSON.stringify(parts) === JSON.stringify(row.translation)) throw new Error("Live.NoChange");
       if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict");
       const saved = await saveReviewRows(snapshot, [{ rowId: row.id, parts }], { id: args.operationId!, label: `MCP: ${args.reason!}`, agentRequestHash: requestHash,
-        repairReferences: !!args.restoreSourceReferences, canWrite });
+        repairReferences: !!args.restoreSourceReferences, restoreEmbedSourceNumbers: !!args.restoreSourceNumbers, canWrite });
       Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
       return { ok: true, value: { saved: true, operationId: args.operationId, documentId, rowId,
         revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash])), warnings, verified: false } };

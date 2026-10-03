@@ -357,10 +357,10 @@
   "FOUNDRY_TRANSLATE.Review.PauseFirst": "Nejdříve pozastavte běžící překlad a počkejte na dokončení právě ukládaného bloku.",
   "FOUNDRY_TRANSLATE.Review.Conflict": "Dokument se mezitím změnil. Vaše rozepsaná oprava zůstala v okně; zkopírujte ji a načtěte aktuální stav. Nic se nepřepsalo.",
   "FOUNDRY_TRANSLATE.Review.EmptyText": "Textovou část nelze uložit prázdnou.",
-  "FOUNDRY_TRANSLATE.Review.ProtectedText": "Oprava by změnila chráněný odkaz, příkaz nebo formátování. Zkontrolujte text; nic se neuložilo.",
-  "FOUNDRY_TRANSLATE.Review.ReferenceChanged": "Každá značka odkazu musí být v odstavci právě jednou. Pořadí můžete změnit. Popisky nesmí obsahovat příkazy, složené závorky ani nové řádky.",
+  "FOUNDRY_TRANSLATE.Review.ProtectedText": "Oprava by změnila chráněný odkaz, příkaz, formátování nebo čísla v textu vloženého náhledu. Zkontrolujte text; nic se neuložilo.",
+  "FOUNDRY_TRANSLATE.Review.ReferenceChanged": "Každá značka odkazu musí být v odstavci právě jednou. Pořadí můžete změnit. Popisky nesmí obsahovat příkazy, složené závorky ani nové řádky. Text vloženého náhledu musí být prostý text bez HTML, příkazů, uvozovek, hranatých či složených závorek, znaku = a nových řádků.",
   "FOUNDRY_TRANSLATE.Review.LinkedDocument": "Propojený dokument",
-  "FOUNDRY_TRANSLATE.Review.ReferenceHelp": "Značky ⟦1⟧ můžete přesouvat v rámci odstavce. Popisky upravíte níže.",
+  "FOUNDRY_TRANSLATE.Review.ReferenceHelp": "Značky ⟦1⟧ můžete přesouvat v rámci odstavce. Popisky i existující texty vložených náhledů upravíte níže; cíle a ostatní nastavení zůstanou zachované.",
   "FOUNDRY_TRANSLATE.Review.LinkLabel": "Popisek odkazu",
   "FOUNDRY_TRANSLATE.Review.AutomaticLabel": "Automatický název dokumentu",
   "FOUNDRY_TRANSLATE.Review.ProtectedCommand": "Chráněný herní příkaz",
@@ -748,5 +748,10 @@
   "FOUNDRY_TRANSLATE.Reader.Section.RelatedLocations": "Související místa",
   "FOUNDRY_TRANSLATE.Reader.Section.InvolvedLocations": "Zapojená místa",
   "FOUNDRY_TRANSLATE.Reader.Section.Edict": "Edikt: {name}",
-  "FOUNDRY_TRANSLATE.Reader.ReadAloud": "Číst nahlas"
+  "FOUNDRY_TRANSLATE.Reader.ReadAloud": "Číst nahlas",
+  "FOUNDRY_TRANSLATE.Review.References": "Odkazy a vložené náhledy",
+  "FOUNDRY_TRANSLATE.Review.EmbedReadaloud": "Text ke čtení nahlas",
+  "FOUNDRY_TRANSLATE.Review.EmbedCaption": "Titulek náhledu",
+  "FOUNDRY_TRANSLATE.Review.EmbedLabel": "Název vloženého náhledu",
+  "FOUNDRY_TRANSLATE.Review.SourceReferenceUnmatched": "Originál nelze jednoznačně přiřadit."
 }

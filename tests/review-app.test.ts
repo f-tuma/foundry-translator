@@ -155,3 +155,42 @@ it("keeps tabs and closing available while history is waiting for a compendium i
   complete([]); await Promise.resolve(); expect(app.element.querySelector("textarea")).toBeTruthy();
   await app.close(); expect(app.element.isConnected).toBe(false);
 });
+
+it("edits existing embed prose beside readonly originals in one disclosure without moving or exposing commands", async () => {
+  const { app, Event, snapshot, save, storage } = await fixture();
+  const row = snapshot.rows[0]!;
+  row.source = ['@Embed[Actor.a inline readaloud="English words" caption="English caption" label="English name"]{English brace}'];
+  row.translation = ['@Embed[Actor.a inline readaloud="Česká slova" caption="Český titulek" label="Český název"]{Český popisek}'];
+  await app.render(true);
+  const rendered = app.element.querySelector('[data-review-row="row1"]')!;
+  expect(rendered.querySelectorAll('details.ft-review__references')).toHaveLength(1);
+  expect(rendered.querySelectorAll('[data-reference-option]')).toHaveLength(6);
+  const source = rendered.querySelector<HTMLTextAreaElement>('[data-reference-option="readaloud"][data-reference-side="source"]')!;
+  const target = rendered.querySelector<HTMLTextAreaElement>('[data-reference-option="readaloud"][data-reference-side="target"]')!;
+  expect(source.readOnly).toBe(true); expect(source.value).toBe("English words");
+  target.value = '<img src=x onerror=alert(1)> Nový český text.'; target.dispatchEvent(new Event("input"));
+  expect(rendered.querySelector('img')).toBeNull();
+  expect([...storage.values()].join(" ")).toContain('"key":"readaloud"');
+  target.value = "Nový český text."; target.dispatchEvent(new Event("input"));
+  rendered.querySelector<HTMLButtonElement>('[data-review-save]')!.click();
+  await vi.waitFor(() => expect(save).toHaveBeenCalled());
+  const action = save.mock.calls.at(-1)![2];
+  expect(action.type).toBe("save");
+  if (action.type === "save") expect(action.parts[0]).toContain('readaloud="Nový český text."');
+  expect(row.source[0]).toContain('readaloud="English words"');
+});
+it("matches reordered embed originals by canonical immutable targets, not marker order", async () => {
+  const { app, snapshot } = await fixture(); const row = snapshot.rows[0]!;
+  row.source = ['@Embed[Actor.a readaloud="Original A"] @Embed[Actor.b readaloud="Original B"]'];
+  row.translation = ['@Embed[Compendium.world.actors.Actor.copyB readaloud="Překlad B"] @Embed[Compendium.world.actors.Actor.copyA readaloud="Překlad A"]'];
+  snapshot.reverse.set('Compendium.world.actors.Actor.copyA', 'Actor.a'); snapshot.reverse.set('Compendium.world.actors.Actor.copyB', 'Actor.b');
+  await app.render(true);
+  const entries = app.element.querySelector('[data-review-row="row1"]')!.querySelectorAll('.ft-review__reference-entry');
+  expect(entries[0]!.querySelector<HTMLTextAreaElement>('[data-reference-side="source"]')!.value).toBe('Original B');
+  expect(entries[1]!.querySelector<HTMLTextAreaElement>('[data-reference-side="source"]')!.value).toBe('Original A');
+  row.source = ['@Embed[Actor.a readaloud="Original A"] @Embed[Actor.a readaloud="Another A"]'];
+  row.translation = ['@Embed[Actor.a readaloud="Překlad A"] @Embed[Actor.a readaloud="Další A"]'];
+  await app.render(true);
+  expect(app.element.querySelector('[data-review-row="row1"]')!.querySelectorAll('[data-reference-side="source"]')).toHaveLength(0);
+  expect(app.element.textContent).toContain('SourceReferenceUnmatched');
+});

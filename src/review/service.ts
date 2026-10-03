@@ -20,6 +20,8 @@ import { captureTranslationWriteGuard, type TranslationWriteGuard } from "../tra
 import { activeTranslations } from "../translation/active-translations";
 import { sha256 } from "../translation/hash";
 import { planReviewText } from "./text-plan";
+import { assertEmbedOptionEdits } from "./embed-text-options";
+import { embedOptionNumbersChanged, sourceNumberRepair } from "../polish/quality-guards";
 import { referenceContext, sourceReferenceNotation } from "../bundles/reference-notation";
 
 const SPECS = [
@@ -340,7 +342,7 @@ function abortableHistoryRead<T>(pending: Promise<T>, signal?: AbortSignal): Pro
 
 /** Compile only schema-allowed text updates. One document update includes its embedded
  * changes and undo record, so a lost response can be resolved from persistent history. */
-export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; identifierRepair?: boolean; canWrite?: () => boolean } = {}): Promise<ReviewSnapshot> {
+export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; identifierRepair?: boolean; restoreEmbedSourceNumbers?: boolean; canWrite?: () => boolean } = {}): Promise<ReviewSnapshot> {
   gmOnly();
   if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   const fresh = await loadReview(snapshot.entry);
@@ -352,6 +354,10 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   if (!target) fail("Conflict");
   const data = target.toObject(), staged = structuredClone(data), fieldValues = new Map<string, string>();
   const undo = options.undoId ? readReviewHistory(target.flags).find(item => item.id === options.undoId) : undefined;
+  const exactUndo = !!undo && !undo.undoneAt && undo.sourceHash === fresh.sourceHash && undo.rows.length === changes.length &&
+    undo.rows.every(saved => changes.some(change => change.rowId === saved.rowId && JSON.stringify(change.parts) === JSON.stringify(saved.before)) &&
+      JSON.stringify(fresh.rows.find(row => row.id === saved.rowId)?.translation) === JSON.stringify(saved.after));
+  if (options.undoId && !exactUndo) fail("UndoConflict");
   if (options.identifierRepair && (options.repairReferences || options.undoId)) fail("ProtectedText");
   const identifierMode = options.identifierRepair || !!undo?.identifierRepair;
   if (identifierMode) {
@@ -402,7 +408,7 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
     if (JSON.stringify(change.parts) === JSON.stringify(row.translation)) continue;
     const field = fresh.fields.find(field => field.id === row.fieldId)!;
     const previous = fieldValues.get(field.id) ?? field.translation;
-    const value = identifierMode ? fieldValues.get(field.id)! : validateReviewCorrection(fresh, row.id, change.parts, previous, !!options.repairReferences, undoReferences);
+    const value = identifierMode ? fieldValues.get(field.id)! : validateReviewCorrection(fresh, row.id, change.parts, previous, !!options.repairReferences, undoReferences, !!options.restoreEmbedSourceNumbers, exactUndo);
     fieldValues.set(field.id, value);
     history.rows.push({ rowId: row.id, before: row.translation, after: [...change.parts], label: row.label, group: row.group });
     patch[`flags.${MODULE_ID}.review.entries.${row.id}`] = null;
@@ -454,7 +460,7 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
 }
 
 /** Preview and persistence share the same paragraph/markup/reference checks. */
-export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string, parts: string[], previous?: string, repairReferences = false, undoReferences = false): string {
+export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string, parts: string[], previous?: string, repairReferences = false, undoReferences = false, restoreEmbedSourceNumbers = false, undoEmbedOptions = false): string {
   const row = snapshot.rows.find(row => row.id === rowId);
   if (!row) fail("MissingField");
   if (row.blocked && !(repairReferences && row.blocked === "StructureChanged")) fail(row.blocked);
@@ -462,6 +468,10 @@ export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string
   const field = snapshot.fields.find(field => field.id === row.fieldId)!;
   const value = planReviewText(previous ?? field.translation, field.format).replace(row.unitId, parts);
   try {
+    assertEmbedOptionEdits(row.translation, parts);
+    if (!undoEmbedOptions && embedOptionNumbersChanged(row.translation, parts) &&
+        (!restoreEmbedSourceNumbers || !sourceNumberRepair(row.source, row.translation, parts,
+          text => portableReviewText(snapshot, field, text)).allowed)) throw new Error("Numbers inside an embedded description changed.");
     if (repairReferences || undoReferences) {
       if (repairReferences) {
         const repair = referenceRepairDraft(snapshot, row);

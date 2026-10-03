@@ -373,6 +373,7 @@ def check_changes(ws, user, changes, strict=True, review=False):
         content_engine(
             "validate",
             template=book.template,
+            beforeUnits=[r for r in rows if r["document_id"] == book.pk],
             units=[
                 {**r, "value": replacements.get(r["id"], r["value"])}
                 for r in rows

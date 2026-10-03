@@ -1565,3 +1565,21 @@ body.ft-czech-fonts :is(.application, .app, .ember, .crucible, .journal-entry-pa
   .ft-reader-search label { flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .ft-reader * { scroll-behavior: auto !important; } }
+
+/* One shared disclosure keeps source and translated embed prose together. */
+.ft-review__references { margin-top: 8px; min-width: 0; container: ft-reference-editor / inline-size; }
+.ft-review__references > summary { cursor: pointer; padding: 6px 8px; color: var(--ft-color-text-muted); }
+.ft-review__reference-entry { padding: 8px; border-top: 1px solid var(--ft-color-border); }
+.ft-review__reference-marker { display: block; margin-bottom: 6px; }
+.ft-review__reference-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.ft-review__reference-columns > div { min-width: 0; }
+.ft-review__reference-columns h4 { margin: 0 0 8px; font-size: 12px; }
+.ft-review__reference textarea { width: 100%; min-width: 0; margin-top: 4px; padding: 5px 8px; font-size: 13px; line-height: 1.5; resize: vertical; }
+.ft-review__reference :is(input, textarea) { box-sizing: border-box; }
+.ft-review__reference [readonly] { opacity: .8; }
+@container ft-reference-editor (max-width: 480px) {
+  .ft-review__reference-columns { grid-template-columns: minmax(0, 1fr); }
+}
+@supports not (container-type: inline-size) {
+  @media (max-width: 700px) { .ft-review__reference-columns { grid-template-columns: minmax(0, 1fr); } }
+}

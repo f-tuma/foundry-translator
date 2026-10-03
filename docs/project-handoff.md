@@ -1982,3 +1982,37 @@ Validation: 693 module tests passed; 4 optional integration tests skipped. Both
 typechecks, module/MCP builds, 32 MCP tests and release metadata checks passed.
 Private proofreading prose, runtime diagnostics and local screenshots stay
 outside Git.
+
+
+### 2026-10-03 — 0.33.8 protected embedded prose editing
+
+Foundry and community editors expose existing double-quoted `@Embed` readaloud,
+caption and label values inside one movable reference marker. Original reference
+fields are matched by unique immutable command identity, with canonical targets
+in Foundry; reordered or ambiguous references never borrow another original's
+text. Narrow panels stack the two sides at their actual container width.
+
+The scanner preserves immutable command bytes and rejects new keys, duplicate
+keys, unsafe values, malformed syntax, target/config changes and ambiguous
+residual pairings. Existing drafts without option metadata hydrate from their
+saved commands; incomplete drafts remain recoverable. Search, replacement and
+history previews include embedded prose. Saves invalidate verification and
+record before/after history; undo requires the exact recorded current state.
+
+Live MCP 0.3.7 accepts optional marker/key/value corrections, previews option
+changes, and hashes them for idempotent retries. Each option preserves its own
+numerical multiset. Explicit source-number restoration also requires a unique
+canonical source command and that same source option's quantities; an aggregate
+match cannot justify moving quantities between descriptions. Community 0.3.5
+passes authoritative current units into validation at save/review/merge; ordinary
+manual repairs cannot change embedded quantities. Release/import portability
+checks and original document identities are retained.
+
+Validation: 744 module tests passed, with four optional integration tests skipped;
+33 MCP tests, 23 community tests, and 31 real Weblate backend tests passed.
+Typechecks, builds and release metadata passed. Local Foundry 14.368 / Ember
+0.6.2 / Crucible 0.11.0 browser QA exercised save, history preview, exact undo,
+rejected numeric edits and draft recovery against a standalone synthetic journal.
+Private linguistic examples, credentials and screenshots remain outside Git.
+Production module installation remains user-managed. Whole-corpus proofreading
+is still ongoing and is not implied by these software checks.

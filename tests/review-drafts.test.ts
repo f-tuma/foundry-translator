@@ -59,3 +59,31 @@ it("retains embed captions from old drafts that did not yet expose them as edita
   expect(recoverText(old).references[0]![0]!.label).toBe('Původní popisek');
   expect(recoverText({ ...old, referenceScope: 'row' }).references[0]![0]!.label).toBe('');
 });
+
+it("persists row-scoped embed prose separately from brace labels and restores it after cold recovery", async () => {
+  const { draftFor, textPayload } = await import("../src/review/drafts");
+  const { restoreReviewParts } = await import("../src/review/text-plan");
+  const baseline = ['@Embed[Actor.a inline readaloud="Original words" caption="Old caption" label="Old heading"]{Brace label}'];
+  const row = { id: "embed", group: "document", fieldId: "field", label: "name", translation: baseline } as any;
+  const snapshot = { entry: { uuid: "copy", sourceUuid: "Actor.source", name: "Name" }, groups: [], fields: [{ id: "field", source: baseline[0] }] } as any;
+  const draft = draftFor(row);
+  draft.text = ["Na konci věty ⟦1⟧."];
+  draft.references[0]![0]!.label = "Samostatný popisek";
+  draft.references[0]![0]!.options!.find(option => option.key === "readaloud")!.value = "Český text ke čtení.";
+  const p = textPayload(snapshot, row, draft) as Extract<DraftPayload, { kind: "text" }>;
+  expect(p.referenceScope).toBe("row");
+  expect(p.options).toContainEqual({ marker: "⟦1⟧", key: "readaloud", value: "Český text ke čtení." });
+  const storage = new LocalReviewDrafts(() => "cs", vi.fn()); storage.write(p);
+  const recovered = recoverText(new LocalReviewDrafts(() => "cs", vi.fn()).list()[0]!.payload as typeof p);
+  expect(restoreReviewParts(recovered)).toEqual(['Na konci věty @Embed[Actor.a inline readaloud="Český text ke čtení." caption="Old caption" label="Old heading"]{Samostatný popisek}.']);
+  const { options: _options, ...legacy } = p;
+  expect(restoreReviewParts(recoverText(legacy))[0]).toContain('readaloud="Original words"');
+});
+it("recovers incomplete embed prose values but refuses injected or duplicate option identities", () => {
+  const p = { ...payload, kind: "text" as const, referenceScope: "row" as const,
+    baseline: ['@Embed[Actor.a caption="Old"]'], text: ['⟦1⟧'], labels: [['']], options: [{ marker: "⟦1⟧", key: "caption" as const, value: 'Incomplete ] value' }] };
+  expect(recoverText(p).references[0]![0]!.options![0]!.value).toBe('Incomplete ] value');
+  expect(() => recoverText({ ...p, options: [{ marker: "⟦2⟧", key: "caption", value: "Wrong marker" }] })).toThrow("DraftInvalid");
+  expect(() => recoverText({ ...p, options: [...p.options, ...p.options] })).toThrow("DraftInvalid");
+  expect(() => recoverText({ ...p, options: [{ marker: "⟦1⟧", key: "label", value: "Cannot add missing key" }] })).toThrow("DraftInvalid");
+});
