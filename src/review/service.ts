@@ -13,7 +13,7 @@ import { TRANSLATIONS_PACK_ID } from "../translation/compendium-translation-repo
 import { actorSourceHash, readActorTranslationFlag, type ActorData } from "../translation/actor";
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "../translation/item";
 import { journalSourceHash, readJournalTranslationFlag, type JournalData } from "../translation/journal";
-import { DISPLAY_TEXT_PACK, displaySourceHash, escapeDisplayText, readDisplayTextFlag, readDisplayTranslation } from "../translation/display-text";
+import { DISPLAY_TEXT_PACK, displaySourceHash, escapeDisplayText, readDisplayTextFlag, readDisplayTranslation, readDisplayTranslationContent } from "../translation/display-text";
 import { readPath, writePath, type HtmlFieldPath } from "../translation/system-html-fields";
 import { captureTranslationWriteGuard, type TranslationWriteGuard } from "../translation/write-guard";
 import { activeTranslations } from "../translation/active-translations";
@@ -133,7 +133,10 @@ export async function loadReview(entry: ReviewDocument, knownCatalog?: ReviewDoc
       if (typeof stable[1] === "number") stable[1] = (data[stable[0]!] as { _id: string }[])[stable[1]]!._id;
       const metadata = display.fields.find(saved => JSON.stringify(saved.path) === JSON.stringify(stable));
       const pageIndex = (output as JournalData).pages.findIndex(page => page._id === metadata?.pageId);
-      translated = metadata && readDisplayTranslation(output as JournalData, metadata);
+      // Validate below with canonical UUIDs and the current source. The runtime
+      // reader deliberately rejects damaged content; using it here would hide
+      // the actual stored text and misreport broken references as MissingField.
+      translated = metadata && readDisplayTranslationContent(output as JournalData, metadata);
       target = ["pages", pageIndex, "text", "content"];
     } else {
       try { const paths = fieldPaths(data, output, field.path); stable = [...paths.stable]; target = paths.target; translated = readPath(output, target); }

@@ -3,6 +3,7 @@ import { isGlossaryCategory, isGlossaryMode } from "../glossary/types";
 import { validateGlossary } from "../glossary/protection";
 import { FOUNDRY_EXPRESSION, protectFoundrySyntax } from "../translation/foundry-syntax";
 import { planMarkdownTranslation } from "../translation/markdown";
+import { isDecorativeIconText } from "../translation/decorative-text";
 import type { BundleDocumentKind, FieldFormat, PortableField } from "./fields";
 import { isProviderId, type ProviderId } from "../settings/settings";
 
@@ -116,7 +117,7 @@ function htmlStructure(value: string): string {
     if (el.matches("code,pre,script,style,textarea,noscript,template")) return el.outerHTML;
     // Foundry tooltips can render HTML stored in an attribute. Validate their
     // structure too, rather than treating an injected element as plain prose.
-    return [el.tagName, [...el.attributes].map((a) => [a.name, TEXT_ATTRIBUTES.has(a.name) ? htmlStructure(a.value) : a.value]).sort(), [...el.childNodes].map(walk)];
+    return [el.tagName, [...el.attributes].map((a) => [a.name, TEXT_ATTRIBUTES.has(a.name) ? htmlStructure(a.value) : a.value]).sort(), [...el.childNodes].filter(node => !isDecorativeIconText(node)).map(walk)];
   };
   return JSON.stringify([...template.content.childNodes].map(walk));
 }

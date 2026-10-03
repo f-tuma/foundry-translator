@@ -135,6 +135,22 @@ it("accepts translated copy references but rejects changes to their UUIDs and ad
   view = await updateReview(view, row.id, { type: "save", parts: [`Přečti si @UUID[Compendium.${packId}.JournalEntry.copy]{Příručku}.`] });
   expect(textRow(view).translation[0]).toContain('{Příručku}');
 });
+it("allows reviewing an omitted invisible icon placeholder without allowing missing references", async () => {
+  source.pages[0]!.text!.content = '<p><span class="reference fa-solid fa-compass">\u200B</span> Read @UUID[JournalEntry.source]{Guide}.</p>';
+  copy.pages[0]!.text!.content = `<p><span class="reference fa-solid fa-compass"></span> Čti @UUID[Compendium.${packId}.JournalEntry.copy]{Průvodce}.</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const original = JSON.stringify(source), view = await snapshot(), row = textRow(view);
+  expect(row.blocked).toBeNull();
+  expect(row.source).toHaveLength(1);
+  expect(row.translation).toHaveLength(1);
+  const saved = await updateReview(view, row.id, { type: "save", parts: [`Přečti @UUID[Compendium.${packId}.JournalEntry.copy]{Příručku}.`] });
+  expect(textRow(saved).id).toBe(row.id);
+  expect(textRow(saved).blocked).toBeNull();
+  expect(JSON.stringify(source)).toBe(original);
+  expect(copy.pages[0]!.text!.content).toContain('<span class="reference fa-solid fa-compass"></span>');
+  copy.pages[0]!.text!.content = '<p><span class="reference fa-solid fa-compass"></span> Přečti příručku.</p>';
+  expect(textRow(await snapshot()).blocked).toBe("StructureChanged");
+});
 it("edits and verifies scene sidecar text without touching the scene mechanics", async () => {
   packId = DISPLAY_TEXT_PACK;
   const scene = { name: "Old Gate", navName: "Gate", width: 8000, walls: [{ _id: "wall", c: [0, 0, 100, 100] }] };
@@ -151,6 +167,49 @@ it("edits and verifies scene sidecar text without touching the scene mechanics",
   expect(view.rows[0]!.verified).toBeTruthy();
   expect(JSON.stringify(scene)).toBe(before);
   expect(Hooks.callAll).toHaveBeenCalledWith("foundryTranslateDisplayTextChanged");
+});
+
+async function effectReview(content: string) {
+  packId = DISPLAY_TEXT_PACK;
+  const effect = { name: "Protection", description: "<p>Visit @UUID[Actor.source]{Guide}.</p>", changes: [{ key: "system.health", value: 5 }] };
+  copy = { name: "Ochrana", pages: [{ _id: "name000000000000", name: "name", type: "text", text: { content: "<p>Ochrana</p>" } },
+    { _id: "desc000000000000", name: "description", type: "text", text: { content } }],
+    flags: { [MODULE_ID]: { displayTranslation: { schemaVersion: 1, engineRevision: DISPLAY_TEXT_REVISION,
+      sourceUuid: "ActiveEffect.source", documentType: "ActiveEffect", sourceHash: await displaySourceHash("ActiveEffect", effect),
+      providerId: "openai-compatible", targetLanguage: "cs", sourceLanguage: "en", translatedAt: "2026-10-03",
+      glossaryFingerprint: "", providerFingerprint: "", fallbackTextSegments: 0,
+      fields: [{ path: ["name"], format: "text", source: effect.name, pageId: "name000000000000" },
+        { path: ["description"], format: "html", source: effect.description, pageId: "desc000000000000" }] } } } };
+  install(); sourceDocument = { id: "source", uuid: "ActiveEffect.source", documentName: "ActiveEffect", toObject: () => structuredClone(effect) };
+  const catalog = await reviewCatalog("cs");
+  catalog.push({ id: "linked", uuid: `Compendium.${ACTOR_TRANSLATIONS_PACK_ID}.Actor.linked`, pack: ACTOR_TRANSLATIONS_PACK_ID,
+    name: "Průvodce", kind: "Actor", sourceUuid: "Actor.source", language: "cs" });
+  return { effect, snapshot: await loadReview(catalog.find(d => d.kind === "ActiveEffect")!, catalog) };
+}
+
+it("reviews effect descriptions with mapped UUIDs instead of discarding them as missing", async () => {
+  const { snapshot: view } = await effectReview(`<p>Navštivte @UUID[Compendium.${ACTOR_TRANSLATIONS_PACK_ID}.Actor.linked]{Průvodce}.</p>`);
+  const row = view.rows.find(row => row.label === "description")!;
+  expect(row.blocked).toBeNull();
+  expect(row.translation[0]).toContain("{Průvodce}");
+  expect(view.fields.find(f => f.id === row.fieldId)!.integrity).toBeNull();
+});
+
+it("retains damaged effect text for diagnosis and still rejects ordinary saves", async () => {
+  const { effect, snapshot: view } = await effectReview("<p>Navštivte @UUID[Actor.unrelated]{Průvodce}.</p>");
+  const before = JSON.stringify(effect), row = view.rows.find(row => row.label === "description")!;
+  expect(row.blocked).toBe("StructureChanged");
+  expect(row.translation).toEqual(["Navštivte @UUID[Actor.unrelated]{Průvodce}."]);
+  expect(view.fields.find(f => f.id === row.fieldId)!.integrity?.commands.missing).toHaveLength(1);
+  await expect(updateReview(view, row.id, { type: "save", parts: ["Jiná věta."] })).rejects.toThrow("StructureChanged");
+  expect(writes).toEqual([]); expect(JSON.stringify(effect)).toBe(before);
+});
+
+it("distinguishes a genuinely absent effect description page from damaged content", async () => {
+  await effectReview("<p>Navštivte @UUID[Actor.source]{Průvodce}.</p>");
+  copy.pages.pop();
+  const view = await snapshot(), row = view.rows.find(row => row.label === "description")!;
+  expect(row.blocked).toBe("MissingField"); expect(row.translation).toEqual([""]);
 });
 
 it("writes Ember outcome labels as a schema array and preserves adjacent automation data", async () => {
@@ -290,6 +349,27 @@ it('MCP previews and directly saves with history, resolves lost-response retries
   expect(await f.call('undo_correction', { documentId: f.s.entry.uuid, operationId: f.args.operationId })).toMatchObject({ ok: true, value: { alreadyUndone: true } });
   expect(writes).toHaveLength(afterUndo); expect(JSON.stringify(source)).toBe(original);
 });
+it('MCP reads only the original reference attached to the fresh paragraph, even without a translated copy', async () => {
+  source.pages[0]!.text!.content = '<p>Read @UUID[Item.path]{Path}.</p>';
+  copy.pages[0]!.text!.content = '<p>Přečtěte si @UUID[Item.wrong]{Cestu}.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  vi.stubGlobal('fromUuid', async (uuid: string) => uuid === 'JournalEntry.source' ? sourceDocument : uuid === 'Item.path' ? {
+    uuid, documentName: 'Item', toObject: () => ({ name: 'Path', system: { description: '<p>A life of travel.</p>', health: 5 }, flags: { private: 'secret' } }),
+    system: { constructor: { schema: { fields: { description: { constructor: { name: 'HTMLField' } } } } } },
+  } : null);
+  const f = await liveFixture();
+  const context = await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id });
+  expect(context).toMatchObject({ ok: true, value: { blocked: 'StructureChanged', sourceReferences: [{ index: 0, sourceUuid: 'Item.path' }] } });
+  const result = await f.call('get_reference_context', { documentId: f.s.entry.uuid, rowId: f.row.id, referenceIndex: 0 });
+  expect(result).toMatchObject({ ok: true, value: { sourceUuid: 'Item.path', total: 2, fields: [{ text: 'Path' }, { text: '<p>A life of travel.</p>' }] } });
+  expect(JSON.stringify(result)).not.toMatch(/health|secret|private/);
+  expect(await f.call('get_reference_context', { documentId: f.s.entry.uuid, rowId: f.row.id, referenceIndex: 1 })).toMatchObject({ ok: false, error: { code: 'Live.ReferenceUnavailable' } });
+  expect(await f.call('get_reference_context', { documentId: 'JournalEntry.source', rowId: f.row.id, referenceIndex: 0 })).toMatchObject({ ok: false, error: { code: 'Review.TranslationMissing' } });
+  f.disconnect();
+  expect(await f.call('get_reference_context', { documentId: f.s.entry.uuid, rowId: f.row.id, referenceIndex: 0 })).toMatchObject({ ok: false, error: { code: 'Live.Disconnected' } });
+  expect(writes).toEqual([]);
+});
+
 it('MCP refuses stale revisions, arbitrary original reads, invalid links, and revoked world access', async () => {
   const f = await liveFixture();
   expect(await f.call('get_context', { documentId: 'JournalEntry.source', rowId: f.row.id })).toMatchObject({ ok: false, error: { code: 'Review.TranslationMissing' } });

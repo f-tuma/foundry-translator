@@ -14,6 +14,12 @@ originál, kontext a glosář přes `live_get_context`. Opravy se rovnou ukláda
 s historií a možností vrácení v editoru. **Ověřit** zůstává samostatný ruční krok.
 V otevřeném editoru použij **Načíst znovu**; rozpracované změny se nepřepisují.
 
+Pokud chybí podklady pro název nebo význam, `live_get_reference_context`
+načte původní text dokumentu odkazovaného v anglickém odstavci. Používá
+index ze `sourceReferences` v čerstvém `live_get_context`; nepřijímá vlastní
+UUID ani cesty. Vrací pouze povolená textová pole, bez makra, konfigurace
+automatizace či zápisu do originálu. Pro další pole pokračuj přes `nextOffset`.
+
 Menu můžeš zavřít, GM kartu nech otevřenou. Povolený přístup se po obnovení
 stránky či restartu MCP automaticky připojí znovu ve stejném světě, účtu a jazyce.
 **Vypnout přístup** zastaví i automatické navazování. JSON obsahuje klíč; nesdílej

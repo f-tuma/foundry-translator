@@ -1,5 +1,6 @@
 import { FOUNDRY_EXPRESSION } from "../translation/foundry-syntax";
 import type { FieldFormat } from "../bundles/fields";
+import { isDecorativeIconText } from "../translation/decorative-text";
 
 export interface ReviewTextUnit { id: string; parts: string[]; heading: boolean; attribute?: string }
 export interface ReviewTextPlan {
@@ -34,7 +35,7 @@ export function planReviewText(value: string, format: FieldFormat): ReviewTextPl
     group.unit.parts.push(text); group.setters.push(setter); groups.set(id, group);
   };
   for (const [node, path] of address) {
-    if (node.nodeType !== 3 || node.parentElement?.closest(EXCLUDED) || !node.textContent?.trim()) continue;
+    if (node.nodeType !== 3 || node.parentElement?.closest(EXCLUDED) || !node.textContent?.trim() || isDecorativeIconText(node)) continue;
     const block = node.parentElement?.closest(BLOCKS);
     add(block ? address.get(block)! : path, node.textContent, value => { node.textContent = value; }, !!block?.matches("h1,h2,h3,h4,h5,h6"));
   }

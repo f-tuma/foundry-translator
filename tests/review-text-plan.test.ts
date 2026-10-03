@@ -6,6 +6,17 @@ import { assertPortableText } from "../src/bundles/format";
 beforeEach(() => vi.stubGlobal("document", parseHTML("<html><body></body></html>").document));
 afterEach(() => vi.unstubAllGlobals());
 
+it("aligns prose around icons whose invisible placeholder was omitted, without creating a phantom review row", () => {
+  const source = '<p><span class="reference fa-solid fa-map">\u200b</span> Read <strong>this</strong>.</p>';
+  const target = '<p><span class="reference fa-solid fa-map"></span> Přečti <strong>toto</strong>.</p>';
+  const before = planReviewText(source, "html"), after = planReviewText(target, "html");
+  expect(before.units.map(u => u.id)).toEqual(after.units.map(u => u.id));
+  expect(before.units.map(u => u.parts.length)).toEqual(after.units.map(u => u.parts.length));
+  expect(before.units).toHaveLength(1);
+  expect(before.units[0]!.parts).toEqual([" Read ", "this", "."]);
+  expect(() => assertPortableText(source, after.replace(after.units[0]!.id, [" Prohlédni si ", "toto", "."]), "html")).not.toThrow();
+});
+
 it("keeps paragraphs and inline formatting together without exposing executable markup", () => {
   const value = '<h2>Arrival</h2><p>The <strong>three-toed</strong> feet.</p><p>Next.</p><img src="map.webp" alt="Map"><pre>keep me</pre>';
   const plan = planReviewText(value, "html");
