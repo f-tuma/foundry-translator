@@ -55,6 +55,12 @@ Event automation controls, warnings and quest flowcharts are not rendered. Scrip
 inline executable handlers are removed from the reading surface. Roll and macro
 links never execute in the reader; use Open in Foundry when gameplay is wanted.
 
+Quest overview cards resolve event and location titles and overview text from
+their exact processed translation in the overview's target language. The native
+sheet and reader share this display adapter. Source UUIDs, icons, tags, order and
+canonical narrative registries stay unchanged. Missing, inaccessible, unprocessed
+or structurally invalid copies retain original card text.
+
 Character previews include artwork, appearance and public biography; private
 biography is GM-only. LIMITED actor access displays only name/artwork. Items,
 active effects and scenes provide supported descriptive text/artwork. Unsupported
