@@ -1,6 +1,6 @@
 export const LIVE_PROTOCOL = 1;
 export const LIVE_PORT = 3112;
-export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "list_history" | "undo_correction";
+export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "list_history" | "undo_correction";
 export interface LiveArgs {
   documentId?: string; rowId?: string; revision?: string; operationId?: string;
   text?: string[]; labels?: { marker: string; label: string }[]; reason?: string;
@@ -12,7 +12,7 @@ export interface LiveArgs {
 export interface LiveRequest { id: string; method: LiveMethod; args: Record<string, unknown> }
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
-const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "list_history", "undo_correction"];
+const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "list_history", "undo_correction"];
 const keys = new Set(["documentId", "rowId", "revision", "operationId", "text", "labels", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
@@ -20,6 +20,12 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   if (!object(value) || typeof value.id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/u.test(value.id) || !methods.includes(String(value.method)) || !object(value.args)) fail();
   const request = value as unknown as LiveRequest, input = request.args;
   if (Object.keys(input).some(key => !keys.has(key))) fail();
+  if (["validate_reference_identifiers", "restore_reference_identifiers"].includes(request.method)) {
+    const allowed = new Set(["documentId", "rowId", "revision", "reason", ...(request.method === "restore_reference_identifiers" ? ["operationId"] : [])]);
+    if (Object.keys(input).some(key => !allowed.has(key))) fail();
+    if (!input.documentId || !input.rowId || !input.revision || typeof input.reason !== "string" || input.reason.trim().length < 5 ||
+      (request.method === "restore_reference_identifiers" && !input.operationId)) fail();
+  }
   const args: LiveArgs = { offset: 0, limit: 20, query: "", radius: 2, fuzzy: false };
   if (input.referenceIndex !== undefined) {
     if (request.method !== "get_reference_context" || !Number.isSafeInteger(input.referenceIndex) || (input.referenceIndex as number) < 0 || (input.referenceIndex as number) > 1000) fail();

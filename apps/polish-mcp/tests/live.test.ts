@@ -58,12 +58,33 @@ it("accepts explicit source repairs only on correction requests with boolean fla
     expect(() => parseLiveRequest({ id: '1', method: 'get_context', args: { documentId: 'copy', rowId: args.rowId, [key]: true} })).toThrow();
   }
 });
+it("restricts source identifier repair methods to fresh bound scope with no caller replacements", () => {
+  const args = { documentId: 'copy', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Restore exact source identifiers' };
+  expect(parseLiveRequest({ id: '1', method: 'validate_reference_identifiers', args }).args).toMatchObject(args);
+  expect(parseLiveRequest({ id: '1', method: 'restore_reference_identifiers', args: { ...args, operationId: 'restore-1' } }).args).toMatchObject({ ...args, operationId: 'restore-1' });
+  for (const method of ['validate_reference_identifiers', 'restore_reference_identifiers']) {
+    const bound = { ...args, ...(method === 'restore_reference_identifiers' ? { operationId: 'restore-1' } : {}) };
+    for (const extra of [{ text: ['replacement'] }, { labels: [] }, { path: ['system', 'health'] }, { uuid: 'Actor.other' }, { restoreSourceReferences: true }, { query: 'Poisoned' }])
+      expect(() => parseLiveRequest({ id: '1', method, args: { ...bound, ...extra } })).toThrow();
+    for (const required of ['documentId', 'rowId', 'revision', 'reason']) {
+      const incomplete: Record<string, unknown> = { ...bound }; delete incomplete[required];
+      expect(() => parseLiveRequest({ id: '1', method, args: incomplete })).toThrow();
+    }
+  }
+  expect(() => parseLiveRequest({ id: '1', method: 'restore_reference_identifiers', args })).toThrow();
+  expect(() => parseLiveRequest({ id: '1', method: 'validate_reference_identifiers', args: { ...args, operationId: 'unexpected' } })).toThrow();
+});
 it("exposes live tools through the actual STDIO SDK and forwards browser results without an export", async () => {
   const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../dist/index.cjs', import.meta.url)), '--live', '--origin', origin, '--port', '0'], stderr: 'pipe' });
   const client = new Client({ name: 'live-integration-test', version: '1' });
   try {
     await client.connect(transport);
     const tools = await client.listTools(); expect(tools.tools.map(t => t.name)).toContain('live_save_correction'); expect(tools.tools.map(t => t.name)).toContain('live_get_reference_context'); expect(tools.tools.map(t => t.name)).not.toContain('export_corrections');
+    for (const name of ['live_validate_reference_identifiers', 'live_restore_reference_identifiers']) {
+      const tool = tools.tools.find(t => t.name === name)!;
+      expect(tool).toBeDefined(); expect(tool.inputSchema.additionalProperties).toBe(false);
+      expect(Object.keys(tool.inputSchema.properties ?? {})).not.toContain('text');
+    }
     const result = await client.callTool({ name: 'live_connection', arguments: {} });
     const connection = JSON.parse((result.content as { text: string }[])[0]!.text);
     const connect = await fetch(`${connection.address}/connect`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${connection.pairingCode}`, 'Content-Type': 'application/json' }, body: JSON.stringify(claim) });
@@ -77,6 +98,13 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     expect(contextRequest).toMatchObject({ method: 'get_reference_context', args: { documentId: 'translated', rowId: 'a'.repeat(64), referenceIndex: 0, offset: 1, limit: 2 } });
     await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: contextRequest.id, result: { ok: true, value: { fields: [{ text: 'Original context' }], nextOffset: null } } }) });
     expect(JSON.parse(((await contextPending).content as { text: string }[])[0]!.text)).toMatchObject({ ok: true, value: { nextOffset: null } });
+    const repairArgs = { documentId: 'translated', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Restore exact source IDs', operationId: 'repair-1' };
+    const repairPending = client.callTool({ name: 'live_restore_reference_identifiers', arguments: repairArgs });
+    const repairRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
+    expect(repairRequest).toMatchObject({ method: 'restore_reference_identifiers', args: repairArgs });
+    await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: repairRequest.id, result: { ok: true, value: { saved: true, verified: false } } }) });
+    expect(JSON.parse(((await repairPending).content as { text: string }[])[0]!.text)).toEqual({ ok: true, value: { saved: true, verified: false } });
+
   } finally { await client.close(); }
 });
 
