@@ -200,7 +200,7 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         const changes = rebuilt.changes.map(change => {
           const row = snapshot.rows.find(item => item.id === change.rowId)!;
           const planned = plan.rows.find(item => item.rowId === row.id)!;
-          const warnings = correctionWarnings(planned.partIndices.map(index => row.translation[index]!),
+          const warnings = correctionWarnings(planned.partIndices.map(index => (planned.alignedBefore ?? row.translation)[index]!),
             planned.partIndices.map(index => change.parts[index]!), glossary);
           return { rowId: row.id, partIndices: planned.partIndices, source: row.source, before: row.translation, after: change.parts, warnings };
         });

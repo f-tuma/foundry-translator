@@ -2,6 +2,17 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.33.11** also displays saved translations of event outcome summaries
+in Ember's native journal and Adventure Reader. Matching uses the original
+outcome IDs; choice controls, completion state and canonical event data remain
+unchanged. Invalid, ambiguous or stale translations retain the original summary.
+
+Source-owned MCP reference rebuilding now preserves relative UUID spelling
+when it resolves to the exact mapped destination in the copy. It can also restore
+one missing punctuation-only inline text leaf alongside damaged references,
+with a preview, persistent receipt and guarded undo. It never substitutes a
+missing source document or permits arbitrary HTML changes.
+
 Version **0.33.10** displays translated event and location summaries in Ember
 quest overviews, in both the native journal and Adventure Reader. Cards use exact
 translation provenance and preserve original links, tags and narrative state;

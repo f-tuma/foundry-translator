@@ -63,7 +63,8 @@ A missing embedded page is not silently replaced by a different page.
 
 ## Verification and boundaries
 
-397 automated tests pass; typecheck, build and release metadata checks pass.
+The automated suite covers runtime binding and translated display adapters;
+typecheck, build and release metadata checks are required for releases.
 
 Automated tests cover round trips, languages, actors/items, duplicate/cyclic/stale
 mappings, source removal, model replacement, mechanics changes, original method
@@ -88,5 +89,13 @@ Actor, synchronize tokens/HP, or globally redirect macros. Native automatic
 opening may still show the original Journal; generated summaries/confirmation
 labels derived from the canonical event can remain English. Combat, every
 encounter hook, every quest branch, multiplayer races and other Ember versions
-are not certified by these tests. Native gameplay actions themselves retain
+are not certified by these tests. Since 0.33.10, quest overview event/location
+cards can display their saved translated summaries; 0.33.11 also displays saved
+outcome summaries in native event views and Reader. These adapters require
+unique source provenance, exact event/outcome IDs, unchanged mechanics and
+valid text/reference structure. Missing, stale or ambiguous translations retain
+the original display. They do not change canonical labels, summaries or state,
+and confirmation dialogs can still contain original text.
+
+Native gameplay actions themselves retain
 Ember's concurrency behavior; opening a view is the operation made idempotent.

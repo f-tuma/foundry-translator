@@ -7,6 +7,7 @@ import { proseNumbers } from "../polish/quality-guards";
 import { editableEmbedTextOptions, embedTextOptionSignature } from "./embed-text-options";
 import { portableReviewText, type ReviewChange, type ReviewSnapshot } from "./service";
 import { maskReviewParts, planReviewText, restoreReviewParts, type ReviewTextDraft } from "./text-plan";
+import { restoreSourcePunctuation, removeSourcePunctuation, type SourcePunctuationRestoration } from "./source-punctuation";
 
 export interface RebuildReference {
   partIndex: number; marker: string; sourceCommand: string; command: string;
@@ -16,12 +17,15 @@ export interface RebuildReference {
 export interface ReferenceRebuildRow {
   rowId: string; unitId: string; partIndices: number[];
   source: string[]; before: string[]; baseline: string[];
+  /** Source-owned punctuation can insert one part without changing before. */
+  alignedBefore?: string[];
   edit: ReviewTextDraft; referenceMap: RebuildReference[];
 }
 export interface ReferenceRebuildPlan {
   version: 1; documentId: string; sourceHash: string; fieldId: string;
   fieldSourceHash: string; beforeHash: string; guardFingerprint: string; proofHash: string;
   systemId: string; emberActive: boolean; emberVersion: string;
+  punctuation?: SourcePunctuationRestoration;
   rows: ReferenceRebuildRow[]; targets: { sourceTarget: string; target: string; required: boolean; inactiveSystem?: "dnd5e" | "crucible" }[];
 }
 export interface ReferenceRebuildEdit { rowId: string; text: string[]; labels?: { marker: string; label: string }[] }
@@ -30,6 +34,7 @@ export interface ReferenceRebuildReceipt {
   version: 1; fieldId: string; documentId: string; sourceHash: string; fieldSourceHash: string;
   proofHash: string; guardFingerprint: string; beforeHash: string;
   systemId: string; emberActive: boolean; emberVersion: string;
+  punctuation?: SourcePunctuationRestoration;
   rows: { rowId: string; unitId: string; partIndices: number[]; beforeHash: string; afterHash: string }[];
   /** Canonical bindings are reconstructed on undo; never caller replacements. */
   referenceMap: RebuildReference[];
@@ -110,7 +115,19 @@ function mapSourceCommand(snapshot: ReviewSnapshot, context: string, command: st
   const sourceTarget = absoluteReference(parsed[3]!, context);
   if (!sourceTarget || sourceTarget.includes("=")) fail();
   const target = inactiveSystem ? sourceTarget : forwardTarget(snapshot, sourceTarget);
-  return { command: `${parsed[1]}${parsed[2]}${target}${parsed[4]}`, sourceTarget, target, required: !inactiveSystem, ...(inactiveSystem ? { inactiveSystem } : {}) };
+  // Rebuilding is source-owned, so each occurrence has its exact lexical
+  // spelling even when the source mixes relative and absolute aliases of one
+  // destination. A relative token is safe in the copy only if it resolves to
+  // the same uniquely mapped target there. Keep the absolute target in the
+  // plan/receipt for the independent existence guard; never choose a copy from
+  // labels, occurrence order, or a caller-supplied replacement UUID.
+  const sourceRoot = snapshot.entry.sourceUuid;
+  const copiedContext = context === sourceRoot || context.startsWith(`${sourceRoot}.`)
+    ? snapshot.entry.uuid + context.slice(sourceRoot.length) : null;
+  if (parsed[3]!.startsWith(".") && !copiedContext) fail();
+  const notation = parsed[3]!.startsWith(".") && copiedContext && absoluteReference(parsed[3]!, copiedContext) === target
+    ? parsed[3]! : target;
+  return { command: `${parsed[1]}${parsed[2]}${notation}${parsed[4]}`, sourceTarget, target, required: !inactiveSystem, ...(inactiveSystem ? { inactiveSystem } : {}) };
 }
 
 /** Refuse changes to existing embedded descriptions in this first rebuild mode.
@@ -135,11 +152,16 @@ export async function prepareReferenceRebuild(snapshot: ReviewSnapshot, fieldId:
 async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<ReferenceRebuildPlan | null> {
   const field = snapshot.fields.find(field => field.id === fieldId);
   if (!field || snapshot.warning || !field.translation.trim()) return null;
-  const canonical = portableReviewText(snapshot, field, field.translation);
+  // The only markup repair admitted here is a separately proved source-owned
+  // punctuation leaf. Normal validation below still checks the complete field.
+  const punctuation = field.format === "html" ? restoreSourcePunctuation(field.source, field.translation) : null;
+  const alignedTranslation = punctuation?.value ?? field.translation;
+  const canonical = portableReviewText(snapshot, field, alignedTranslation);
   const integrity = diagnosePortableText(field.source, canonical, field.format);
   if (!integrity || integrity.markup.length || integrity.markupTruncated || integrity.commands.truncated ||
       (!integrity.commands.missing.length && !integrity.commands.extra.length)) return null;
-  const sourcePlan = planReviewText(field.source, field.format), currentPlan = planReviewText(field.translation, field.format);
+  const sourcePlan = planReviewText(field.source, field.format), currentPlan = planReviewText(alignedTranslation, field.format);
+  const beforePlan = planReviewText(field.translation, field.format);
   const environment = referenceRebuildEnvironment(), gates = sourcePartGates(field.source, field.format, environment);
   const sourceRequirements = new Map<string, boolean>();
   const classifiedOccurrences = new Map<string, number>();
@@ -176,10 +198,13 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<Ref
   const rows: ReferenceRebuildRow[] = [], targets: ReferenceRebuildPlan["targets"] = [];
   for (const sourceUnit of sourcePlan.units) {
     const currentUnit = currentPlan.units.find(unit => unit.id === sourceUnit.id);
+    const beforeUnit = beforePlan.units.find(unit => unit.id === sourceUnit.id);
     const row = fieldRows.find(row => row.unitId === sourceUnit.id);
-    if (!currentUnit || !row || row.format !== field.format || sourceUnit.parts.length !== currentUnit.parts.length ||
-        !equal(row.source, sourceUnit.parts) || !equal(row.translation, currentUnit.parts)) return null;
+    if (!currentUnit || !beforeUnit || !row || row.format !== field.format || sourceUnit.parts.length !== currentUnit.parts.length ||
+        !equal(row.source, sourceUnit.parts) || !equal(row.translation, beforeUnit.parts)) return null;
     const partIndices = sourceUnit.parts.flatMap((part, index) => equal(syntaxExpressions(part), syntaxExpressions(portableReviewText(snapshot, field, currentUnit.parts[index]!))) ? [] : [index]);
+    if (punctuation?.proof.unitId === sourceUnit.id && !partIndices.includes(punctuation.proof.partIndex)) partIndices.push(punctuation.proof.partIndex);
+    partIndices.sort((a, b) => a - b);
     if (!partIndices.length) continue;
     if (sourceUnit.attribute) return null;
     const baseline = [...currentUnit.parts];
@@ -212,14 +237,15 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<Ref
         referenceMap.push({ partIndex, marker: reference.marker, sourceCommand: sourceCommands[index]!, ...mapped.get(partIndex)![index]! });
       });
     }
-    rows.push({ rowId: row.id, unitId: row.unitId, partIndices, source: [...sourceUnit.parts], before: [...row.translation], baseline, edit, referenceMap });
+    rows.push({ rowId: row.id, unitId: row.unitId, partIndices, source: [...sourceUnit.parts], before: [...row.translation], baseline, edit, referenceMap,
+      ...(punctuation?.proof.unitId === sourceUnit.id ? { alignedBefore: [...currentUnit.parts] } : {}) });
   }
   if (!rows.length || rows.length > 50 || rows.reduce((sum, row) => sum + row.source.join("").length + row.before.join("").length, 0) > 120000) return null;
-  const value = replaceRows(field.translation, field.format, rows.map(row => ({ unitId: row.unitId, parts: row.baseline })));
+  const value = replaceRows(alignedTranslation, field.format, rows.map(row => ({ unitId: row.unitId, parts: row.baseline })));
   assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
   const body = { version: 1 as const, documentId: snapshot.entry.uuid, sourceHash: snapshot.sourceHash, fieldId,
     fieldSourceHash: await hash(field.source), beforeHash: await hash(field.translation), guardFingerprint: snapshot.guard.fingerprint,
-    ...environment, rows, targets: targets.filter((target, index) => targets.findIndex(other => equal(other, target)) === index) };
+    ...environment, ...(punctuation ? { punctuation: punctuation.proof } : {}), rows, targets: targets.filter((target, index) => targets.findIndex(other => equal(other, target)) === index) };
   return { ...body, proofHash: await hash(body) };
 }
 
@@ -239,9 +265,10 @@ export async function materializeReferenceRebuild(snapshot: ReviewSnapshot, plan
   const changes: ReviewChange[] = [], numbers: RebuildNumberProof[] = [];
   for (const row of fresh.rows) {
     const edit = edits.find(edit => edit.rowId === row.rowId);
-    if (!edit || edit.text.length !== row.before.length || edit.text.some(text => typeof text !== "string" || !text.trim()) || edit.text.join("").length > 60000) fail();
+    if (!edit || edit.text.length !== row.baseline.length || edit.text.some(text => typeof text !== "string" || !text.trim()) || edit.text.join("").length > 60000) fail();
     const draft = structuredClone(row.edit), editableParts = new Set(row.partIndices), known = new Set(draft.references.flat().map(ref => ref.marker));
     for (const [index, text] of edit.text.entries()) {
+      if (fresh.punctuation?.unitId === row.unitId && fresh.punctuation.partIndex === index && text !== row.edit.text[index]) fail("ProtectedText");
       if (!editableParts.has(index) && text !== row.edit.text[index]) fail("ProtectedText");
       if (/(?:@[\p{L}][\p{L}\p{N}]*|&(?:amp;)?[\p{L}][\p{L}\p{N}_]*)\[|\[\[|__FT[NGS]_/u.test(text)) fail("ReferenceChanged");
       for (const [marker] of text.matchAll(/⟦+[^⟦⟧]*⟧+/gu)) if (!known.has(marker)) fail("ReferenceChanged");
@@ -257,9 +284,9 @@ export async function materializeReferenceRebuild(snapshot: ReviewSnapshot, plan
     const parts = restoreReviewParts({ ...draft, text: [...edit.text] });
     const field = snapshot.fields.find(field => field.id === plan.fieldId)!;
     for (let partIndex = 0; partIndex < parts.length; partIndex++) {
-      if (!editableParts.has(partIndex)) { if (parts[partIndex] !== row.before[partIndex]) fail("ProtectedText"); continue; }
+      if (!editableParts.has(partIndex)) { if (parts[partIndex] !== (row.alignedBefore ?? row.before)[partIndex]) fail("ProtectedText"); continue; }
       if (!equal(syntaxExpressions(row.source[partIndex]!), syntaxExpressions(portableReviewText(snapshot, field, parts[partIndex]!)))) fail("ReferenceChanged");
-      const proof = { rowId: row.rowId, partIndex, source: prosePartNumbers(row.source[partIndex]!), before: prosePartNumbers(row.before[partIndex]!),
+      const proof = { rowId: row.rowId, partIndex, source: prosePartNumbers(row.source[partIndex]!), before: prosePartNumbers((row.alignedBefore ?? row.before)[partIndex]!),
         after: prosePartNumbers(parts[partIndex]!), restored: restoreSourceNumbers };
       if (!equal(proof.after, restoreSourceNumbers ? proof.source : proof.before)) fail("NumbersChanged");
       numbers.push(proof);
@@ -268,11 +295,14 @@ export async function materializeReferenceRebuild(snapshot: ReviewSnapshot, plan
   }
   const field = snapshot.fields.find(field => field.id === fresh.fieldId)!;
   if (restoreSourceNumbers && !numbers.some(proof => !equal(proof.before, proof.source))) fail("NumbersChanged");
-  const value = replaceRows(field.translation, field.format, changes.map(change => ({ unitId: fresh.rows.find(row => row.rowId === change.rowId)!.unitId, parts: change.parts })));
+  const punctuation = fresh.punctuation ? restoreSourcePunctuation(field.source, field.translation) : null;
+  if (fresh.punctuation && (!punctuation || !equal(punctuation.proof, fresh.punctuation))) fail("Conflict");
+  const value = replaceRows(punctuation?.value ?? field.translation, field.format, changes.map(change => ({ unitId: fresh.rows.find(row => row.rowId === change.rowId)!.unitId, parts: change.parts })));
   assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
   const receipt: ReferenceRebuildReceipt = { version: 1, fieldId: fresh.fieldId, documentId: fresh.documentId, sourceHash: fresh.sourceHash,
     fieldSourceHash: fresh.fieldSourceHash, proofHash: fresh.proofHash, guardFingerprint: fresh.guardFingerprint, beforeHash: fresh.beforeHash,
     systemId: fresh.systemId, emberActive: fresh.emberActive, emberVersion: fresh.emberVersion,
+    ...(fresh.punctuation ? { punctuation: fresh.punctuation } : {}),
     rows: await Promise.all(fresh.rows.map(async row => ({ rowId: row.rowId, unitId: row.unitId, partIndices: [...row.partIndices],
       beforeHash: await hash(row.before), afterHash: await hash(changes.find(change => change.rowId === row.rowId)!.parts) }))), referenceMap: fresh.rows.flatMap(row => row.referenceMap) };
   return { changes, value, receipt, numbers };
@@ -321,7 +351,9 @@ export async function undoReferenceRebuild(snapshot: ReviewSnapshot, receipt: Re
         binding.beforeHash !== await hash(saved.before) || binding.afterHash !== await hash(saved.after)) fail("UndoConflict");
     restore.push({ unitId: current.unitId, parts: saved.before });
   }
-  const before = replaceRows(field.translation, field.format, restore), beforePlan = planReviewText(before, field.format);
+  const withoutPunctuation = receipt.punctuation ? removeSourcePunctuation(field.source, field.translation, receipt.punctuation) : field.translation;
+  if (withoutPunctuation === null) fail("UndoConflict");
+  const before = replaceRows(withoutPunctuation, field.format, restore), beforePlan = planReviewText(before, field.format);
   const prior: ReviewSnapshot = { ...snapshot, guard: { ...snapshot.guard, fingerprint: receipt.guardFingerprint },
     fields: snapshot.fields.map(item => item.id === field.id ? { ...item, translation: before } : item),
     rows: snapshot.rows.map(row => row.fieldId === field.id ? { ...row, translation: beforePlan.units.find(unit => unit.id === row.unitId)?.parts ?? [], blocked: "StructureChanged" } : row) };
@@ -329,7 +361,7 @@ export async function undoReferenceRebuild(snapshot: ReviewSnapshot, receipt: Re
   // hash/proof is not reused. Re-prove the same damaged scope and source targets.
   const plan = await prepareReferenceRebuild(prior, field.id);
   if (!plan || !equal(plan.rows.map(row => ({ rowId: row.rowId, unitId: row.unitId, partIndices: row.partIndices })),
-    receipt.rows.map(row => ({ rowId: row.rowId, unitId: row.unitId, partIndices: row.partIndices }))) || !equal(plan.rows.flatMap(row => row.referenceMap), receipt.referenceMap)) fail("UndoConflict");
+    receipt.rows.map(row => ({ rowId: row.rowId, unitId: row.unitId, partIndices: row.partIndices }))) || !equal(plan.rows.flatMap(row => row.referenceMap), receipt.referenceMap) || !equal(plan.punctuation, receipt.punctuation)) fail("UndoConflict");
   const { proofHash: _proof, ...body } = plan;
   if (await hash({ ...body, beforeHash: receipt.beforeHash }) !== receipt.proofHash) fail("UndoConflict");
   return { fieldId: field.id, value: before };

@@ -50,7 +50,10 @@ labeled. Nested blocks get one label and empty embedded descriptions get none. C
 use normal document flow, leaving room for enlarged text. The contents panel
 keeps its close control visible while scrolling long chapter lists. Event outcomes are shown as static text with
 their reached/not reached state; translated event copies show outcome labels
-from the translation, matched by outcome ID as in the native sheet.
+from the translation, matched by outcome ID as in the native sheet. Since
+0.33.11, valid saved outcome summaries also use the translation, with exact
+source/copy provenance and unchanged event mechanics. Stale or invalid
+translations retain the original summary; reached/not reached state is unchanged.
 Event automation controls, warnings and quest flowcharts are not rendered. Script/form controls and
 inline executable handlers are removed from the reading surface. Roll and macro
 links never execute in the reader; use Open in Foundry when gameplay is wanted.
