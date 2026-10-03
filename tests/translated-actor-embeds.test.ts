@@ -28,7 +28,7 @@ function fixture() {
     public: { get() { throw new Error("public must not be read"); } },
     private: { get() { throw new Error("private must not be read"); } },
   });
-  const journal = { id: "guide", uuid: "JournalEntry.copy", documentName: "JournalEntry", flags: { "foundry-translate": { translation: {
+  const journal = { id: "guide", uuid: "JournalEntry.copy", documentName: "JournalEntry", visible: true, flags: { "foundry-translate": { translation: {
     schemaVersion: 1, sourceUuid: "JournalEntry.source", sourceHash: "hash", providerId: "openai-compatible",
     sourceLanguage: "en", targetLanguage: "cs", translatedAt: "now", translatedTextPages: 1, skippedTextPages: 0,
   } } } };
@@ -129,14 +129,98 @@ describe("translated native Actor appearance embeds", () => {
     f.target.system.details.biography.appearance = '<section><p>Skryté.</p></section>';
     await f.invoke(); expect(f.root.outerHTML).toBe(before);
   });
-  it("does not translate unscoped/original journals, explicit readaloud, copied actors, unsupported layouts or model types", async () => {
+  it("does not translate unscoped/original journals, copied actors, unsupported layouts or model types", async () => {
     const f = fixture(), before = f.root.outerHTML;
     await f.invoke({}); await f.invoke({ relativeTo: { uuid: "JournalEntry.source", documentName: "JournalEntry" } });
-    await f.invoke(undefined, { readaloud: "Explicit source override" });
     await f.invoke(undefined, {}, f.target); await f.invoke(undefined, {}, { ...f.source, type: "character" });
     f.root.classList.remove("actor"); await f.invoke();
     expect(f.enrich).not.toHaveBeenCalled(); expect(resolve).not.toHaveBeenCalled();
     f.root.classList.add("actor"); expect(f.root.outerHTML).toBe(before);
+  });
+  it("renders four explicit plain-text readaloud overrides in a compendium page, retaining the native chat/discovery DOM", async () => {
+    const overrides = ["Vidíte vysokého zvěda.", "Slyšíte kroky.\\nZ chodby vystupuje bojovník.",
+      "Cestovatel má zlaté oči.", "Lékař & jeho pomocník vás zdraví."];
+    for (const readaloud of overrides) {
+      const f = fixture();
+      f.journal.uuid = "Compendium.world.foundry-translate-translations.JournalEntry.guide";
+      const page = { id: "overview", uuid: `${f.journal.uuid}.JournalEntryPage.overview`, documentName: "JournalEntryPage", visible: true, parent: f.journal };
+      const snapshot = JSON.stringify([f.source, f.target, f.journal, page]);
+      const discovery = f.root.querySelector("button")!, listener = vi.fn(); discovery.addEventListener("click", listener);
+      const chat = document.createElement("button"); chat.className = "readaloud-chat";
+      let posted = "";
+      chat.addEventListener("click", () => {
+        const clone = chat.closest("section.readaloud")!.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll("button.readaloud-chat").forEach(button => button.remove());
+        posted = clone.innerHTML;
+      });
+      const config = { readaloud, count: 3, uuid: f.source.uuid }, options = { relativeTo: page, secrets: false };
+      await f.invoke(options, config);
+      f.slot().appendChild(chat); chat.dispatchEvent(new Event("click")); discovery.dispatchEvent(new Event("click"));
+      expect([...f.slot().querySelectorAll("p")].map(p => p.textContent)).toEqual(readaloud.split("\\n"));
+      expect(posted).toBe(f.slot().innerHTML.replace(chat.outerHTML, ""));
+      expect(posted).not.toContain("A tall scout"); expect(listener).toHaveBeenCalledTimes(1);
+      expect(f.original).toHaveBeenCalledWith(config, options);
+      expect(f.enrich).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+        relativeTo: f.source, secrets: false, documents: false, links: false, embeds: false, rolls: false, custom: false,
+      }));
+      expect(f.root.getAttribute("uuid")).toBe(f.source.uuid);
+      expect(f.root.querySelector("a")?.getAttribute("data-uuid")).toBe(f.source.uuid);
+      expect(discovery.getAttribute("data-discovery-id")).toBe("source");
+      expect(JSON.stringify([f.source, f.target, f.journal, page])).toBe(snapshot);
+    }
+  });
+  it.each(["missing", "ambiguous", "invalid", "source-only"] as const)("does not need an Actor copy for a journal override when mapping is %s", async status => {
+    const f = fixture(); resolve.mockResolvedValue({ sourceUuid: f.source.uuid, translatedUuid: null, status });
+    await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    expect(f.slot().textContent).toBe("Vidíte zvěda.");
+    expect(f.root.querySelector("a")?.textContent).toBe("Silver Scout");
+    expect(f.root.querySelector(".category")?.textContent).toBe("Human Operator");
+    expect(fromUuid).not.toHaveBeenCalled(); expect(f.loadExisting).not.toHaveBeenCalled();
+  });
+  it("uses a journal override when the optional Actor index is unavailable, retaining source captions", async () => {
+    const f = fixture(); resolve.mockRejectedValueOnce(new Error("Index unavailable"));
+    await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    expect(f.slot().textContent).toBe("Vidíte zvěda.");
+    expect(f.root.querySelector("a")?.textContent).toBe("Silver Scout");
+  });
+  it.each(["", "   ", false, 7, "<p>HTML</p>", "<section class='secret'>Hidden</section>", "@UUID[Actor.other]", "@Check[type:poison dc:99]", "&Reference[Poisoned]", "[[1d20]]", "x".repeat(60001)]
+    .map(readaloud => ({ readaloud, label: typeof readaloud === "string" && readaloud.length > 80 ? "over size limit" : String(readaloud) })))
+  ("keeps native rendering for an empty or unsupported override $label", async ({ readaloud }) => {
+    const f = fixture(), before = f.root.outerHTML;
+    await f.invoke({ relativeTo: f.journal }, { readaloud });
+    expect(f.root.outerHTML).toBe(before); expect(f.enrich).not.toHaveBeenCalled(); expect(resolve).not.toHaveBeenCalled();
+  });
+  it("leaves original journals native even with a valid override, and honors explicit caller captions in translated ones", async () => {
+    const f = fixture(), before = f.root.outerHTML;
+    await f.invoke({ relativeTo: { documentName: "JournalEntry", visible: true, flags: {} } }, { readaloud: "Original override" });
+    expect(f.root.outerHTML).toBe(before); expect(f.enrich).not.toHaveBeenCalled();
+    // The label wrapper/native renderer owns an explicit caption; the appearance
+    // adapter may not replace it with the copy's stored name.
+    f.root.querySelector("a")!.lastChild!.textContent = "Caller caption";
+    await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda.", label: "Caller caption" });
+    expect(f.root.querySelector("a")?.textContent).toBe("Caller caption");
+    expect(f.slot().textContent).toBe("Vidíte zvěda.");
+  });
+  it("does not widen journal/Actor visibility or use an invalid mapped copy for explicit overrides", async () => {
+    const f = fixture(), before = f.root.outerHTML;
+    f.journal.visible = false; await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    f.journal.visible = true; f.source.visible = false; await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    f.source.visible = true; f.target.visible = false; await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    f.target.visible = true; f.actorFlag.sourceUuid = "Actor.unrelated"; await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    expect(f.root.outerHTML).toBe(before); expect(f.enrich).not.toHaveBeenCalled();
+  });
+  it("rechecks the full journal identity, visibility and override while enrichment is pending", async () => {
+    const f = fixture(), before = f.root.outerHTML;
+    f.enrich.mockImplementationOnce(async text => { f.journal.flags["foundry-translate"].translation.sourceUuid = "JournalEntry.other"; return text; });
+    await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    expect(f.root.outerHTML).toBe(before);
+    f.enrich.mockImplementationOnce(async text => { f.journal.visible = false; return text; });
+    await f.invoke({ relativeTo: f.journal }, { readaloud: "Vidíte zvěda." });
+    expect(f.root.outerHTML).toBe(before); f.journal.visible = true;
+    const config = { readaloud: "Vidíte zvěda." };
+    f.enrich.mockImplementationOnce(async text => { config.readaloud = "<p>Later markup</p>"; return text; });
+    await f.invoke({ relativeTo: f.journal }, config);
+    expect(f.root.outerHTML).toBe(before);
   });
   it("does not use private nested slots for unsupported native layouts", async () => {
     const f = fixture(); f.root.innerHTML = '<header><h4><a data-uuid="Actor.source">Silver Scout</a></h4></header><div><section class="readaloud">Nested</section></div>';

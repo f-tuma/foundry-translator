@@ -1,4 +1,3 @@
-import { discoverDocumentDependencies, rewriteDocumentReferences } from "../translation/document-dependencies";
 import type { HtmlFieldPath } from "../translation/system-html-fields";
 
 /** The context that Foundry uses to resolve relative links in a text field. */
@@ -29,21 +28,39 @@ export function absoluteReference(uuid: string, context: string): string | null 
   return [...parts.slice(0, -1), ...tail].join(".");
 }
 
+/** Visit full target tokens, including anchors, without changing surrounding
+ * syntax. Dependency remapping uses bare UUIDs and cannot distinguish two
+ * anchors on the same document, so it must not be used for notation repair. */
+function referenceTargets(text: string, transform: (target: string) => string): string {
+  const commands = text.replace(/@(?:UUID|Embed)\[([^\S\r\n]*)([^\]\s]+)([^\]\r\n]*)\]/giu,
+    (expression: string, leading: string, target: string, options: string) => {
+      if (target.includes("=")) return expression;
+      return `${expression.slice(0, expression.indexOf("[") + 1)}${leading}${transform(target)}${options}]`;
+    });
+  return commands.replace(/(\bdata-uuid\s*=\s*)(["'])([^"']+)\2/giu,
+    (expression: string, prefix: string, quote: string, value: string) => {
+      const target = value.trim();
+      if (!target) return expression;
+      const offset = value.indexOf(target);
+      return `${prefix}${quote}${value.slice(0, offset)}${transform(target)}${value.slice(offset + target.length)}${quote}`;
+    });
+}
+
 /** Restore only equivalent spellings present in the source. Never drop embedded
  * suffixes or anchors. Ambiguous spellings fail closed in the regular validator. */
 export function sourceReferenceNotation<T extends string | string[]>(source: string, translation: T, context: string): T {
   const spellings = new Map<string, Set<string>>();
-  for (const { sourceUuid } of discoverDocumentDependencies(source)) {
-    const absolute = absoluteReference(sourceUuid, context);
-    if (!absolute) continue;
-    const set = spellings.get(absolute) ?? new Set<string>();
-    set.add(sourceUuid); spellings.set(absolute, set);
-  }
-  const dependencies = discoverDocumentDependencies(typeof translation === "string" ? translation : translation.join("\n"));
-  const replacements = dependencies.flatMap(({ sourceUuid }) => {
-    const absolute = absoluteReference(sourceUuid, context), set = absolute && spellings.get(absolute);
-    const spelling = set && set.size === 1 ? [...set][0] : undefined;
-    return spelling && spelling !== sourceUuid ? [{ sourceUuid, translatedUuid: spelling }] : [];
+  referenceTargets(source, target => {
+    const absolute = absoluteReference(target, context);
+    if (absolute) {
+      const set = spellings.get(absolute) ?? new Set<string>();
+      set.add(target); spellings.set(absolute, set);
+    }
+    return target;
   });
-  return rewriteDocumentReferences(translation, replacements);
+  const rewrite = (text: string) => referenceTargets(text, target => {
+    const absolute = absoluteReference(target, context), set = absolute && spellings.get(absolute);
+    return set && set.size === 1 ? [...set][0]! : target;
+  });
+  return (typeof translation === "string" ? rewrite(translation) : translation.map(rewrite)) as T;
 }
