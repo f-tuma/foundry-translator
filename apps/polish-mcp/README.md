@@ -69,6 +69,43 @@ nové načtení kontextu; nelze slepě použít starou revizi.
 posuzuje člověk. Foundry neposkytuje serverové compare-and-swap; souběžný zápis
 jiného GM ve stejném okamžiku nelze plně vyloučit. Používej jednoho zapisujícího GM.
 
+### Rekonstrukce poškozených odkazů od 0.33.9 / MCP 0.3.8
+
+Starší překlad může několik odkazů na různé schopnosti zkrátit na stejnou
+postavu nebo přeložit samotný příkaz. Pak nelze bezpečně poznat původní cíle
+podle českých popisků ani pořadí. `live_prepare_reference_rebuild` vytvoří plán
+pro celé poškozené textové pole: úplný originál, současný překlad, přesně vybrané
+části k rekonstrukci a značky odvozené z originálu.
+
+Agent znovu sestaví české věty **jen v těchto částech** a umístí jejich značky.
+Ostatní části musí zachovat přesně. Neposílá UUID, příkazy ani nové parametry.
+`live_validate_reference_rebuild` ukáže úplné před/po, vazby a dostupnost cílů,
+kontrolu čísel i upozornění glosáře. Teprve po kontrole může
+`live_apply_reference_rebuild` uložit všechny plánované řádky jedním zápisem.
+Obě metody vyžadují čerstvou `revision` a `planHash`; zápis také důvod a
+jedinečné `operationId`. Vynechaný řádek, změněný originál, nejednoznačná
+provenience nebo poškozené HTML zápis zablokují.
+
+Číselné hodnoty se kontrolují zvlášť v každé dotčené části. Výslovné
+`restoreSourceNumbers` musí obnovit čísla téže části originálu; shodný součet
+mezi několika odstavci nestačí. Existující přeložené parametry `@Embed` se touto
+rekonstrukcí nevracejí do angličtiny; taková nejednoznačná oprava se odmítne.
+
+Aktivní odkazy musí mít dostupný cíl. Ember obsahuje také původní větve pro
+jiný herní systém, které při vykreslení odstraňuje. Jen u přesně prokázané
+neaktivní větve původního `system-swap` bloku lze zachovat přesný původní odkaz,
+i když v tomto světě neexistuje. Náhled tuto výjimku výslovně ukazuje. Pokud
+se tentýž cíl používá také mimo neaktivní větev, jeho existence je povinná.
+Neznámé větvení ani větev přidaná pouze do překladu tuto výjimku nezískají.
+Výjimka je ověřená pro aktivní Ember **0.6.2** a systémy `crucible`/`dnd5e`;
+jiná verze modulu nebo systém vyžadují existenci všech obnovovaných cílů.
+
+Zápis zůstává neověřený a má historii a možnost vrácení. Vrácení může obnovit
+původní poškození a znovu zablokovat dané pole; přijímá pouze přesný uložený
+stav dotčených řádků a nezměněný originál. Po aktualizaci zkopíruj nový MCP JSON
+a restartuj klienta. Běžné opravy textu používají stejné přísné kontroly jako
+dříve; tento postup není obecné povolení měnit odkazy.
+
 ### Atomická obnova identifikátorů od 0.33.4 / MCP 0.3.4
 
 Pokud starý překlad přeložil technický název uvnitř `&Reference[...]`, lze použít

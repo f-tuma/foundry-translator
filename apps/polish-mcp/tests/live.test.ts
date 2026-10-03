@@ -99,6 +99,13 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
       expect(tool).toBeDefined(); expect(tool.inputSchema.additionalProperties).toBe(false);
       expect(Object.keys(tool.inputSchema.properties ?? {})).not.toContain('text');
     }
+    for (const name of ['live_prepare_reference_rebuild', 'live_validate_reference_rebuild', 'live_apply_reference_rebuild']) {
+      const tool = tools.tools.find(t => t.name === name)!;
+      expect(tool).toBeDefined(); expect(tool.inputSchema.additionalProperties).toBe(false);
+      expect(tool.annotations?.readOnlyHint).toBe(name !== 'live_apply_reference_rebuild');
+      for (const forbidden of ['text', 'labels', 'options', 'uuid', 'commands']) expect(Object.keys(tool.inputSchema.properties ?? {})).not.toContain(forbidden);
+      if (name !== 'live_prepare_reference_rebuild') expect((tool.inputSchema.properties as any).edits.items).toMatchObject({ additionalProperties: false });
+    }
     const batchTool = tools.tools.find(t => t.name === 'live_get_context_batch')!;
     expect(batchTool).toBeDefined(); expect(batchTool.annotations?.readOnlyHint).toBe(true);
     expect(batchTool.inputSchema.additionalProperties).toBe(false);
@@ -138,6 +145,22 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     const optionReply = { ok: true, value: { optionChanges: [{ marker: '⟦1⟧', key: 'readaloud', before: 'Vstoupíte dovnitř.', after: 'Vstupujete dovnitř.' }], willVerify: false } };
     await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: optionRequest.id, result: optionReply }) });
     expect(JSON.parse(((await optionPending).content as { text: string }[])[0]!.text)).toEqual(optionReply);
+    const rebuildArgs = { documentId: 'translated', fieldId: '["pages","page","text","content"]', revision: 'a'.repeat(64), planHash: 'b'.repeat(64),
+      edits: [{ rowId: 'c'.repeat(64), text: ['Věta ⟦1⟧.'], labels: [{ marker: '⟦1⟧', label: 'Spojenec' }] }], reason: 'Restore exact source references', operationId: 'rebuild-1' };
+    expect((await client.callTool({ name: 'live_apply_reference_rebuild', arguments: { ...rebuildArgs, commands: ['@UUID[Other]'] } })).isError).toBe(true);
+    expect((await client.callTool({ name: 'live_apply_reference_rebuild', arguments: { ...rebuildArgs, edits: [{ ...rebuildArgs.edits[0], uuid: 'Actor.other' }] } })).isError).toBe(true);
+    for (const [name, method, args] of [
+      ['live_prepare_reference_rebuild', 'prepare_reference_rebuild', { documentId: rebuildArgs.documentId, fieldId: rebuildArgs.fieldId }],
+      ['live_validate_reference_rebuild', 'validate_reference_rebuild', Object.fromEntries(Object.entries(rebuildArgs).filter(([key]) => key !== 'operationId'))],
+      ['live_apply_reference_rebuild', 'apply_reference_rebuild', rebuildArgs],
+    ] as const) {
+      const pending = client.callTool({ name, arguments: args });
+      const request = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
+      expect(request).toMatchObject({ method, args });
+      const value = { ok: true, value: { willVerify: false, sourceOwned: true } };
+      await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: request.id, result: value }) });
+      expect(JSON.parse(((await pending).content as { text: string }[])[0]!.text)).toEqual(value);
+    }
     const repairArgs = { documentId: 'translated', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Restore exact source IDs', operationId: 'repair-1' };
     const repairPending = client.callTool({ name: 'live_restore_reference_identifiers', arguments: repairArgs });
     const repairRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;

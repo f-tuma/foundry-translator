@@ -1,8 +1,10 @@
 export const LIVE_PROTOCOL = 1;
 export const LIVE_PORT = 3112;
-export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "list_history" | "undo_correction";
+export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "prepare_reference_rebuild" | "validate_reference_rebuild" | "apply_reference_rebuild" | "list_history" | "undo_correction";
 export interface LiveArgs {
   documentId?: string; rowId?: string; rowIds?: string[]; revision?: string; operationId?: string;
+  fieldId?: string; planHash?: string;
+  edits?: { rowId: string; text: string[]; labels?: { marker: string; label: string }[] }[];
   text?: string[]; labels?: { marker: string; label: string }[]; reason?: string;
   options?: { marker: string; key: "readaloud" | "caption" | "label"; value: string }[];
   restoreSourceNumbers?: boolean;
@@ -13,8 +15,8 @@ export interface LiveArgs {
 export interface LiveRequest { id: string; method: LiveMethod; args: Record<string, unknown> }
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
-const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "list_history", "undo_correction"];
-const keys = new Set(["documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex"]);
+const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild", "list_history", "undo_correction"];
+const keys = new Set(["documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
   const fail = (): never => { throw new Error("Live.InvalidRequest"); };
@@ -27,6 +29,16 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
     if (!input.documentId || !input.rowId || !input.revision || typeof input.reason !== "string" || input.reason.trim().length < 5 ||
       (request.method === "restore_reference_identifiers" && !input.operationId)) fail();
   }
+  const rebuild = ["prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild"].includes(request.method);
+  if (rebuild) {
+    const preparing = request.method === "prepare_reference_rebuild";
+    const allowed = new Set(["documentId", "fieldId", "revision", ...(preparing ? [] : ["planHash", "edits", "reason", "restoreSourceNumbers"]),
+      ...(request.method === "apply_reference_rebuild" ? ["operationId"] : [])]);
+    if (Object.keys(input).some(key => !allowed.has(key)) || !input.documentId || !input.fieldId ||
+      (!preparing && (!input.revision || !input.planHash || !Array.isArray(input.edits) || !input.edits.length ||
+        typeof input.reason !== "string" || input.reason.trim().length < 5)) ||
+      (request.method === "apply_reference_rebuild" && !input.operationId)) fail();
+  } else if (["fieldId", "planHash", "edits"].some(key => input[key] !== undefined)) fail();
   if (request.method === "get_context_batch" && (Object.keys(input).some(key => !["documentId", "rowIds"].includes(key)) || !input.documentId || input.rowIds === undefined)) fail();
   const args: LiveArgs = { offset: 0, limit: 20, query: "", radius: 2, fuzzy: false };
   if (input.rowIds !== undefined) {
@@ -39,7 +51,7 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
     args.referenceIndex = input.referenceIndex as number;
   }
   for (const key of ["restoreSourceNumbers", "restoreSourceReferences"] as const) if (input[key] !== undefined) {
-    if (typeof input[key] !== "boolean" || !["validate_correction", "save_correction"].includes(request.method)) fail();
+    if (typeof input[key] !== "boolean" || !(["validate_correction", "save_correction"].includes(request.method) || (key === "restoreSourceNumbers" && rebuild && request.method !== "prepare_reference_rebuild"))) fail();
     args[key] = input[key] as boolean;
   }
   for (const key of ["offset", "limit", "radius"] as const) if (input[key] !== undefined) {
@@ -48,12 +60,27 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   }
   if (input.fuzzy !== undefined) { if (typeof input.fuzzy !== "boolean") fail(); args.fuzzy = input.fuzzy as boolean; }
   if (input.query !== undefined) { if (typeof input.query !== "string" || input.query.length > 160) fail(); args.query = input.query as string; }
-  for (const key of ["documentId", "rowId", "revision", "operationId", "reason"] as const) if (input[key] !== undefined) {
-    const s = input[key]; if (typeof s !== "string" || !s.trim() || s.length > (key === "reason" ? 3000 : 500)) fail();
+  for (const key of ["documentId", "rowId", "revision", "operationId", "reason", "fieldId", "planHash"] as const) if (input[key] !== undefined) {
+    const s = input[key]; if (typeof s !== "string" || !s.trim() || s.length > (key === "reason" ? 3000 : key === "fieldId" ? 1000 : 500)) fail();
     args[key] = s as string;
   }
-  for (const key of ["rowId", "revision"] as const) if (args[key] && !/^[a-f0-9]{64}$/u.test(args[key]!)) fail();
+  for (const key of ["rowId", "revision", "planHash"] as const) if (args[key] && !/^[a-f0-9]{64}$/u.test(args[key]!)) fail();
   if (args.operationId && !/^[a-zA-Z0-9-]{1,80}$/u.test(args.operationId)) fail();
+  if (input.edits !== undefined) {
+    if (!rebuild || request.method === "prepare_reference_rebuild" || !Array.isArray(input.edits) || input.edits.length < 1 || input.edits.length > 100) fail();
+    for (const edit of input.edits as Record<string, unknown>[]) {
+      if (!object(edit) || Object.keys(edit).some(key => !["rowId", "text", "labels"].includes(key)) ||
+        typeof edit.rowId !== "string" || !/^[a-f0-9]{64}$/u.test(edit.rowId) || !Array.isArray(edit.text) ||
+        !edit.text.length || edit.text.length > 1000 || edit.text.some(part => typeof part !== "string" || !part.trim()) || edit.text.join("").length > 60000) fail();
+      if (edit.labels !== undefined && (!Array.isArray(edit.labels) || edit.labels.length > 1000 || (edit.labels as unknown[]).some(label =>
+        !object(label) || Object.keys(label).some(key => !["marker", "label"].includes(key)) || typeof label.marker !== "string" ||
+        !label.marker.trim() || label.marker.length > 120 || typeof label.label !== "string" || label.label.length > 2000) ||
+        new Set((edit.labels as { marker: string }[]).map(label => label.marker)).size !== edit.labels.length)) fail();
+    }
+    args.edits = input.edits as NonNullable<LiveArgs["edits"]>;
+    if (new Set(args.edits.map(edit => edit.rowId)).size !== args.edits.length || args.edits.reduce((total, edit) =>
+      total + edit.text.join("").length + (edit.labels ?? []).reduce((sum, label) => sum + label.label.length, 0), 0) > 120000) fail();
+  }
   if (input.text !== undefined) {
     if (!Array.isArray(input.text) || !input.text.length || input.text.length > 1000 || input.text.some(p => typeof p !== "string" || !p.trim()) || input.text.join("").length > 60000) fail();
     args.text = input.text as string[];

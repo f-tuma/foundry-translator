@@ -7,6 +7,7 @@ import { portableFields, type BundleDocumentKind, type FieldFormat, type Portabl
 import { assertPortableText, diagnosePortableText, syntaxExpressions, type PortableTextDiagnostics } from "../bundles/format";
 import { referenceRepairDraft } from "./reference-repair";
 import { referenceIdentifierRepairDraft } from "./reference-identifier-repair";
+import { validateReferenceRebuildChanges, undoReferenceRebuild, assertReferenceRebuildEnvironment, type ReferenceRebuildReceipt } from "./reference-rebuild";
 import { remapBundleReferences } from "../bundles/service";
 import { ACTOR_TRANSLATIONS_PACK_ID } from "../translation/compendium-actor-translation-repository";
 import { ITEM_TRANSLATIONS_PACK_ID } from "../translation/compendium-item-translation-repository";
@@ -288,6 +289,7 @@ export interface ReviewHistoryEntry {
   agentRequestHash?: string;
   referenceRepair?: true;
   identifierRepair?: true;
+  referenceRebuild?: ReferenceRebuildReceipt;
   rows: { rowId: string; before: string[]; after: string[]; label: string; group: string }[];
   undoneAt?: string;
 }
@@ -342,7 +344,7 @@ function abortableHistoryRead<T>(pending: Promise<T>, signal?: AbortSignal): Pro
 
 /** Compile only schema-allowed text updates. One document update includes its embedded
  * changes and undo record, so a lost response can be resolved from persistent history. */
-export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; identifierRepair?: boolean; restoreEmbedSourceNumbers?: boolean; canWrite?: () => boolean } = {}): Promise<ReviewSnapshot> {
+export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; identifierRepair?: boolean; referenceRebuild?: { fieldId: string; proofHash: string; restoreSourceNumbers?: boolean }; restoreEmbedSourceNumbers?: boolean; canWrite?: () => boolean; beforeWrite?: () => Promise<void> } = {}): Promise<ReviewSnapshot> {
   gmOnly();
   if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   const fresh = await loadReview(snapshot.entry);
@@ -358,6 +360,22 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
     undo.rows.every(saved => changes.some(change => change.rowId === saved.rowId && JSON.stringify(change.parts) === JSON.stringify(saved.before)) &&
       JSON.stringify(fresh.rows.find(row => row.id === saved.rowId)?.translation) === JSON.stringify(saved.after));
   if (options.undoId && !exactUndo) fail("UndoConflict");
+  const rebuildMode = !!options.referenceRebuild || !!undo?.referenceRebuild;
+  if (options.beforeWrite && !options.referenceRebuild) fail("ProtectedText");
+  let rebuildReceipt: ReferenceRebuildReceipt | undefined;
+  let rebuildTargets: { target: string; required: boolean }[] = [];
+  if (rebuildMode) {
+    if (options.repairReferences || options.identifierRepair || options.restoreEmbedSourceNumbers || (options.referenceRebuild && options.undoId)) fail("ProtectedText");
+    if (options.referenceRebuild) {
+      const rebuilt = await validateReferenceRebuildChanges(fresh, options.referenceRebuild.fieldId, options.referenceRebuild.proofHash, changes, options.referenceRebuild.restoreSourceNumbers ?? false);
+      rebuildTargets = rebuilt.plan.targets;
+      rebuildReceipt = rebuilt.receipt; fieldValues.set(rebuilt.plan.fieldId, rebuilt.value);
+    } else {
+      if (!undo?.referenceRebuild || !exactUndo) fail("UndoConflict");
+      const restored = await undoReferenceRebuild(fresh, undo.referenceRebuild, undo.rows);
+      fieldValues.set(restored.fieldId, restored.value);
+    }
+  }
   if (options.identifierRepair && (options.repairReferences || options.undoId)) fail("ProtectedText");
   const identifierMode = options.identifierRepair || !!undo?.identifierRepair;
   if (identifierMode) {
@@ -398,17 +416,18 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   }
   if (options.repairReferences) history.referenceRepair = true;
   if (options.identifierRepair) history.identifierRepair = true;
+  if (rebuildReceipt) history.referenceRebuild = rebuildReceipt;
   if (!/^[a-zA-Z0-9-]{1,80}$/u.test(history.id) || (options.undoId && !/^[a-zA-Z0-9-]{1,80}$/u.test(options.undoId))) fail("MissingField");
   if (readReviewHistory(target.flags).some(item => item.id === history.id)) fail("Conflict");
   const patch: Record<string, unknown> = {};
   for (const change of changes) {
     const row = fresh.rows.find(row => row.id === change.rowId);
     if (!row) fail("MissingField");
-    if (row.blocked && !((options.repairReferences || options.identifierRepair) && row.blocked === "StructureChanged")) fail(row.blocked);
+    if (row.blocked && !((options.repairReferences || options.identifierRepair || options.referenceRebuild) && row.blocked === "StructureChanged")) fail(row.blocked);
     if (JSON.stringify(change.parts) === JSON.stringify(row.translation)) continue;
     const field = fresh.fields.find(field => field.id === row.fieldId)!;
     const previous = fieldValues.get(field.id) ?? field.translation;
-    const value = identifierMode ? fieldValues.get(field.id)! : validateReviewCorrection(fresh, row.id, change.parts, previous, !!options.repairReferences, undoReferences, !!options.restoreEmbedSourceNumbers, exactUndo);
+    const value = identifierMode || rebuildMode ? fieldValues.get(field.id)! : validateReviewCorrection(fresh, row.id, change.parts, previous, !!options.repairReferences, undoReferences, !!options.restoreEmbedSourceNumbers, exactUndo);
     fieldValues.set(field.id, value);
     history.rows.push({ rowId: row.id, before: row.translation, after: [...change.parts], label: row.label, group: row.group });
     patch[`flags.${MODULE_ID}.review.entries.${row.id}`] = null;
@@ -444,7 +463,22 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   }
   patch[`flags.${MODULE_ID}.reviewHistory.${history.id}`] = history;
   if (options.undoId) patch[`flags.${MODULE_ID}.reviewHistory.${options.undoId}.undoneAt`] = history.at;
-  if (identifierMode) {
+  const checkRebuildTargets = async () => {
+    for (const target of rebuildTargets) {
+      if (!target.required) continue; // Exact source-only, proven inactive Ember branch.
+      const uuid = target.target.split("#")[0]!;
+      const kind = /(?:^|\.)(Actor|Item|JournalEntry|JournalEntryPage)\.[^.]+$/u.exec(uuid)?.[1];
+      const document = await fromUuid(uuid);
+      if (!kind || document?.uuid !== uuid || document.documentName !== kind) fail("ReferenceTargetMissing");
+    }
+  };
+  // Check both sides of the integration callback: it may await glossary/scope
+  // reads while a required target changes. Its repeated read also rejects a
+  // glossary change during the final target reads. Foundry still has no CAS.
+  await checkRebuildTargets();
+  if (options.beforeWrite) await options.beforeWrite();
+  if (options.beforeWrite) { await checkRebuildTargets(); await options.beforeWrite(); }
+  if (identifierMode || rebuildMode) {
     const latestSource = await fromUuid(fresh.entry.sourceUuid) as PortableDocument | null;
     if (!latestSource?.toObject || latestSource.documentName !== fresh.entry.kind ||
       await hashSource(fresh.entry.kind, latestSource.toObject()) !== fresh.sourceHash) fail("Conflict");
@@ -453,6 +487,11 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   }
   // Recheck immediately before the single persistence operation. Never restamp outputHash.
   if ((await captureTranslationWriteGuard(target))?.fingerprint !== fresh.guard.fingerprint) fail("Conflict");
+  if (rebuildMode) assertReferenceRebuildEnvironment(rebuildReceipt ?? undo!.referenceRebuild!);
+  if (rebuildMode) {
+    if (pack.locked) fail("Locked");
+    if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
+  }
   if (options.canWrite && !options.canWrite()) throw new Error("Live.Disconnected");
   await target.update(patch);
   if (displayKind(fresh.entry.kind)) Hooks.callAll("foundryTranslateDisplayTextChanged");

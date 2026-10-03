@@ -10,6 +10,7 @@ import { referenceRepairDraft, type ReferenceRepairDraft } from "../review/refer
 import { correctionOptionChanges, correctionParts, correctionWarnings, sourceNumberRepair } from "./quality-guards";
 import { parseLiveRequest, type LiveResult } from "./live-protocol";
 import { readSourceReferenceContext, sourceReferences } from "./reference-context";
+import { prepareReferenceRebuild, materializeReferenceRebuild, type ReferenceRebuildPlan } from "../review/reference-rebuild";
 import { referenceIdentifierRepairDraft } from "../review/reference-identifier-repair";
 
 const page = <T>(items: T[], offset: number, limit: number) => ({ total: items.length, items: items.slice(offset, offset + limit), nextOffset: offset + limit < items.length ? offset + limit : null });
@@ -31,13 +32,29 @@ async function repairTargets(draft: ReferenceRepairDraft | null | undefined) {
   return targets;
 }
 
+/** Plan targets are produced exclusively by source/provenance proof, never by callers. */
+async function rebuildTargets(plan: ReferenceRebuildPlan) {
+  const targets = [];
+  for (const mapped of plan.targets) {
+    const target = mapped.target.split("#")[0]!;
+    const kind = /(?:^|\.)(Actor|Item|JournalEntry|JournalEntryPage)\.[^.]+$/u.exec(target)?.[1];
+    let exists = false;
+    try { const document = await fromUuid(target); exists = !!kind && document?.uuid === target && document.documentName === kind; }
+    catch { /* Missing/inaccessible targets are a hard barrier, including translated children. */ }
+    targets.push({ ...mapped, exists, availability: exists ? "available" : mapped.required === false ? "missing-preserved-from-source" : "missing-required" });
+  }
+  return targets;
+}
+
 /** One explicit browser pairing grants access only to this world's translated
  * text allowlist. No arbitrary UUID reads, original updates, macros or eval. */
 export function createLiveHandler(language: string, connected: () => boolean) {
-  const world = game.world?.id, user = game.user?.id;
+  const world = game.world?.id, user = game.user?.id, systemId = game.system?.id ?? null;
+  const ember = game.modules?.get("ember"), emberActive = ember?.active === true, emberVersion = String(ember?.version ?? "");
   const check = () => {
+    const currentEmber = game.modules?.get("ember");
     if (!connected()) throw new Error("Live.Disconnected");
-    if (!world || !user || game.world?.id !== world || game.user?.id !== user || !game.user?.isGM || String(game.settings.get(MODULE_ID, "targetLanguage") ?? "cs") !== language) throw new Error("Live.ScopeChanged");
+    if (!world || !user || game.world?.id !== world || game.user?.id !== user || (game.system?.id ?? null) !== systemId || (currentEmber?.active === true) !== emberActive || String(currentEmber?.version ?? "") !== emberVersion || !game.user?.isGM || String(game.settings.get(MODULE_ID, "targetLanguage") ?? "cs") !== language) throw new Error("Live.ScopeChanged");
   };
   const canWrite = () => { try { check(); return true; } catch { return false; } };
   return async (input: unknown): Promise<LiveResult> => {
@@ -49,7 +66,7 @@ export function createLiveHandler(language: string, connected: () => boolean) {
       const glossary = await new GlossaryCompendiumRepository().loadExisting();
       const glossaryHash = await sha256(JSON.stringify(glossary));
       check();
-      if (request.method === "status") return { ok: true, value: { worldId: world, language, documents: catalog.length, glossary: glossary.length,
+      if (request.method === "status") return { ok: true, value: { worldId: world, systemId, language, documents: catalog.length, glossary: glossary.length,
         activeTranslations: activeTranslations.list().filter(run => run.finishedAt === undefined).map(run => ({ id: run.id, paused: run.pausedAt !== undefined })) } };
       if (request.method === "list_documents") return { ok: true, value: page(catalog.map(entry => ({ documentId: entry.uuid, name: entry.name, sourceUuid: entry.sourceUuid, kind: entry.kind })), args.offset, args.limit) };
       if (request.method === "list_glossary") {
@@ -80,7 +97,7 @@ export function createLiveHandler(language: string, connected: () => boolean) {
       const entry = catalog.find(entry => entry.uuid === documentId);
       if (!entry) throw new Error("Review.TranslationMissing");
       const snapshot = await loadReview(entry, catalog), row = snapshot.rows.find(row => row.id === rowId);
-      const revision = await sha256(JSON.stringify([snapshot.guard.fingerprint, snapshot.sourceHash, glossaryHash]));
+      const revision = await sha256(JSON.stringify([snapshot.guard.fingerprint, snapshot.sourceHash, glossaryHash, systemId, emberActive, emberVersion]));
       check();
       const contextFor = async (row: ReviewSnapshot["rows"][number], radius: number) => {
         const field = snapshot.fields.find(field => field.id === row.fieldId)!;
@@ -149,6 +166,60 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
         return { ok: true, value: { undone: true, operationId: operation.id, verified: false } };
       }
+      if (["prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild"].includes(request.method)) {
+        fieldId = args.fieldId;
+        const field = snapshot.fields.find(item => item.id === fieldId);
+        if (!field) throw new Error("Review.MissingField");
+        const requestHash = await sha256(JSON.stringify(["reference-rebuild", documentId, fieldId, args.revision, args.planHash,
+          args.edits, args.reason, !!args.restoreSourceNumbers]));
+        if (request.method === "apply_reference_rebuild") {
+          // Reconcile a committed receipt before preparing again: the repaired
+          // field may no longer need a plan, and its revision necessarily changed.
+          const previous = history.find(item => item.id === args.operationId);
+          if (previous) {
+            if (!previous.referenceRebuild || previous.referenceRebuild.fieldId !== fieldId || previous.agentRequestHash !== requestHash ||
+              previous.undoneAt || previous.sourceHash !== snapshot.sourceHash || previous.rows.some(change =>
+                JSON.stringify(snapshot.rows.find(item => item.id === change.rowId)?.translation) !== JSON.stringify(change.after))) throw new Error("Live.OperationConflict");
+            return { ok: true, value: { alreadyApplied: true, operationId: previous.id, documentId, fieldId, revision, verified: false } };
+          }
+        }
+        if (args.revision !== undefined && revision !== args.revision) throw new Error("Review.Conflict");
+        if (snapshot.warning) throw new Error(`Review.${snapshot.warning}`);
+        const plan = await prepareReferenceRebuild(snapshot, field.id);
+        if (!plan) throw new Error("Live.InvalidReferenceRebuild");
+        const planHash = await sha256(JSON.stringify(["reference-rebuild-v1", documentId, field.id, revision, snapshot.sourceHash, glossaryHash, systemId, emberActive, emberVersion, plan.proofHash]));
+        const targets = await rebuildTargets(plan);
+        check();
+        const bounded = (value: unknown) => { if (JSON.stringify(value).length > 200000) throw new Error("Live.ContextTooLarge"); return value; };
+        if (request.method === "prepare_reference_rebuild") return { ok: true, value: bounded({ documentId, fieldId, revision, planHash, systemId,
+          plan, targets, canApply: targets.every(target => target.required === false || target.exists), willVerify: false,
+          instruction: "Read every full source and current translated part. Explicitly reconstruct only listed partIndices using the source-owned edit markers, including every plan row once. Preserve all unaffected edit.text parts byte-identically. Never supply commands or UUIDs, infer identity from target labels, or guess missing context. Preview before applying. Saving never human-verifies." }) };
+        if (planHash !== args.planHash) throw new Error("Review.Conflict");
+        if (targets.some(target => target.required !== false && !target.exists)) throw new Error("Live.ReferenceTargetMissing");
+        const rebuilt = await materializeReferenceRebuild(snapshot, plan, args.edits!, !!args.restoreSourceNumbers);
+        const changes = rebuilt.changes.map(change => {
+          const row = snapshot.rows.find(item => item.id === change.rowId)!;
+          const planned = plan.rows.find(item => item.rowId === row.id)!;
+          const warnings = correctionWarnings(planned.partIndices.map(index => row.translation[index]!),
+            planned.partIndices.map(index => change.parts[index]!), glossary);
+          return { rowId: row.id, partIndices: planned.partIndices, source: row.source, before: row.translation, after: change.parts, warnings };
+        });
+        const preview = { documentId, fieldId, revision, planHash, systemId, changes, targets, numberRepair: {
+          requested: !!args.restoreSourceNumbers, allowed: !!args.restoreSourceNumbers, parts: rebuilt.numbers, proof: "Each affected prose part independently checked against its current/source part; commands excluded." }, willVerify: false };
+        check();
+        bounded(preview);
+        if (request.method === "validate_reference_rebuild") return { ok: true, value: preview };
+        if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict");
+        const saved = await saveReviewRows(snapshot, rebuilt.changes, { id: args.operationId!, label: `MCP: ${args.reason!}`,
+          agentRequestHash: requestHash, referenceRebuild: { fieldId: field.id, proofHash: plan.proofHash, restoreSourceNumbers: !!args.restoreSourceNumbers },
+          beforeWrite: async () => {
+            if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict");
+            check();
+          }, canWrite });
+        Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
+        return { ok: true, value: { saved: true, operationId: args.operationId, documentId, fieldId, rowIds: rebuilt.changes.map(change => change.rowId),
+          revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])), warnings: changes.flatMap(change => change.warnings), verified: false } };
+      }
       if (!row) throw new Error("Review.MissingField");
       fieldId = row.fieldId;
       const field = snapshot.fields.find(field => field.id === row.fieldId)!;
@@ -186,7 +257,7 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
         return { ok: true, value: { saved: true, operationId: args.operationId, documentId, fieldId: field.id,
           rowIds: repair.changes.map(change => change.rowId), identifiers: repair.identifiers,
-          revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash])), verified: false } };
+          revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])), verified: false } };
       }
       const requestHash = await sha256(JSON.stringify([documentId, rowId, args.revision, args.text, args.labels ?? [], args.reason,
         ...(args.restoreSourceNumbers ? [{ restoreSourceNumbers: true }] : []), ...(args.restoreSourceReferences ? [{ restoreSourceReferences: true }] : []),
@@ -221,7 +292,7 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         repairReferences: !!args.restoreSourceReferences, restoreEmbedSourceNumbers: !!args.restoreSourceNumbers, canWrite });
       Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
       return { ok: true, value: { saved: true, operationId: args.operationId, documentId, rowId,
-        revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash])), warnings, verified: false } };
+        revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])), warnings, verified: false } };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Live.Failed";
       return { ok: false, error: { code: message.startsWith("Review.") || message.startsWith("Live.") ? message : "Live.InvalidCorrection",

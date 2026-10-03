@@ -2016,3 +2016,55 @@ rejected numeric edits and draft recovery against a standalone synthetic journal
 Private linguistic examples, credentials and screenshots remain outside Git.
 Production module installation remains user-managed. Whole-corpus proofreading
 is still ongoing and is not implied by these software checks.
+
+### 2026-10-03 — 0.33.9 source-owned damaged-reference reconstruction
+
+When several embedded ability links have collapsed to their parent, neither
+translated labels nor occurrence order can establish their identities. Live MCP
+0.3.8 now prepares a complete field plan from the original text and uniquely
+bound translation provenance. The agent explicitly rewrites only the damaged
+text parts using server-owned markers. Every planned row is mandatory; untouched
+parts remain byte-identical. Target UUIDs, command configuration and HTML are
+never supplied by the caller. A fresh complete-field validation precedes one
+document update, with revision/plan hashes, history receipts and unverified saves.
+
+Quantities are checked per affected text part, including editable Reference
+fallback labels. Explicit source-number restoration must match that same source
+part; moving quantities between parts or requesting a no-op restoration fails.
+Existing translated Embed options are not silently rebuilt from English. Changed
+markup, ambiguous provenance and unsupported attribute repairs remain blocked.
+Undo proves the recorded source/target bindings and exact current affected rows,
+preserving later edits to unrelated rows; it may intentionally restore the prior
+damaged state, which ordinary correction writes still cannot accept.
+
+The verified Ember 0.6.2 renderer removes other-system branches inside its exact
+system-swap-block/inline wrappers. Only proven source-only inactive branches may
+retain an unavailable exact original UUID. Active, ungated, nested, unknown or
+attribute occurrences of the same source target require availability. This
+exception is bound to the current supported system and active Ember version;
+other renderers retain strict availability requirements. Preview reports the
+exception explicitly. No guessed ability substitution is permitted.
+
+Independent adversarial tests reproduced and fixed four changes during awaited
+pre-write work: altered original, locked pack, newly active translation and
+disappearing required child. Source, glossary, environment, scope, targets and
+write guards are reread, with final synchronous environment/lock/run checks.
+These are bounded optimistic checks: Foundry has no cross-document server CAS,
+so concurrent GM work is not an absolute transaction across all dependencies.
+
+Validation: 833 module tests passed / four optional LM integrations skipped;
+33 MCP tests, typechecks, builds and release metadata passed. The standard runner
+includes 69 independent adversarial tests. Native local Foundry 14.368 / Ember
+0.6.2 / Crucible 0.11.0 exercised prepare, no-write preview, numeric rejection,
+three-row save, idempotent retry, history diff, UI undo and navigation back to
+Documents. Actual stored source data was unchanged; the prior damaged field was
+restored exactly on undo. Generic local QA journals remain separate from the
+licensed corpus; temporary harness code and private evidence are not published.
+Production requires the user-installed update before these new tools are used.
+
+The first CI run hit the pre-existing pagination test's combined five-second
+budget. Its paging/draft, whole-section search and bookmark coverage now use
+three separately bounded scenarios. Fake timers exercise the actual search
+debounce, including superseded-query cancellation, without wall-clock polling.
+The focused 12-test editor suite and typecheck pass; no global timeout or
+production behavior changed. Final CI runs the resulting 835 module tests.
