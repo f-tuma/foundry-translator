@@ -14,6 +14,7 @@ import { registerCrucibleEmbedLabels } from "./translation/crucible-embed-labels
 import { registerEmberRuntimeBridge } from "./translation/ember-runtime-bridge";
 import { registerDisplayTextView } from "./translation/display-text-view";
 import { registerTranslatedJournalEmbeds } from "./translation/translated-journal-embeds";
+import { registerTranslatedActorEmbeds } from "./translation/translated-actor-embeds";
 import { applyCzechFonts } from "./ui/czech-fonts";
 
 import { registerReviewHeaderControl } from "./review/header-control";
@@ -48,6 +49,7 @@ Hooks.once("ready", () => {
   ready = true;
   registerCrucibleEmbedLabels();
   registerTranslatedJournalEmbeds();
+  registerTranslatedActorEmbeds();
   applyCzechFonts();
   startRememberedMcp();
   registerEmberRuntimeBridge();

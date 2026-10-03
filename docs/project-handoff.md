@@ -1923,3 +1923,38 @@ expression changes are still rejected by the existing structural guards.
 Regression tests cover sentence reordering, expression preservation, nested command
 rejection, empty labels and no-label expressions. Live correction evidence remains
 private under the ignored polish workspace; licensed story content is not committed.
+
+
+### 2026-10-03 — 0.33.6 complete batch context reads
+
+Live MCP 0.3.6 exposes a read-only batch of up to ten explicit stable row IDs
+from one translated document. Each selected paragraph includes complete source
+and target parts, markers, glossary and the same integrity guards as a single
+context read. Nearby excerpts are omitted; heading metadata remains explicitly
+identified as excerpted. Unknown rows fail the complete request before returning
+prose. Permission is checked throughout the read.
+
+The response is bounded to 100,000 JSON characters. Whole omitted contexts and
+reasons are reported explicitly; prose is never truncated to fit. The existing
+60,000-character per-paragraph guard is unchanged. Batch reads do not write or
+verify translations. Regression coverage includes scope revocation, wrong rows,
+complete long text, exact equivalence with single reads and response limits.
+
+
+The same release fixes Crucible adversary appearance embeds inside translated
+journals. The native card still renders from the original Actor; only validated
+appearance prose, the name caption and exact unambiguous approved glossary
+categories are replaced. Original UUIDs, threat/rank, image selection, discovery
+controls and native listeners remain intact. Source and target visibility,
+language and ownership are checked again after enrichment. Explicit readaloud
+overrides, missing/ambiguous translations and changed command/secret structure
+retain the native card. Public/private biography fields are not read.
+
+Validation: 669 module tests passed; 4 optional LM tests skipped. 32 MCP tests
+and both typechecks passed, along with module/MCP builds. A local Foundry14.368,
+Crucible0.11.0 and Ember0.6.2 reproduced the original English appearance cards
+then displayed the three stored Czech copies on an Ember journal sheet. Native
+Actor UUID/discovery IDs were unchanged, and the read-aloud button posted Czech
+text to local chat. English taxonomy/archetype captions with no approved glossary
+entry deliberately retain their native text. Private samples and screenshots
+are excluded from Git.
