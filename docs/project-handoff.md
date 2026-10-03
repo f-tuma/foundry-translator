@@ -1958,3 +1958,27 @@ Actor UUID/discovery IDs were unchanged, and the read-aloud button posted Czech
 text to local chat. English taxonomy/archetype captions with no approved glossary
 entry deliberately retain their native text. Private samples and screenshots
 are excluded from Git.
+
+
+### 2026-10-03 — 0.33.7 journal readaloud overrides and anchored references
+
+A translated Ember guide can supply its own Czech `readaloud` text in an Actor
+embed. Crucible's native card ignored that parameter and showed the original
+Actor appearance. The presentation adapter now honors a nonempty plain-text
+override in a visible, marked translated journal. Text nodes escape the value;
+command, link, roll, embed and custom enrichment are disabled, as are secrets.
+Unsupported HTML, Foundry commands and invalid values retain native rendering.
+The same original Actor, actions, UUIDs and discovery listeners remain in use.
+The override also works without an Actor copy; translated captions and metadata
+still require an exact valid copy. Journal identity and visibility are rechecked
+after enrichment. The native read-aloud button reads the resulting Czech DOM.
+
+Reference notation repair now compares full targets including heading anchors.
+A field containing relative and absolute links to different headings on one
+page is normalized per occurrence, without collapsing embedded item/page IDs,
+changing options, losing duplicates or choosing ambiguous same-anchor aliases.
+
+Validation: 693 module tests passed; 4 optional integration tests skipped. Both
+typechecks, module/MCP builds, 32 MCP tests and release metadata checks passed.
+Private proofreading prose, runtime diagnostics and local screenshots stay
+outside Git.

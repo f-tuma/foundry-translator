@@ -25,17 +25,48 @@ type EmbedMethod = (this: EmbedActor, config: Record<string, unknown>, options?:
 const PATCHED = Symbol("foundry-translate-actor-embeds");
 interface EmbedPrototype { toEmbed?: EmbedMethod; [PATCHED]?: boolean }
 
-function journalLanguage(document?: FoundryUuidDocument): string | null {
+function journalContext(document?: FoundryUuidDocument) {
   const seen = new Set<FoundryUuidDocument>();
   while (document && !seen.has(document)) {
     seen.add(document);
     if (document.documentName === "JournalEntry" || document.documentName === "JournalEntryPage") {
       const identity = translationIdentity(document, document.documentName);
-      if (identity) return identity.targetLanguage;
+      if (identity) return { document, language: identity.targetLanguage, identity: JSON.stringify(identity) };
     }
     document = document.parent ?? undefined;
   }
   return null;
+}
+
+function journalVisible(document?: FoundryUuidDocument): boolean {
+  const seen = new Set<FoundryUuidDocument>();
+  let found = false;
+  while (document && !seen.has(document)) {
+    seen.add(document);
+    if (document.documentName === "JournalEntry" || document.documentName === "JournalEntryPage") {
+      found = true;
+      if ((document as FoundryUuidDocument & { visible?: boolean }).visible !== true) return false;
+    }
+    document = document.parent ?? undefined;
+  }
+  return found;
+}
+
+/** Ember's readaloud config is plain text, not another HTML/command entry point.
+ * Reject unsupported payloads and create the same paragraph shape through text
+ * nodes so no caller markup, secrets or executable enrichment can be inserted.
+ */
+function plainReadaloud(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim() || value.length > 60000
+    || /[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)
+    || /(?:@\w+\s*\[|&(?:amp;)?reference\s*\[|\[\[)/iu.test(value)) return null;
+  const holder = document.createElement("div");
+  for (const text of value.split(/\\n|\r?\n/u)) {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = text;
+    holder.appendChild(paragraph);
+  }
+  return holder.innerHTML;
 }
 
 function appearance(actor: EmbedActor): string | undefined { return actor.system?.details?.biography?.appearance; }
@@ -86,45 +117,62 @@ export function registerTranslatedActorEmbeds(): void {
   prototype.toEmbed = async function(config = {}, options = {}) {
     // Rendering a translated Actor would change gameplay IDs and visibility.
     const root = await original.call(this, config, options);
-    const language = journalLanguage(options.relativeTo);
+    const context = journalContext(options.relativeTo), language = context?.language;
     if (!root || !language || this.type !== "adversary" || this.visible !== true
-      || readActorTranslationFlag(this.flags) || config.readaloud !== undefined) return root;
+      || readActorTranslationFlag(this.flags)) return root;
     const slot = root.querySelector<HTMLElement>(":scope > section.readaloud");
     const heading = root.querySelector<HTMLElement>(":scope > header > h4");
     if (!root.matches("document-embed.block.actor") || !slot || !heading
       || ![...heading.querySelectorAll<HTMLElement>("a[data-uuid]")].some(link => link.dataset.uuid === this.uuid)) return root;
+    const explicit = config.readaloud !== undefined, override = config.readaloud;
+    const explicitHtml = explicit ? plainReadaloud(override) : null;
+    if (explicit && (!explicitHtml || !journalVisible(options.relativeTo))) return root;
     try {
-      const pair = await resolveTranslationReference(this.uuid, language);
-      if (pair.status !== "mapped" || pair.sourceUuid !== this.uuid || !pair.translatedUuid) return root;
-      const target = await fromUuid(pair.translatedUuid) as EmbedActor | null;
-      if (!target || target.uuid !== pair.translatedUuid || !permitted(this, target, language)) return root;
-      const sourceText = appearance(this), targetText = appearance(target);
-      if (typeof sourceText !== "string" || typeof targetText !== "string" || !targetText.trim()) return root;
-      const normalized = await originalAppearance(this, target, targetText);
+      let target: EmbedActor | null = null;
+      try {
+        const pair = await resolveTranslationReference(this.uuid, language);
+        if (pair.status === "mapped") {
+          if (pair.sourceUuid !== this.uuid || !pair.translatedUuid) return root;
+          target = await fromUuid(pair.translatedUuid) as EmbedActor | null;
+          if (!target || target.uuid !== pair.translatedUuid || !permitted(this, target, language)) return root;
+        }
+      } catch (error) {
+        if (!explicit) throw error;
+        // A valid journal override has its own authority; no Actor copy is
+        // necessary and no translated caption/metadata is used without one.
+      }
+      if (!explicit && !target) return root;
+      const sourceText = appearance(this), targetText = target && appearance(target);
+      if (!explicit && (typeof sourceText !== "string" || typeof targetText !== "string" || !targetText.trim())) return root;
+      const normalized = explicitHtml ?? await originalAppearance(this, target!, targetText!);
       const editor = (CONFIG as unknown as { ux?: { TextEditor?: {
         enrichHTML(html: string, options: Record<string, unknown>): Promise<string>;
       } } }).ux?.TextEditor;
       if (!editor) return root;
-      const secrets = options.secrets !== false && this.isOwner === true && target.isOwner === true;
-      const enriched = await editor.enrichHTML(normalized, { ...options, relativeTo: this, secrets });
+      const secrets = !explicit && options.secrets !== false && this.isOwner === true && target?.isOwner === true;
+      const enriched = await editor.enrichHTML(normalized, { ...options, relativeTo: this, secrets,
+        ...(explicit ? { documents: false, links: false, embeds: false, rolls: false, custom: false } : {}) });
       // Do not widen a native visibility decision or replace the prose of a
       // concurrently edited actor. Stage everything before touching the DOM.
       const category = root.querySelector<HTMLElement>(":scope > header > .meta > .category");
       const names = [this.system?.details?.taxonomy?.name || "Unknown", this.system?.details?.archetype?.name || "Unknown"];
       let subtitle: string | undefined;
-      if (category?.textContent === names.join(" ")) {
+      if (target && category?.textContent === names.join(" ")) {
         try {
           const entries = await new GlossaryCompendiumRepository().loadExisting();
           subtitle = names.map(name => glossaryName(name, entries)).join(" ");
         } catch { /* An unavailable glossary must not block valid appearance prose. */ }
       }
-      if (!permitted(this, target, language) || appearance(this) !== sourceText || appearance(target) !== targetText
-        || journalLanguage(options.relativeTo) !== language
-        || secrets !== (options.secrets !== false && this.isOwner === true && target.isOwner === true)) return root;
+      const currentContext = journalContext(options.relativeTo);
+      if (this.visible !== true || readActorTranslationFlag(this.flags)
+        || (target && (!permitted(this, target, language) || appearance(target) !== targetText)) || appearance(this) !== sourceText
+        || currentContext?.document !== context!.document || currentContext?.identity !== context!.identity
+        || (explicit && (config.readaloud !== override || !journalVisible(options.relativeTo)))
+        || secrets !== (!explicit && options.secrets !== false && this.isOwner === true && target?.isOwner === true)) return root;
       slot.innerHTML = enriched;
       if (category && subtitle !== undefined) category.textContent = subtitle;
       // An explicit caller caption has precedence over the stored translation.
-      if (typeof config.label !== "string" || !config.label.trim()) applyEmbedLabel(root, this.uuid, this.name, target.name);
+      if (target && (typeof config.label !== "string" || !config.label.trim())) applyEmbedLabel(root, this.uuid, this.name, target.name);
     } catch (error) {
       logger.warn("Could not display a translated Actor appearance; keeping the native embed.", error);
     }
