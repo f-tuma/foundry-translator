@@ -334,6 +334,25 @@ async function liveFixture() {
     text: ['Tříprsté nohy.'], labels: [], reason: 'Přesnější anatomický význam původní věty.', operationId: crypto.randomUUID() };
   return { s, row, call, args, disconnect: () => { connected = false; } };
 }
+it('MCP corrects resolver fallback prose with guarded history and undo while preserving the expression', async () => {
+  source.pages[0]!.text!.content = '<p>@ref[actor.name]{Watcher} waits near the gate.</p>';
+  copy.pages[0]!.text!.content = '<p>@ref[actor.name]{Strážce čeká u brány.}</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const original = JSON.stringify(source), before = copy.pages[0]!.text!.content;
+  const f = await liveFixture();
+  expect(await f.call('get_context', { documentId: f.s.entry.uuid, rowId: f.row.id })).toMatchObject({
+    ok: true, value: { edit: { references: [[{ editable: true, label: 'Strážce čeká u brány.' }]] } },
+  });
+  const args = { ...f.args, text: ['U brány čeká ⟦1⟧.'], labels: [{ marker: '⟦1⟧', label: 'Strážce' }] };
+  expect((await f.call('validate_correction', args)).ok).toBe(true);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toBe('<p>U brány čeká @ref[actor.name]{Strážce}.</p>');
+  expect(textRow(await snapshot()).blocked).toBeNull();
+  expect(textRow(await snapshot()).verified).toBeNull();
+  await undoReview(f.s.entry, args.operationId);
+  expect(copy.pages[0]!.text!.content).toBe(before);
+  expect(JSON.stringify(source)).toBe(original);
+});
 it('MCP previews and directly saves with history, resolves lost-response retries, and safely undoes', async () => {
   const original = JSON.stringify(source), f = await liveFixture();
   const preview = await f.call('validate_correction', f.args); expect(preview.ok).toBe(true); expect(writes).toHaveLength(0);

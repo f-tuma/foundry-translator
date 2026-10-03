@@ -73,8 +73,11 @@ export function maskReviewParts(values: readonly string[]): ReviewTextDraft {
     const text = value.replace(FOUNDRY_EXPRESSION, command => {
       let marker = `⟦${++number}⟧`;
       while (literal.includes(marker)) marker = `⟦${marker}⟧`;
-      const match = /^(@(?:UUID|Embed)\[[^\]\r\n]*\])(?:\{([^}\r\n]*)\})?$/iu.exec(command);
-      references.push({ marker, command, label: match?.[2] ?? "", editable: !!match });
+      const match = /^(@(?:UUID|Embed|ref)\[[^\]\r\n]*\])(?:\{([^}\r\n]*)\})?$/iu.exec(command);
+      // Resolver expressions stay immutable. Only an existing fallback label is
+      // prose; creating/removing its braces would change the protected syntax.
+      const resolver = /^@ref\[/iu.test(command);
+      references.push({ marker, command, label: match?.[2] ?? "", editable: !!match && (!resolver || match[2] !== undefined) });
       return marker;
     });
     return { text, references };
@@ -95,7 +98,8 @@ export function restoreReviewParts(draft: ReviewTextDraft): string[] {
   for (const text of draft.text) for (const [marker] of text.matchAll(MARKER)) counts.set(marker, (counts.get(marker) ?? 0) + 1);
   const replacements = new Map(references.map(reference => {
     if (counts.get(reference.marker) !== 1 || /[{}\r\n]|@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(reference.label)) throw new Error("Review.ReferenceChanged");
-    const command = reference.editable ? reference.command.replace(/\{[^}\r\n]*\}$/u, "") + (reference.label ? `{${reference.label}}` : "") : reference.command;
+    const keepEmptyFallback = /^@ref\[/iu.test(reference.command) && /\{[^}\r\n]*\}$/u.test(reference.command);
+    const command = reference.editable ? reference.command.replace(/\{[^}\r\n]*\}$/u, "") + (reference.label || keepEmptyFallback ? `{${reference.label}}` : "") : reference.command;
     return [reference.marker, command];
   }));
   if (replacements.size !== references.length) throw new Error("Review.ReferenceChanged");

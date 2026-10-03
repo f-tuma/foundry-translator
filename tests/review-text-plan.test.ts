@@ -82,3 +82,35 @@ it("counts complete markers, rejects nested commands in labels and keeps duplica
   draft.references[0]![0]!.label = '@Macro[evil]';
   expect(() => restoreReviewParts(draft)).toThrow();
 });
+
+it("edits resolver fallback names and moves sentence prose outside the label without changing its expression", () => {
+  const source = '<p>@ref[actor.name]{The Watcher} waits beside the gate.</p>';
+  const target = '<p>@ref[actor.name]{Strážce čeká u brány.}</p>';
+  const plan = planReviewText(target, "html");
+  const draft = maskReviewParts(plan.units[0]!.parts);
+  expect(draft.references[0]![0]!.editable).toBe(true);
+  draft.references[0]![0]!.label = "Strážce";
+  draft.text = ["U brány čeká ⟦1⟧."];
+  const result = plan.replace(plan.units[0]!.id, restoreReviewParts(draft));
+  expect(result).toBe('<p>U brány čeká @ref[actor.name]{Strážce}.</p>');
+  expect(() => assertPortableText(source, result, "html")).not.toThrow();
+  expect(() => assertPortableText(source, result.replace('actor.name', 'actor.secret'), "html")).toThrow();
+  for (const label of ['@Macro[execute]', '[[/r 1d20]]', 'Name}\n{other']) {
+    draft.references[0]![0]!.label = label;
+    expect(() => restoreReviewParts(draft)).toThrow("Review.ReferenceChanged");
+  }
+});
+
+it("preserves empty resolver fallback braces and leaves unlabeled expressions protected", () => {
+  for (const command of ['@ref[actor.name]{}', '@ref[actor.name]{ }', '@ref[actor.name]']) {
+    const draft = maskReviewParts([command]);
+    expect(restoreReviewParts(draft)).toEqual([command]);
+  }
+  const empty = maskReviewParts(['@ref[actor.name]{}']);
+  empty.references[0]![0]!.label = 'Tvor';
+  expect(restoreReviewParts(empty)).toEqual(['@ref[actor.name]{Tvor}']);
+  empty.references[0]![0]!.label = '';
+  expect(restoreReviewParts(empty)).toEqual(['@ref[actor.name]{}']);
+  expect(() => assertPortableText('@ref[actor.name]{Creature}', '@ref[actor.name]{}', 'text')).not.toThrow();
+  expect(maskReviewParts(['@ref[actor.name]']).references[0]![0]!.editable).toBe(false);
+});
