@@ -1909,3 +1909,17 @@ revision changes and guarded undo. An independent code review found no concrete
 regression. Production still needs the user-installed module update and updated
 MCP binary before these tools can be exercised against a live damaged field.
 Private proofreading content and evidence remain in ignored `.polish-workspace`.
+
+
+### 2026-10-03 — 0.33.5 editable resolver fallback prose
+
+The review editor and live MCP correction payload now expose existing `@ref[...]`
+fallback labels as editable prose. A translator can move a predicate out of a
+fallback label and into the surrounding sentence while keeping the resolver
+expression unchanged. Empty fallback braces remain intact and expressions without
+a fallback stay protected. Nested commands, missing/duplicated markers and resolver
+expression changes are still rejected by the existing structural guards.
+
+Regression tests cover sentence reordering, expression preservation, nested command
+rejection, empty labels and no-label expressions. Live correction evidence remains
+private under the ignored polish workspace; licensed story content is not committed.
