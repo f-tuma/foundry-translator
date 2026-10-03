@@ -29,6 +29,18 @@ Po výpadku zkontroluj historii: oprava mohla být uložená bez doručené odpo
 Zápisy se automaticky neopakují; opakování vyžaduje stejné `operationId` a
 argumenty. Nad jedním dokumentem používej jednoho zapisujícího GM.
 
+Od verze **0.33.11** umí obnova odkazů zachovat relativní UUID, pokud v kopii
+vede na přesně určený přeložený dokument. V jednom úzce vymezeném případě
+obnoví také jediný chybějící textový uzel obsahující pouze interpunkci uvnitř
+existujícího formátování. Celé pole znovu projde kontrolou; změna má náhled,
+historii a bezpečné vrácení. Chybějící původní dokumenty ani jiné změny HTML
+tím nelze obejít.
+
+U výsledků událostí Emberu se uložené české shrnutí od verze **0.33.11**
+zobrazuje v běžném deníku i ve čtečce. Stav události a zaškrtávací ovládání
+zůstávají napojené na původní událost. Pokud překlad neprojde kontrolou nebo
+není jednoznačně spárovaný, zobrazí se původní text.
+
 ## České rozhraní
 
 V **Nastavení hry → Preferovaný jazyk** vyber **Čeština**, ulož nastavení a

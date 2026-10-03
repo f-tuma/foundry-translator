@@ -1,6 +1,7 @@
 import { MODULE_ID } from "../constants";
 import { logger } from "../logger";
 import { sourceReferenceUuid } from "./document-identity";
+import { translatedOutcomeSections } from "./translated-event-outcomes";
 
 type Method = (this: any, ...args: any[]) => any;
 interface RuntimeEvent { id: string; page?: string; [key: string]: unknown }
@@ -205,6 +206,12 @@ export function registerEmberRuntimeBridge(): void {
   sheetPrototype._prepareContext = function(...args: unknown[]) {
     bindTranslatedEmberModel(this.document.system);
     return prepare.apply(this, args);
+  };
+  const sections = sheetPrototype._getSections;
+  if (typeof sections === "function") sheetPrototype._getSections = async function(...args: unknown[]) {
+    const result = await sections.apply(this, args);
+    if (!Array.isArray(result)) return result;
+    try { return await translatedOutcomeSections(this, result); } catch { return result; }
   };
   const render = sheetPrototype._onRender!;
   sheetPrototype._onRender = async function(...args: unknown[]) {

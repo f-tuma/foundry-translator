@@ -58,6 +58,127 @@ async function prepared(view = broken()) {
 }
 const editsFor = (plan: NonNullable<Awaited<ReturnType<typeof prepareReferenceRebuild>>>): ReferenceRebuildEdit[] => plan.rows.map(row => ({ rowId: row.rowId, text: [...row.edit.text], labels: [] }));
 
+const SOURCE_GUIDE = "JournalEntry.original", COPY_GUIDE = "Compendium.world.translations.JournalEntry.copy";
+function relativeSnapshot(source: string, translation: string, reverse = new Map([[COPY_GUIDE, SOURCE_GUIDE]])) {
+  const view = snapshot(source, translation, reverse);
+  view.fields[0]!.referenceContext = `${SOURCE_GUIDE}.JournalEntryPage.chapter`;
+  return view;
+}
+
+it("preserves source-owned mixed relative and absolute UUID spellings while independently binding their absolute target", async () => {
+  const command = "@UUID";
+  const sourceTarget = `${SOURCE_GUIDE}.JournalEntryPage.next#section`, target = `${COPY_GUIDE}.JournalEntryPage.next#section`;
+  const source = `<p>First ${command}[.next#section]{First}, then ${command}[${sourceTarget}]{Second}.</p>`;
+  const translation = `<p>První ${command}[${target}]{První}, potom ${command}[${target}]{Druhá}.</p>`;
+  const view = relativeSnapshot(source, translation), { plan } = await prepared(view);
+  expect(plan.rows[0]!.referenceMap.map(ref => ref.command)).toEqual([
+    `${command}[.next#section]{First}`, `${command}[${target}]{Second}`,
+  ]);
+  expect(plan.rows[0]!.referenceMap.every(ref => ref.sourceTarget === sourceTarget && ref.target === target && ref.required)).toBe(true);
+  expect(plan.targets).toEqual([{ sourceTarget, target, required: true }]);
+  const references = plan.rows[0]!.edit.references[0]!, edits = editsFor(plan);
+  // The agent still controls Czech order and labels, not the binding.
+  edits[0]!.text[0] = `Nejprve ${references[1]!.marker}, potom ${references[0]!.marker}.`;
+  edits[0]!.labels = references.map((ref, index) => ({ marker: ref.marker, label: index ? "Druhá" : "První" }));
+  const compiled = await materializeReferenceRebuild(view, plan, edits);
+  expect(compiled.value).toBe(`<p>Nejprve ${command}[${target}]{Druhá}, potom ${command}[.next#section]{První}.</p>`);
+  assertPortableText(source, portableReviewText(view, view.fields[0]!, compiled.value), "html");
+  const proved = await validateReferenceRebuildChanges(view, "field", plan.proofHash, compiled.changes);
+  expect(proved.value).toBe(compiled.value);
+  const current = relativeSnapshot(source, compiled.value);
+  const recorded = compiled.changes.map(change => ({ rowId: change.rowId, before: [...view.rows.find(row => row.id === change.rowId)!.translation], after: change.parts }));
+  expect((await undoReferenceRebuild(current, compiled.receipt, recorded)).value).toBe(translation);
+});
+
+it.each([
+  [".", "JournalEntryPage.chapter"], [".next", "JournalEntryPage.next"], ["..JournalEntryPage.next", "JournalEntryPage.next"],
+])("retains exact source spelling %s only after copied-context resolution, preserving whitespace, case and anchors", async (relative, suffix) => {
+  const sourceTarget = `${SOURCE_GUIDE}.${suffix}#detail`, target = `${COPY_GUIDE}.${suffix}#detail`;
+  const view = relativeSnapshot(`<p>@uUiD[  ${relative}#detail\t]{First} @UUID[${sourceTarget}]{Second}</p>`,
+    `<p>@uUiD[  ${target}\t]{První} @UUID[${target}]{Druhá}</p>`);
+  const { plan } = await prepared(view);
+  expect(plan.rows[0]!.referenceMap[0]!.command).toBe(`@uUiD[  ${relative}#detail\t]{First}`);
+  expect(plan.rows[0]!.referenceMap[0]!.target).toBe(target);
+  const result = await materializeReferenceRebuild(view, plan, editsFor(plan));
+  assertPortableText(view.fields[0]!.source, portableReviewText(view, view.fields[0]!, result.value), "html");
+});
+
+it.each(["different-copy", "multiple-copies", "missing-provenance", "foreign-context"])("refuses ambiguous mixed notation without exact copied-context mapping: %s", async kind => {
+  const target = `${COPY_GUIDE}.JournalEntryPage.next`, sourceTarget = `${SOURCE_GUIDE}.JournalEntryPage.next`;
+  const view = relativeSnapshot(`<p>@UUID[.next] @UUID[${sourceTarget}]</p>`, `<p>@UUID[${target}] @UUID[${target}]</p>`);
+  if (kind === "different-copy") { view.reverse.clear(); view.reverse.set("Compendium.world.translations.JournalEntry.other", SOURCE_GUIDE); }
+  if (kind === "multiple-copies") view.reverse.set("Compendium.world.translations.JournalEntry.other", SOURCE_GUIDE);
+  if (kind === "missing-provenance") view.reverse.clear();
+  if (kind === "foreign-context") view.fields[0]!.referenceContext = "JournalEntry.foreign.JournalEntryPage.chapter";
+  expect(await prepareReferenceRebuild(view, "field")).toBeNull();
+});
+
+it("rejects stale copied field context and caller substitution of equivalent absolute notation after prepare", async () => {
+  const target = `${COPY_GUIDE}.JournalEntryPage.next`, sourceTarget = `${SOURCE_GUIDE}.JournalEntryPage.next`;
+  const view = relativeSnapshot(`<p>@UUID[.next] @UUID[${sourceTarget}]</p>`, `<p>@UUID[${target}] @UUID[${target}]</p>`);
+  const { plan } = await prepared(view), compiled = await materializeReferenceRebuild(view, plan, editsFor(plan));
+  const tampered = structuredClone(compiled.changes);
+  tampered[0]!.parts[0] = tampered[0]!.parts[0]!.replace("@UUID[.next]", `@UUID[${target}]`);
+  await expect(validateReferenceRebuildChanges(view, "field", plan.proofHash, tampered)).rejects.toThrow("ReferenceChanged");
+  view.fields[0]!.referenceContext = SOURCE_GUIDE;
+  await expect(materializeReferenceRebuild(view, plan, editsFor(plan))).rejects.toThrow("Conflict");
+});
+
+it("keeps the existing conservative Embed caption guard for ambiguous equivalent occurrences", async () => {
+  const sourceTarget = `${SOURCE_GUIDE}.JournalEntryPage.next`, target = `${COPY_GUIDE}.JournalEntryPage.next`;
+  const view = relativeSnapshot(`<p>@Embed[.next caption="First"] @Embed[${sourceTarget} caption="Second"]</p>`,
+    `<p>@Embed[${target} caption="First"] @Embed[${target} caption="Second"]</p>`);
+  expect(await prepareReferenceRebuild(view, "field")).toBeNull();
+});
+
+const punctuationSource = '<p>First<strong>,</strong> then &Reference[Exhaustion] for 2 turns.</p><p>Keep other prose for 3 turns.</p>';
+const punctuationBefore = '<p>První<strong></strong> potom na 2 tahy.</p><p>Zachovat jiný text na 3 tahy.</p>';
+it("atomically restores one punctuation leaf and a missing source reference with original before layout, receipt and exact undo", async () => {
+  const view = snapshot(punctuationSource, punctuationBefore), { plan } = await prepared(view);
+  expect(plan.punctuation).toEqual({ parentPath: [0, 1], text: ",", unitId: "html/0", partIndex: 1 });
+  const row = plan.rows[0]!;
+  expect(row.before).toHaveLength(2);
+  expect(row.alignedBefore).toEqual(["První", ",", " potom na 2 tahy."]);
+  expect(row.partIndices).toEqual([1, 2]);
+  expect(row.baseline).toEqual(["První", ",", " then &Reference[Exhaustion] for 2 turns."]);
+  const edits = editsFor(plan);
+  edits[0]!.text[2] = ` potom ${row.edit.references[2]![0]!.marker} na 2 tahy.`;
+  const compiled = await materializeReferenceRebuild(view, plan, edits);
+  expect(compiled.value).toBe('<p>První<strong>,</strong> potom &amp;Reference[Exhaustion] na 2 tahy.</p><p>Zachovat jiný text na 3 tahy.</p>');
+  expect(compiled.receipt.punctuation).toEqual(plan.punctuation);
+  expect(compiled.numbers.find(proof => proof.partIndex === 2)).toEqual(expect.objectContaining({ before: ["2"], after: ["2"] }));
+  assertPortableText(punctuationSource, portableReviewText(view, view.fields[0]!, compiled.value), "html");
+  expect((await validateReferenceRebuildChanges(view, "field", plan.proofHash, compiled.changes)).value).toBe(compiled.value);
+  const recorded = compiled.changes.map(change => ({ rowId: change.rowId, before: [...view.rows.find(row => row.id === change.rowId)!.translation], after: [...change.parts] }));
+  const current = snapshot(punctuationSource, compiled.value.replace("Zachovat jiný text", "Pozdější jiný text"));
+  expect((await undoReferenceRebuild(current, compiled.receipt, recorded)).value).toBe(punctuationBefore.replace("Zachovat jiný text", "Pozdější jiný text"));
+});
+
+it.each(["punctuation-edit", "punctuation-number", "forged-address", "forged-text", "changed-prose-number"])("refuses caller modification of source-owned punctuation or shifted number guards: %s", async kind => {
+  const view = snapshot(punctuationSource, punctuationBefore), { plan } = await prepared(view), edits = editsFor(plan);
+  if (kind === "punctuation-edit") edits[0]!.text[1] = ";";
+  if (kind === "punctuation-number") edits[0]!.text[1] = "2";
+  if (kind === "forged-address") plan.punctuation!.parentPath = [99];
+  if (kind === "forged-text") plan.punctuation!.text = "Missing words";
+  if (kind === "changed-prose-number") edits[0]!.text[2] = edits[0]!.text[2]!.replace("2", "3");
+  await expect(materializeReferenceRebuild(view, plan, edits)).rejects.toThrow();
+});
+
+it("keeps a punctuation-only defect without a command defect blocked", async () => {
+  expect(await prepareReferenceRebuild(snapshot(punctuationSource, punctuationBefore.replace("potom na", "potom &Reference[Exhaustion] na")), "field")).toBeNull();
+});
+
+it("restores a punctuation row separately from the command-damaged row while keeping both in one field receipt", async () => {
+  const view = snapshot('<p>First<strong>,</strong> then second.</p><p>&Reference[Exhaustion] for 2 turns.</p>',
+    '<p>První<strong></strong> potom druhá.</p><p>Na 2 tahy.</p>');
+  const { plan } = await prepared(view);
+  expect(plan.rows).toHaveLength(2);
+  const compiled = await materializeReferenceRebuild(view, plan, editsFor(plan));
+  expect(compiled.changes).toHaveLength(2);
+  expect(compiled.value).toContain('První<strong>,</strong> potom druhá.');
+  assertPortableText(view.fields[0]!.source, portableReviewText(view, view.fields[0]!, compiled.value), "html");
+});
+
 it("regenerates two collapsed siblings from source identities, never target label/order, and retains unrelated current prose", async () => {
   const { view, plan } = await prepared(); const before = JSON.stringify(view);
   expect(plan.rows).toHaveLength(1);
@@ -272,7 +393,7 @@ async function persistedFixture(sourceHtml = '<p>Use @UUID[Actor.original.Item.a
     settings: { get: () => undefined }, i18n: { localize: (key: string) => key }, packs: new Map([[TRANSLATIONS_PACK_ID, pack]]) });
   vi.stubGlobal("Hooks", { callAll: vi.fn() });
   vi.stubGlobal("fromUuid", async (uuid: string) => uuid === sourceDocument.uuid ? sourceDocument : unavailable.has(uuid) ? null :
-    { uuid, documentName: uuid.includes(".Item.") ? "Item" : "Actor" });
+    { uuid, documentName: /(?:^|\.)(Actor|Item|JournalEntry|JournalEntryPage)\.[^.]+$/u.exec(uuid)?.[1] });
   const view = await loadReview({ id: "copy", uuid: copyDocument.uuid, pack: TRANSLATIONS_PACK_ID, name: copyData.name,
     kind: "JournalEntry", sourceUuid: sourceDocument.uuid, language: "cs" });
   const field = view.fields.find(field => field.targetPath.at(-1) === "content")!;
@@ -281,6 +402,46 @@ async function persistedFixture(sourceHtml = '<p>Use @UUID[Actor.original.Item.a
   const metadata = { referenceRebuild: { fieldId: field.id, proofHash: plan!.proofHash } };
   return { state, view, plan: plan!, compiled, metadata, update };
 }
+
+const mixedSource = '<p>First @UUID[.page]{First}, second @UUID[JournalEntry.original.JournalEntryPage.page]{Second}.</p>';
+const mixedBefore = '<p>První @UUID[JournalEntry.original.JournalEntryPage.page]{První}, potom @UUID[JournalEntry.original.JournalEntryPage.page]{Druhá}.</p>';
+it("persists mixed source notation once with absolute existence checks, history and unverified corrections", async () => {
+  const f = await persistedFixture(mixedSource, mixedBefore), target = `${f.view.entry.uuid}.JournalEntryPage.page`;
+  expect(f.plan.targets).toEqual([{ sourceTarget: "JournalEntry.original.JournalEntryPage.page", target, required: true }]);
+  await saveReviewRows(f.view, f.compiled.changes, f.metadata);
+  expect(f.update).toHaveBeenCalledTimes(1);
+  expect(f.state.copyData.pages[0]!.text!.content).toBe(`<p>First @UUID[.page]{First}, second @UUID[${target}]{Second}.</p>`);
+  expect(f.state.sourceData.pages[0]!.text!.content).toBe(mixedSource);
+  const history = Object.values((f.state.copyData.flags![MODULE_ID] as any).reviewHistory) as any[];
+  expect(history).toHaveLength(1);
+  expect(history[0].referenceRebuild.referenceMap[0]).toEqual(expect.objectContaining({ command: "@UUID[.page]{First}", target, required: true }));
+  expect(history[0].rows[0].before).toEqual(f.view.rows.find(row => row.id === f.compiled.changes[0]!.rowId)!.translation);
+  expect(history[0].rows[0].after).toEqual(f.compiled.changes[0]!.parts);
+  expect((f.state.copyData.flags![MODULE_ID] as any).review.entries[f.compiled.changes[0]!.rowId]).toBeNull();
+});
+
+it.each(["missing-before", "missing-during-write", "wrong-type"])("does not save a relative token with an unavailable exact copied target: %s", async kind => {
+  const f = await persistedFixture(mixedSource, mixedBefore), target = `${f.view.entry.uuid}.JournalEntryPage.page`;
+  if (kind === "missing-before") unavailable.add(target);
+  if (kind === "wrong-type") {
+    const resolve = fromUuid;
+    vi.stubGlobal("fromUuid", async (uuid: string) => uuid === target ? { uuid, documentName: "Actor" } : resolve(uuid));
+  }
+  await expect(saveReviewRows(f.view, f.compiled.changes, { ...f.metadata, ...(kind === "missing-during-write" ? { beforeWrite: async () => { await Promise.resolve(); unavailable.add(target); } } : {}) })).rejects.toThrow("ReferenceTargetMissing");
+  expect(f.update).not.toHaveBeenCalled();
+  expect(f.state.copyData.pages[0]!.text!.content).toBe(mixedBefore);
+});
+
+it("does not partially restore punctuation when another required source-owned reference is unavailable", async () => {
+  const source = '<p>First<strong>,</strong> &Reference[Exhaustion] and @UUID[Actor.original.Item.alpha] for 2 turns.</p>';
+  const before = '<p>První<strong></strong> a @UUID[Actor.original] na 2 tahy.</p>';
+  const f = await persistedFixture(source, before);
+  expect(f.plan.punctuation).toBeDefined();
+  unavailable.add('Actor.original.Item.alpha');
+  await expect(saveReviewRows(f.view, f.compiled.changes, f.metadata)).rejects.toThrow('ReferenceTargetMissing');
+  expect(f.update).not.toHaveBeenCalled();
+  expect(f.state.copyData.pages[0]!.text!.content).toBe(before);
+});
 
 it.each(["source", "lock", "active-run", "system", "ember-active", "ember-version"])("rechecks late %s changes after an awaited beforeWrite hook", async kind => {
   const f = await persistedFixture();

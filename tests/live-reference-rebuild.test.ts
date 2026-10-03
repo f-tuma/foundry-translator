@@ -111,6 +111,44 @@ it('prepares full source/current parts and atomically saves a source-owned field
   expect(copy.pages[0]!.text!.content).toBe(before);
   expect(await f.call('apply_reference_rebuild', f.args)).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
 });
+it('previews and atomically saves a source-owned punctuation leaf with a missing reference, retry and exact layout undo', async () => {
+  const sourceHtml = '<p>First<strong>,</strong> then &amp;Reference[Exhaustion] for 2 turns.</p><p>Keep another paragraph.</p>';
+  const targetHtml = '<p>První<strong></strong> potom na 2 tahy.</p><p>Další odstavec.</p>';
+  const f = await rebuildFixture(sourceHtml, targetHtml), beforeSource = JSON.stringify(source);
+  expect(f.value.plan.punctuation).toEqual({ parentPath: [0, 1], text: ',', unitId: 'html/0', partIndex: 1 });
+  expect(f.value.plan.rows[0]).toMatchObject({ before: ['První', ' potom na 2 tahy.'], alignedBefore: ['První', ',', ' potom na 2 tahy.'] });
+  const planned = f.value.plan.rows[0];
+  f.args.edits[0]!.text[2] = ` potom ${planned.edit.references[2][0].marker} na 2 tahy.`;
+  const { operationId, ...previewArgs } = f.args;
+  expect(await f.call('validate_reference_rebuild', previewArgs)).toMatchObject({ ok: true, value: { changes: [{ warnings: [] }], willVerify: false } });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('apply_reference_rebuild', f.args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(writes).toHaveLength(1);
+  expect(copy.pages[0]!.text!.content).toBe('<p>První<strong>,</strong> potom &amp;Reference[Exhaustion] na 2 tahy.</p><p>Další odstavec.</p>');
+  expect(JSON.stringify(source)).toBe(beforeSource);
+  expect(readReviewHistory(copy.flags)[0]).toMatchObject({ id: operationId, referenceRebuild: { punctuation: f.value.plan.punctuation } });
+  expect(await f.call('apply_reference_rebuild', f.args)).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(writes).toHaveLength(1);
+  expect(await f.call('undo_correction', { documentId: f.args.documentId, operationId })).toMatchObject({ ok: true, value: { undone: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toBe(targetHtml);
+  expect(writes).toHaveLength(2);
+});
+it('keeps EXACT glossary authority on the aligned prose after the restored punctuation and refuses its loss', async () => {
+  const f = await rebuildFixture('<p>First<strong>,</strong> then Exact Name and &amp;Reference[Exhaustion].</p>',
+    '<p>První<strong></strong> potom Exact Name.</p>');
+  vi.spyOn(GlossaryCompendiumRepository.prototype, 'loadExisting').mockResolvedValue([
+    { source: 'Exact Name', replacement: 'Exact Name', category: 'character', aliases: [], mode: 'fixed' },
+  ]);
+  const prepared = await f.call('prepare_reference_rebuild', { documentId: f.args.documentId, fieldId: f.args.fieldId });
+  expect(prepared).toMatchObject({ ok: true });
+  const value = prepared.value as any;
+  const edits = value.plan.rows.map((row: any) => ({ rowId: row.rowId, text: [...row.edit.text] }));
+  edits[0].text[2] = edits[0].text[2].replace('Exact Name', 'Other Name');
+  const args = { ...f.args, revision: value.revision, planHash: value.planHash, edits };
+  expect(await f.call('validate_reference_rebuild', args)).toMatchObject({ ok: false });
+  expect(await f.call('apply_reference_rebuild', args)).toMatchObject({ ok: false });
+  expect(writes).toHaveLength(0);
+});
 it('rejects missing/extra plan rows, unknown labels, stale revision/hash and missing immutable targets without writes', async () => {
   const f = await rebuildFixture(); const { operationId, ...args } = f.args;
   for (const unsafe of [ { ...args, edits: args.edits.slice(0, 1) }, { ...args, edits: [...args.edits, { rowId: 'e'.repeat(64), text: ['Extra'] }] },
