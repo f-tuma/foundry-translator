@@ -63,7 +63,7 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
   const client = new Client({ name: 'live-integration-test', version: '1' });
   try {
     await client.connect(transport);
-    const tools = await client.listTools(); expect(tools.tools.map(t => t.name)).toContain('live_save_correction'); expect(tools.tools.map(t => t.name)).not.toContain('export_corrections');
+    const tools = await client.listTools(); expect(tools.tools.map(t => t.name)).toContain('live_save_correction'); expect(tools.tools.map(t => t.name)).toContain('live_get_reference_context'); expect(tools.tools.map(t => t.name)).not.toContain('export_corrections');
     const result = await client.callTool({ name: 'live_connection', arguments: {} });
     const connection = JSON.parse((result.content as { text: string }[])[0]!.text);
     const connect = await fetch(`${connection.address}/connect`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${connection.pairingCode}`, 'Content-Type': 'application/json' }, body: JSON.stringify(claim) });
@@ -72,6 +72,11 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     const request = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as { id: string };
     await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: request.id, result: { ok: true, value: { language: 'cs', documents: 1 } } }) });
     const response = await pending; expect(JSON.parse((response.content as { text: string }[])[0]!.text)).toEqual({ ok: true, value: { language: 'cs', documents: 1 } });
+    const contextPending = client.callTool({ name: 'live_get_reference_context', arguments: { documentId: 'translated', rowId: 'a'.repeat(64), referenceIndex: 0, offset: 1, limit: 2 } });
+    const contextRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
+    expect(contextRequest).toMatchObject({ method: 'get_reference_context', args: { documentId: 'translated', rowId: 'a'.repeat(64), referenceIndex: 0, offset: 1, limit: 2 } });
+    await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: contextRequest.id, result: { ok: true, value: { fields: [{ text: 'Original context' }], nextOffset: null } } }) });
+    expect(JSON.parse(((await contextPending).content as { text: string }[])[0]!.text)).toMatchObject({ ok: true, value: { nextOffset: null } });
   } finally { await client.close(); }
 });
 

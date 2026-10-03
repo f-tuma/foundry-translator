@@ -1,18 +1,19 @@
 export const LIVE_PROTOCOL = 1;
 export const LIVE_PORT = 3112;
-export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "list_history" | "undo_correction";
+export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "list_history" | "undo_correction";
 export interface LiveArgs {
   documentId?: string; rowId?: string; revision?: string; operationId?: string;
   text?: string[]; labels?: { marker: string; label: string }[]; reason?: string;
   restoreSourceNumbers?: boolean;
   restoreSourceReferences?: boolean;
+  referenceIndex?: number;
   offset: number; limit: number; query: string; radius: number; fuzzy: boolean;
 }
 export interface LiveRequest { id: string; method: LiveMethod; args: Record<string, unknown> }
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
-const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "list_history", "undo_correction"];
-const keys = new Set(["documentId", "rowId", "revision", "operationId", "text", "labels", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences"]);
+const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "list_history", "undo_correction"];
+const keys = new Set(["documentId", "rowId", "revision", "operationId", "text", "labels", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
   const fail = (): never => { throw new Error("Live.InvalidRequest"); };
@@ -20,6 +21,10 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   const request = value as unknown as LiveRequest, input = request.args;
   if (Object.keys(input).some(key => !keys.has(key))) fail();
   const args: LiveArgs = { offset: 0, limit: 20, query: "", radius: 2, fuzzy: false };
+  if (input.referenceIndex !== undefined) {
+    if (request.method !== "get_reference_context" || !Number.isSafeInteger(input.referenceIndex) || (input.referenceIndex as number) < 0 || (input.referenceIndex as number) > 1000) fail();
+    args.referenceIndex = input.referenceIndex as number;
+  }
   for (const key of ["restoreSourceNumbers", "restoreSourceReferences"] as const) if (input[key] !== undefined) {
     if (typeof input[key] !== "boolean" || !["validate_correction", "save_correction"].includes(request.method)) fail();
     args[key] = input[key] as boolean;
@@ -45,8 +50,9 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
     args.labels = input.labels as { marker: string; label: string }[];
     if (args.labels.reduce((total, label) => total + label.label.length, 0) > 60000) fail();
   }
-  if (["list_passages", "get_context", "validate_correction", "save_correction", "list_history", "undo_correction"].includes(request.method) && !args.documentId) fail();
-  if (["get_context", "validate_correction", "save_correction"].includes(request.method) && !args.rowId) fail();
+  if (["list_passages", "get_context", "get_reference_context", "validate_correction", "save_correction", "list_history", "undo_correction"].includes(request.method) && !args.documentId) fail();
+  if (["get_context", "get_reference_context", "validate_correction", "save_correction"].includes(request.method) && !args.rowId) fail();
+  if (request.method === "get_reference_context" && args.referenceIndex === undefined) fail();
   if (["validate_correction", "save_correction"].includes(request.method) && (!args.revision || !args.text || !args.reason || args.reason.trim().length < 5)) fail();
   if (["save_correction", "undo_correction"].includes(request.method) && !args.operationId) fail();
   if (request.method === "search_passages" && args.query.trim().length < 2) fail();

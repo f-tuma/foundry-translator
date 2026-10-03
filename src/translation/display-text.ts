@@ -108,8 +108,9 @@ export function escapeDisplayText(text: string): string {
   return text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
-/** Read an editable text page, but never accept executable markup or altered UUIDs. */
-export function readDisplayTranslation(data: JournalData, field: DisplayTextFlag["fields"][number]): string | null {
+/** Diagnostic input for the review validator. HTML is untrusted raw content,
+ * never suitable for rendering until validated against the original. */
+export function readDisplayTranslationContent(data: JournalData, field: DisplayTextFlag["fields"][number]): string | null {
   const page = data.pages.find(p => p._id === field.pageId);
   const html = page?.text?.content;
   if (typeof html !== "string") return null;
@@ -122,6 +123,14 @@ export function readDisplayTranslation(data: JournalData, field: DisplayTextFlag
     if ([...template.content.childNodes].some(node => node !== template.content.firstElementChild && node.textContent?.trim())) return null;
     text = template.content.firstElementChild.textContent ?? "";
   }
+  return text;
+}
+
+/** Runtime display accepts only valid text. Review reads the stored content
+ * separately so damaged references are diagnosed instead of appearing missing. */
+export function readDisplayTranslation(data: JournalData, field: DisplayTextFlag["fields"][number]): string | null {
+  const text = readDisplayTranslationContent(data, field);
+  if (text === null) return null;
   try { assertPortableText(field.source, text, field.format); } catch { return null; }
   return text.trim() ? text : null;
 }
