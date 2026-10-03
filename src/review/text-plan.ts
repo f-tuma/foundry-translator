@@ -1,6 +1,7 @@
 import { FOUNDRY_EXPRESSION } from "../translation/foundry-syntax";
 import type { FieldFormat } from "../bundles/fields";
 import { isDecorativeIconText } from "../translation/decorative-text";
+import { applyEmbedTextOptions, editableEmbedTextOptions, type EmbedTextOption } from "./embed-text-options";
 
 export interface ReviewTextUnit { id: string; parts: string[]; heading: boolean; attribute?: string }
 export interface ReviewTextPlan {
@@ -60,7 +61,7 @@ export function planReviewText(value: string, format: FieldFormat): ReviewTextPl
   };
 }
 
-export interface ReviewReference { marker: string; command: string; label: string; editable: boolean }
+export interface ReviewReference { marker: string; command: string; label: string; editable: boolean; options?: EmbedTextOption[] }
 export interface ReviewTextDraft { text: string[]; references: ReviewReference[][] }
 const MARKER = /⟦+[^⟦⟧]*⟧+/gu;
 
@@ -77,7 +78,9 @@ export function maskReviewParts(values: readonly string[]): ReviewTextDraft {
       // Resolver expressions stay immutable. Only an existing fallback label is
       // prose; creating/removing its braces would change the protected syntax.
       const resolver = /^@ref\[/iu.test(command);
-      references.push({ marker, command, label: match?.[2] ?? "", editable: !!match && (!resolver || match[2] !== undefined) });
+      const options = editableEmbedTextOptions(command);
+      references.push({ marker, command, label: match?.[2] ?? "", editable: !!match && (!resolver || match[2] !== undefined),
+        ...(options.length ? { options } : {}) });
       return marker;
     });
     return { text, references };
@@ -99,7 +102,8 @@ export function restoreReviewParts(draft: ReviewTextDraft): string[] {
   const replacements = new Map(references.map(reference => {
     if (counts.get(reference.marker) !== 1 || /[{}\r\n]|@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(reference.label)) throw new Error("Review.ReferenceChanged");
     const keepEmptyFallback = /^@ref\[/iu.test(reference.command) && /\{[^}\r\n]*\}$/u.test(reference.command);
-    const command = reference.editable ? reference.command.replace(/\{[^}\r\n]*\}$/u, "") + (reference.label || keepEmptyFallback ? `{${reference.label}}` : "") : reference.command;
+    const baseline = applyEmbedTextOptions(reference.command, reference.options ?? []);
+    const command = reference.editable ? baseline.replace(/\{[^}\r\n]*\}$/u, "") + (reference.label || keepEmptyFallback ? `{${reference.label}}` : "") : baseline;
     return [reference.marker, command];
   }));
   if (replacements.size !== references.length) throw new Error("Review.ReferenceChanged");

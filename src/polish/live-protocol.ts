@@ -4,6 +4,7 @@ export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_co
 export interface LiveArgs {
   documentId?: string; rowId?: string; rowIds?: string[]; revision?: string; operationId?: string;
   text?: string[]; labels?: { marker: string; label: string }[]; reason?: string;
+  options?: { marker: string; key: "readaloud" | "caption" | "label"; value: string }[];
   restoreSourceNumbers?: boolean;
   restoreSourceReferences?: boolean;
   referenceIndex?: number;
@@ -13,7 +14,7 @@ export interface LiveRequest { id: string; method: LiveMethod; args: Record<stri
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
 const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "list_history", "undo_correction"];
-const keys = new Set(["documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex"]);
+const keys = new Set(["documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
   const fail = (): never => { throw new Error("Live.InvalidRequest"); };
@@ -61,6 +62,15 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
     if (!Array.isArray(input.labels) || input.labels.length > 1000 || input.labels.some(l => !object(l) || typeof l.marker !== "string" || l.marker.length > 120 || typeof l.label !== "string" || l.label.length > 2000 || Object.keys(l).some(k => !["marker", "label"].includes(k)))) fail();
     args.labels = input.labels as { marker: string; label: string }[];
     if (args.labels.reduce((total, label) => total + label.label.length, 0) > 60000) fail();
+  }
+  if (input.options !== undefined) {
+    if (!["validate_correction", "save_correction"].includes(request.method) || !Array.isArray(input.options) || input.options.length > 1000 ||
+      input.options.some(option => !object(option) || typeof option.marker !== "string" || !option.marker.trim() || option.marker.length > 120 ||
+        typeof option.key !== "string" || !["readaloud", "caption", "label"].includes(option.key) || typeof option.value !== "string" ||
+        Object.keys(option).some(key => !["marker", "key", "value"].includes(key)))) fail();
+    args.options = input.options as NonNullable<LiveArgs["options"]>;
+    if (args.options.reduce((total, option) => total + option.value.length, 0) > 60000 ||
+      new Set(args.options.map(option => JSON.stringify([option.marker, option.key]))).size !== args.options.length) fail();
   }
   if (["list_passages", "get_context", "get_reference_context", "validate_correction", "save_correction", "list_history", "undo_correction"].includes(request.method) && !args.documentId) fail();
   if (["get_context", "get_reference_context", "validate_correction", "save_correction"].includes(request.method) && !args.rowId) fail();

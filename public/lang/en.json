@@ -357,10 +357,10 @@
   "FOUNDRY_TRANSLATE.Review.PauseFirst": "Pause the running translation and wait for its current checkpoint to finish saving.",
   "FOUNDRY_TRANSLATE.Review.Conflict": "The document changed in the meantime. Your draft remains in the editor; copy it and reload the current state. Nothing was overwritten.",
   "FOUNDRY_TRANSLATE.Review.EmptyText": "A text segment cannot be saved empty.",
-  "FOUNDRY_TRANSLATE.Review.ProtectedText": "The correction would alter a protected link, command or formatting. Check the text; nothing was saved.",
-  "FOUNDRY_TRANSLATE.Review.ReferenceChanged": "Each link marker must occur exactly once in the paragraph. You may change their order. Labels cannot contain commands, braces or line breaks.",
+  "FOUNDRY_TRANSLATE.Review.ProtectedText": "The correction would alter a protected link, command, formatting or numbers in embedded preview text. Check the text; nothing was saved.",
+  "FOUNDRY_TRANSLATE.Review.ReferenceChanged": "Each link marker must occur exactly once in the paragraph. You may change their order. Labels cannot contain commands, braces or line breaks. Embedded preview text must be plain text without HTML, commands, quotes, square or curly brackets, the = sign, or new lines.",
   "FOUNDRY_TRANSLATE.Review.LinkedDocument": "Linked document",
-  "FOUNDRY_TRANSLATE.Review.ReferenceHelp": "Move markers such as ⟦1⟧ anywhere within this paragraph. Edit their labels below.",
+  "FOUNDRY_TRANSLATE.Review.ReferenceHelp": "Move markers such as ⟦1⟧ anywhere within this paragraph. Edit labels and existing embedded preview text below; destinations and other settings remain protected.",
   "FOUNDRY_TRANSLATE.Review.LinkLabel": "Link label",
   "FOUNDRY_TRANSLATE.Review.AutomaticLabel": "Automatic document name",
   "FOUNDRY_TRANSLATE.Review.ProtectedCommand": "Protected game command",
@@ -748,5 +748,10 @@
   "FOUNDRY_TRANSLATE.Reader.Section.RelatedLocations": "Related Locations",
   "FOUNDRY_TRANSLATE.Reader.Section.InvolvedLocations": "Involved Locations",
   "FOUNDRY_TRANSLATE.Reader.Section.Edict": "Edict of {name}",
-  "FOUNDRY_TRANSLATE.Reader.ReadAloud": "Read aloud"
+  "FOUNDRY_TRANSLATE.Reader.ReadAloud": "Read aloud",
+  "FOUNDRY_TRANSLATE.Review.References": "Links and embedded previews",
+  "FOUNDRY_TRANSLATE.Review.EmbedReadaloud": "Read-aloud text",
+  "FOUNDRY_TRANSLATE.Review.EmbedCaption": "Preview caption",
+  "FOUNDRY_TRANSLATE.Review.EmbedLabel": "Embedded preview name",
+  "FOUNDRY_TRANSLATE.Review.SourceReferenceUnmatched": "The original cannot be matched unambiguously."
 }

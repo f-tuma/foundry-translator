@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { parseHTML } from "linkedom";
-import { findTextMatches, searchableSegments, searchReviews, replaceHits, type SearchIndex } from "../src/review/search";
+import { displayParts, findTextMatches, searchableSegments, searchReviews, replaceHits, type SearchIndex } from "../src/review/search";
 import { planBulk, applyBulk } from "../src/review/bulk";
 import * as service from "../src/review/service";
 import { resolveReviewTarget } from "../src/review/target";
@@ -41,6 +41,22 @@ it("protects UUIDs, rolls, URLs and code but finds editable link labels", () => 
   const hits = searchReviews({ snapshots: [snapshot], skipped: [] }, "Rychlý", false);
   expect(hits).toHaveLength(4);
   expect(replaceHits(snapshot.rows[0]!, hits.map(hit => ({ hit, replacement: "Hbitý" })))[0]).toBe('Hbitý @UUID[Actor.Rychly]{Hbitý} @Embed[Actor.Rychly]{Hbitý} [[Rychly]] `Rychlý` [Hbitý](https://Rychly.test)');
+});
+it("finds and independently replaces names in existing embed text options without exposing configuration", () => {
+  const snapshot = view("a"), command = '@Embed[Actor.Rychly readaloud="Rychlý čeká u brány." caption="Rychlý" label="Rychlý" count=4 classes="Rychly"]{Rychlý}';
+  snapshot.rows[0]!.translation = [command];
+  const hits = searchReviews({ snapshots: [snapshot], skipped: [] }, "Rychlý", false);
+  expect(hits).toHaveLength(4);
+  expect(new Set(hits.map(hit => hit.id)).size).toBe(4);
+  expect(hits.filter(hit => hit.segment.optionKey).map(hit => hit.segment.optionKey).sort()).toEqual(["caption", "label", "readaloud"]);
+  const spoken = hits.find(hit => hit.segment.optionKey === "readaloud")!;
+  expect(replaceHits(snapshot.rows[0]!, [{ hit: spoken, replacement: "Hbitý" }])).toEqual([
+    command.replace('readaloud="Rychlý', 'readaloud="Hbitý'),
+  ]);
+  expect(displayParts([command])).toContain("Rychlý čeká u brány.");
+  expect(displayParts([command])).not.toMatch(/Actor\.|count=|classes=/u);
+  expect(() => replaceHits(snapshot.rows[0]!, [{ hit: spoken, replacement: 'Hbitý" count=9 readaloud="' }])).toThrow();
+  expect(() => replaceHits(snapshot.rows[0]!, [{ hit: { ...spoken, segment: { ...spoken.segment, optionKey: "unknown" as any } }, replacement: "Hbitý" }])).toThrow("Conflict");
 });
 it("skips incomplete pages and keeps blocked results read only", () => {
   const snapshot = view("a"); snapshot.rows.push({ ...row, id: "pending", blocked: "Untranslated" }, { ...row, id: "locked", blocked: "Locked" });

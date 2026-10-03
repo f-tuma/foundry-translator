@@ -13,8 +13,9 @@ import { EditorialProjectPanel } from "./project-panel";
 import type { PanelHost } from "./elements";
 import { getTranslatorSettings } from "../settings/settings";
 import { activateHelpTooltips, renderHelpTooltip } from "../ui/help-tooltip";
-import { loadReview, reviewCatalog, updateReview, type ReviewDocument, type ReviewRow, type ReviewSnapshot } from "./service";
-import { maskReviewParts, restoreReviewParts } from "./text-plan";
+import { loadReview, reviewCatalog, updateReview, portableReviewText, type ReviewDocument, type ReviewRow, type ReviewSnapshot } from "./service";
+import { maskReviewParts, restoreReviewParts, type ReviewReference } from "./text-plan";
+import { embedTextOptionSignature } from "./embed-text-options";
 
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Review.${key}`);
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] => {
@@ -290,7 +291,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     for (const [index, part] of source.text.entries()) {
       const masked = { text: part, references: source.references[index]! }; const text = el("p", "", masked.text);
       original.append(text);
-      for (const ref of masked.references) original.append(el("small", "ft-review__reference", `${ref.marker} ${ref.label || t("LinkedDocument")}`));
+
     }
     const draft = this.#drafts.get(row.id) ?? draftFor(row);
     const changed = () => {
@@ -311,16 +312,56 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
       translated.append(input);
     });
     if (draft.references.some(parts => parts.length)) {
+      const details = el("details", "ft-review__references");
+      details.append(el("summary", "", `${t("References")} (${draft.references.flat().length})`));
       const help = el("div", "ft-review__reference-help");
-      help.innerHTML = renderHelpTooltip(t("ReferenceHelp"), t("LinkLabel")); translated.append(help);
-    }
-    for (const reference of draft.references.flat()) {
-        const label = el("label", "ft-review__reference", `${reference.marker} ${t("LinkLabel")}`);
-        if (reference.editable) {
-          const name = el("input"); name.type = "text"; name.value = reference.label; name.placeholder = t("AutomaticLabel"); name.setAttribute("aria-label", `${reference.marker} ${t("LinkLabel")}`); name.disabled = !!row.blocked;
-          name.addEventListener("input", () => { reference.label = name.value; changed(); }); label.append(name);
-        } else label.append(el("span", "", t("ProtectedCommand")));
-        translated.append(label);
+      help.innerHTML = renderHelpTooltip(t("ReferenceHelp"), t("LinkLabel")); details.append(help);
+      const field = this.#snapshot!.fields.find(field => field.id === row.fieldId);
+      const signature = (reference: ReviewReference, target: boolean) => {
+        const command = target && field ? portableReviewText(this.#snapshot!, field, reference.command) : reference.command;
+        return embedTextOptionSignature(command) ?? command.replace(/\{[^}\r\n]*\}$/u, "");
+      };
+      const originals = new Map<string, ReviewReference[]>(), targets = new Map<string, number>();
+      for (const reference of source.references.flat()) {
+        const key = signature(reference, false); originals.set(key, [...(originals.get(key) ?? []), reference]);
+      }
+      for (const reference of draft.references.flat()) { const key = signature(reference, true); targets.set(key, (targets.get(key) ?? 0) + 1); }
+      for (const reference of draft.references.flat()) {
+        const entry = el("section", "ft-review__reference-entry"); entry.dataset.referenceMarker = reference.marker;
+        entry.append(el("strong", "ft-review__reference-marker", reference.marker));
+        const columns = el("div", "ft-review__reference-columns");
+        const key = signature(reference, true), candidates = originals.get(key);
+        // Appearance/marker order is not identity: reordered links and embeds
+        // must keep the source belonging to their immutable canonical command.
+        const matched = candidates?.length === 1 && targets.get(key) === 1 ? candidates[0] : undefined;
+        for (const [value, editable] of [[matched, false], [reference, true]] as const) {
+          const column = el("div"); column.append(el("h4", "", `${t(editable ? "Translation" : "Original")} ${value?.marker ?? ""}`));
+          if (!value) { column.append(el("span", "", t("SourceReferenceUnmatched"))); columns.append(column); continue; }
+          const label = el("label", "ft-review__reference", t("LinkLabel"));
+          if (value.editable) {
+            const name = el("input"); name.type = "text"; name.value = value.label; name.placeholder = t("AutomaticLabel"); name.readOnly = !editable; name.disabled = !!row.blocked;
+            name.setAttribute("aria-label", `${t(editable ? "Translation" : "Original")} ${value.marker} ${t("LinkLabel")}`);
+            if (editable) name.addEventListener("input", () => { reference.label = name.value; changed(); });
+            label.append(name);
+          } else label.append(el("span", "", t("ProtectedCommand")));
+          column.append(label);
+          for (const option of value.options ?? []) {
+            const key = option.key === "readaloud" ? "EmbedReadaloud" : option.key === "caption" ? "EmbedCaption" : "EmbedLabel";
+            const optionLabel = el("label", "ft-review__reference", t(key));
+            const input = option.key === "readaloud" ? el("textarea") : el("input");
+            if (input.tagName === "INPUT") (input as HTMLInputElement).type = "text";
+            input.value = option.value; input.readOnly = !editable; input.disabled = !!row.blocked;
+            input.dataset.referenceOption = option.key; input.dataset.referenceSide = editable ? "target" : "source";
+            input.setAttribute("aria-label", `${t(editable ? "Translation" : "Original")} ${value.marker} ${t(key)}`);
+            if (input.tagName === "TEXTAREA") (input as HTMLTextAreaElement).rows = Math.max(2, Math.min(8, Math.ceil(option.value.length / 48)));
+            if (editable) input.addEventListener("input", () => { option.value = input.value; changed(); if (input.tagName === "TEXTAREA") this.#grow(input as HTMLTextAreaElement); });
+            optionLabel.append(input); column.append(optionLabel);
+          }
+          columns.append(column);
+        }
+        entry.append(columns); details.append(entry);
+      }
+      translated.append(details);
     }
     const validation = el("p", "ft-review__error"); validation.dataset.referenceError = ""; validation.setAttribute("role", "status"); translated.append(validation);
     const status = el("span", "ft-review__badge"); status.dataset.rowStatus = ""; actions.append(status);
@@ -351,7 +392,7 @@ export class TranslationReviewApplication extends foundry.applications.api.Appli
     if (draft) { try { restoreReviewParts(draft); } catch { invalid = true; } }
     const error = tr.querySelector<HTMLElement>("[data-reference-error]");
     if (error) { error.textContent = invalid ? t("ReferenceChanged") : ""; error.hidden = !invalid; }
-    for (const input of tr.querySelectorAll("textarea")) input.setAttribute("aria-invalid", String(invalid));
+    for (const input of tr.querySelectorAll("textarea:not([readonly]), input[data-reference-side='target']")) input.setAttribute("aria-invalid", String(invalid));
     tr.classList.toggle("is-dirty", dirty); tr.classList.toggle("is-verified", !!row.verified && !dirty);
     const status = tr.querySelector<HTMLElement>("[data-row-status]")!;
     status.textContent = t(dirty ? "Unsaved" : row.blocked ? "Unavailable" : row.verified ? "Verified" : "NeedsReview");

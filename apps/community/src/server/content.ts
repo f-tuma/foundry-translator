@@ -8,6 +8,8 @@ import {
   type TranslationBundle,
 } from "../../../../src/bundles/format";
 import { planReviewText } from "../../../../src/review/text-plan";
+import { assertEmbedOptionEdits } from "../../../../src/review/embed-text-options";
+import { embedOptionNumbersChanged } from "../../../../src/polish/quality-guards";
 import {
   COMMUNITY_FORMAT,
   parseCommunityRelease,
@@ -106,14 +108,23 @@ export function unitsForDocument(
 export function rebuildDocument(
   template: BundleDocument,
   units: Unit[],
+  beforeUnits?: Unit[],
 ): BundleDocument {
   return {
     ...template,
     patches: template.patches.map((patch, i) => {
       const plan = planReviewText(patch.translation, patch.format);
       let translation = patch.translation;
-      for (const unit of units.filter((u) => u.field_index === i))
+      for (const unit of units.filter((u) => u.field_index === i)) {
+        const before = beforeUnits
+          ? beforeUnits.find(current => current.id === unit.id)?.value
+          : plan.units.find(current => current.id === unit.unit_key)?.parts;
+        if (!before) throw new Problem(400, "Původní oddíl pro opravu nebyl nalezen.");
+        assertEmbedOptionEdits(before, unit.value);
+        if (beforeUnits && embedOptionNumbersChanged(before, unit.value))
+          throw new Problem(400, "Čísla uvnitř vloženého popisu nelze měnit běžnou opravou. Vyžadují kontrolu proti originálu.");
         translation = plan.replace(unit.unit_key, unit.value);
+      }
       assertPortableText(patch.source, translation, patch.format);
       return { ...patch, translation };
     }),

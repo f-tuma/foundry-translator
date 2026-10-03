@@ -303,3 +303,20 @@ it("roundtrips reordered references and corrected labels through import, review,
   row.value[2] = " @UUID[Actor.changed].";
   expect(() => rebuildDocument(parsed.documents[0]!, units)).toThrow();
 });
+
+
+it("guards embedded prose at the community engine boundary using authoritative current units", () => {
+  const bundle = fixture();
+  bundle.documents[0]!.patches[1]!.source = '<p>@Embed[Actor.scout readaloud="Scout waits 2 hours." caption="Scout 3" count=4]</p>';
+  bundle.documents[0]!.patches[1]!.translation = '<p>@Embed[Actor.scout readaloud="Zvěd čeká 2 hodiny." caption="Zvěd 3" count=4]</p>';
+  const template = bundle.documents[0]!;
+  const before = unitsForDocument(template).map(u => ({ ...u, revision: "r", approval: null })) as Unit[];
+  const units = structuredClone(before);
+  units[1]!.value = [units[1]!.value[0]!.replace("čeká", "hlídá")];
+  expect(rebuildDocument(template, units, before).patches[1]!.translation).toContain("hlídá 2 hodiny");
+  expect(() => rebuildDocument(template, units, [])).toThrow("Původní oddíl");
+  units[1]!.value = ['@Embed[Actor.scout readaloud="Zvěd čeká 3 hodiny." caption="Zvěd 2" count=4]'];
+  expect(() => rebuildDocument(template, units, before)).toThrow("Čísla");
+  units[1]!.value = ['@Embed[Actor.scout readaloud="Zvěd čeká 2 hodiny. <script>evil</script>" caption="Zvěd 3" count=4]'];
+  expect(() => rebuildDocument(template, units, before)).toThrow();
+});

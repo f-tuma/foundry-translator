@@ -74,6 +74,20 @@ it("restricts source identifier repair methods to fresh bound scope with no call
   expect(() => parseLiveRequest({ id: '1', method: 'restore_reference_identifiers', args })).toThrow();
   expect(() => parseLiveRequest({ id: '1', method: 'validate_reference_identifiers', args: { ...args, operationId: 'unexpected' } })).toThrow();
 });
+it("accepts bounded existing Embed option edits only on corrections, with strict unique option entries", () => {
+  const args = { documentId: 'copy', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Correct embedded prose', text: ['⟦1⟧'], operationId: 'embed-1' };
+  const options = [{ marker: '⟦1⟧', key: 'readaloud', value: 'Vstupujete do místnosti.' }];
+  for (const method of ['validate_correction', 'save_correction']) {
+    expect(parseLiveRequest({ id: '1', method, args: { ...args, options } }).args.options).toEqual(options);
+    expect(parseLiveRequest({ id: '1', method, args: { ...args, options: [] } }).args.options).toEqual([]);
+    for (const unsafe of [
+      [{ ...options[0], key: 'uuid' }], [{ ...options[0], key: ['readaloud'] }], [{ ...options[0], command: '@Embed[Other]' }], [{ ...options[0], marker: '' }],
+      [options[0], options[0]], [{ ...options[0], value: 'x'.repeat(60001) }],
+      [{ ...options[0], value: 'x'.repeat(30001) }, { ...options[0], key: 'caption', value: 'x'.repeat(30000) }],
+    ]) expect(() => parseLiveRequest({ id: '1', method, args: { ...args, options: unsafe } })).toThrow('Live.InvalidRequest');
+  }
+  expect(() => parseLiveRequest({ id: '1', method: 'get_context', args: { documentId: args.documentId, rowId: args.rowId, options } })).toThrow('Live.InvalidRequest');
+});
 it("exposes live tools through the actual STDIO SDK and forwards browser results without an export", async () => {
   const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../dist/index.cjs', import.meta.url)), '--live', '--origin', origin, '--port', '0'], stderr: 'pipe' });
   const client = new Client({ name: 'live-integration-test', version: '1' });
@@ -90,6 +104,9 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     expect(batchTool.inputSchema.additionalProperties).toBe(false);
     expect(Object.keys(batchTool.inputSchema.properties ?? {}).sort()).toEqual(['documentId', 'rowIds']);
     expect((batchTool.inputSchema.properties as any).rowIds).toMatchObject({ minItems: 1, maxItems: 10 });
+    const correctionTool = tools.tools.find(t => t.name === 'live_validate_correction')!;
+    expect((correctionTool.inputSchema.properties as any).options.items).toMatchObject({ additionalProperties: false,
+      properties: { key: { enum: ['readaloud', 'caption', 'label'] } } });
     const result = await client.callTool({ name: 'live_connection', arguments: {} });
     const connection = JSON.parse((result.content as { text: string }[])[0]!.text);
     const connect = await fetch(`${connection.address}/connect`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${connection.pairingCode}`, 'Content-Type': 'application/json' }, body: JSON.stringify(claim) });
@@ -110,6 +127,17 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     const batchReply = { ok: true, value: { documentId: 'translated', contexts: [{ rowId: batchArgs.rowIds[0], source: ['Complete source.'], translation: ['Úplný překlad.'] }], omittedRowIds: [batchArgs.rowIds[1]], maxResponseChars: 100000 } };
     await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: batchRequest.id, result: batchReply }) });
     expect(JSON.parse(((await batchPending).content as { text: string }[])[0]!.text)).toEqual(batchReply);
+    const optionArgs = { documentId: 'translated', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), text: ['⟦1⟧'],
+      reason: 'Correct the read-aloud prose', options: [{ marker: '⟦1⟧', key: 'readaloud', value: 'Vstupujete dovnitř.' }] };
+    const unsafeOption = await client.callTool({ name: 'live_validate_correction', arguments: { ...optionArgs,
+      options: [{ ...optionArgs.options[0], command: '@Embed[Other]' }] } });
+    expect(unsafeOption.isError).toBe(true);
+    const optionPending = client.callTool({ name: 'live_validate_correction', arguments: optionArgs });
+    const optionRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
+    expect(optionRequest).toMatchObject({ method: 'validate_correction', args: optionArgs });
+    const optionReply = { ok: true, value: { optionChanges: [{ marker: '⟦1⟧', key: 'readaloud', before: 'Vstoupíte dovnitř.', after: 'Vstupujete dovnitř.' }], willVerify: false } };
+    await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: optionRequest.id, result: optionReply }) });
+    expect(JSON.parse(((await optionPending).content as { text: string }[])[0]!.text)).toEqual(optionReply);
     const repairArgs = { documentId: 'translated', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Restore exact source IDs', operationId: 'repair-1' };
     const repairPending = client.callTool({ name: 'live_restore_reference_identifiers', arguments: repairArgs });
     const repairRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;

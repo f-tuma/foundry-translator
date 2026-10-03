@@ -722,6 +722,8 @@ small {
 .row-references {
   grid-column: 1 / -1;
   margin: 8px 0 0;
+  min-width: 0;
+  container: community-reference-editor / inline-size;
 }
 .row-references > summary {
   min-height: 30px;
@@ -2243,4 +2245,15 @@ small {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.reference-entry { padding: 10px 11px; border-top: 1px solid var(--line); }
+.reference-entry > .reference-marker { display: block; margin-bottom: 8px; color: var(--ink); }
+.reference-entry .reference-columns { padding: 0; border: 0; }
+.reference-field label { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+.reference-field textarea { width: 100%; min-width: 0; padding: 8px; font: 14px/1.6 Literata, Georgia, serif; resize: vertical; }
+.reference-field :is(input, textarea) { box-sizing: border-box; }
+.reference-field [readonly] { color: var(--muted); }
+@container community-reference-editor (max-width: 480px) {
+  .reference-entry .reference-columns { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }
