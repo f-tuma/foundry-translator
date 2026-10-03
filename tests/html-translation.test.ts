@@ -7,6 +7,13 @@ import {
 } from "../src/translation/html";
 
 describe("HTML translation planning", () => {
+  it("never sends an icon's invisible placeholder to the provider and preserves it in HTML", () => {
+    const { document } = parseHTML("<html><body></body></html>");
+    const html = '<p>Read <span class="reference fa-solid fa-map">\u200b</span> this.</p>';
+    const plan = planHtmlTranslation(html, document);
+    expect(plan.units).toEqual([["Read ", " this."]]);
+    expect(plan.apply([["Přečti ", " toto."]])).toBe('<p>Přečti <span class="reference fa-solid fa-map">\u200b</span> toto.</p>');
+  });
   it("groups inline text for context while preserving markup and attributes", () => {
     const { document } = parseHTML("<html><body></body></html>");
     const plan = planHtmlTranslation(

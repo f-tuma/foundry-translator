@@ -1,5 +1,6 @@
 import { passageContexts } from "./passage-context";
 import type { PassageContext } from "../providers/types";
+import { isDecorativeIconText } from "./decorative-text";
 
 const BLOCK_SELECTOR = [
   "address",
@@ -60,7 +61,7 @@ function textDescendants(element: Element): Text[] {
 }
 
 function isExcluded(node: Text): boolean {
-  return !!node.parentElement?.closest(EXCLUDED_SELECTOR);
+  return !!node.parentElement?.closest(EXCLUDED_SELECTOR) || isDecorativeIconText(node);
 }
 
 interface TranslationValue {

@@ -135,6 +135,22 @@ it("accepts translated copy references but rejects changes to their UUIDs and ad
   view = await updateReview(view, row.id, { type: "save", parts: [`Přečti si @UUID[Compendium.${packId}.JournalEntry.copy]{Příručku}.`] });
   expect(textRow(view).translation[0]).toContain('{Příručku}');
 });
+it("allows reviewing an omitted invisible icon placeholder without allowing missing references", async () => {
+  source.pages[0]!.text!.content = '<p><span class="reference fa-solid fa-compass">\u200B</span> Read @UUID[JournalEntry.source]{Guide}.</p>';
+  copy.pages[0]!.text!.content = `<p><span class="reference fa-solid fa-compass"></span> Čti @UUID[Compendium.${packId}.JournalEntry.copy]{Průvodce}.</p>`;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const original = JSON.stringify(source), view = await snapshot(), row = textRow(view);
+  expect(row.blocked).toBeNull();
+  expect(row.source).toHaveLength(1);
+  expect(row.translation).toHaveLength(1);
+  const saved = await updateReview(view, row.id, { type: "save", parts: [`Přečti @UUID[Compendium.${packId}.JournalEntry.copy]{Příručku}.`] });
+  expect(textRow(saved).id).toBe(row.id);
+  expect(textRow(saved).blocked).toBeNull();
+  expect(JSON.stringify(source)).toBe(original);
+  expect(copy.pages[0]!.text!.content).toContain('<span class="reference fa-solid fa-compass"></span>');
+  copy.pages[0]!.text!.content = '<p><span class="reference fa-solid fa-compass"></span> Přečti příručku.</p>';
+  expect(textRow(await snapshot()).blocked).toBe("StructureChanged");
+});
 it("edits and verifies scene sidecar text without touching the scene mechanics", async () => {
   packId = DISPLAY_TEXT_PACK;
   const scene = { name: "Old Gate", navName: "Gate", width: 8000, walls: [{ _id: "wall", c: [0, 0, 100, 100] }] };

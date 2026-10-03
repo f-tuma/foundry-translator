@@ -14,6 +14,16 @@ beforeEach(() => vi.stubGlobal("document", parseHTML("<html><body></body></html>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("portable translation format", () => {
+  it("ignores only invisible decorative icon placeholders, retaining icon attributes and actual text", () => {
+    const source = '<p>Read <span class="reference fa-solid fa-compass">\u200b</span> the map.</p>';
+    const target = '<p>Přečti <span class="reference fa-solid fa-compass"></span> mapu.</p>';
+    expect(() => assertPortableText(source, target, "html")).not.toThrow();
+    expect(diagnosePortableText(source, target, "html")).toBeNull();
+    expect(() => assertPortableText(source, target.replace('fa-compass', 'fa-bomb'), "html")).toThrow();
+    expect(() => assertPortableText(source, target.replace('</span>', 'New content</span>'), "html")).toThrow();
+    expect(() => assertPortableText('<p><span>\u200b</span></p>', '<p><span></span></p>', "html")).toThrow();
+    expect(() => assertPortableText(source.replace('\u200b', '@UUID[Actor.a]'), target, "html")).toThrow();
+  });
   it("preserves inflection in version 2 bundles and rejects invalid modes", () => {
     const value=bundle();value.version=2;
     value.glossary=[{source:"Old Carinth",replacement:"Starý Carinth",category:"location",aliases:[],mode:"inflect"}];
