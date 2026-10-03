@@ -1882,3 +1882,30 @@ passed; native isolated Foundry exercised save/retry/undo and dead-target reject
 Details and confirmed missing original `luminousTransit0` ability:
 `docs/benchmarks/reference-target-repair-2026-10-01.md`. User updates production;
 new MCP JSON/client restart required for the new immutable bridge binary.
+
+### 2026-10-03 — 0.33.4 atomic source Reference identifier restoration
+
+Legacy translations can change bare `&Reference[...]` resolver identifiers in
+several paragraphs of one field. Ordinary correction validation must reject a
+partial repair while another paragraph still contains a changed command.
+The new MCP preview/save pair derives each exact original identifier from the
+bound source, stages all unambiguous replacements and validates the entire field
+before one persistence operation. Caller text, commands, paths and UUIDs are not
+accepted by these tools. Existing single-row source repair remains unchanged.
+
+The repair retains target prose, labels, formatting, numbers and occurrence
+positions. Ambiguous identifiers, missing commands, other command damage,
+source changes and markup damage remain blocked. Fresh revision, immediate
+source/write/scope checks, operation-ID receipts, history and separate unverified
+status are retained. Undo reconstructs the recorded prior paragraphs and proves
+that the same narrow forward repair recreates the current field, keeping later
+unrelated edits and refusing changed affected rows.
+
+Validation: 638 module tests passed / 4 optional LM integrations skipped;
+31 MCP tests passed. Both typechecks, module/MCP builds and v0.33.4 release
+metadata verification passed. Integration coverage includes three identifiers
+in one write, no-write preview, idempotent retry/conflict, revocation, source
+revision changes and guarded undo. An independent code review found no concrete
+regression. Production still needs the user-installed module update and updated
+MCP binary before these tools can be exercised against a live damaged field.
+Private proofreading content and evidence remain in ignored `.polish-workspace`.

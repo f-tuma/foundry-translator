@@ -623,3 +623,116 @@ it("lets history cancel a stalled index read immediately without late progress u
   controller.abort(); await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   complete(new Map()); await Promise.resolve(); expect(progress).toHaveBeenCalledTimes(1);
 });
+
+async function identifierFixture() {
+  source.pages[0]!.text!.content = '<p>The area is &amp;Reference[Lightly Obscured].</p><p><strong>Result 6:</strong> &amp;Reference[Poisoned].</p><p>Take &amp;Reference[Long Rest] for [[/roll 2d4 hours]] or @UUID[Actor.a]{Ally}.</p><p>Other text.</p>';
+  copy.pages[0]!.text!.content = '<p>Oblast je &amp;Reference[Lehce zastřená].</p><p><strong>Výsledek 6:</strong> &amp;Reference[Otravená].</p><p>Využij &amp;Reference[Dlouhého odpočinku] po [[/roll 2d4 hours]] nebo @UUID[Actor.a]{Spojence}.</p><p>Jiný text.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture();
+  const args = { documentId: f.args.documentId, rowId: f.args.rowId, revision: f.args.revision,
+    reason: 'Obnova přesných původních resolver identifikátorů; próza i mechaniky zachovány.' };
+  return { ...f, repairArgs: args, saveArgs: { ...args, operationId: crypto.randomUUID() } };
+}
+
+it('atomically restores three source Reference identifiers with exact preview, one persistent write and idempotent receipt', async () => {
+  const f = await identifierFixture(), original = JSON.stringify(source);
+  const preview = await f.call('validate_reference_identifiers', f.repairArgs);
+  expect(preview).toMatchObject({ ok: true, value: { willVerify: false, identifiers: [
+    { before: '&Reference[Lehce zastřená]', after: '&Reference[Lightly Obscured]' },
+    { before: '&Reference[Otravená]', after: '&Reference[Poisoned]' },
+    { before: '&Reference[Dlouhého odpočinku]', after: '&Reference[Long Rest]' },
+  ], changes: expect.any(Array) } });
+  expect((preview.value as any).changes).toHaveLength(3);
+  expect(writes).toHaveLength(0);
+  // The ordinary row route must not apply just one member of a broken field.
+  expect(await f.call('save_correction', { ...f.args, text: ['Oblast je &Reference[Lightly Obscured].'] })).toMatchObject({ ok: false });
+  expect(writes).toHaveLength(0);
+  const saved = await f.call('restore_reference_identifiers', f.saveArgs);
+  expect(saved).toMatchObject({ ok: true, value: { saved: true, verified: false, rowIds: expect.any(Array) } });
+  expect(writes).toHaveLength(1); expect(writes[0]!.kind).toBe('root');
+  const view = await snapshot();
+  expect(view.rows.filter(row => row.fieldId === f.row.fieldId).every(row => !row.blocked && !row.verified)).toBe(true);
+  expect(copy.pages[0]!.text!.content).toContain('[[/roll 2d4 hours]] nebo @UUID[Actor.a]{Spojence}');
+  expect(copy.pages[0]!.text!.content).toContain('<strong>Výsledek 6:</strong>');
+  expect(copy.pages[0]!.text!.content).toContain('<p>Jiný text.</p>');
+  expect(JSON.stringify(source)).toBe(original);
+  expect(readReviewHistory(copy.flags)[0]).toMatchObject({ id: f.saveArgs.operationId, identifierRepair: true, rows: expect.any(Array) });
+  expect(readReviewHistory(copy.flags)[0]!.rows).toHaveLength(3);
+  expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(writes).toHaveLength(1);
+  expect(await f.call('restore_reference_identifiers', { ...f.saveArgs, reason: 'Different request reason' })).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+  expect(await f.call('restore_reference_identifiers', { ...f.saveArgs, rowId: view.rows.find(row => row.fieldId === f.row.fieldId && row.id !== f.row.id)!.id })).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+});
+
+it('undo proves the exact whole-field identifier repair and preserves unrelated subsequent prose edits', async () => {
+  const f = await identifierFixture(), before = copy.pages[0]!.text!.content!, original = JSON.stringify(source);
+  expect((await f.call('restore_reference_identifiers', f.saveArgs)).ok).toBe(true);
+  const s = await snapshot(), other = s.rows.find(row => row.translation.join('') === 'Jiný text.')!;
+  await saveReviewRows(s, [{ rowId: other.id, parts: ['Pozdější jazyková oprava.'] }]);
+  expect(await f.call('undo_correction', { documentId: f.saveArgs.documentId, operationId: f.saveArgs.operationId })).toMatchObject({ ok: true, value: { undone: true } });
+  expect(copy.pages[0]!.text!.content).toBe(before.replace('Jiný text.', 'Pozdější jazyková oprava.'));
+  expect(textRow(await snapshot()).blocked).toBe('StructureChanged');
+  expect(JSON.stringify(source)).toBe(original);
+  const count = writes.length;
+  expect(await f.call('undo_correction', { documentId: f.saveArgs.documentId, operationId: f.saveArgs.operationId })).toMatchObject({ ok: true, value: { alreadyUndone: true } });
+  expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: false, error: { code: 'Live.OperationConflict' } });
+  expect(writes).toHaveLength(count);
+});
+
+it('refuses identifier undo after an affected-row edit or a source change', async () => {
+  const f = await identifierFixture();
+  expect((await f.call('restore_reference_identifiers', f.saveArgs)).ok).toBe(true);
+  const s = await snapshot();
+  await saveReviewRows(s, [{ rowId: f.row.id, parts: ['Oblast nyní má &Reference[Lightly Obscured].'] }]);
+  const count = writes.length;
+  expect(await f.call('undo_correction', { documentId: f.saveArgs.documentId, operationId: f.saveArgs.operationId })).toMatchObject({ ok: false, error: { code: 'Review.UndoConflict' } });
+  source.pages[0]!.text!.content += '<p>New source.</p>';
+  expect(await f.call('undo_correction', { documentId: f.saveArgs.documentId, operationId: f.saveArgs.operationId })).toMatchObject({ ok: false, error: { code: 'Review.UndoConflict' } });
+  expect(writes).toHaveLength(count);
+});
+
+it.each([
+  ['<p>&Reference[Poisoned]</p>', '<p>Chybí.</p>'],
+  ['<p>&Reference[Poisoned]</p><p>Other.</p>', '<p>Jiné.</p><p>&Reference[Otravená]</p>'],
+  ['<p>&Reference[Poisoned] &Reference[Long Rest]</p>', '<p>&Reference[Otravená] &Reference[Odpočinek]</p>'],
+  ['<p>&Reference[Poisoned] @UUID[Actor.a]</p>', '<p>&Reference[Otravená] @UUID[Actor.b]</p>'],
+  ['<p>&Reference[Poisoned]</p>', '<p class="wrong">&Reference[Otravená]</p>'],
+])('keeps unsupported identifier damage blocked: %s', async (original, translated) => {
+  source.pages[0]!.text!.content = original; copy.pages[0]!.text!.content = translated;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), args = { documentId: f.args.documentId, rowId: f.args.rowId, revision: f.args.revision, reason: 'Restore exact source identifiers' };
+  expect(await f.call('validate_reference_identifiers', args)).toMatchObject({ ok: false, error: { code: 'Live.InvalidIdentifierRepair' } });
+  expect(await f.call('restore_reference_identifiers', { ...args, operationId: crypto.randomUUID() })).toMatchObject({ ok: false, error: { code: 'Live.InvalidIdentifierRepair' } });
+  expect(writes).toHaveLength(0);
+});
+
+it('rechecks identifier repair revision, exact changes and write permission without a normal-write bypass', async () => {
+  const f = await identifierFixture();
+  const { referenceIdentifierRepairDraft } = await import('../src/review/reference-identifier-repair');
+  const repair = referenceIdentifierRepairDraft(f.s, f.row.fieldId)!;
+  await expect(saveReviewRows(f.s, repair.changes.slice(0, 1), { identifierRepair: true })).rejects.toThrow('ProtectedText');
+  await expect(saveReviewRows(f.s, [{ ...repair.changes[0]!, parts: ['Invented prose'] }, ...repair.changes.slice(1)], { identifierRepair: true })).rejects.toThrow('ProtectedText');
+  await expect(saveReviewRows(f.s, repair.changes, { identifierRepair: true, canWrite: () => false })).rejects.toThrow('Live.Disconnected');
+  expect(writes).toHaveLength(0);
+  locked = true;
+  expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: false, error: { code: 'Review.Locked' } });
+  locked = false; const run = activeTranslations.start('Guide', 'cs');
+  expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: false, error: { code: 'Review.PauseFirst' } });
+  activeTranslations.finish(run);
+  copy.pages[0]!.text!.content += '<p>Newer copy edit.</p>';
+  expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: false, error: { code: 'Review.Conflict' } });
+  f.disconnect();
+  expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: false, error: { code: 'Live.Disconnected' } });
+  expect(writes).toHaveLength(0);
+});
+
+it('rechecks the authoritative source immediately before the atomic identifier persistence', async () => {
+  const f = await identifierFixture();
+  let reads = 0;
+  vi.stubGlobal('fromUuid', async () => {
+    if (++reads === 3) source.pages[0]!.text!.content += '<p>Concurrent source revision.</p>';
+    return sourceDocument;
+  });
+  expect(await f.call('restore_reference_identifiers', f.saveArgs)).toMatchObject({ ok: false, error: { code: 'Review.Conflict' } });
+  expect(writes).toHaveLength(0);
+});

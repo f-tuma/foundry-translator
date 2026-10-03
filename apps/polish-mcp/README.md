@@ -69,6 +69,23 @@ nové načtení kontextu; nelze slepě použít starou revizi.
 posuzuje člověk. Foundry neposkytuje serverové compare-and-swap; souběžný zápis
 jiného GM ve stejném okamžiku nelze plně vyloučit. Používej jednoho zapisujícího GM.
 
+### Atomická obnova identifikátorů od 0.33.4 / MCP 0.3.4
+
+Pokud starý překlad přeložil technický název uvnitř `&Reference[...]`, lze použít
+`live_validate_reference_identifiers` a poté `live_restore_reference_identifiers`.
+Obě metody přijímají jen `documentId`, `rowId`, čerstvou `revision` a `reason`;
+zápis navíc vyžaduje `operationId`. Agent žádný náhradní příkaz ani UUID nezadává.
+Modul odvodí přesný původní identifikátor z originálu a v náhledu ukáže všechny
+změněné odstavce. Po kontrole je obnoví v jednom zápisu do přeloženého dokumentu.
+
+Povolena je jen jednoznačná záměna jednoho holého `Reference` v každém odstavci
+téhož pole. Chybějící příkazy, jinak poškozené UUID, nejednoznačné záměny,
+změněné parametry nebo HTML se tím opravit nedají. České věty, popisky, čísla
+a umístění odkazů zůstávají zachované. Celé opravené pole musí projít běžnou
+validací. Zápis má historii, idempotentní opakování a možnost vrácení, pokud se
+jeho dotčené odstavce ani originál nezměnily. Oprava se neoznačí jako ověřená.
+Po aktualizaci modulu zkopíruj nový MCP JSON a restartuj MCP klienta.
+
 ### Diagnostika a řízené opravy od 0.32.1 / MCP 0.3.1
 
 `live_get_context` vrací také `integrityDetails`: chybějící a nadbytečné chráněné

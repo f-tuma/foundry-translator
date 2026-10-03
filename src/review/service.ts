@@ -6,6 +6,7 @@ import { MODULE_ID } from "../constants";
 import { portableFields, type BundleDocumentKind, type FieldFormat, type PortableDocument } from "../bundles/fields";
 import { assertPortableText, diagnosePortableText, syntaxExpressions, type PortableTextDiagnostics } from "../bundles/format";
 import { referenceRepairDraft } from "./reference-repair";
+import { referenceIdentifierRepairDraft } from "./reference-identifier-repair";
 import { remapBundleReferences } from "../bundles/service";
 import { ACTOR_TRANSLATIONS_PACK_ID } from "../translation/compendium-actor-translation-repository";
 import { ITEM_TRANSLATIONS_PACK_ID } from "../translation/compendium-item-translation-repository";
@@ -284,6 +285,7 @@ export interface ReviewHistoryEntry {
   id: string; at: string; userName: string; sourceHash: string; label: string;
   agentRequestHash?: string;
   referenceRepair?: true;
+  identifierRepair?: true;
   rows: { rowId: string; before: string[]; after: string[]; label: string; group: string }[];
   undoneAt?: string;
 }
@@ -338,7 +340,7 @@ function abortableHistoryRead<T>(pending: Promise<T>, signal?: AbortSignal): Pro
 
 /** Compile only schema-allowed text updates. One document update includes its embedded
  * changes and undo record, so a lost response can be resolved from persistent history. */
-export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; canWrite?: () => boolean } = {}): Promise<ReviewSnapshot> {
+export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; identifierRepair?: boolean; canWrite?: () => boolean } = {}): Promise<ReviewSnapshot> {
   gmOnly();
   if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   const fresh = await loadReview(snapshot.entry);
@@ -350,6 +352,35 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   if (!target) fail("Conflict");
   const data = target.toObject(), staged = structuredClone(data), fieldValues = new Map<string, string>();
   const undo = options.undoId ? readReviewHistory(target.flags).find(item => item.id === options.undoId) : undefined;
+  if (options.identifierRepair && (options.repairReferences || options.undoId)) fail("ProtectedText");
+  const identifierMode = options.identifierRepair || !!undo?.identifierRepair;
+  if (identifierMode) {
+    const fieldId = fresh.rows.find(row => row.id === changes[0]!.rowId)?.fieldId;
+    if (!fieldId || changes.some(change => fresh.rows.find(row => row.id === change.rowId)?.fieldId !== fieldId)) fail("ProtectedText");
+    const field = fresh.fields.find(item => item.id === fieldId)!;
+    if (options.identifierRepair) {
+      const repair = referenceIdentifierRepairDraft(fresh, fieldId);
+      if (!repair || JSON.stringify(repair.changes) !== JSON.stringify(changes)) fail("ProtectedText");
+      fieldValues.set(fieldId, repair.value);
+    } else {
+      if (!undo || undo.undoneAt || undo.sourceHash !== fresh.sourceHash || undo.rows.length !== changes.length ||
+        !undo.rows.every(saved => changes.some(change => change.rowId === saved.rowId && JSON.stringify(change.parts) === JSON.stringify(saved.before)) &&
+          JSON.stringify(fresh.rows.find(row => row.id === saved.rowId)?.translation) === JSON.stringify(saved.after))) fail("UndoConflict");
+      // Reconstruct every recorded before row before proving the inverse. An
+      // ordinary partial-row validator cannot validate this intentionally bad field.
+      const beforePlan = planReviewText(field.translation, field.format);
+      let beforeValue = field.translation;
+      for (const change of changes) beforeValue = beforePlan.replace(fresh.rows.find(row => row.id === change.rowId)!.unitId, change.parts);
+      const beforeUnits = new Map(planReviewText(beforeValue, field.format).units.map(unit => [unit.id, unit.parts]));
+      const restored: ReviewSnapshot = { ...fresh,
+        fields: fresh.fields.map(item => item.id === fieldId ? { ...item, translation: beforeValue } : item),
+        rows: fresh.rows.map(row => row.fieldId === fieldId ? { ...row, translation: beforeUnits.get(row.unitId) ?? [], blocked: "StructureChanged" } : row) };
+      const proof = referenceIdentifierRepairDraft(restored, fieldId);
+      if (!proof || proof.value !== field.translation || JSON.stringify(proof.changes) !==
+        JSON.stringify(undo.rows.map(saved => ({ rowId: saved.rowId, parts: saved.after })))) fail("UndoConflict");
+      fieldValues.set(fieldId, beforeValue);
+    }
+  }
   const undoReferences = !!undo?.referenceRepair && !undo.undoneAt && undo.sourceHash === fresh.sourceHash && undo.rows.length === changes.length &&
     undo.rows.every(saved => changes.some(change => change.rowId === saved.rowId && JSON.stringify(change.parts) === JSON.stringify(saved.before)) &&
       JSON.stringify(fresh.rows.find(row => row.id === saved.rowId)?.translation) === JSON.stringify(saved.after));
@@ -360,17 +391,18 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
     history.agentRequestHash = options.agentRequestHash;
   }
   if (options.repairReferences) history.referenceRepair = true;
+  if (options.identifierRepair) history.identifierRepair = true;
   if (!/^[a-zA-Z0-9-]{1,80}$/u.test(history.id) || (options.undoId && !/^[a-zA-Z0-9-]{1,80}$/u.test(options.undoId))) fail("MissingField");
   if (readReviewHistory(target.flags).some(item => item.id === history.id)) fail("Conflict");
   const patch: Record<string, unknown> = {};
   for (const change of changes) {
     const row = fresh.rows.find(row => row.id === change.rowId);
     if (!row) fail("MissingField");
-    if (row.blocked && !(options.repairReferences && row.blocked === "StructureChanged")) fail(row.blocked);
+    if (row.blocked && !((options.repairReferences || options.identifierRepair) && row.blocked === "StructureChanged")) fail(row.blocked);
     if (JSON.stringify(change.parts) === JSON.stringify(row.translation)) continue;
     const field = fresh.fields.find(field => field.id === row.fieldId)!;
     const previous = fieldValues.get(field.id) ?? field.translation;
-    const value = validateReviewCorrection(fresh, row.id, change.parts, previous, !!options.repairReferences, undoReferences);
+    const value = identifierMode ? fieldValues.get(field.id)! : validateReviewCorrection(fresh, row.id, change.parts, previous, !!options.repairReferences, undoReferences);
     fieldValues.set(field.id, value);
     history.rows.push({ rowId: row.id, before: row.translation, after: [...change.parts], label: row.label, group: row.group });
     patch[`flags.${MODULE_ID}.review.entries.${row.id}`] = null;
@@ -406,6 +438,13 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   }
   patch[`flags.${MODULE_ID}.reviewHistory.${history.id}`] = history;
   if (options.undoId) patch[`flags.${MODULE_ID}.reviewHistory.${options.undoId}.undoneAt`] = history.at;
+  if (identifierMode) {
+    const latestSource = await fromUuid(fresh.entry.sourceUuid) as PortableDocument | null;
+    if (!latestSource?.toObject || latestSource.documentName !== fresh.entry.kind ||
+      await hashSource(fresh.entry.kind, latestSource.toObject()) !== fresh.sourceHash) fail("Conflict");
+    if (pack.locked) fail("Locked");
+    if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
+  }
   // Recheck immediately before the single persistence operation. Never restamp outputHash.
   if ((await captureTranslationWriteGuard(target))?.fingerprint !== fresh.guard.fingerprint) fail("Conflict");
   if (options.canWrite && !options.canWrite()) throw new Error("Live.Disconnected");
