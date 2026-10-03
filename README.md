@@ -2,6 +2,11 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.33.10** displays translated event and location summaries in Ember
+quest overviews, in both the native journal and Adventure Reader. Cards use exact
+translation provenance and preserve original links, tags and narrative state;
+unavailable or invalid translations retain the original card.
+
 Version **0.33.2** marks Ember's explicit read-aloud passages with a visible label
 and a distinct reading surface in all themes. Browser Back/Forward traverses
 reader pages and restores their reading positions; closing the reader returns
