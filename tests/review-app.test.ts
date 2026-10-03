@@ -33,7 +33,7 @@ async function fixture() {
   const app = new TranslationReviewApplication(); document.body.append(app.element); await app.render(true);
   return { app, Event, save, snapshot, storage, TranslationReviewApplication };
 }
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("offers a persisted crash draft in a new editor, restores only to the form and clears recovery only after saving", async () => {
   const { app, Event, save, storage, TranslationReviewApplication } = await fixture();
@@ -121,27 +121,56 @@ it("opens the working file from MCP but refuses to interrupt unsaved text or a r
   await app.openProject(); expect(app.element.textContent).toContain('Review.ProjectNotice');
 });
 
-it("bounds large sections, searches all pages, retains off-page drafts and opens a bookmark on its page", async () => {
-  const { app, Event, snapshot } = await fixture();
+function addLargeSection(snapshot: ReviewSnapshot): void {
+  // More than four production-size pages: filtering must inspect hidden rows.
   for (let i = 0; i < 220; i++) snapshot.rows.push({ ...snapshot.rows[0]!, id: `large-${i}`, source: [`Passage ${i}`], translation: [`Pasáž ${i}`] });
+}
+
+it("bounds large sections to fifty rows and retains drafts when paging away and back", async () => {
+  const { app, Event, snapshot } = await fixture(); addLargeSection(snapshot);
   await app.render(true);
   expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
   const input = app.element.querySelector('textarea')!; input.value = 'Rozepsáno mimo stránku'; input.dispatchEvent(new Event('input'));
   app.element.querySelector<HTMLButtonElement>('[data-review-next-page]')!.click();
   expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
+  expect(app.element.querySelector('[data-review-row="large-49"]')).toBeTruthy();
   expect(app.element.querySelector('textarea')!.value).not.toBe('Rozepsáno mimo stránku');
+  app.element.querySelector<HTMLButtonElement>('[data-review-previous-page]')!.click();
+  expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
+  expect(app.element.querySelector('textarea')!.value).toBe('Rozepsáno mimo stránku');
+});
+
+it("searches hidden pages after the debounce and retains a draft when clearing the filter", async () => {
+  const { app, Event, snapshot } = await fixture(); addLargeSection(snapshot);
+  await app.render(true);
+  const input = app.element.querySelector('textarea')!; input.value = 'Rozepsáno mimo stránku'; input.dispatchEvent(new Event('input'));
   const search = app.element.querySelector<HTMLInputElement>('input[type=search]')!;
+  // Exercise the real debounce callback without wall-clock polling under CI load.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  search.value = 'Pasáž 218'; search.dispatchEvent(new Event('input'));
+  vi.advanceTimersByTime(149);
+  expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
+  // A newer query cancels the earlier deadline and gets its own full debounce.
   search.value = 'Pasáž 219'; search.dispatchEvent(new Event('input'));
-  await vi.waitFor(() => expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(1));
+  vi.advanceTimersByTime(149);
+  expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
+  vi.advanceTimersByTime(1);
+  expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(1);
+  expect(app.element.querySelector('[data-review-row="large-219"]')).toBeTruthy();
   expect(app.element.querySelector('textarea')!.value).toBe('Pasáž 219');
   search.value = ''; search.dispatchEvent(new Event('input'));
-  await vi.waitFor(() => expect(app.element.querySelector('textarea')!.value).toBe('Rozepsáno mimo stránku'));
-  app.element.querySelector<HTMLButtonElement>('[data-review-discard]')!.click();
+  vi.advanceTimersByTime(150);
+  expect(app.element.querySelectorAll('[data-review-row]')).toHaveLength(50);
+  expect(app.element.querySelector('textarea')!.value).toBe('Rozepsáno mimo stránku');
+});
+
+it("opens an off-page bookmark directly on its bounded page", async () => {
+  const { app, snapshot } = await fixture(); addLargeSection(snapshot);
   await app.openAt(snapshot.entry.uuid, 'document', 'large-219');
   expect(app.element.querySelector('[data-review-row="large-219"]')).toBeTruthy();
   expect(app.element.querySelectorAll('[data-review-row]').length).toBeLessThanOrEqual(50);
+  expect(app.element.querySelector('[data-review-row="row1"]')).toBeNull();
 });
-
 
 it("keeps tabs and closing available while history is waiting for a compendium index", async () => {
   const { app } = await fixture(); const service = await import("../src/review/service");

@@ -2061,3 +2061,10 @@ Documents. Actual stored source data was unchanged; the prior damaged field was
 restored exactly on undo. Generic local QA journals remain separate from the
 licensed corpus; temporary harness code and private evidence are not published.
 Production requires the user-installed update before these new tools are used.
+
+The first CI run hit the pre-existing pagination test's combined five-second
+budget. Its paging/draft, whole-section search and bookmark coverage now use
+three separately bounded scenarios. Fake timers exercise the actual search
+debounce, including superseded-query cancellation, without wall-clock polling.
+The focused 12-test editor suite and typecheck pass; no global timeout or
+production behavior changed. Final CI runs the resulting 835 module tests.
