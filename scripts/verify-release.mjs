@@ -16,6 +16,16 @@ const sourceVersion = constantsSource.match(/MODULE_VERSION = "([^"]+)"/)?.[1];
 
 const failures = [];
 
+try {
+  const html = await readFile("dist/reader/index.html", "utf8");
+  for (const extension of ["js", "css"]) {
+    const name = `reader-${packageJson.version}.${extension}`;
+    if (!html.includes(`./${name}`)) failures.push(`Reader HTML must reference ${name}`);
+    const built = await readFile(`dist/reader/${name}`, "utf8");
+    if (built !== await readFile(`public/reader/reader.${extension}`, "utf8")) failures.push(`Reader ${extension} differs from source`);
+  }
+} catch { failures.push("Build the standalone reader assets first"); }
+
 for (const asset of ["vollkorn.woff2", "vollkorn-italic.woff2", "OFL.txt"]) {
   try {
     const original = await readFile(`public/fonts/vollkorn/${asset}`);

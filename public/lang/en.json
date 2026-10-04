@@ -753,5 +753,15 @@
   "FOUNDRY_TRANSLATE.Review.EmbedReadaloud": "Read-aloud text",
   "FOUNDRY_TRANSLATE.Review.EmbedCaption": "Preview caption",
   "FOUNDRY_TRANSLATE.Review.EmbedLabel": "Embedded preview name",
-  "FOUNDRY_TRANSLATE.Review.SourceReferenceUnmatched": "The original cannot be matched unambiguously."
+  "FOUNDRY_TRANSLATE.Review.SourceReferenceUnmatched": "The original cannot be matched unambiguously.",
+  "FOUNDRY_TRANSLATE.Reader.LightTitle": "Lightweight Reader",
+  "FOUNDRY_TRANSLATE.Reader.LightHint": "Prepare this book, previously added books and linked previews for a separate reading URL. Moving there closes the game tab. Repeat this step to pick up later corrections.",
+  "FOUNDRY_TRANSLATE.Reader.LightPrepare": "Update library and move to reader",
+  "FOUNDRY_TRANSLATE.Reader.LightOpen": "Open prepared libraries",
+  "FOUNDRY_TRANSLATE.Reader.LightPrivacy": "Texts are stored only in this browser profile, including GM information you can access. Copies remain after logout. You can delete them in the reader. Artwork and first loading the reader require a network connection.",
+  "FOUNDRY_TRANSLATE.Reader.LightPreparing": "Preparing documents…",
+  "FOUNDRY_TRANSLATE.Reader.LightPending": "Pending",
+  "FOUNDRY_TRANSLATE.Reader.LightCancel": "Cancel preparation",
+  "FOUNDRY_TRANSLATE.Reader.LightCancelled": "Preparation cancelled. Previous library retained.",
+  "FOUNDRY_TRANSLATE.Reader.LightFailed": "Could not prepare the library. Previous copy retained; check access to original books and available browser storage."
 }

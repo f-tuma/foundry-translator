@@ -753,5 +753,15 @@
   "FOUNDRY_TRANSLATE.Review.EmbedReadaloud": "Text ke čtení nahlas",
   "FOUNDRY_TRANSLATE.Review.EmbedCaption": "Titulek náhledu",
   "FOUNDRY_TRANSLATE.Review.EmbedLabel": "Název vloženého náhledu",
-  "FOUNDRY_TRANSLATE.Review.SourceReferenceUnmatched": "Originál nelze jednoznačně přiřadit."
+  "FOUNDRY_TRANSLATE.Review.SourceReferenceUnmatched": "Originál nelze jednoznačně přiřadit.",
+  "FOUNDRY_TRANSLATE.Reader.LightTitle": "Odlehčená Čtečka",
+  "FOUNDRY_TRANSLATE.Reader.LightHint": "Připraví tento deník, dříve přidané knihy a propojené náhledy pro čtení na samostatné URL. Přechodem se herní karta zavře. Další změny načtete opakováním tohoto kroku.",
+  "FOUNDRY_TRANSLATE.Reader.LightPrepare": "Aktualizovat knihovnu a přejít do čtečky",
+  "FOUNDRY_TRANSLATE.Reader.LightOpen": "Otevřít připravené knihovny",
+  "FOUNDRY_TRANSLATE.Reader.LightPrivacy": "Texty se uloží pouze do tohoto profilu prohlížeče, včetně informací pro vypravěče, pokud k nim máte přístup. Kopie zůstává i po odhlášení. Ve čtečce ji můžete odstranit. Obrázky a první načtení čtečky vyžadují síť.",
+  "FOUNDRY_TRANSLATE.Reader.LightPreparing": "Připravuji dokumenty…",
+  "FOUNDRY_TRANSLATE.Reader.LightPending": "Zbývá",
+  "FOUNDRY_TRANSLATE.Reader.LightCancel": "Zrušit přípravu",
+  "FOUNDRY_TRANSLATE.Reader.LightCancelled": "Příprava zrušena. Předchozí knihovna zůstala zachována.",
+  "FOUNDRY_TRANSLATE.Reader.LightFailed": "Knihovnu se nepodařilo připravit. Předchozí kopie zůstala zachována; ověřte přístup k původním knihám a volné úložiště prohlížeče."
 }
