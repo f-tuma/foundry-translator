@@ -20,6 +20,22 @@ index ze `sourceReferences` v čerstvém `live_get_context`; nepřijímá vlastn
 UUID ani cesty. Vrací pouze povolená textová pole, bez makra, konfigurace
 automatizace či zápisu do originálu. Pro další pole pokračuj přes `nextOffset`.
 
+Pokud se oprava zablokuje, asistent může použít `live_get_field_diagnostic`.
+Nejprve musí znovu načíst dotčený řádek přes `live_get_context` a převzít jeho
+`documentId`, `fieldId` a čerstvou `revision`. Diagnostika ukáže skutečnou
+odmítající kontrolu rekonstrukce či interpunkce, počty textových částí a
+stránkovaná metadata uzlů. Pro další stránku se používá `nodes.nextOffset` se
+stejnou revizí; při konfliktu je nutné začít s novým kontextem.
+
+Celé raw hodnoty originálu a překladu se vracejí jen při `raw.complete: true`
+a nejvýše 120 000 znacích dohromady. Jinak se výslovně uvede důvod vynechání
+(`RawSizeLimit` nebo `UnsafeRawPayload`), nikoli zkrácený text. Kontrola známých
+nebezpečných vzorů nepozná libovolné tajemství vložené do příběhu. Metadata
+rozdílů vracejí pouze počty, cesty a typy, nikoli raw hodnoty či příkazy.
+**Diagnostika nic neopravuje ani neověřuje** a nenahrazuje čerstvý náhled a
+validaci opravy. Podrobné limity a postup jsou v
+[návodu MCP](../apps/polish-mcp/README.md#diagnostika-celého-pole-bez-zápisu).
+
 Menu můžeš zavřít, GM kartu nech otevřenou. Povolený přístup se po obnovení
 stránky či restartu MCP automaticky připojí znovu ve stejném světě, účtu a jazyce.
 **Vypnout přístup** zastaví i automatické navazování. JSON obsahuje klíč; nesdílej

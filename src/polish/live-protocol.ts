@@ -1,6 +1,6 @@
 export const LIVE_PROTOCOL = 1;
 export const LIVE_PORT = 3112;
-export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "prepare_reference_rebuild" | "validate_reference_rebuild" | "apply_reference_rebuild" | "list_history" | "undo_correction";
+export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_field_diagnostic" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "prepare_reference_rebuild" | "validate_reference_rebuild" | "apply_reference_rebuild" | "list_history" | "undo_correction";
 export interface LiveArgs {
   documentId?: string; rowId?: string; rowIds?: string[]; revision?: string; operationId?: string;
   fieldId?: string; planHash?: string;
@@ -15,7 +15,7 @@ export interface LiveArgs {
 export interface LiveRequest { id: string; method: LiveMethod; args: Record<string, unknown> }
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
-const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild", "list_history", "undo_correction"];
+const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_field_diagnostic", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild", "list_history", "undo_correction"];
 const keys = new Set(["documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
@@ -29,6 +29,11 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
     if (!input.documentId || !input.rowId || !input.revision || typeof input.reason !== "string" || input.reason.trim().length < 5 ||
       (request.method === "restore_reference_identifiers" && !input.operationId)) fail();
   }
+  const fieldDiagnostic = request.method === "get_field_diagnostic";
+  if (fieldDiagnostic) {
+    const allowed = new Set(["documentId", "fieldId", "revision", "offset", "limit"]);
+    if (Object.keys(input).some(key => !allowed.has(key)) || !input.documentId || !input.fieldId || !input.revision) fail();
+  }
   const rebuild = ["prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild"].includes(request.method);
   if (rebuild) {
     const preparing = request.method === "prepare_reference_rebuild";
@@ -38,7 +43,7 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
       (!preparing && (!input.revision || !input.planHash || !Array.isArray(input.edits) || !input.edits.length ||
         typeof input.reason !== "string" || input.reason.trim().length < 5)) ||
       (request.method === "apply_reference_rebuild" && !input.operationId)) fail();
-  } else if (["fieldId", "planHash", "edits"].some(key => input[key] !== undefined)) fail();
+  } else if (["fieldId", "planHash", "edits"].some(key => input[key] !== undefined) && !fieldDiagnostic) fail();
   if (request.method === "get_context_batch" && (Object.keys(input).some(key => !["documentId", "rowIds"].includes(key)) || !input.documentId || input.rowIds === undefined)) fail();
   const args: LiveArgs = { offset: 0, limit: 20, query: "", radius: 2, fuzzy: false };
   if (input.rowIds !== undefined) {

@@ -7,7 +7,7 @@ import { proseNumbers } from "../polish/quality-guards";
 import { editableEmbedTextOptions, embedTextOptionSignature } from "./embed-text-options";
 import { portableReviewText, type ReviewChange, type ReviewSnapshot } from "./service";
 import { maskReviewParts, planReviewText, restoreReviewParts, type ReviewTextDraft } from "./text-plan";
-import { restoreSourcePunctuation, removeSourcePunctuation, type SourcePunctuationRestoration } from "./source-punctuation";
+import { restoreSourcePunctuation, removeSourcePunctuation, type SourcePunctuationRestoration, type SourcePunctuationDiagnostic } from "./source-punctuation";
 
 export interface RebuildReference {
   partIndex: number; marker: string; sourceCommand: string; command: string;
@@ -145,27 +145,56 @@ function assertUnchangedEmbedOptions(snapshot: ReviewSnapshot, field: ReviewSnap
 
 /** Complete field plan: command-damaged parts or one proved punctuation leaf.
  * Every new marker originates in the authoritative source of that same part. */
+export interface ReferenceRebuildDiagnostic {
+  stage: string; predicate: string; canPrepare: boolean;
+  details?: Record<string, string | number | boolean | null>;
+  errorCode?: string; punctuation?: SourcePunctuationDiagnostic;
+}
+/** Same builder, read-only report; this is not a proof accepted by any write API. */
+export async function diagnoseReferenceRebuild(snapshot: ReviewSnapshot, fieldId: string): Promise<ReferenceRebuildDiagnostic> {
+  const diagnostic: ReferenceRebuildDiagnostic = { stage: "field", predicate: "not-started", canPrepare: false };
+  try {
+    const plan = await buildPlan(snapshot, fieldId, diagnostic);
+    if (plan) { diagnostic.stage = "ready"; diagnostic.predicate = "complete-plan-proved"; diagnostic.canPrepare = true; }
+  } catch (error) {
+    // Never return raw exception messages or stacks (may contain application data).
+    const code = error instanceof Error && /^Review\.[A-Za-z]+$/u.test(error.message) ? error.message : "InternalDiagnosticError";
+    diagnostic.errorCode = code;
+  }
+  return diagnostic;
+}
 export async function prepareReferenceRebuild(snapshot: ReviewSnapshot, fieldId: string): Promise<ReferenceRebuildPlan | null> {
   try { return await buildPlan(snapshot, fieldId); }
   catch { return null; }
 }
-async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<ReferenceRebuildPlan | null> {
+async function buildPlan(snapshot: ReviewSnapshot, fieldId: string, diagnostic?: ReferenceRebuildDiagnostic): Promise<ReferenceRebuildPlan | null> {
+  const stage = (value: string, predicate: string) => { if (diagnostic) { diagnostic.stage = value; diagnostic.predicate = predicate; } };
+  const reject = (predicate: string, details: ReferenceRebuildDiagnostic["details"] = {}): null => {
+    if (diagnostic) { diagnostic.predicate = predicate; diagnostic.details = details; }
+    return null;
+  };
+  stage("field", "allowlisted-field-with-nonempty-translation-and-no-warning");
   const field = snapshot.fields.find(field => field.id === fieldId);
-  if (!field || snapshot.warning || !field.translation.trim()) return null;
+  if (!field || snapshot.warning || !field.translation.trim()) return reject("allowlisted-field-with-nonempty-translation-and-no-warning", { fieldFound: !!field, warning: snapshot.warning, nonemptyTranslation: !!field?.translation.trim() });
   // The only markup repair admitted here is a separately proved source-owned
   // punctuation leaf. Normal validation below still checks the complete field.
-  const punctuation = field.format === "html" ? restoreSourcePunctuation(field.source, field.translation) : null;
+  stage("punctuation", "raw-punctuation-proof");
+  const punctuationTrace: { value?: SourcePunctuationDiagnostic } = {};
+  const punctuation = field.format === "html" ? restoreSourcePunctuation(field.source, field.translation, diagnostic ? punctuationTrace : undefined) : null;
+  if (diagnostic && punctuationTrace.value) diagnostic.punctuation = punctuationTrace.value;
   const alignedTranslation = punctuation?.value ?? field.translation;
+  stage("canonical-integrity", "portable-reference-notation-and-structure");
   const canonical = portableReviewText(snapshot, field, alignedTranslation);
   const integrity = diagnosePortableText(field.source, canonical, field.format);
   // A punctuation-only repair needs no command defect: restoring the proved
   // leaf can already make the complete field portable. Its text is immutable
   // in materializeReferenceRebuild, while every unrelated part stays exact.
-  if (!integrity && !punctuation) return null;
+  if (!integrity && !punctuation) return reject("repair-required");
   if (integrity && (integrity.markup.length || integrity.markupTruncated || integrity.commands.truncated ||
-      (!integrity.commands.missing.length && !integrity.commands.extra.length))) return null;
+      (!integrity.commands.missing.length && !integrity.commands.extra.length))) return reject("only-command-defects-after-proved-punctuation", { markup: integrity.markup.length, markupTruncated: integrity.markupTruncated, commandTruncated: integrity.commands.truncated, missingCommands: integrity.commands.missing.length, extraCommands: integrity.commands.extra.length });
   const sourcePlan = planReviewText(field.source, field.format), currentPlan = planReviewText(alignedTranslation, field.format);
   const beforePlan = planReviewText(field.translation, field.format);
+  stage("source-gates", "source-part-addresses-match-planner");
   const environment = referenceRebuildEnvironment(), gates = sourcePartGates(field.source, field.format, environment);
   const sourceRequirements = new Map<string, boolean>();
   const classifiedOccurrences = new Map<string, number>();
@@ -195,27 +224,31 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<Ref
       if (canonical) sourceRequirements.set(canonical.split("#")[0]!, true);
     }
   }
+  stage("field-rows", "unit-count-and-unique-complete-blocked-rows");
   const fieldRows = snapshot.rows.filter(row => row.fieldId === fieldId);
   if (sourcePlan.units.length !== currentPlan.units.length || fieldRows.length !== sourcePlan.units.length ||
       new Set(fieldRows.map(row => row.id)).size !== fieldRows.length || new Set(fieldRows.map(row => row.unitId)).size !== fieldRows.length ||
-      fieldRows.some(row => row.blocked !== "StructureChanged")) return null;
+      fieldRows.some(row => row.blocked !== "StructureChanged")) return reject("unit-count-and-unique-complete-blocked-rows", { sourceUnits: sourcePlan.units.length, currentUnits: currentPlan.units.length, fieldRows: fieldRows.length, uniqueRowIds: new Set(fieldRows.map(row => row.id)).size, uniqueUnitIds: new Set(fieldRows.map(row => row.unitId)).size, allStructureChanged: fieldRows.every(row => row.blocked === "StructureChanged") });
   const rows: ReferenceRebuildRow[] = [], targets: ReferenceRebuildPlan["targets"] = [];
   for (const sourceUnit of sourcePlan.units) {
+    stage("unit-alignment", "unit-and-row-source-current-exact");
     const currentUnit = currentPlan.units.find(unit => unit.id === sourceUnit.id);
     const beforeUnit = beforePlan.units.find(unit => unit.id === sourceUnit.id);
     const row = fieldRows.find(row => row.unitId === sourceUnit.id);
     if (!currentUnit || !beforeUnit || !row || row.format !== field.format || sourceUnit.parts.length !== currentUnit.parts.length ||
-        !equal(row.source, sourceUnit.parts) || !equal(row.translation, beforeUnit.parts)) return null;
+        !equal(row.source, sourceUnit.parts) || !equal(row.translation, beforeUnit.parts)) return reject("unit-and-row-source-current-exact", { unitId: sourceUnit.id, currentFound: !!currentUnit, beforeFound: !!beforeUnit, rowFound: !!row, formatEqual: row?.format === field.format, sourceParts: sourceUnit.parts.length, currentParts: currentUnit?.parts.length ?? -1, beforeParts: beforeUnit?.parts.length ?? -1, rowSourceEqual: !!row && equal(row.source, sourceUnit.parts), rowCurrentEqual: !!row && !!beforeUnit && equal(row.translation, beforeUnit.parts) });
     const partIndices = sourceUnit.parts.flatMap((part, index) => equal(syntaxExpressions(part), syntaxExpressions(portableReviewText(snapshot, field, currentUnit.parts[index]!))) ? [] : [index]);
     if (punctuation?.proof.unitId === sourceUnit.id && !partIndices.includes(punctuation.proof.partIndex)) partIndices.push(punctuation.proof.partIndex);
     partIndices.sort((a, b) => a - b);
     if (!partIndices.length) continue;
-    if (sourceUnit.attribute) return null;
+    if (sourceUnit.attribute) return reject("affected-unit-is-not-prose-attribute", { unitId: sourceUnit.id });
     const baseline = [...currentUnit.parts];
     const mapped = new Map<number, ReturnType<typeof mapSourceCommand>[]>();
     for (const partIndex of partIndices) {
       const part = sourceUnit.parts[partIndex]!;
+      stage("embed-options", "source-current-embed-options-uniquely-bound-and-unchanged");
       assertUnchangedEmbedOptions(snapshot, field, part, currentUnit.parts[partIndex]!);
+      stage("source-command-map", "exact-source-command-forward-provenance");
       const refs: ReturnType<typeof mapSourceCommand>[] = [];
       baseline[partIndex] = part.replace(FOUNDRY_EXPRESSION, command => {
         const rawTarget = /^@(?:UUID|Embed)\[[^\S\r\n]*([^\]\s]+)/iu.exec(command)?.[1];
@@ -227,9 +260,10 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<Ref
         return ref.command;
       });
       // Source text with command-like corruption is not a safe rebuilding authority.
-      if (/&(?:amp;)?(?![Rr]eference\[)[\p{L}][\p{L}\p{N}_]*\[/u.test(baseline[partIndex]!)) return null;
+      if (/&(?:amp;)?(?![Rr]eference\[)[\p{L}][\p{L}\p{N}_]*\[/u.test(baseline[partIndex]!)) return reject("source-has-no-unknown-command-prefix", { unitId: sourceUnit.id, partIndex });
       mapped.set(partIndex, refs);
     }
+    stage("source-mask", "source-derived-inventory-paired");
     const edit = maskReviewParts(baseline), referenceMap: RebuildReference[] = [];
     for (const partIndex of partIndices) {
       const sourceCommands = [...sourceUnit.parts[partIndex]!.matchAll(FOUNDRY_EXPRESSION)].map(match => match[0]);
@@ -244,9 +278,12 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<Ref
     rows.push({ rowId: row.id, unitId: row.unitId, partIndices, source: [...sourceUnit.parts], before: [...row.translation], baseline, edit, referenceMap,
       ...(punctuation?.proof.unitId === sourceUnit.id ? { alignedBefore: [...currentUnit.parts] } : {}) });
   }
-  if (!rows.length || rows.length > 50 || rows.reduce((sum, row) => sum + row.source.join("").length + row.before.join("").length, 0) > 120000) return null;
+  stage("plan-bounds", "nonempty-at-most-50-rows-and-120000-prose-chars");
+  if (!rows.length || rows.length > 50 || rows.reduce((sum, row) => sum + row.source.join("").length + row.before.join("").length, 0) > 120000) return reject("nonempty-at-most-50-rows-and-120000-prose-chars", { affectedRows: rows.length, proseChars: rows.reduce((sum, row) => sum + row.source.join("").length + row.before.join("").length, 0) });
+  stage("final-field-proof", "all-source-derived-replacements-pass-full-portable-validation");
   const value = replaceRows(alignedTranslation, field.format, rows.map(row => ({ unitId: row.unitId, parts: row.baseline })));
   assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
+  stage("proof-hash", "deterministic-plan-hash");
   const body = { version: 1 as const, documentId: snapshot.entry.uuid, sourceHash: snapshot.sourceHash, fieldId,
     fieldSourceHash: await hash(field.source), beforeHash: await hash(field.translation), guardFingerprint: snapshot.guard.fingerprint,
     ...environment, ...(punctuation ? { punctuation: punctuation.proof } : {}), rows, targets: targets.filter((target, index) => targets.findIndex(other => equal(other, target)) === index) };

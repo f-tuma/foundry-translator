@@ -123,6 +123,48 @@ validací. Zápis má historii, idempotentní opakování a možnost vrácení, 
 jeho dotčené odstavce ani originál nezměnily. Oprava se neoznačí jako ověřená.
 Po aktualizaci modulu zkopíruj nový MCP JSON a restartuj MCP klienta.
 
+### Diagnostika celého pole bez zápisu
+
+Pokud je text zablokovaný nebo `live_prepare_reference_rebuild` odmítne plán,
+`live_get_field_diagnostic` pomůže zjistit, kterou kontrolou celé pole neprošlo.
+Neopravuje dokument, nemění ověření a není oprávněním obejít ochrany.
+
+1. Načti dotčený řádek přes `live_get_context` a z odpovědi převezmi přesné
+   `documentId`, `fieldId` a čerstvou `revision`. `fieldId` je identifikátor
+   povoleného textového pole, nikoli libovolná cesta, kterou si agent sestaví.
+2. Zavolej `live_get_field_diagnostic` s těmito třemi hodnotami a například
+   `offset: 0`, `limit: 50`. Nástroj nepřijímá náhradní text, UUID, příkazy ani
+   argumenty pro zápis. Vyžaduje přístup spárovaného GM k originálu i kopii.
+3. Čti `rebuild.stage` a `rebuild.predicate`, případně `rebuild.punctuation`:
+   popisují skutečný průchod stejným striktním plánovačem, který rozhoduje o
+   dostupnosti rekonstrukce. `canPrepare` není potvrzení dostupnosti cílových
+   dokumentů ani povolení k zápisu.
+4. Pro další metadata uzlů pokračuj s `offset` z `nodes.nextOffset`, stejnou
+   revizí a stejným polem, dokud není `null`. `units` uvádí počty původních a
+   přeložených částí a jejich vazbu na řádky; `nodes` stránkuje cesty, typy,
+   délky a příznaky uzlů, ne jejich text ani hodnoty atributů.
+
+`raw.complete: true` znamená, že `raw.source` a `raw.current` obsahují celé
+nezkrácené hodnoty vybraného pole. Pro obě dohromady platí limit **120 000 znaků**.
+Při překročení nebo zjištění známého spustitelného či přihlašovacího obsahu se
+nevrací výňatek: `raw.complete` je `false`, `omittedReason` uvádí `RawSizeLimit`
+nebo `UnsafeRawPayload` a jsou uvedeny pouze délky. To platí i pro prostý text.
+Kontrola známých vzorů není detektor libovolného tajemství vloženého do příběhu;
+vrácená próza může obsahovat například herní hesla a je určena spárovanému GM.
+
+`integrity` vždy vrací jen počty, cesty a typy rozdílů, nikdy znovu raw hodnoty
+ani těla příkazů. Větší požadavek může skončit `Live.ContextTooLarge`: vstup má
+limit **250 000 znaků**, odpověď **200 000 UTF-8 bajtů**, nejvýše 500 textových
+jednotek a 5 000 parsovaných uzlů na každé straně. Stránkování uzlů neobchází
+tyto limity a neobnovuje vynechané raw hodnoty.
+
+Změna dokumentu, originálu, glosáře nebo mapování přeložených kopií během čtení
+způsobí konflikt; změna oprávnění či rozsahu také zablokuje odpověď. V takovém
+případě načti nový kontext a začni znovu. Nekombinuj stránky z různých revizí.
+Případná oprava stále vyžaduje samostatný čerstvý plán, náhled a validovaný zápis;
+diagnostika sama nepotvrzuje příčinu staršího problému, dokud nejsou přečteny
+skutečné podklady daného pole.
+
 ### Diagnostika a řízené opravy od 0.32.1 / MCP 0.3.1
 
 `live_get_context` vrací také `integrityDetails`: chybějící a nadbytečné chráněné
