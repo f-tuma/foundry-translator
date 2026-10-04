@@ -36,6 +36,39 @@ Positions, tab histories, bookmarks and settings are stored locally, scoped to
 world, account and UI language. Document prose is not cached. Reading requires a
 live Foundry connection and login. Positions do not sync across devices.
 
+## Lightweight reading URL
+
+Reader Settings → **Update library and move to reader** prepares the current
+book, all its readable chapters, previously added books, and recursively linked
+document previews. It then navigates the same tab to
+`<routePrefix>/modules/foundry-translate/reader/index.html`. Bookmark that URL on
+the tablet. The separate page loads a small static HTML/CSS/JavaScript reader;
+it does not load Foundry, the canvas, a game socket or animation loops.
+
+The library lives in IndexedDB in this browser profile, scoped to world, user
+and translation language. Preparing another book adds it to this library; every
+update rebuilds all selected books and linked previews from current, permitted
+documents. Original and translated permissions are checked by the existing
+reader and checked again before committing. An interrupted, failed or oversized
+preparation leaves the previous library intact. Limit: 5,000 requested document
+identities / 64 MiB of snapshot data. Failed linked targets are listed in library
+notes; they never route to guessed documents.
+
+Reading supports chapter navigation, exact document links, anchors, previews,
+browser Back/Forward, bookmarks, search, text size and dark/paper/sepia themes.
+The saved timestamp identifies the copy being read. Open Foundry again and repeat
+preparation to pick up corrections; the snapshot is not a live feed. Artwork
+uses same-origin server URLs and may still need a connection. This version has
+no service worker and does not guarantee an offline cold start.
+
+**Local copies are not an authentication boundary.** A GM library includes the
+GM text available at preparation. Anyone using the same browser profile (and
+same-origin scripts) can access its stored copy; logout or later permission
+revocation does not remotely erase it. Use a personal browser profile. Settings
+→ Delete this library removes the selected copy and its local reading state.
+Nothing containing story text is uploaded to a public server file. The public
+URL is an empty shell until a local library has been explicitly prepared/chosen.
+
 ## Documents and safety
 
 Ember pages use a separate native sheet prepared in view mode. The reader does

@@ -2068,3 +2068,21 @@ three separately bounded scenarios. Fake timers exercise the actual search
 debounce, including superseded-query cancellation, without wall-clock polling.
 The focused 12-test editor suite and typecheck pass; no global timeout or
 production behavior changed. Final CI runs the resulting 835 module tests.
+
+- 2026-10-04: Lightweight Reader prepared for 0.34.0. The user explicitly chose a
+  personal browser-local library with manual refresh. Reader Settings prepares
+  the current book plus previously added roots and recursively linked previews;
+  the completed snapshot commits atomically to IndexedDB and the SAME tab moves
+  to `modules/foundry-translate/reader/index.html`, ending the Foundry runtime.
+  Source/copy access, ownership and GM role are checked again before commit;
+  interrupted/failed preparations retain the old copy. The public static shell
+  contains no story data and makes no game/API/socket calls. Local copies are
+  device/profile trust, not an auth boundary; GM text survives logout/revocation
+  until locally deleted. Artwork and cold starts can require a network; no service
+  worker. Native ToC IDs (including repeated heading suffixes) are materialized.
+  Standalone browser QA used ONLY a synthetic library at 127.0.0.1:3102, in tablet
+  768x1024 and phone 390x844 sizes; links, previews, anchors, Back across books,
+  bookmarks, find, themes, restore and console passed. Local Foundry is currently
+  being used by another agent: DO NOT start, modify or test it until the user
+  authorizes that again. Actual Foundry preparation is not yet browser-tested.
+  Production installation remains user-managed.

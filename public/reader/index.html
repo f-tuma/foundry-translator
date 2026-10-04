@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="dark light">
+  <title>Místní čtečka · Foundry Translate</title>
+  <link rel="stylesheet" href="./reader.css">
+  <script type="module" src="./reader.js"></script>
+</head>
+<body data-theme="dark">
+  <header class="reader-header">
+    <div class="header-row">
+      <button id="library-button" class="icon-button" aria-label="Knihovna" title="Knihovna"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 3v18M9 3v18M14 3v18M18 4l4 16"/></svg></button>
+      <button id="contents-button" class="icon-button" aria-label="Obsah" title="Obsah"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 5h13M8 12h13M8 19h13M3 5h1M3 12h1M3 19h1"/></svg></button>
+      <div class="header-title"><small id="book-title">Foundry Translate</small><strong id="page-title">Místní čtečka</strong></div>
+      <button id="bookmark-button" class="icon-button" aria-label="Přidat záložku" title="Přidat záložku" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+      <button id="find-button" class="icon-button" aria-label="Hledat na stránce" title="Hledat na stránce"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg></button>
+      <button id="settings-button" class="icon-button" aria-label="Nastavení čtení" title="Nastavení čtení"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg></button>
+    </div>
+    <div id="find-bar" class="find-bar" hidden>
+      <label class="sr-only" for="find-input" data-i18n="find">Hledat na stránce</label><input id="find-input" type="search" autocomplete="off" placeholder="Hledat na stránce">
+      <output id="find-count" aria-live="polite"></output><button id="find-previous" aria-label="Předchozí výskyt">↑</button><button id="find-next" aria-label="Další výskyt">↓</button><button id="find-close" aria-label="Zavřít hledání">×</button>
+    </div>
+    <progress id="reading-progress" max="100" value="0" aria-label="Postup čtení"></progress>
+  </header>
+  <main id="reading-surface" tabindex="-1">
+    <article id="article" class="reader-article"><header><p id="article-context" class="eyebrow"></p><h1 id="article-title">Místní čtečka</h1><p id="article-subtitle" class="subtitle" hidden></p></header><div id="prose" class="reader-prose"></div><nav id="page-navigation" class="page-navigation" aria-label="Listování"><button id="previous-page">← <span data-i18n="previous">Předchozí</span></button><button id="next-page"><span data-i18n="next">Další</span> →</button></nav></article>
+  </main>
+  <footer class="reader-footer"><button id="back-button">← <span data-i18n="back">Zpět</span></button><span id="position-label"></span><span id="local-label" data-i18n="local">Místní knihovna</span></footer>
+  <dialog id="panel" aria-labelledby="panel-title"><header class="panel-header"><h2 id="panel-title"></h2><button id="panel-close" class="icon-button" aria-label="Zavřít">×</button></header><div id="panel-body"></div></dialog>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

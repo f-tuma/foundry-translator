@@ -2,6 +2,7 @@ import { logger } from "../logger";
 import { escapeReader as esc, loadReaderContent, prepareReaderProse, type ReaderContent } from "./content";
 import { activeTab, closeReaderTab, currentPlace, freshReaderState, navigateTab, parseReaderState, MAX_TABS, type ReaderState, type ReadingPlace } from "./state";
 import { ReaderBrowserHistory, type ReaderHistoryLocation } from "./browser-history";
+import { lightReaderUrl, prepareLightReader } from "./light-launch";
 
 const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Reader.${key}`);
 const icon = (name: string) => `<i class="fa-solid fa-${name}" aria-hidden="true"></i>`;
@@ -27,6 +28,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
   private previousFocus: HTMLElement | null = null;
   private libraryFilter = "";
   private attemptedUuid?: string;
+  private lightPreparation: AbortController | undefined;
   private browserHistory = new ReaderBrowserHistory(location => {
     void this.restoreBrowserLocation(location).catch(error => { logger.warn("Reader history failed.", error); ui.notifications.warn(t("Unavailable")); });
   }, () => { void this.close(); });
@@ -194,7 +196,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
       }).join("") ?? ""}</nav>`;
     }
     if (this.panel === "bookmarks") return header + `<button type="button" class="ft-reader-save-bookmark" data-reader-action="bookmark">${icon("bookmark")} ${esc(t("BookmarkHere"))}</button><nav>${this.state.bookmarks.map((p, i) => `<div class="ft-reader-bookmark"><button type="button" data-reader-bookmark="${i}"${p.uuid === this.content?.uuid ? ' aria-current="page"' : ""}><span>${esc(p.title)}</span><small>${p.book ? `${esc(p.book)} · ` : ""}${Math.round(p.ratio * 100)} %</small></button><button type="button" data-reader-remove-bookmark="${i}" aria-label="${esc(t("RemoveBookmark"))}">${icon("trash")}</button></div>`).join("") || `<p>${esc(t("NoBookmarks"))}</p>`}</nav>`;
-    if (this.panel === "settings") return header + `<div class="ft-reader-preferences"><h3>${esc(t("FontSize"))}</h3><div class="ft-reader-size">${button("font-minus", "Smaller", "minus")}<output>${this.state.fontSize} px</output>${button("font-plus", "Larger", "plus")}</div><h3>${esc(t("Theme"))}</h3><div class="ft-reader-themes">${(["dark", "paper", "sepia"] as const).map(theme => `<button type="button" data-reader-theme="${theme}" aria-pressed="${theme === this.state.theme}">${esc(t({ dark: "Dark", paper: "Paper", sepia: "Sepia" }[theme]))}</button>`).join("")}</div><button type="button" data-reader-action="wide" aria-pressed="${this.state.wide}">${icon("arrows-left-right-to-line")} ${esc(t("Wide"))}</button><button type="button" data-reader-action="fullscreen">${icon("expand")} ${esc(t("Fullscreen"))}</button><p>${esc(t("PreferenceHint"))}</p></div>`;
+    if (this.panel === "settings") return header + `<div class="ft-reader-preferences"><h3>${esc(t("FontSize"))}</h3><div class="ft-reader-size">${button("font-minus", "Smaller", "minus")}<output>${this.state.fontSize} px</output>${button("font-plus", "Larger", "plus")}</div><h3>${esc(t("Theme"))}</h3><div class="ft-reader-themes">${(["dark", "paper", "sepia"] as const).map(theme => `<button type="button" data-reader-theme="${theme}" aria-pressed="${theme === this.state.theme}">${esc(t({ dark: "Dark", paper: "Paper", sepia: "Sepia" }[theme]))}</button>`).join("")}</div><button type="button" data-reader-action="wide" aria-pressed="${this.state.wide}">${icon("arrows-left-right-to-line")} ${esc(t("Wide"))}</button><button type="button" data-reader-action="fullscreen">${icon("expand")} ${esc(t("Fullscreen"))}</button><p>${esc(t("PreferenceHint"))}</p><section class="ft-reader-light-settings"><h3>${esc(t("LightTitle"))}</h3><p>${esc(t("LightHint"))}</p><button type="button" data-reader-action="light-prepare"${this.content ? "" : " disabled"}>${icon("book-open")} ${esc(t("LightPrepare"))}</button><button type="button" data-reader-action="light-cancel" hidden>${esc(t("LightCancel"))}</button><output data-reader-light-progress role="status" aria-live="polite"></output><a href="${esc(lightReaderUrl())}">${esc(t("LightOpen"))}</a><p>${esc(t("LightPrivacy"))}</p></section></div>`;
     // Group by the sidebar folder path (Ember: Quests › Chapter 2, Gazetteer, …).
     const groups = new Map<string, { name: string; uuid: string }[]>();
     for (const j of game.journal.contents as any[]) {
@@ -243,6 +245,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
   private async onClick(event: MouseEvent): Promise<void> {
     if (!(event.target instanceof Element)) return;
     const el = event.target.closest<HTMLElement>("button,a,.ft-reader-scrim"); if (!el || !this.element?.contains(el)) return;
+    if (this.lightPreparation && !["close", "light-cancel"].includes(el.dataset.readerAction ?? "")) { event.preventDefault(); event.stopImmediatePropagation(); return; }
     if (el.closest("[data-reader-prose]")) {
       // Native document-link/roll handlers must not execute behind the reader.
       if (el.matches("a.content-link[data-uuid]")) {
@@ -282,6 +285,27 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     if (el.dataset.readerRemoveBookmark !== undefined) this.state.bookmarks.splice(Number(el.dataset.readerRemoveBookmark), 1);
     if (el.dataset.readerTheme) this.state.theme = el.dataset.readerTheme as ReaderState["theme"];
     const action = el.dataset.readerAction;
+    if (action === "light-cancel") { this.lightPreparation?.abort(); return; }
+    if (action === "light-prepare" && this.content) {
+      const controller = new AbortController(); this.lightPreparation = controller;
+      const output = this.element.querySelector<HTMLOutputElement>("[data-reader-light-progress]");
+      const cancel = this.element.querySelector<HTMLButtonElement>('[data-reader-action="light-cancel"]');
+      if (cancel) cancel.hidden = false;
+      (el as HTMLButtonElement).disabled = true;
+      if (output) output.textContent = t("LightPreparing");
+      try {
+        const url = await prepareLightReader(this.content.uuid, (done, pending) => {
+          if (output) output.textContent = `${t("LightPreparing")} ${done} · ${t("LightPending")}: ${pending}`;
+        }, controller.signal);
+        if (controller.signal.aborted) return;
+        // Same-tab navigation tears down the canvas, game socket and animations.
+        this.remember(); this.save(); window.location.assign(url);
+      } catch (error) {
+        if (output) output.textContent = t(error instanceof Error && error.name === "AbortError" ? "LightCancelled" : "LightFailed");
+        if (!(error instanceof Error && error.name === "AbortError")) logger.warn("Light reader preparation failed.", error);
+      } finally { this.lightPreparation = undefined; (el as HTMLButtonElement).disabled = false; if (cancel) cancel.hidden = true; }
+      return;
+    }
     if (action === "close") { await this.close(); return; }
     if (action === "retry" && this.attemptedUuid) return this.navigate(this.attemptedUuid);
     if (action === "back" || action === "forward") {
@@ -394,6 +418,7 @@ export class AdventureReader extends foundry.applications.api.ApplicationV2 {
     const count = this.element.querySelector("[data-reader-find-count]"); if (count) count.textContent = this.matches.length ? `${this.matchIndex + 1} / ${this.matches.length}${this.matches.length === 500 ? "+" : ""}` : t("NoMatches");
   }
   async close(options?: Record<string, unknown>): Promise<this> {
+    this.lightPreparation?.abort();
     this.remember(); clearTimeout(this.saveTimer); this.save(); ++this.sequence; this.busy = false;
     await this.browserHistory.stop();
     if (this.fullscreenOwned && document.fullscreenElement) await document.exitFullscreen().catch(() => {});
