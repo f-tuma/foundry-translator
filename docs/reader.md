@@ -38,6 +38,10 @@ live Foundry connection and login. Positions do not sync across devices.
 
 ## Lightweight reading URL
 
+**Server prerequisite:** Foundry serves module HTML as plain text. Configure an
+exact-path reverse-proxy exception for the reader shell before using this URL;
+see [reader-hosting.md](reader-hosting.md). Keep all other uploaded HTML protected.
+
 Reader Settings → **Update library and move to reader** prepares the current
 book, all its readable chapters, previously added books, and recursively linked
 document previews. It then navigates the same tab to

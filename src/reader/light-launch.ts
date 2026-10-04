@@ -56,8 +56,18 @@ export function lightReaderUrl(library?: string, uuid?: string): string {
   if (uuid) url.searchParams.set("uuid", uuid);
   return url.href;
 }
+/** Foundry deliberately serves uploaded HTML as plain text. A reverse proxy
+ * must opt in only this trusted module shell, never arbitrary uploaded HTML. */
+export async function assertLightReaderEndpoint(signal?: AbortSignal): Promise<void> {
+  const response = await fetch(lightReaderUrl(), { method: "HEAD", cache: "no-store", redirect: "error", ...(signal ? { signal } : {}) });
+  if (!response.ok || response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() !== "text/html") {
+    throw new Error("Reader.LightServerHtmlRequired");
+  }
+}
 export async function prepareLightReader(uuid: string, progress?: (done: number, pending: number) => void, signal?: AbortSignal): Promise<string> {
-  const initial = scope(), initialGM = game.user?.isGM, old = await readLightLibrary(initial.id);
+  const initial = scope(), initialGM = game.user?.isGM;
+  await assertLightReaderEndpoint(signal);
+  const old = await readLightLibrary(initial.id);
   const authorized = new Map<string, { sourceUuid: string; owner: boolean; sourceOwner: boolean }>();
   const assertAccount = () => { if (scope().id !== initial.id || game.user?.isGM !== initialGM) throw new Error("Reader.LightAccountChanged"); };
   const access = async (target: string) => {

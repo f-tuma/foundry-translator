@@ -763,5 +763,7 @@
   "FOUNDRY_TRANSLATE.Reader.LightPending": "Zbývá",
   "FOUNDRY_TRANSLATE.Reader.LightCancel": "Zrušit přípravu",
   "FOUNDRY_TRANSLATE.Reader.LightCancelled": "Příprava zrušena. Předchozí knihovna zůstala zachována.",
-  "FOUNDRY_TRANSLATE.Reader.LightFailed": "Knihovnu se nepodařilo připravit. Předchozí kopie zůstala zachována; ověřte přístup k původním knihám a volné úložiště prohlížeče."
+  "FOUNDRY_TRANSLATE.Reader.LightFailed": "Knihovnu se nepodařilo připravit. Předchozí kopie zůstala zachována; ověřte přístup k původním knihám a volné úložiště prohlížeče.",
+  "FOUNDRY_TRANSLATE.Reader.LightServerHtmlRequired": "Server podává stránku čtečky jako prostý text. Správce musí pro jedinou cestu /modules/foundry-translate/reader/index.html nastavit Content-Type: text/html; charset=utf-8 v reverzní proxy. Knihovna zůstala beze změny. Postup: docs/reader-hosting.md v repozitáři modulu.",
+  "FOUNDRY_TRANSLATE.Reader.LightChecking": "Kontroluji stránku čtečky…"
 }
