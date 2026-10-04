@@ -2,6 +2,12 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.33.12** extends that display to Ember's inline outcome cards and
+inline event-state links, in native journals and Adventure Reader. It uses saved
+translated labels and summaries with exact source/event/outcome identity. Native
+checkbox nodes, listeners, live state, source UUIDs and icons are retained;
+ambiguous, inaccessible or concurrently changed copies retain original text.
+
 Version **0.33.11** also displays saved translations of event outcome summaries
 in Ember's native journal and Adventure Reader. Matching uses the original
 outcome IDs; choice controls, completion state and canonical event data remain

@@ -1,7 +1,7 @@
 import { MODULE_ID } from "../constants";
 import { logger } from "../logger";
 import { sourceReferenceUuid } from "./document-identity";
-import { translatedOutcomeSections } from "./translated-event-outcomes";
+import { registerTranslatedEventEnrichers, translatedOutcomeSections } from "./translated-event-outcomes";
 
 type Method = (this: any, ...args: any[]) => any;
 interface RuntimeEvent { id: string; page?: string; [key: string]: unknown }
@@ -189,6 +189,7 @@ export function decorateEmberTranslation(sheet: { document: EmberPage; element: 
 
 export function registerEmberRuntimeBridge(): void {
   if (!game.modules.get("ember")?.active) return;
+  registerTranslatedEventEnrichers();
   const models = (CONFIG as any).JournalEntryPage?.dataModels;
   const sheetPrototype = environment.runtime()?.api.applications.EmberEventPageSheet?.prototype;
   if (!models || !sheetPrototype || typeof sheetPrototype._prepareContext !== "function") {
