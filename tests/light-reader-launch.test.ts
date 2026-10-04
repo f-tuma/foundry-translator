@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseHTML } from "linkedom";
-import { prepareLightReader, sanitizeLightHtml } from "../src/reader/light-launch";
+import { assertLightReaderEndpoint, prepareLightReader, sanitizeLightHtml } from "../src/reader/light-launch";
+import { AdventureReader } from "../src/reader/reader-app";
 
 const mocks = vi.hoisted(() => ({ load: vi.fn(), read: vi.fn(), write: vi.fn(), source: vi.fn() }));
 vi.mock("../src/reader/light-storage", () => ({ readLightLibrary: mocks.read, writeLightLibrary: mocks.write }));
@@ -15,9 +16,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   const { document } = parseHTML("<html><body></body></html>"); vi.stubGlobal("document", document);
   user = { id: "u", name: "Reader", isGM: true };
-  vi.stubGlobal("game", { user, world: { id: "w", title: "World" }, i18n: { lang: "cs" }, settings: { get: () => "cs" } });
+  vi.stubGlobal("game", { user, world: { id: "w", title: "World" }, i18n: { lang: "cs", localize: (key: string) => key }, settings: { get: () => "cs" } });
   vi.stubGlobal("foundry", { utils: { getRoute: (value: string) => `/prefix/${value}` } });
   vi.stubGlobal("window", { location: { href: "https://example.test/prefix/game" } });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { headers: { "content-type": "text/html; charset=utf-8" } })));
   vi.stubGlobal("CONFIG", { JournalEntryPage: { documentClass: { slugifyHeading: (heading: HTMLElement) => heading.textContent?.toLowerCase().replaceAll(" ", "-") } } });
   original = { uuid: "JournalEntry.source.JournalEntryPage.p", allowed: true, isOwner: true, documentName: "JournalEntryPage" };
   copy = { ...original, uuid: "JournalEntry.copy.JournalEntryPage.p" };
@@ -29,6 +31,33 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("light library launch authorization", () => {
+  it.each(["light-prepare", "light-open"])("keeps the game open and explains the MIME error from %s", async action => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { headers: { "content-type": "text/plain" } }));
+    vi.stubGlobal("Element", document.defaultView!.Element);
+    const assign = vi.fn(); (window.location as any).assign = assign;
+    const root = document.createElement("div");
+    root.innerHTML = `<button data-reader-action="${action}">Read</button><button data-reader-action="light-cancel" hidden>Cancel</button><output data-reader-light-progress></output>`;
+    const reader = Object.create(AdventureReader.prototype) as any;
+    Object.assign(reader, { element: root, content: { uuid: copy.uuid }, remember: vi.fn(), save: vi.fn() });
+    await reader.onClick({ target: root.querySelector("button"), stopPropagation: vi.fn() });
+    expect(root.querySelector("output")!.textContent).toBe("FOUNDRY_TRANSLATE.Reader.LightServerHtmlRequired");
+    expect(assign).not.toHaveBeenCalled(); expect(mocks.write).not.toHaveBeenCalled();
+    expect(root.querySelector("button")!.disabled).toBe(false);
+    expect(root.querySelector('[data-reader-action="light-cancel"]')!.hasAttribute("hidden")).toBe(true);
+  });
+  it("stops before preparing or replacing a library when Foundry serves HTML as plain text", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { headers: { "content-type": "text/plain; charset=utf-8" } }));
+    await expect(prepareLightReader(copy.uuid)).rejects.toThrow("Reader.LightServerHtmlRequired");
+    expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.load).not.toHaveBeenCalled(); expect(mocks.write).not.toHaveBeenCalled();
+  });
+  it("checks the actual deployment URL without caching or following redirects, and supports cancellation", async () => {
+    const controller = new AbortController(); await assertLightReaderEndpoint(controller.signal);
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/prefix/modules/foundry-translate/reader/index.html?v="), { method: "HEAD", cache: "no-store", redirect: "error", signal: controller.signal });
+  });
+  it("rejects missing or failed responses instead of navigating to an error page", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 404, headers: { "content-type": "text/html" } }));
+    await expect(assertLightReaderEndpoint()).rejects.toThrow("Reader.LightServerHtmlRequired");
+  });
   it("commits after source/copy checks and uses the configured route prefix", async () => {
     const url = await prepareLightReader(copy.uuid);
     expect(url).toContain("https://example.test/prefix/modules/foundry-translate/reader/index.html?");

@@ -763,5 +763,7 @@
   "FOUNDRY_TRANSLATE.Reader.LightPending": "Pending",
   "FOUNDRY_TRANSLATE.Reader.LightCancel": "Cancel preparation",
   "FOUNDRY_TRANSLATE.Reader.LightCancelled": "Preparation cancelled. Previous library retained.",
-  "FOUNDRY_TRANSLATE.Reader.LightFailed": "Could not prepare the library. Previous copy retained; check access to original books and available browser storage."
+  "FOUNDRY_TRANSLATE.Reader.LightFailed": "Could not prepare the library. Previous copy retained; check access to original books and available browser storage.",
+  "FOUNDRY_TRANSLATE.Reader.LightServerHtmlRequired": "The server is not serving the reader as HTML. Ask the administrator to set Content-Type: text/html; charset=utf-8 in the reverse proxy only for /modules/foundry-translate/reader/index.html. The library is unchanged. See docs/reader-hosting.md in the module repository.",
+  "FOUNDRY_TRANSLATE.Reader.LightChecking": "Checking the reader page…"
 }
