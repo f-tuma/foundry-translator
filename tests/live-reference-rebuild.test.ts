@@ -149,6 +149,27 @@ it('keeps EXACT glossary authority on the aligned prose after the restored punct
   expect(await f.call('apply_reference_rebuild', args)).toMatchObject({ ok: false });
   expect(writes).toHaveLength(0);
 });
+it('repairs a punctuation-only blocked field through MCP without changing existing prose or labels, with retry and undo', async () => {
+  const sourceHtml = '<p>Use <strong>a &amp;Reference[Equipment]{Tool}</strong><strong>,</strong> or borrowed clothes for 2 turns.</p><p>Keep this.</p>';
+  const targetHtml = '<p>Použij <strong>nástroj &amp;Reference[Equipment]{Nástroj}</strong><strong></strong> nebo půjčené oblečení na 2 tahy.</p><p>Beze změny.</p>';
+  const f = await rebuildFixture(sourceHtml, targetHtml), sourceBefore = JSON.stringify(source);
+  expect(f.value.plan.rows).toHaveLength(1);
+  expect(f.value.plan.rows[0].partIndices).toEqual([2]);
+  expect(f.value.plan.targets).toEqual([]);
+  const { operationId, ...previewArgs } = f.args;
+  const preview = await f.call('validate_reference_rebuild', previewArgs);
+  expect(preview).toMatchObject({ ok: true, value: { willVerify: false, changes: [{ warnings: [] }] } });
+  expect(writes).toHaveLength(0);
+  expect(await f.call('apply_reference_rebuild', f.args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toBe(targetHtml.replace('<strong></strong>', '<strong>,</strong>'));
+  expect((await snapshot()).rows.every(row => !row.blocked && !row.verified)).toBe(true);
+  expect(JSON.stringify(source)).toBe(sourceBefore);
+  expect(readReviewHistory(copy.flags)[0]).toMatchObject({ id: operationId, referenceRebuild: { punctuation: f.value.plan.punctuation } });
+  expect(await f.call('apply_reference_rebuild', f.args)).toMatchObject({ ok: true, value: { alreadyApplied: true, verified: false } });
+  expect(writes).toHaveLength(1);
+  expect(await f.call('undo_correction', { documentId: f.args.documentId, operationId })).toMatchObject({ ok: true, value: { undone: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toBe(targetHtml);
+});
 it('rejects missing/extra plan rows, unknown labels, stale revision/hash and missing immutable targets without writes', async () => {
   const f = await rebuildFixture(); const { operationId, ...args } = f.args;
   for (const unsafe of [ { ...args, edits: args.edits.slice(0, 1) }, { ...args, edits: [...args.edits, { rowId: 'e'.repeat(64), text: ['Extra'] }] },
