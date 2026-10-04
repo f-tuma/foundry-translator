@@ -1,3 +1,4 @@
+import { diagnoseReferenceRebuild as peerDiagnose } from "../src/review/reference-rebuild";
 import { saveReviewRows, readReviewHistory, reviewHistory, undoReview } from "../src/review/service";
 import { parseHTML } from "linkedom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -332,4 +333,67 @@ it('never trusts a gate fabricated only in the translated HTML', async () => {
   const fresh = await f.call('prepare_reference_rebuild', { documentId: f.args.documentId, fieldId: f.args.fieldId });
   expect(fresh).toMatchObject({ ok: false });
   expect(writes).toHaveLength(0);
+});
+
+
+// Read-only generic diagnostic route fixtures; no production/private prose.
+async function diagnosticFixture() {
+  source.pages[0]!.text!.content = '<p title="Source">First<strong>,</strong> then second.</p>';
+  copy.pages[0]!.text!.content = '<p title="Překlad">První<strong></strong> a druhá.</p>';
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  sourceDocument.testUserPermission = () => true; copyDocument.testUserPermission = () => true;
+  copy.flags![MODULE_ID]!.secretForTest = 'NEVER_RETURN_SECRET';
+  vi.spyOn(GlossaryCompendiumRepository.prototype, 'loadExisting').mockResolvedValue([]);
+  const handle = createLiveHandler('cs', () => true), s = await snapshot(), row = textRow(s);
+  const call = (method: string, args: Record<string, unknown>) => handle({ id: crypto.randomUUID(), method, args });
+  const context = await call('get_context', { documentId: s.entry.uuid, rowId: row.id, radius: 0 });
+  expect(context.ok).toBe(true);
+  const args = { documentId: s.entry.uuid, fieldId: row.fieldId, revision: (context.value as any).revision };
+  return { call, args };
+}
+it('read-only diagnostic returns exact one portable field with actual failing predicate and no flags/users/writes', async () => {
+  const f = await diagnosticFixture(), original = JSON.stringify(source), translated = JSON.stringify(copy);
+  const result = await f.call('get_field_diagnostic', f.args);
+  expect(result).toMatchObject({ ok: true, value: { raw: { complete: true }, rebuild: { canPrepare: false, punctuation: { predicate: 'all-raw-attributes-equal' } } } });
+  expect(JSON.stringify(result)).not.toContain('NEVER_RETURN_SECRET');
+  expect(JSON.stringify(source)).toBe(original);
+  expect(JSON.stringify(copy)).toBe(translated); expect(writes).toHaveLength(0);
+});
+it.each(['permission', 'source', 'scope'])('read-only diagnostic discards result if %s changes across awaits', async kind => {
+  const f = await diagnosticFixture(); let permissions = 0;
+  sourceDocument.testUserPermission = () => {
+    permissions++;
+    if (kind === 'permission') return permissions < 2;
+    if (permissions === 1 && kind === 'source') source.pages[0]!.text!.content += '<p>Changed source.</p>';
+    if (permissions === 1 && kind === 'scope') (game.user as any).isGM = false;
+    return true;
+  };
+  expect(await f.call('get_field_diagnostic', f.args)).toMatchObject({ ok: false }); expect(writes).toHaveLength(0);
+});
+it('read-only diagnostic rejects stale revision, unknown field and unrelated document', async () => {
+  const f = await diagnosticFixture();
+  for (const extra of [{ revision: 'f'.repeat(64) }, { fieldId: '["flags","secrets"]' }, { documentId: 'JournalEntry.unrelated' }])
+    expect(await f.call('get_field_diagnostic', { ...f.args, ...extra })).toMatchObject({ ok: false });
+  expect(writes).toHaveLength(0);
+});
+
+it('read-only diagnostic rejects registry ambiguity created after old-snapshot diagnosis', async () => {
+ const f = await diagnosticFixture();
+ source.pages[0]!.text!.content = '<p>Use @UUID[Actor.a.Item.b]{Ability}.</p>';
+ copy.pages[0]!.text!.content = '<p>Použij @UUID[Actor.a]{Schopnost}.</p>';
+ (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+ const actorFlag = { schemaVersion:1, sourceUuid:'Actor.a',sourceHash:'source',providerId:'openai-compatible',sourceLanguage:'en',targetLanguage:'cs',translatedAt:'date',translatedHtmlFields:1 };
+ let rows = [{_id:'aCopy',name:'Actor A',flags:{[MODULE_ID]:{actorTranslation:actorFlag}}}];
+ (game.packs as any).set(ACTOR_TRANSLATIONS_PACK_ID,{getIndex:async()=>new Map(rows.map(x=>[x._id,x]))});
+ const st = await snapshot(),row = textRow(st);
+ const ctx = await f.call('get_context',{documentId:st.entry.uuid,rowId:row.id,radius:0});
+ expect(ctx.ok).toBe(true);
+ expect(await peerDiagnose(st,row.fieldId)).toMatchObject({canPrepare:true});
+ let calls=0;
+ sourceDocument.testUserPermission = () => { if (++calls===1) rows.push({_id:'aCopy2',name:'Actor A2',flags:{[MODULE_ID]:{actorTranslation:actorFlag}}});return true; };
+ const result = await f.call('get_field_diagnostic',{documentId:st.entry.uuid,fieldId:row.fieldId,revision:(ctx.value as any).revision});
+ const fresh = await snapshot();
+ expect(await peerDiagnose(fresh,row.fieldId)).toMatchObject({canPrepare:false});
+ expect(result).toMatchObject({ok:false});
+ expect(writes).toHaveLength(0);
 });

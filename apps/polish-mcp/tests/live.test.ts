@@ -111,6 +111,11 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     expect(batchTool.inputSchema.additionalProperties).toBe(false);
     expect(Object.keys(batchTool.inputSchema.properties ?? {}).sort()).toEqual(['documentId', 'rowIds']);
     expect((batchTool.inputSchema.properties as any).rowIds).toMatchObject({ minItems: 1, maxItems: 10 });
+    const diagnosticTool = tools.tools.find(t => t.name === 'live_get_field_diagnostic')!;
+    expect(diagnosticTool).toBeDefined(); expect(diagnosticTool.annotations?.readOnlyHint).toBe(true);
+    expect(diagnosticTool.inputSchema.additionalProperties).toBe(false);
+    expect(Object.keys(diagnosticTool.inputSchema.properties ?? {}).sort()).toEqual(['documentId', 'fieldId', 'limit', 'offset', 'revision']);
+    expect(diagnosticTool.inputSchema.required).toEqual(expect.arrayContaining(['documentId', 'fieldId', 'revision']));
     const correctionTool = tools.tools.find(t => t.name === 'live_validate_correction')!;
     expect((correctionTool.inputSchema.properties as any).options.items).toMatchObject({ additionalProperties: false,
       properties: { key: { enum: ['readaloud', 'caption', 'label'] } } });
@@ -134,6 +139,16 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
     const batchReply = { ok: true, value: { documentId: 'translated', contexts: [{ rowId: batchArgs.rowIds[0], source: ['Complete source.'], translation: ['Úplný překlad.'] }], omittedRowIds: [batchArgs.rowIds[1]], maxResponseChars: 100000 } };
     await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: batchRequest.id, result: batchReply }) });
     expect(JSON.parse(((await batchPending).content as { text: string }[])[0]!.text)).toEqual(batchReply);
+    const diagnosticArgs = { documentId: 'translated', fieldId: '["pages","page","text","content"]', revision: 'a'.repeat(64), offset: 0, limit: 2 };
+    for (const forbidden of [{ sourceUuid: 'Actor.other' }, { text: ['replacement'] }, { operationId: 'write' }]) {
+      expect((await client.callTool({ name: 'live_get_field_diagnostic', arguments: { ...diagnosticArgs, ...forbidden } })).isError).toBe(true);
+    }
+    const diagnosticPending = client.callTool({ name: 'live_get_field_diagnostic', arguments: diagnosticArgs });
+    const diagnosticRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
+    expect(diagnosticRequest).toMatchObject({ method: 'get_field_diagnostic', args: diagnosticArgs });
+    const diagnosticReply = { ok: true, value: { raw: { complete: false, omittedReason: 'UnsafeRawPayload' }, rebuild: { canPrepare: false, predicate: 'all-raw-attributes-equal' }, nodes: { nextOffset: 2 } } };
+    await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: diagnosticRequest.id, result: diagnosticReply }) });
+    expect(JSON.parse(((await diagnosticPending).content as { text: string }[])[0]!.text)).toEqual(diagnosticReply);
     const optionArgs = { documentId: 'translated', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), text: ['⟦1⟧'],
       reason: 'Correct the read-aloud prose', options: [{ marker: '⟦1⟧', key: 'readaloud', value: 'Vstupujete dovnitř.' }] };
     const unsafeOption = await client.callTool({ name: 'live_validate_correction', arguments: { ...optionArgs,

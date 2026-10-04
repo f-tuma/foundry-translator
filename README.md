@@ -63,6 +63,17 @@ MCP supplies context to the model in your chosen client; it does not itself
 run inference. Original documents and mechanics are not writable. Ordinary
 translation and glossary export/import remains available for community sharing.
 
+`live_get_field_diagnostic` provides read-only diagnosis of one allowlisted
+translated field. Obtain its exact `fieldId` and fresh `revision` from
+`live_get_context`. The response explains the strict rebuild/punctuation
+predicate and includes unit counts and paginated node metadata. Whole raw
+source/current values are returned only within explicit size and known unsafe
+content limits; omissions are reported without silently truncated excerpts.
+Integrity metadata contains counts, paths and kinds, never duplicate raw values
+or command bodies. A diagnosis grants no repair authority; corrections still
+need their own fresh preview and validated write. See the
+[field diagnostic guide](apps/polish-mcp/README.md#diagnostika-celého-pole-bez-zápisu).
+
 Export now recognizes equivalent absolute/relative Foundry UUID notation while
 retaining anchors and embedded targets. Actual missing or changed references
 remain rejected with a field-specific explanation.

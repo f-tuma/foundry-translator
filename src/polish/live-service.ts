@@ -1,3 +1,4 @@
+import { readFieldDiagnostic } from "./field-diagnostic";
 import { MODULE_ID } from "../constants";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { sha256 } from "../translation/hash";
@@ -153,6 +154,40 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         return { ok: true, value };
       }
       if (request.method === "list_passages") return { ok: true, value: { ...page(snapshot.rows.map(excerpt), args.offset, args.limit), groups: snapshot.groups, partial: snapshot.partial, warning: snapshot.warning } };
+      if (request.method === "get_field_diagnostic") {
+        fieldId = args.fieldId;
+        if (revision !== args.revision) throw new Error("Review.Conflict");
+        const field = snapshot.fields.find(item => item.id === fieldId);
+        if (!field) throw new Error("Review.MissingField");
+        // Reuse pairing/GM scope, provenance and actual portable field selection;
+        // inspect observer permission explicitly, never caller paths/UUIDs.
+        type Observed = { uuid?: string; documentName?: string; testUserPermission?: (user: unknown, level: string) => boolean };
+        const sourceDoc = await fromUuid(entry.sourceUuid) as Observed | null;
+        const copyDoc = await game.packs.get(entry.pack)!.getDocument(entry.id) as Observed | null;
+        if (!sourceDoc || sourceDoc.uuid !== entry.sourceUuid || sourceDoc.documentName !== entry.kind || !copyDoc || copyDoc.uuid !== entry.uuid || typeof sourceDoc.testUserPermission !== "function" || typeof copyDoc.testUserPermission !== "function" ||
+            !sourceDoc.testUserPermission(game.user!, "OBSERVER") || !copyDoc.testUserPermission(game.user!, "OBSERVER")) throw new Error("Live.ReferenceUnavailable");
+        const diagnostic = await readFieldDiagnostic(snapshot, field.id, args.offset, args.limit);
+        const latestSource = await fromUuid(entry.sourceUuid) as Observed | null;
+        const latestCopy = await game.packs.get(entry.pack)!.getDocument(entry.id) as Observed | null;
+        const freshCatalog = await reviewCatalog(language), fresh = await loadReview(entry, freshCatalog);
+        const freshGlossary = await new GlossaryCompendiumRepository().loadExisting();
+        const freshRevision = await sha256(JSON.stringify([fresh.guard.fingerprint, fresh.sourceHash, await sha256(JSON.stringify(freshGlossary)), systemId, emberActive, emberVersion]));
+        // Registry provenance is outside the document/glossary revision. A
+        // second copy can make a formerly unique command mapping ambiguous.
+        // Freeze the complete deterministic inventory, never return stale proof.
+        const provenance = (value: ReviewSnapshot) => JSON.stringify([...value.reverse.entries()]
+          .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+        if (provenance(fresh) !== provenance(snapshot)) throw new Error("Review.Conflict");
+        const freshField = fresh.fields.find(item => item.id === field.id);
+        check();
+        if (freshRevision !== revision || !freshField || freshField.source !== field.source || freshField.translation !== field.translation) throw new Error("Review.Conflict");
+        if (!latestSource || latestSource.uuid !== entry.sourceUuid || latestSource.documentName !== entry.kind || !latestCopy || latestCopy.uuid !== entry.uuid ||
+            typeof latestSource.testUserPermission !== "function" || typeof latestCopy.testUserPermission !== "function" ||
+            !latestSource.testUserPermission(game.user!, "OBSERVER") || !latestCopy.testUserPermission(game.user!, "OBSERVER")) throw new Error("Live.ReferenceUnavailable");
+        const result = { documentId: entry.uuid, revision, ...diagnostic };
+        if (new TextEncoder().encode(JSON.stringify({ ok: true, value: result })).length > diagnostic.maxResponseBytes) throw new Error("Live.ContextTooLarge");
+        return { ok: true, value: result };
+      }
       const target = await game.packs.get(entry.pack)!.getDocument(entry.id);
       const history = readReviewHistory(target?.flags).sort((a, b) => b.at.localeCompare(a.at));
       if (request.method === "list_history") return { ok: true, value: page(history.map(operation => ({ ...operation, totalRows: operation.rows.length,
