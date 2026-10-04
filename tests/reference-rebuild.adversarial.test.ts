@@ -164,8 +164,29 @@ it.each(["punctuation-edit", "punctuation-number", "forged-address", "forged-tex
   await expect(materializeReferenceRebuild(view, plan, edits)).rejects.toThrow();
 });
 
-it("keeps a punctuation-only defect without a command defect blocked", async () => {
-  expect(await prepareReferenceRebuild(snapshot(punctuationSource, punctuationBefore.replace("potom na", "potom &Reference[Exhaustion] na")), "field")).toBeNull();
+it("restores only a source-proved punctuation leaf without requiring a command defect, with exact undo", async () => {
+  const before = punctuationBefore.replace("potom na", "potom &amp;Reference[Exhaustion] na");
+  const view = snapshot(punctuationSource, before), { plan } = await prepared(view);
+  expect(plan.rows).toHaveLength(1);
+  expect(plan.rows[0]!.partIndices).toEqual([1]);
+  expect(plan.rows[0]!.referenceMap).toEqual([]);
+  expect(plan.targets).toEqual([]);
+  const compiled = await materializeReferenceRebuild(view, plan, editsFor(plan));
+  expect(compiled.value).toBe(before.replace("<strong></strong>", "<strong>,</strong>"));
+  assertPortableText(punctuationSource, portableReviewText(view, view.fields[0]!, compiled.value), "html");
+  expect((await validateReferenceRebuildChanges(view, "field", plan.proofHash, compiled.changes)).value).toBe(compiled.value);
+  const recorded = compiled.changes.map(change => ({ rowId: change.rowId, before: [...view.rows.find(row => row.id === change.rowId)!.translation], after: [...change.parts] }));
+  expect((await undoReferenceRebuild(snapshot(punctuationSource, compiled.value), compiled.receipt, recorded)).value).toBe(before);
+});
+
+it.each(["changed-unrelated-prose", "changed-punctuation", "changed-reference-label"])("protects every existing part during a punctuation-only rebuild: %s", async kind => {
+  const before = punctuationBefore.replace("potom na", "potom &Reference[Exhaustion]{Vyčerpání} na");
+  const { view, plan } = await prepared(snapshot(punctuationSource.replace("&Reference[Exhaustion]", "&Reference[Exhaustion]{Exhaustion}"), before));
+  const edits = editsFor(plan);
+  if (kind === "changed-unrelated-prose") edits[0]!.text[0] = "Jiné slovo";
+  if (kind === "changed-punctuation") edits[0]!.text[1] = ";";
+  if (kind === "changed-reference-label") edits[0]!.labels = [{ marker: plan.rows[0]!.edit.references[2]![0]!.marker, label: "Jiný" }];
+  await expect(materializeReferenceRebuild(view, plan, edits)).rejects.toThrow();
 });
 
 it("restores a punctuation row separately from the command-damaged row while keeping both in one field receipt", async () => {

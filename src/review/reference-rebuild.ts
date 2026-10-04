@@ -143,7 +143,7 @@ function assertUnchangedEmbedOptions(snapshot: ReviewSnapshot, field: ReviewSnap
   if (sourceEmbeds.length !== currentEmbeds.length) fail();
 }
 
-/** Complete field plan: only command-damaged text parts, never markup repairs.
+/** Complete field plan: command-damaged parts or one proved punctuation leaf.
  * Every new marker originates in the authoritative source of that same part. */
 export async function prepareReferenceRebuild(snapshot: ReviewSnapshot, fieldId: string): Promise<ReferenceRebuildPlan | null> {
   try { return await buildPlan(snapshot, fieldId); }
@@ -158,8 +158,12 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string): Promise<Ref
   const alignedTranslation = punctuation?.value ?? field.translation;
   const canonical = portableReviewText(snapshot, field, alignedTranslation);
   const integrity = diagnosePortableText(field.source, canonical, field.format);
-  if (!integrity || integrity.markup.length || integrity.markupTruncated || integrity.commands.truncated ||
-      (!integrity.commands.missing.length && !integrity.commands.extra.length)) return null;
+  // A punctuation-only repair needs no command defect: restoring the proved
+  // leaf can already make the complete field portable. Its text is immutable
+  // in materializeReferenceRebuild, while every unrelated part stays exact.
+  if (!integrity && !punctuation) return null;
+  if (integrity && (integrity.markup.length || integrity.markupTruncated || integrity.commands.truncated ||
+      (!integrity.commands.missing.length && !integrity.commands.extra.length))) return null;
   const sourcePlan = planReviewText(field.source, field.format), currentPlan = planReviewText(alignedTranslation, field.format);
   const beforePlan = planReviewText(field.translation, field.format);
   const environment = referenceRebuildEnvironment(), gates = sourcePartGates(field.source, field.format, environment);
