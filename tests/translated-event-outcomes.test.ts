@@ -24,7 +24,7 @@ function fixture(standalone = false) {
   const page: any = { ...source, uuid: `${targetParent.uuid}.JournalEntryPage.event`, parent: targetParent, system: structuredClone(source.system) };
   page.system._source.outcomes[0].label = "Přijmout"; page.system._source.outcomes[0].summary = "Čeká je teplé jídlo.";
   page.system._source.outcomes[1].label = "Odmítnout"; page.system._source.outcomes[1].summary = "Odejdou.";
-  const event: any = { page: source.uuid, state: { complete: false }, outcomes: Object.fromEntries(source.system._source.outcomes.map((o: any) => [o.id,
+  const event: any = { id: "evt", page: source.uuid, state: { complete: false }, outcomes: Object.fromEntries(source.system._source.outcomes.map((o: any) => [o.id,
     { ...o, text: { summary: o.summary }, complete: o.id === "choice" }])) };
   const canonical = event.outcomes.choice;
   Object.defineProperty(canonical, "summary", { configurable: true, get: () => canonical.text.summary });

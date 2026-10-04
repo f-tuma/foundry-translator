@@ -53,7 +53,11 @@ their reached/not reached state; translated event copies show outcome labels
 from the translation, matched by outcome ID as in the native sheet. Since
 0.33.11, valid saved outcome summaries also use the translation, with exact
 source/copy provenance and unchanged event mechanics. Stale or invalid
-translations retain the original summary; reached/not reached state is unchanged.
+translations retain the original summary; reached/not reached state is unchanged. Since
+0.33.12 this also covers inline outcome labels/summaries and event-state link
+labels. They use exact IDs and saved translations; source link destinations,
+icons and state remain unchanged. Native gameplay controls are retained in the
+native sheet and stripped from the Reader as usual.
 Event automation controls, warnings and quest flowcharts are not rendered. Script/form controls and
 inline executable handlers are removed from the reading surface. Roll and macro
 links never execute in the reader; use Open in Foundry when gameplay is wanted.

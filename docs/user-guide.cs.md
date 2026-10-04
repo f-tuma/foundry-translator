@@ -36,6 +36,11 @@ existujícího formátování. Celé pole znovu projde kontrolou; změna má ná
 historii a bezpečné vrácení. Chybějící původní dokumenty ani jiné změny HTML
 tím nelze obejít.
 
+Od verze **0.33.12** se uložené překlady zobrazují také v blocích výsledků
+vložených přímo do textu a v popiscích odkazů na stav události. Platí to pro
+běžný deník i Čtečku. Identita událostí, odkazy, ikony a stav zůstávají původní;
+neplatné, nejednoznačné nebo mezitím změněné překlady se nepoužijí.
+
 U výsledků událostí Emberu se uložené české shrnutí od verze **0.33.11**
 zobrazuje v běžném deníku i ve čtečce. Stav události a zaškrtávací ovládání
 zůstávají napojené na původní událost. Pokud překlad neprojde kontrolou nebo

@@ -91,7 +91,12 @@ labels derived from the canonical event can remain English. Combat, every
 encounter hook, every quest branch, multiplayer races and other Ember versions
 are not certified by these tests. Since 0.33.10, quest overview event/location
 cards can display their saved translated summaries; 0.33.11 also displays saved
-outcome summaries in native event views and Reader. These adapters require
+outcome summaries in native event views and Reader. Version 0.33.12 adds inline
+outcome cards and event-state link labels. The native enrichers run first, and
+only proven text slots are updated; checkbox nodes, handlers and live checked,
+disabled and indeterminate properties are preserved. Source link UUIDs, icons
+and completion state stay native. Async provenance, permissions, mechanics and
+registry changes abort the display projection. These adapters require
 unique source provenance, exact event/outcome IDs, unchanged mechanics and
 valid text/reference structure. Missing, stale or ambiguous translations retain
 the original display. They do not change canonical labels, summaries or state,
