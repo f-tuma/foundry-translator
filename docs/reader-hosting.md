@@ -19,6 +19,25 @@ existing origin, upstream, TLS and access policy. Do not rewrite the host or
 move the reader to another origin: its IndexedDB library belongs to the Foundry
 origin. JS, CSS and fonts already have the correct MIME types.
 
+## Cloudflare
+
+If the domain is already proxied through Cloudflare, the same exact exception
+can be applied at the edge without changing the Foundry host. Create a
+**Response Header Transform Rule** for:
+
+```
+(http.host eq "ember.frgtn.cz" and http.request.uri.path eq "/modules/foundry-translate/reader/index.html")
+```
+
+Set static `Content-Type` to `text/html; charset=utf-8`. Use **Set**, not **Add**:
+Set replaces the upstream value, while Add could leave conflicting headers.
+Optionally set `X-Content-Type-Options` to `nosniff`. Keep every other request
+unchanged; do not match all `/modules/` or all `.html` files. Recheck the public
+GET/HEAD responses after deploying the rule. Direct connections bypassing
+Cloudflare will still receive Foundry's original plain-text header.
+
+Reference: [Cloudflare Response Header Transform Rules](https://developers.cloudflare.com/rules/transform/response-header-modification/).
+
 ## Nginx
 
 Add an exact location inside the existing Foundry HTTPS server. Copy the
