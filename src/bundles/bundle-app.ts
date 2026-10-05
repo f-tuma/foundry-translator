@@ -43,39 +43,48 @@ export class BundleApplication extends foundry.applications.api.ApplicationV2 {
   protected async _renderHTML(): Promise<HTMLElement> { return renderBundleView(this.#plan, this.#fileName); }
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }
   protected async _onRender(): Promise<void> {
-    this.element.querySelector("[data-bundle-export]")?.addEventListener("click", () => void this.#run(async () => {
+    const root = this.element;
+    if (!root?.isConnected) return;
+    root.querySelector("[data-bundle-export]")?.addEventListener("click", () => void this.#run(async () => {
       const language = getTranslatorSettings().targetLanguage;
       const result = await exportTranslationBundle(language, (message) => this.#status(message));
       downloadBundle(JSON.stringify(result.bundle, null, 2), language);
       this.#status(t("Exported").replace("{count}", String(result.bundle.documents.length)).replace("{skipped}", String(result.skipped.length)));
       this.#issues(result.skipped);
     }));
-    this.element.querySelector<HTMLInputElement>("[data-bundle-file]")?.addEventListener("change", (event) => {
+    root.querySelector<HTMLInputElement>("[data-bundle-file]")?.addEventListener("change", (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
       void this.#run(async () => {
         // Selecting a different file always discards the old import preview.
         this.#plan = undefined;
         this.#fileName = file.name;
-        await this.render({ force: true });
+        await this.#renderIfOpen();
         if (file.size > MAX_BUNDLE_BYTES) throw new Error(t("TooLarge"));
         this.#plan = await planBundleImport(parseTranslationBundle(await file.text()));
-        await this.render({ force: true });
+        await this.#renderIfOpen();
       });
     });
-    this.element.querySelector("[data-bundle-import]")?.addEventListener("click", () => void this.#run(async () => {
+    root.querySelector("[data-bundle-import]")?.addEventListener("click", () => void this.#run(async () => {
       if (!this.#plan) return;
       const result = await importTranslationBundle(this.#plan, (message) => this.#status(message));
       this.#plan = await planBundleImport(this.#plan.bundle);
-      await this.render({ force: true });
+      await this.#renderIfOpen();
       this.#status(t("Imported").replace("{count}", String(result.imported)).replace("{skipped}", String(result.skipped)).replace("{glossary}", String(result.glossaryAdded)));
       if (result.issues.length) this.#status(t("ImportIssues").replace("{count}", String(result.imported)).replace("{issues}", String(result.issues.length)), true);
       this.#issues(result.issues);
     }));
     this.#updateControls();
   }
+  async #renderIfOpen(): Promise<void> {
+    // Closing a transfer window does not cancel an in-flight import or export.
+    // Complete the operation without reopening a window the user dismissed.
+    if (this.element?.isConnected) await this.render({ force: true });
+  }
   #updateControls(): void {
-    for (const el of this.element.querySelectorAll<HTMLInputElement | HTMLButtonElement>("[data-bundle-file],[data-bundle-export],[data-bundle-import]")) {
+    const root = this.element;
+    if (!root?.isConnected) return;
+    for (const el of root.querySelectorAll<HTMLInputElement | HTMLButtonElement>("[data-bundle-file],[data-bundle-export],[data-bundle-import]")) {
       const canImport = this.#plan && (this.#plan.rows.some((r) => r.state === "ready") || this.#plan.glossary.length > 0);
       el.disabled = this.#busy || (el.hasAttribute("data-bundle-import") && !canImport);
     }
@@ -91,11 +100,19 @@ export class BundleApplication extends foundry.applications.api.ApplicationV2 {
     finally { this.#busy = false; this.#updateControls(); }
   }
   #status(message: string, error = false): void {
-    const el = this.element.querySelector<HTMLElement>("[data-bundle-status]");
+    const root = this.element;
+    if (!root?.isConnected) return;
+    const el = root.querySelector<HTMLElement>("[data-bundle-status]");
     if (el) { el.textContent = message; el.dataset.error = String(error); }
   }
   #issues(issues: string[]): void {
-    const el = this.element.querySelector<HTMLElement>("[data-bundle-issues]");
-    if (el) { el.hidden = !issues.length; el.querySelector("pre")!.textContent = issues.join("\n"); }
+    const root = this.element;
+    if (!root?.isConnected) return;
+    const el = root.querySelector<HTMLElement>("[data-bundle-issues]");
+    if (el) {
+      el.hidden = !issues.length;
+      const text = el.querySelector("pre");
+      if (text) text.textContent = issues.join("\n");
+    }
   }
 }

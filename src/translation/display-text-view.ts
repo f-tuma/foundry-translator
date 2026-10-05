@@ -1,7 +1,9 @@
 import { sourceReferenceUuid } from "./document-identity";
 import { openActiveTranslationsOverview } from "./active-translations-app";
 import { MODULE_ID } from "../constants";
-import { getTranslatorSettings } from "../settings/settings";
+import { getTranslatorSettings, preferTranslations, SETTINGS } from "../settings/settings";
+import { GlossaryCompendiumRepository, GLOSSARY_PACK_ID } from "../glossary/compendium-repository";
+import { mapGlossaryLabels, mapGlossaryLabel } from "./map-glossary-labels";
 import { logger } from "../logger";
 import { DISPLAY_TEXT_PACK, isDisplayDocument, readDisplayField, readDisplayTextFlag, readDisplayTranslation,
   type DisplayDocument, type DisplayTextFlag } from "./display-text";
@@ -10,6 +12,7 @@ import { JournalTranslationService } from "./journal-service";
 
 type TextRecord = { flag: DisplayTextFlag; fields: Map<string, { source: string; translation: string | null }> };
 const records = new Map<string, TextRecord>();
+let mapLabels = new Map<string, string>();
 let reloadNumber = 0;
 let registered = false;
 const previewApps = new Set<DisplayApplication>();
@@ -60,6 +63,12 @@ export async function reloadDisplayTexts(): Promise<void> {
     logger.warn("Scene/effect text could not be loaded.", error);
   }
   if (generation !== reloadNumber) return;
+  // Read an existing glossary only; a player view never creates or synchronizes it.
+  let nextMapLabels = new Map<string, string>();
+  try { nextMapLabels = mapGlossaryLabels(await new GlossaryCompendiumRepository().loadExisting()); }
+  catch { /* Revoked access must remove our previously visible glossary labels. */ }
+  if (generation !== reloadNumber) return;
+  mapLabels = nextMapLabels;
   records.clear();
   for (const [key, record] of next) records.set(key, record);
   await applyDisplayLabels(document.body);
@@ -96,8 +105,13 @@ export async function applyDisplayLabels(root: HTMLElement): Promise<void> {
       replaced.delete(node);
     }
   }
+  if (!preferTranslations()) return;
+  const generation = reloadNumber, language = getTranslatorSettings().targetLanguage, user = game.user;
+  const current = () => preferTranslations() && generation === reloadNumber
+    && language === getTranslatorSettings().targetLanguage && user === game.user;
   for (const row of root.querySelectorAll<HTMLElement>("[data-scene-id]")) {
     const doc = await resolveDisplayDocument(`Scene.${row.dataset.sceneId}`);
+    if (!current()) return;
     if (!doc || !row.isConnected) continue;
     const source = doc.toObject();
     const path = row.dataset.levelId ? ["levels", row.dataset.levelId, "name"] : null;
@@ -123,12 +137,14 @@ export async function applyDisplayLabels(root: HTMLElement): Promise<void> {
   for (const row of root.querySelectorAll<HTMLElement>("#scenes [data-entry-id], #effects [data-entry-id]")) {
     const kind = row.closest("#scenes") ? "Scene" : "ActiveEffect";
     const doc = await resolveDisplayDocument(`${kind}.${row.dataset.entryId}`);
+    if (!current()) return;
     if (doc && row.isConnected) replaceDisplayLabel(row.querySelector(".entry-name"), doc.name, lookupDisplayText(doc, ["name"]));
   }
   for (const link of root.querySelectorAll<HTMLElement>("a.content-link[data-uuid], [data-effect-id][data-uuid]")) {
     const uuid = link.dataset.uuid ?? "";
     if (!records.has(`${uuid}\0${getTranslatorSettings().targetLanguage}`) && !/\.ActiveEffect\.[^.]+$/u.test(uuid)) continue;
     const doc = await resolveDisplayDocument(uuid);
+    if (!current()) return;
     if (doc && link.isConnected) replaceDisplayLabel(link.matches("a") ? link : link.querySelector("h4, .effect-name"), doc.name, lookupDisplayText(doc, ["name"]));
   }
 }
@@ -151,8 +167,13 @@ export function applyCanvasDisplayText(object: DisplayPlaceable): void {
   const previous = canvasText.get(text);
   if (previous && text.text === previous.translation) text.text = previous.source;
   canvasText.delete(text);
-  const source = typeof doc.text === "string" ? doc.text : "";
-  const translated = lookupDisplayText(parent, [drawing ? "drawings" : "notes", doc.id, "text"]);
+  const source = !drawing && typeof doc.label === "string" ? doc.label : (typeof doc.text === "string" ? doc.text : "");
+  // Ember's world map renders names as always-visible Note tooltips. Explicit
+  // scene translations take precedence; otherwise use an unambiguous, whole
+  // glossary label for Ember notes only. Never change Note/page IDs or click actions.
+  const emberNote = !drawing && !!(doc as typeof doc & { getFlag?: (module: string, key: string) => unknown }).getFlag?.("ember", "type");
+  const translated = preferTranslations() ? (lookupDisplayText(parent, [drawing ? "drawings" : "notes", doc.id, "text"])
+    ?? (emberNote ? mapGlossaryLabel(mapLabels, source) : null)) : null;
   if (!source || !translated || text.text !== source) return;
   text.text = translated;
   canvasText.set(text, { source, translation: translated });
@@ -170,14 +191,16 @@ const previewGenerations = new WeakMap<object, number>();
 async function renderDisplayDocument(app: DisplayApplication): Promise<void> {
   const doc = app.document ?? app.object;
   if (!doc || !isDisplayDocument(doc) || !app.element) return;
+  const element = app.element;
   previewApps.add(app);
   const generation = (previewGenerations.get(app) ?? 0) + 1;
   previewGenerations.set(app, generation);
+  const language = getTranslatorSettings().targetLanguage, user = game.user;
   const title = lookupDisplayText(doc, ["name"]);
-  const description = doc.documentName === "ActiveEffect" ? lookupDisplayText(doc, ["description"]) : null;
+  const description = preferTranslations() && doc.documentName === "ActiveEffect" ? lookupDisplayText(doc, ["description"]) : null;
   // Read-only translated preview; never replace form values that Foundry could submit to the source.
   app.element.querySelector(".ft-display-preview")?.remove();
-  if (title || description) {
+  if (preferTranslations() && (title || description)) {
     const preview = document.createElement("aside");
     preview.className = "ft-display-preview";
     const heading = document.createElement("strong");
@@ -190,7 +213,11 @@ async function renderDisplayDocument(app: DisplayApplication): Promise<void> {
       content.innerHTML = await editor.enrichHTML(description, { async: true, relativeTo: doc });
       preview.append(content);
     }
-    if (previewGenerations.get(app) !== generation || !app.element.isConnected) return;
+    if (!preferTranslations() || language !== getTranslatorSettings().targetLanguage || user !== game.user
+      || previewGenerations.get(app) !== generation || app.element !== element || !element.isConnected
+      || doc !== (app.document ?? app.object)
+      || lookupDisplayText(doc, ["name"]) !== title
+      || (description && lookupDisplayText(doc, ["description"]) !== description)) return;
     app.element.querySelector(".window-content")?.prepend(preview);
   }
   const frame = app.window;
@@ -223,10 +250,12 @@ export function registerDisplayTextView(): void {
   Hooks.on("foundryTranslateDisplayTextChanged", reload);
   for (const event of ["createJournalEntry", "updateJournalEntry", "deleteJournalEntry", "createJournalEntryPage", "updateJournalEntryPage", "deleteJournalEntryPage"]) {
     Hooks.on(event, (doc: { pack?: string; parent?: { pack?: string } }) => {
-      if ((doc.pack ?? doc.parent?.pack) === DISPLAY_TEXT_PACK) reload();
+      if ([DISPLAY_TEXT_PACK, GLOSSARY_PACK_ID].includes(doc.pack ?? doc.parent?.pack ?? "")) reload();
     });
   }
-  Hooks.on("updateSetting", (setting: { key?: string }) => { if (setting.key === `${MODULE_ID}.targetLanguage`) reload(); });
+  Hooks.on("updateSetting", (setting: { key?: string }) => {
+    if ([SETTINGS.TARGET_LANGUAGE, SETTINGS.AUTO_OPEN_TRANSLATIONS].some(key => setting.key === `${MODULE_ID}.${key}`)) reload();
+  });
   Hooks.on("renderApplicationV2", (app: DisplayApplication, html: HTMLElement) => {
     if (html instanceof HTMLElement) void applyDisplayLabels(html).catch(error => logger.warn("Display labels could not be rendered.", error));
     void renderDisplayDocument(app).catch(error => logger.warn("Scene/effect preview could not be rendered.", error));
@@ -252,6 +281,10 @@ export function registerEffectCards(): void {
   const original = prototype.renderCard;
   prototype.renderCard = async function(...args) {
     const html = await original.apply(this, args);
+    if (!preferTranslations()) return html;
+    const generation = reloadNumber, language = getTranslatorSettings().targetLanguage, user = game.user;
+    const current = () => preferTranslations() && generation === reloadNumber
+      && language === getTranslatorSettings().targetLanguage && user === game.user;
     try {
       const name = lookupDisplayText(this, ["name"]);
       const description = lookupDisplayText(this, ["description"]);
@@ -267,9 +300,10 @@ export function registerEffectCards(): void {
         } } } } }).applications.ux.TextEditor.implementation;
         const enriched = await editor.enrichHTML(description, { async: true, relativeTo: this });
         // The record or source may change during enrichment.
-        if (lookupDisplayText(this, ["description"]) !== description) return html;
+        if (!current() || lookupDisplayText(this, ["description"]) !== description) return html;
         body.innerHTML = enriched;
       }
+      if (!current() || lookupDisplayText(this, ["name"]) !== name) return html;
       return template.innerHTML;
     } catch (error) { logger.warn("Effect card translation could not be rendered.", error); return html; }
   };

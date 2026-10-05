@@ -54,6 +54,11 @@ export function discoverSystemHtmlFieldPaths(
 
 /** Reviewed Ember UI strings which are not HTMLFields. Never scan every string:
  * adjacent fields contain IDs, enums, scene configuration and automation data. */
+const EMBER_LORE_PAGE_TYPES = new Set([
+  "ember.lore", "ember.ancestry", "ember.characterClass", "ember.culture",
+  "ember.cosmos", "ember.deity", "ember.organization",
+]);
+
 export function discoverEmberTextFieldPaths(
   type: string,
   fields: Record<string, unknown> | undefined,
@@ -64,6 +69,21 @@ export function discoverEmberTextFieldPaths(
   const subtitle = fields.subtitle as RuntimeDataField | undefined;
   if (subtitle?.constructor?.name === "StringField" && typeof system.subtitle === "string") {
     paths.push(["subtitle"]);
+  }
+  // EmberLorePage and its reviewed subclasses store the banner quote as plain
+  // text. Check the actual nested schema, not just an object named "banner".
+  const banner = fields.banner as RuntimeDataField | undefined;
+  if (EMBER_LORE_PAGE_TYPES.has(type)
+    && banner?.constructor?.name === "SchemaField"
+    && banner.fields?.img?.constructor?.name === "FilePathField"
+    && banner.fields?.caption?.constructor?.name === "StringField"
+    && isRecord(system.banner) && typeof system.banner.caption === "string") {
+    paths.push(["banner", "caption"]);
+  }
+  const edict = fields.edict as RuntimeDataField | undefined;
+  if (type === "ember.deity" && edict?.constructor?.name === "StringField"
+    && typeof system.edict === "string") {
+    paths.push(["edict"]);
   }
   if (type === "ember.questEvent" || type === "ember.standaloneEvent") {
     const outcomes = fields.outcomes as RuntimeDataField | undefined;

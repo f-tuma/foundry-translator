@@ -1052,6 +1052,10 @@
 .ft-desk__status { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .ft-desk__status strong { border: 1px solid var(--ft-color-accent); border-radius: 4px; padding: 4px 8px; color: var(--ft-color-accent); }
 .ft-desk__status span { overflow-wrap: anywhere; color: var(--ft-color-text-muted); }
+.ft-desk__preference { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-block: 1px solid var(--ft-color-border); cursor: pointer; }
+.ft-desk__preference input { flex: 0 0 auto; margin-top: 3px; }
+.ft-desk__preference span { display: grid; gap: 4px; min-width: 0; }
+.ft-desk__preference small { color: var(--ft-color-text-muted); line-height: 1.5; }
 .ft-bundles__card p { color: var(--ft-color-text-muted); overflow-wrap: anywhere; }
 .ft-desk__actions { display: grid; gap: 10px; }
 .ft-desk__actions button { display: flex; gap: 16px; align-items: center; text-align: left; padding: 16px; height: auto; background: var(--ft-color-surface); border: 1px solid var(--ft-color-border); border-radius: 6px; color: var(--ft-color-text); }

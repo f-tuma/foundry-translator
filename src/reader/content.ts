@@ -3,6 +3,7 @@ import { readJournalTranslationFlag } from "../translation/journal";
 import { isTranslatedEmberPage, translateOutcomeLabels } from "../translation/ember-runtime-bridge";
 import { MODULE_ID } from "../constants";
 import { SETTINGS } from "../settings/settings";
+import { localizeEmberSectionHeading } from "../translation/ember-section-headings";
 
 interface ReaderDocument extends FoundryUuidDocument {
   name?: string; type?: string; visible?: boolean; isOwner?: boolean; sort?: number; category?: string | null;
@@ -21,16 +22,6 @@ const t = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.Reader.${key}`)
 export const escapeReader = (text: string) => text.replace(/[&<>"']/gu, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 // The reader renders its own "Open in Foundry" control next to this notice.
 const unsupportedPage = (): ReaderPage => ({ html: `<p class="ft-reader-notice">${escapeReader(t("Unsupported"))}</p>`, unsupported: true });
-/** Ember 0.6.2 passes literal English section headers to its template. Map the
- * known ones to reader strings; unknown/system-localized headers pass through. */
-const EMBER_HEADERS: Record<string, string> = {
-  "At a Glance": "AtAGlance", "Setting the Scene": "SettingTheScene", "Event Details": "EventDetails", "Journal Summary": "JournalSummary",
-  "Event Outcomes": "EventOutcomes", "Secret Lore": "SecretLore", "Gamemaster Information": "Gamemaster", "Ancestry Details": "AncestryDetails",
-  "Culture Details": "CultureDetails", "Biome Details": "BiomeDetails", "Location Details": "LocationDetails", "Quest Details": "QuestDetails",
-  "Biomes": "Biomes", "Locations": "Locations", "Notable Inhabitants": "NotableInhabitants", "Events": "Events", "Event Summary": "EventSummary",
-  "Related Locations": "RelatedLocations", "Involved Locations": "InvolvedLocations",
-};
-const sectionHeader = (header: string) => EMBER_HEADERS[header] ? t(`Section.${EMBER_HEADERS[header]}`) : game.i18n.localize(header);
 /** Translated event copies read outcome labels from the original's live event;
  * localize them by outcome ID exactly as the native translated sheet does. */
 function localizedOutcomes(html: string, page: ReaderDocument): string {
@@ -74,7 +65,7 @@ export async function readerPage(page: ReaderDocument, secrets: boolean): Promis
       const kind = section.sectionClass ?? "";
       if (!section.content || ["actions", "warnings"].includes(kind)) continue;
       if (!game.user?.isGM && ["gamemaster", "secrets"].includes(kind)) continue;
-      const heading = section.header ? `<h2>${escapeReader(sectionHeader(section.header))}</h2>` : "";
+      const heading = section.header ? `<h2>${escapeReader(localizeEmberSectionHeading(section.header))}</h2>` : "";
       let body = await enrich(section.content, page, secrets);
       if (kind === "outcomes") body = localizedOutcomes(body, page);
       if (kind === "edict") body = body.replace(`<h4>Edict of ${page.name}</h4>`, () => `<h4>${escapeReader(t("Section.Edict").replace("{name}", page.name ?? ""))}</h4>`);

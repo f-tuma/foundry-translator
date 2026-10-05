@@ -32,9 +32,10 @@ export async function availableDocumentReferences(data: unknown, language: strin
     const root = keys.find((key) => sourceUuid === key || sourceUuid.startsWith(`${key}.`));
     if (!root) continue;
     const target = `${roots.get(root)}${sourceUuid.slice(root.length)}`;
-    // Source upgrades can remove embedded pages. In that case use the copy's root.
+    // A missing embedded child must retain its exact original reference;
+    // replacing it with the translated parent changes the linked identity.
     const resolved = await fromUuid(target).catch(() => null);
-    result.push({ sourceUuid, translatedUuid: resolved ? target : roots.get(root)! });
+    if (resolved?.uuid === target) result.push({ sourceUuid, translatedUuid: target });
   }
   return result;
 }

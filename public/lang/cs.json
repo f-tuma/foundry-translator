@@ -30,8 +30,10 @@
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Auto": "Rozpoznat automaticky",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Name": "Cílový jazyk",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Hint": "Jazyk výsledného dobrodružství.",
-  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Name": "Automaticky otevírat dostupné překlady",
-  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Hint": "Pokud má odkazovaný dokument uložený překlad do cílového jazyka, otevře se překlad místo zdroje. Vypnutím obnovíte původní chování odkazů ve Foundry.",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Name": "Preferovat překlady",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Hint": "Otevírat dostupné překlady deníků a odkazů a zobrazovat přeložené názvy na mapě. Vypnuto: původní dokumenty; uložené překlady lze otevřít ručně. Chybějící nebo nepřístupný překlad ponechá originál.",
+  "FOUNDRY_TRANSLATE.Desk.PreferTranslations": "Preferovat překlady",
+  "FOUNDRY_TRANSLATE.Desk.PreferTranslationsHint": "Zapnuto: dostupné překlady se otevírají automaticky. Vypnuto: překlad deníku otevřeš ručně tlačítkem v jeho záhlaví. Platí pro celý svět.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyOpenAI": "Text se odesílá přímo z GM prohlížeče na zadaný server. Adresa, model a případný token se ukládají jen v tomto prohlížeči.",
   "FOUNDRY_TRANSLATE.Settings.Test": "Otestovat připojení",
   "FOUNDRY_TRANSLATE.Settings.Save": "Uložit nastavení",
@@ -765,5 +767,13 @@
   "FOUNDRY_TRANSLATE.Reader.LightCancelled": "Příprava zrušena. Předchozí knihovna zůstala zachována.",
   "FOUNDRY_TRANSLATE.Reader.LightFailed": "Knihovnu se nepodařilo připravit. Předchozí kopie zůstala zachována; ověřte přístup k původním knihám a volné úložiště prohlížeče.",
   "FOUNDRY_TRANSLATE.Reader.LightServerHtmlRequired": "Server podává stránku čtečky jako prostý text. Správce musí pro jedinou cestu /modules/foundry-translate/reader/index.html nastavit Content-Type: text/html; charset=utf-8 v reverzní proxy. Knihovna zůstala beze změny. Postup: docs/reader-hosting.md v repozitáři modulu.",
-  "FOUNDRY_TRANSLATE.Reader.LightChecking": "Kontroluji stránku čtečky…"
+  "FOUNDRY_TRANSLATE.Reader.LightChecking": "Kontroluji stránku čtečky…",
+  "FOUNDRY_TRANSLATE.Creation.Culture": "Kultura",
+  "FOUNDRY_TRANSLATE.Creation.Path": "Cesta",
+  "FOUNDRY_TRANSLATE.Creation.Attunement": "Naladění",
+  "FOUNDRY_TRANSLATE.Creation.Token": "Žeton",
+  "FOUNDRY_TRANSLATE.Creation.AsterProgression": "Vývoj Asteru",
+  "FOUNDRY_TRANSLATE.Creation.SoulboundProgression": "Vývoj Duševního Pouta",
+  "FOUNDRY_TRANSLATE.Creation.Rarity": "Vzácnost",
+  "FOUNDRY_TRANSLATE.Creation.Lifespan": "Délka Života"
 }

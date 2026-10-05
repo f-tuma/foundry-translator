@@ -13,6 +13,11 @@ export const SETTINGS = {
   CZECH_FONTS: "czechFonts",
 } as const;
 
+/** Presentation preference only; never changes the documents used by game rules. */
+export function preferTranslations(): boolean {
+  return game.settings.get(MODULE_ID, SETTINGS.AUTO_OPEN_TRANSLATIONS) !== false;
+}
+
 export type ProviderId = "chrome-local" | "google-cloud-basic" | "openai-compatible";
 
 export interface TranslatorSettings {
