@@ -8,7 +8,7 @@ import { mapGlossaryLabel, mapGlossaryLabels } from "./map-glossary-labels";
 import { resolveSourceReference, resolveTranslationReference, translationIdentity } from "./document-identity";
 import { discoverDocumentDependencies, rewriteDocumentReferences } from "./document-dependencies";
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "./item";
-import { readJournalTranslationFlag } from "./journal";
+import { journalSourceHash, readJournalTranslationFlag, type JournalData } from "./journal";
 
 interface DisplayDocument extends FoundryUuidDocument {
   name?: string; type?: string; visible?: boolean; isOwner?: boolean;
@@ -191,6 +191,79 @@ async function descriptionHtml(source: DisplayDocument, target: DisplayDocument)
   return readable(source) && readable(target) && itemDescription(source) === before && itemDescription(target) === after ? html : null;
 }
 
+/** One render's shared ancestry journal proof, including one final access and
+ * content recheck even when many options use the same original parent. */
+function overviewSourceHashes(guards: (() => boolean)[]) {
+  const cache = new Map<DisplayDocument, Promise<string | null>>();
+  return (parent: DisplayDocument): Promise<string | null> => {
+    const known = cache.get(parent); if (known) return known;
+    const work = (async () => {
+      if (!readable(parent) || !parent.toObject) return null;
+      const data = parent.toObject();
+      if (typeof data.name !== "string" || !Array.isArray(data.pages)) return null;
+      const proof = JSON.stringify(data), uuid = parent.uuid;
+      guards.push(() => readable(parent) && parent.uuid === uuid && JSON.stringify(parent.toObject?.()) === proof);
+      const hash = await journalSourceHash(data as JournalData);
+      return readable(parent) ? hash : null;
+    })();
+    cache.set(parent, work); return work;
+  };
+}
+
+function overviewComparisonHtml(html: string): string {
+  const root = document.createElement("div"); root.innerHTML = html;
+  // Ember's native overview renderer adds style="" to the paragraph. Ignore
+  // only this inert attribute in detached comparison trees.
+  for (const element of root.querySelectorAll("[style]")) {
+    if (!element.getAttribute("style")?.trim()) element.removeAttribute("style");
+  }
+  return root.innerHTML;
+}
+
+/** The native Item may embed its own ancestry overview without a translated
+ * Item copy. Replace only that proven embed's children, never arbitrary Item
+ * prose, its surrounding HTML, or its original document identity. */
+async function overviewEmbedHtml(summary: string, item: DisplayDocument, page: DisplayDocument,
+  target: DisplayDocument, locale: string, guards: (() => boolean)[], sourceHash: ReturnType<typeof overviewSourceHashes>): Promise<string | null> {
+  if (!preferTranslations() || locale !== language() || page.type !== "ember.ancestry"
+    || translationIdentity(item, "Item") || typeof item.system?.identifier !== "string" || !item.system.identifier.trim()
+    || item.system.identifier !== page.system?.identifier) return null;
+  const description = itemDescription(item), before = page.system?.content?.overview, after = target.system?.content?.overview;
+  if (typeof description !== "string" || typeof before !== "string" || !before.trim() || typeof after !== "string") return null;
+  // Only the observed native overview/inline form is supported. Other modes
+  // can contain a full page, a caption, or interactive content.
+  const commands = [...description.matchAll(/@Embed\[([^\]\r\n]+)\](?!\{)/gu)];
+  if (!commands.some(match => {
+    const [uuid, ...options] = match[1]!.trim().split(/\s+/u);
+    return uuid === page.uuid && options.length === 2 && new Set(options).size === 2
+      && options.includes("overview") && options.includes("inline");
+  })) return null;
+  const root = document.createElement("div"); root.innerHTML = summary;
+  const embeds = [...root.querySelectorAll<HTMLElement>("document-embed[data-uuid]")]
+    .filter(embed => embed.dataset.uuid === page.uuid);
+  if (embeds.length !== 1 || overviewComparisonHtml(embeds[0]!.innerHTML) !== overviewComparisonHtml(before)) return null;
+  const parent = page.parent as DisplayDocument | undefined, flag = readJournalTranslationFlag(target.parent?.flags);
+  if (!readable(parent) || !flag || flag.fallbackTextSegments > 0 || flag.sourceHash !== await sourceHash(parent)) return null;
+  const itemProof = JSON.stringify(item.toObject?.() ?? item.system);
+  guards.push(() => readable(item) && !translationIdentity(item, "Item")
+    && JSON.stringify(item.toObject?.() ?? item.system) === itemProof);
+  const replacements = [];
+  for (const { sourceUuid } of discoverDocumentDependencies(after)) {
+    const absolute = absoluteReference(sourceUuid, target.uuid);
+    if (!absolute) continue;
+    const original = await resolveSourceReference(absolute);
+    if (original && original !== sourceUuid) replacements.push({ sourceUuid, translatedUuid: original });
+  }
+  const normalized = sourceReferenceNotation(before, rewriteDocumentReferences(after, replacements), page.uuid);
+  assertPortableText(before, normalized, "html");
+  if (JSON.stringify(proseNumbers([before])) !== JSON.stringify(proseNumbers([normalized]))) return null;
+  const html = await (foundry.applications as any).ux.TextEditor.enrichHTML(normalized, { relativeTo: page, secrets: false });
+  if (!readable(item) || !readable(page) || !readable(target) || itemDescription(item) !== description
+    || page.system?.content?.overview !== before || target.system?.content?.overview !== after) return null;
+  embeds[0]!.innerHTML = html;
+  return root.innerHTML;
+}
+
 function originalPage(family: string, option: Option): DisplayDocument | null {
   const spec = JOURNALS[family]; if (!spec || typeof option.identifier !== "string") return null;
   const journal = (game.journal as any)?.get(spec.id) as DisplayDocument | undefined;
@@ -207,6 +280,7 @@ export async function translateEmberCreationContext(context: unknown, locale = l
   const user = game.user, world = (game as any).world, selectedLanguage = language(), interfaceLanguage = (game.i18n as any).lang, preference = preferTranslations();
   const guards: (() => boolean)[] = [];
   const lookup = presentationLookup(locale, guards);
+  const overviewSourceHash = overviewSourceHashes(guards);
   const labels = await glossaryLabels(locale);
   const options = new Map<Option, Promise<Option>>();
   const overlay = (value: unknown, family: string): Promise<any> => {
@@ -231,6 +305,12 @@ export async function translateEmberCreationContext(context: unknown, locale = l
       }
       const page = originalPage(family, option), targetPage = page && await lookup(page);
       if (page && targetPage) {
+        if (item?.documentName === "Item" && readable(item) && typeof option.summary === "string" && copy.summary === option.summary) {
+          try {
+            const html = await overviewEmbedHtml(option.summary, item, page, targetPage, locale, guards, overviewSourceHash);
+            if (html !== null) copy.summary = html;
+          } catch (error) { logger.warn("Creation overview embed validation failed; keeping native prose.", error); }
+        }
         if (option.name === page.name && typeof targetPage.name === "string") copy.name = targetPage.name;
         if (option.title === page.name && typeof targetPage.name === "string") copy.title = targetPage.name;
         if (typeof option.subtitle === "string" && option.subtitle === page.system?.subtitle

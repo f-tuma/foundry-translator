@@ -97,7 +97,10 @@ aktivního glosáře. Přeložený text scény má přednost. UUID, prokliky a u
 scéna se nemění. Nápisy zapečené přímo v obrázku mapy tím nepřeložíš.
 
 Tvorba postavy používá dostupné překlady názvů a popisů Itemů a přesné
-názvy z glosáře. Popisky talentů v denících a jejich nativní náhledy také
+názvy z glosáře. Od verze **0.34.7** může běžný vložený přehled rodového
+původu převzít aktuální, přístupný překlad ze své stránky v deníku, i když
+Item ještě nemá přeloženou kopii. Samostatné popisy schopností potřebují
+vlastní překlad. Popisky talentů v denících a jejich nativní náhledy také
 použijí přístupný, aktuální překlad. Pravidla, předpoklady, ovládání a původní
 identifikátory zůstávají napojené na originál. Nepřístupné, nejednoznačné,
 neúplné či zastaralé kopie se nepoužijí. Chybějící překlad se automaticky
