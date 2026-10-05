@@ -56,16 +56,24 @@ export async function planMissingCreationItems(sourceDocuments: readonly Creatio
 
 export async function creationSourceGuard(source: CreationItemDocument): Promise<() => Promise<void>> {
   assertCreationItem(source);
-  const data = source.toObject(), uuid = source.uuid, proof = JSON.stringify(data), hash = await itemSourceHash(data as ItemData);
+  const data = source.toObject(), uuid = source.uuid, type = source.type, proof = JSON.stringify(data), hash = await itemSourceHash(data as ItemData);
   const check = async () => {
-    assertCreationItem(source);
-    const current = source.toObject();
-    if (source.uuid !== uuid || await fromUuid(uuid) !== source || JSON.stringify(current) !== proof
-      || await itemSourceHash(current as ItemData) !== hash) throw new Error(t("SourceChanged"));
-    assertCreationItem(source);
-    if (JSON.stringify(source.toObject()) !== proof) throw new Error(t("SourceChanged"));
+    assertSourceProof(source, uuid, type, proof, "SourceChanged");
+    const canonical = await fromUuid(uuid) as CreationItemDocument;
+    assertSourceProof(canonical, uuid, type, proof, "SourceChanged");
+    if (await itemSourceHash(source.toObject() as ItemData) !== hash
+      || await itemSourceHash(canonical.toObject() as ItemData) !== hash) throw new Error(t("SourceChanged"));
+    // Compendium caches may replace instances. Recheck both proofs after every
+    // asynchronous resolution/hash, including the originally captured object.
+    assertSourceProof(source, uuid, type, proof, "SourceChanged");
+    assertSourceProof(canonical, uuid, type, proof, "SourceChanged");
   };
   await check(); return check;
+}
+
+function assertSourceProof(document: CreationItemDocument, uuid: string, type: string, proof: string, error: string): void {
+  assertCreationItem(document);
+  if (document.uuid !== uuid || document.type !== type || JSON.stringify(document.toObject()) !== proof) throw new Error(t(error));
 }
 
 /** Mirror only the inspected native option selectors, then one level of
@@ -111,10 +119,23 @@ export async function collectEmberCreationItems(): Promise<CreationItemDocument[
     }
   }
   if (selected.size > MAX_CREATION_ITEMS) throw new Error(t("TooMany").replace("{limit}", String(MAX_CREATION_ITEMS)));
+  const canonicalSources: CreationItemDocument[] = [];
+  const selectedProofs: (() => void)[] = [];
   for (const document of selected.values()) {
-    if (await fromUuid(document.uuid) !== document || JSON.stringify(document.toObject()) !== sourceProofs.get(document)) throw new Error(t("InvalidSource"));
+    const uuid = document.uuid, type = document.type, proof = sourceProofs.get(document)!;
+    assertSourceProof(document, uuid, type, proof, "InvalidSource");
+    const canonical = await fromUuid(uuid) as CreationItemDocument;
+    // Native getDocuments returns fresh instances even when getDocument (and
+    // fromUuid) retains its cached instance. Accept only complete equivalence.
+    const validate = () => {
+      assertSourceProof(document, uuid, type, proof, "InvalidSource");
+      assertSourceProof(canonical, uuid, type, proof, "InvalidSource");
+    };
+    validate(); selectedProofs.push(validate); canonicalSources.push(canonical);
     check();
   }
   if (!journalProofs.every(valid => valid())) throw new Error(t("SourceChanged"));
-  return [...selected.values()].sort((a, b) => a.uuid.localeCompare(b.uuid, "en"));
+  for (const validate of selectedProofs) validate();
+  check();
+  return canonicalSources.sort((a, b) => a.uuid.localeCompare(b.uuid, "en"));
 }
