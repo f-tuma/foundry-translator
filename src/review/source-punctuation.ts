@@ -13,6 +13,9 @@ export interface SourcePunctuationDiagnostic {
   sourceChildren?: number;
   targetChildren?: number;
 }
+export interface SourcePunctuationEnvironment {
+  systemId: string; emberActive: boolean; emberVersion: string;
+}
 const BLOCKS = "p,li,h1,h2,h3,h4,h5,h6,td,th,blockquote,div,section,article,figcaption,dt,dd";
 const EXCLUDED = "script,style,code,pre,textarea,noscript,template";
 const INLINE = new Set(["STRONG", "EM", "B", "I", "U", "SPAN"]);
@@ -31,11 +34,27 @@ function nodeAt(root: Node, path: readonly number[]): Node | undefined {
 }
 const address = (path: readonly number[]) => `html/${path.join("/")}`;
 
+/** Only the known, inactive Ember inline branch; ordinary SUB is not prose markup. */
+function inactiveEmberBranch(element: Element, environment?: SourcePunctuationEnvironment): boolean {
+  if (!environment?.emberActive || environment.emberVersion !== "0.6.2" ||
+      !["dnd5e", "crucible"].includes(environment.systemId) || element.tagName !== "SUB") return false;
+  const parent = element.parentElement, system = element.getAttribute("data-system");
+  if (parent?.tagName !== "SUP" || !parent.classList.contains("system-swap-inline") ||
+      parent.classList.contains("system-swap-block") || !["dnd5e", "crucible"].includes(system ?? "") ||
+      system === environment.systemId) return false;
+  let branches = 0, containers = 0;
+  for (let node: Element | null = element; node; node = node.parentElement) {
+    if (node.hasAttribute("data-system")) branches++;
+    if (node.classList.contains("system-swap-inline") || node.classList.contains("system-swap-block")) containers++;
+  }
+  return branches === 1 && containers === 1;
+}
+
 /** Strictly prove the only structural difference is one empty inline leaf.
  * All element names/attributes (including secrets, URLs and system gates) and
  * all other node shapes must match. Ordinary translated text is retained.
  */
-export function restoreSourcePunctuation(source: string, before: string, diagnostic?: { value?: SourcePunctuationDiagnostic }): { value: string; proof: SourcePunctuationRestoration } | null {
+export function restoreSourcePunctuation(source: string, before: string, diagnostic?: { value?: SourcePunctuationDiagnostic }, environment?: SourcePunctuationEnvironment): { value: string; proof: SourcePunctuationRestoration } | null {
   const reject = (stage: SourcePunctuationDiagnostic["stage"], predicate: string,
     details: Omit<SourcePunctuationDiagnostic, "stage" | "predicate"> = {}): null => {
     if (diagnostic) diagnostic.value = { stage, predicate, ...details };
@@ -55,7 +74,7 @@ export function restoreSourcePunctuation(source: string, before: string, diagnos
       if (element.tagName !== target.tagName || !equal(attributes(element), attributes(target))) return mismatch(element.tagName !== target.tagName ? "tag-equal" : "all-raw-attributes-equal", path, a, b);
       if (element.matches(EXCLUDED)) return element.outerHTML === target.outerHTML || mismatch("excluded-outerHTML-equal", path, a, b);
       if (a.childNodes.length === 1 && a.firstChild?.nodeType === 3 && b.childNodes.length === 0 &&
-          INLINE.has(element.tagName) && !element.closest(EXCLUDED) && element.textContent!.length <= 16 && /^[,.;:!?]+$/u.test(element.textContent!.trim())) {
+          (INLINE.has(element.tagName) || inactiveEmberBranch(element, environment)) && !element.closest(EXCLUDED) && element.textContent!.length <= 16 && /^[,.;:!?]+$/u.test(element.textContent!.trim())) {
         candidates.push({ source: element, target, parentPath: [...path] }); return true;
       }
     } else if (a.nodeType !== 11 && a.textContent !== b.textContent) return mismatch("non-element-text-equal", path, a, b);
@@ -89,14 +108,14 @@ export function restoreSourcePunctuation(source: string, before: string, diagnos
 /** The receipt-bound inverse removes only that exact source leaf. Later prose
  * in unrelated rows stays intact, and the prior plan will be re-proved on undo.
  */
-export function removeSourcePunctuation(source: string, value: string, proof: SourcePunctuationRestoration): string | null {
+export function removeSourcePunctuation(source: string, value: string, proof: SourcePunctuationRestoration, environment?: SourcePunctuationEnvironment): string | null {
   const original = template(source), copy = template(value);
   const a = nodeAt(original.content, proof.parentPath), b = nodeAt(copy.content, proof.parentPath);
   if (a?.nodeType !== 1 || b?.nodeType !== 1 || (a as Element).tagName !== (b as Element).tagName ||
       !equal(attributes(a as Element), attributes(b as Element)) || a.childNodes.length !== 1 || b.childNodes.length !== 1 ||
       a.firstChild?.nodeType !== 3 || b.firstChild?.nodeType !== 3 || a.textContent !== proof.text || b.textContent !== proof.text) return null;
   b.removeChild(b.firstChild);
-  const before = serialize(copy.content), restored = restoreSourcePunctuation(source, before);
+  const before = serialize(copy.content), restored = restoreSourcePunctuation(source, before, undefined, environment);
   if (!restored || !equal(restored.proof, proof) || restored.value !== serialize(template(value).content)) return null;
   return before;
 }

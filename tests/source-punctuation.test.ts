@@ -56,3 +56,38 @@ it("inverse retains unrelated later prose", () => {
   const value = restored.value.replace("Zachovat další text.", "Později upravený text.");
   expect(removeSourcePunctuation(source, value, restored.proof)).toBe(before.replace("Zachovat další text.", "Později upravený text."));
 });
+
+const emberEnvironment = { systemId: "crucible", emberActive: true, emberVersion: "0.6.2" };
+const branchSource = '<p>First<sup class="system-swap-inline"><sub data-system="dnd5e">,</sub></sup> then second.</p><p>Keep other prose.</p>';
+const branchBefore = '<p>První<sup class="system-swap-inline"><sub data-system="dnd5e"></sub></sup> a druhá.</p><p>Zachovat další text.</p>';
+it("restores one literal comma in a proved inactive Ember branch, retains prose and supports guarded inverse", () => {
+  const restored = restoreSourcePunctuation(branchSource, branchBefore, undefined, emberEnvironment)!;
+  expect(restored.value).toBe(branchBefore.replace('<sub data-system="dnd5e"></sub>', '<sub data-system="dnd5e">,</sub>'));
+  expect(restored.proof).toEqual({ parentPath: [0, 1, 0], text: ",", unitId: "html/0", partIndex: 1 });
+  expect(removeSourcePunctuation(branchSource, restored.value, restored.proof, emberEnvironment)).toBe(branchBefore);
+  expect(restoreSourcePunctuation(branchSource, restored.value, undefined, emberEnvironment)).toBeNull();
+  expect(removeSourcePunctuation(branchSource, restored.value, restored.proof)).toBeNull();
+});
+
+it.each([
+  undefined, { ...emberEnvironment, emberActive: false }, { ...emberEnvironment, emberVersion: "0.6.3" },
+  { ...emberEnvironment, systemId: "unknown" }, { ...emberEnvironment, systemId: "dnd5e" },
+])("does not infer an Ember renderer or restore an active system branch: %s", environment => {
+  expect(restoreSourcePunctuation(branchSource, branchBefore, undefined, environment)).toBeNull();
+});
+
+it.each([
+  ['<p>First<sub>,</sub> rest.</p>', '<p>První<sub></sub> zbytek.</p>'],
+  [branchSource.replaceAll("dnd5e", "unknown"), branchBefore.replaceAll("dnd5e", "unknown")],
+  [branchSource.replaceAll("system-swap-inline", "system-swap-block"), branchBefore.replaceAll("system-swap-inline", "system-swap-block")],
+  [branchSource.replaceAll("<sup", "<span").replaceAll("</sup>", "</span>"), branchBefore.replaceAll("<sup", "<span").replaceAll("</sup>", "</span>")],
+  [branchSource.replace('<p>First', '<p data-system="dnd5e">First'), branchBefore.replace('<p>První', '<p data-system="dnd5e">První')],
+  [branchSource.replace(">,</sub>", ">missing</sub>"), branchBefore],
+  [branchSource.replace(">,</sub>", ">2</sub>"), branchBefore],
+  [branchSource, branchBefore.replace('data-system="dnd5e"', 'data-system="crucible"')],
+  [branchSource, branchBefore.replace('<sub data-system="dnd5e">', '<sub data-system="dnd5e" title="Changed">')],
+  [branchSource + branchSource, branchBefore + branchBefore],
+  [`<code>${branchSource}</code>`, `<code>${branchBefore}</code>`],
+])("never widens the branch exception to unrelated markup, words, numbers or additional defects", (original, translated) => {
+  expect(restoreSourcePunctuation(original, translated, undefined, emberEnvironment)).toBeNull();
+});
