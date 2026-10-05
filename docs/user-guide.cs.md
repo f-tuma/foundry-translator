@@ -112,6 +112,8 @@ Od verze **0.34.8** může GM v hlavním menu použít **Doplnit překlady tvorb
 postavy**. Okno nejprve ukáže počet chybějících a existujících kopií. Po
 potvrzení přeloží pouze chybějící možnosti původu, kultury a cesty z balíčku
 Ember Crucible a jejich přímo udělené talenty; maximálně 256 unikátních Itemů.
+Verze **0.34.9** opravuje odmítnutí nezměněných položek při opakovaném
+načtení kompendia.
 Potřebuje stejné připojení k modelu a glosář jako běžný překlad. Nespouští
 překlad odkazovaných deníků ani dalších závislostí.
 

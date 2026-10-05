@@ -40,6 +40,20 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-10-05, v0.34.9 hotfix: native production preview found 78 missing creation
+  Items, but Start rejected the second read before provider execution or saves.
+  Foundry v14 `getDocuments` returns fresh database instances while `fromUuid`
+  can retain a previously cached instance. Collection now resolves canonical
+  Items only after exact UUID, type, readability, untranslated status and complete
+  `toObject` equivalence; source guards accept identical cache rehydration.
+  Both fetched and canonical proofs are checked again after asynchronous work.
+  Divergent contents or permissions still fail closed. Native-cache regression
+  tests and 11 independent adversarial probes pass. Full checks: 1,385 module
+  tests pass (four optional live-model suites skipped), typecheck, build and
+  release metadata verified. No local Foundry was used;
+  an actual provider run remains pending the user-managed hotfix update.
+
+
 - 2026-10-05, v0.34.8 preparation: GM Translation Desk adds a bounded preview
   for missing Ember Crucible creation Items and their explicitly granted talents.
   Exact native option identifiers and UUIDs select at most 256 original Items;

@@ -3,7 +3,7 @@ import { parseHTML } from "linkedom";
 import { JournalTranslationService } from "../src/translation/journal-service";
 import { activeTranslations } from "../src/translation/active-translations";
 import { readItemTranslationFlag } from "../src/translation/item";
-import { collectEmberCreationItems, EMBER_CREATION_PACK, MAX_CREATION_ITEMS, planMissingCreationItems } from "../src/translation/ember-creation-items";
+import { collectEmberCreationItems, creationSourceGuard, EMBER_CREATION_PACK, MAX_CREATION_ITEMS, planMissingCreationItems } from "../src/translation/ember-creation-items";
 
 const mock = vi.hoisted(() => ({ translate: vi.fn(), prepare: vi.fn(), create: vi.fn(), glossary: [] as any[], settings: {} as any }));
 vi.mock("../src/providers/factory", () => ({ createTranslationProvider: (...args: unknown[]) => {
@@ -30,6 +30,15 @@ function stored(pack: string, id: string) {
     toObject: () => structuredClone(rows.get(id)),
   };
   documents.set(uuid, doc); return doc;
+}
+function freshDocument(cached: any, row = cached.toObject()) {
+  const snapshot = structuredClone(row);
+  return { id: cached.id, uuid: cached.uuid, documentName: cached.documentName, parent: null,
+    get visible() { return snapshot.visible !== false; }, get name() { return snapshot.name; },
+    get type() { return snapshot.type; }, get flags() { return snapshot.flags; }, get folder() { return { id: snapshot.folder }; },
+    get system() { return { ...snapshot.system, constructor: { schema: { fields: { description: { constructor: { name: "HTMLField" } } } } } }; },
+    toObject: () => structuredClone(snapshot),
+  };
 }
 function makePack(collection: string) {
   tables.set(collection, new Map());
@@ -85,6 +94,47 @@ afterEach(() => {
 });
 
 describe("Ember creation Item collection", () => {
+  it("supports native fresh getDocuments results while fromUuid retains cached Items across preview and Start", async () => {
+    const a = source("a"); journal("emberAncestries0", [page("ember.ancestry", "a")]);
+    const reads: any[][] = [];
+    packs.get(EMBER_CREATION_PACK).getDocuments.mockImplementation(async () => {
+      // Foundry caches only absent IDs, but returns each new database result.
+      const result = [freshDocument(a)]; reads.push(result); return result;
+    });
+    const preview = await collectEmberCreationItems(), guard = await creationSourceGuard(preview[0]!);
+    const start = await collectEmberCreationItems();
+    expect(reads[0]![0]).not.toBe(a); expect(reads[1]![0]).not.toBe(reads[0]![0]);
+    expect(preview[0]).toBe(a); expect(start[0]).toBe(a); await guard();
+    expect(await new JournalTranslationService().translateMissingItems(preview)).toMatchObject({ createdDocuments: 1 });
+  });
+  it.each(["canonical-content", "fetched-content", "canonical-permission", "fetched-permission", "canonical-flag", "fetched-flag", "canonical-type", "canonical-uuid"])("rejects mismatching %s instead of canonicalizing it", async reason => {
+    const a = source("a"); journal("emberAncestries0", [page("ember.ancestry", "a")]);
+    packs.get(EMBER_CREATION_PACK).getDocuments.mockImplementation(async () => {
+      const fetched = a.toObject();
+      if (reason === "fetched-content") fetched.system.movement.size = 8;
+      if (reason === "fetched-permission") fetched.visible = false;
+      if (reason === "fetched-flag") fetched.flags = { "foundry-translate": { itemTranslation: {} } };
+      if (reason === "canonical-content") tables.get(EMBER_CREATION_PACK)!.get("a")!.system.movement.size = 8;
+      if (reason === "canonical-permission") tables.get(EMBER_CREATION_PACK)!.get("a")!.visible = false;
+      if (reason === "canonical-flag") tables.get(EMBER_CREATION_PACK)!.get("a")!.flags = { "foundry-translate": { itemTranslation: {} } };
+      if (reason === "canonical-type") tables.get(EMBER_CREATION_PACK)!.get("a")!.type = "background";
+      if (reason === "canonical-uuid") documents.set(a.uuid, { ...freshDocument(a), uuid: `${a.uuid}other` });
+      return [freshDocument(a, fetched)];
+    });
+    // Unreadable fetched sources are omitted by the native readable selector.
+    if (reason === "fetched-permission") expect(await collectEmberCreationItems()).toEqual([]);
+    else await expect(collectEmberCreationItems()).rejects.toThrow("InvalidSource");
+    expect(writes).toEqual([]); expect(mock.create).not.toHaveBeenCalled();
+  });
+  it("rechecks an earlier canonical Item after resolving later Items", async () => {
+    const a = source("a"), b = source("b"); journal("emberAncestries0", [page("ember.ancestry", "a"), page("ember.ancestry", "b")]);
+    packs.get(EMBER_CREATION_PACK).getDocuments.mockResolvedValue([freshDocument(a), freshDocument(b)]);
+    vi.mocked(fromUuid).mockImplementation(async uuid => {
+      if (uuid === b.uuid) tables.get(EMBER_CREATION_PACK)!.get("a")!.system.movement.size = 8;
+      return documents.get(uuid) ?? null;
+    });
+    await expect(collectEmberCreationItems()).rejects.toThrow("InvalidSource"); expect(writes).toEqual([]);
+  });
   it("collects native unique ancestry/culture/path selectors plus one level of explicit talent slots", async () => {
     const a = source("a"), c = source("c", "background"), p = source("p", "background", "p", "emberPaths000000"), t = source("t", "talent"), nested = source("nested", "talent");
     source("other", "background"); source("weapon", "weapon");
@@ -110,6 +160,35 @@ describe("Ember creation Item collection", () => {
     const a = source("a"), b = source("b"); reserve(a); reserve(a, "duplicate", { partial: true });
     const plan = await planMissingCreationItems([b, a, b], "cs");
     expect(plan.sources).toEqual([a, b]); expect(plan.missing).toEqual([b]); expect(plan.existing).toBe(1); expect(writes).toEqual([]);
+  });
+});
+
+describe("creation source guard across Compendium cache rehydration", () => {
+  it("accepts a readable rehydrated canonical Item with the identical complete source proof", async () => {
+    const a = source("a"), guard = await creationSourceGuard(a);
+    documents.set(a.uuid, freshDocument(a)); await guard();
+    expect(writes).toEqual([]);
+  });
+  it.each(["original-content", "canonical-content", "original-permission", "canonical-permission", "original-flag", "canonical-flag", "canonical-type", "canonical-uuid"])("rejects %s after cache rehydration", async reason => {
+    const a = source("a"), guard = await creationSourceGuard(a), canonicalRow = a.toObject();
+    if (reason === "original-content") tables.get(EMBER_CREATION_PACK)!.get("a")!.system.movement.size = 8;
+    if (reason === "original-permission") tables.get(EMBER_CREATION_PACK)!.get("a")!.visible = false;
+    if (reason === "original-flag") tables.get(EMBER_CREATION_PACK)!.get("a")!.flags = { "foundry-translate": { itemTranslation: {} } };
+    if (reason === "canonical-content") canonicalRow.system.movement.size = 8;
+    if (reason === "canonical-permission") canonicalRow.visible = false;
+    if (reason === "canonical-flag") canonicalRow.flags = { "foundry-translate": { itemTranslation: {} } };
+    if (reason === "canonical-type") canonicalRow.type = "background";
+    const canonical = freshDocument(a, canonicalRow);
+    if (reason === "canonical-uuid") canonical.uuid += "other";
+    documents.set(a.uuid, canonical);
+    await expect(guard()).rejects.toThrow(); expect(writes).toEqual([]);
+  });
+  it("rejects original source mutation during canonical resolution", async () => {
+    const a = source("a"), guard = await creationSourceGuard(a), canonical = freshDocument(a);
+    vi.mocked(fromUuid).mockImplementation(async () => {
+      tables.get(EMBER_CREATION_PACK)!.get("a")!.system.movement.size = 8; return canonical;
+    });
+    await expect(guard()).rejects.toThrow("SourceChanged"); expect(writes).toEqual([]);
   });
 });
 
