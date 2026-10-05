@@ -180,7 +180,7 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string, diagnostic?:
   // punctuation leaf. Normal validation below still checks the complete field.
   stage("punctuation", "raw-punctuation-proof");
   const punctuationTrace: { value?: SourcePunctuationDiagnostic } = {};
-  const punctuation = field.format === "html" ? restoreSourcePunctuation(field.source, field.translation, diagnostic ? punctuationTrace : undefined) : null;
+  const punctuation = field.format === "html" ? restoreSourcePunctuation(field.source, field.translation, diagnostic ? punctuationTrace : undefined, referenceRebuildEnvironment()) : null;
   if (diagnostic && punctuationTrace.value) diagnostic.punctuation = punctuationTrace.value;
   const alignedTranslation = punctuation?.value ?? field.translation;
   stage("canonical-integrity", "portable-reference-notation-and-structure");
@@ -336,7 +336,7 @@ export async function materializeReferenceRebuild(snapshot: ReviewSnapshot, plan
   }
   const field = snapshot.fields.find(field => field.id === fresh.fieldId)!;
   if (restoreSourceNumbers && !numbers.some(proof => !equal(proof.before, proof.source))) fail("NumbersChanged");
-  const punctuation = fresh.punctuation ? restoreSourcePunctuation(field.source, field.translation) : null;
+  const punctuation = fresh.punctuation ? restoreSourcePunctuation(field.source, field.translation, undefined, referenceRebuildEnvironment()) : null;
   if (fresh.punctuation && (!punctuation || !equal(punctuation.proof, fresh.punctuation))) fail("Conflict");
   const value = replaceRows(punctuation?.value ?? field.translation, field.format, changes.map(change => ({ unitId: fresh.rows.find(row => row.rowId === change.rowId)!.unitId, parts: change.parts })));
   assertPortableText(field.source, portableReviewText(snapshot, field, value), field.format);
@@ -392,7 +392,7 @@ export async function undoReferenceRebuild(snapshot: ReviewSnapshot, receipt: Re
         binding.beforeHash !== await hash(saved.before) || binding.afterHash !== await hash(saved.after)) fail("UndoConflict");
     restore.push({ unitId: current.unitId, parts: saved.before });
   }
-  const withoutPunctuation = receipt.punctuation ? removeSourcePunctuation(field.source, field.translation, receipt.punctuation) : field.translation;
+  const withoutPunctuation = receipt.punctuation ? removeSourcePunctuation(field.source, field.translation, receipt.punctuation, referenceRebuildEnvironment()) : field.translation;
   if (withoutPunctuation === null) fail("UndoConflict");
   const before = replaceRows(withoutPunctuation, field.format, restore), beforePlan = planReviewText(before, field.format);
   const prior: ReviewSnapshot = { ...snapshot, guard: { ...snapshot.guard, fingerprint: receipt.guardFingerprint },

@@ -58,6 +58,25 @@ async function prepared(view = broken()) {
 }
 const editsFor = (plan: NonNullable<Awaited<ReturnType<typeof prepareReferenceRebuild>>>): ReferenceRebuildEdit[] => plan.rows.map(row => ({ rowId: row.rowId, text: [...row.edit.text], labels: [] }));
 
+it("proves, materializes and undoes an inactive Ember punctuation leaf through the complete field guards", async () => {
+  const original = '<p>First<sup class="system-swap-inline"><sub data-system="dnd5e">,</sub></sup> second.</p><p>Keep other prose.</p>';
+  const before = '<p>První<sup class="system-swap-inline"><sub data-system="dnd5e"></sub></sup> druhá.</p><p>Zachovat další text.</p>';
+  const view = snapshot(original, before), { plan } = await prepared(view);
+  expect(plan.punctuation).toEqual({ parentPath: [0, 1, 0], text: ",", unitId: "html/0", partIndex: 1 });
+  expect(plan.rows).toHaveLength(1);
+  const compiled = await materializeReferenceRebuild(view, plan, editsFor(plan));
+  expect(compiled.value).toBe(before.replace('<sub data-system="dnd5e"></sub>', '<sub data-system="dnd5e">,</sub>'));
+  assertPortableText(original, portableReviewText(view, view.fields[0]!, compiled.value), "html");
+  expect((await validateReferenceRebuildChanges(view, "field", plan.proofHash, compiled.changes)).value).toBe(compiled.value);
+  const current = snapshot(original, compiled.value), recorded = compiled.changes.map(change => ({ rowId: change.rowId,
+    before: [...view.rows.find(row => row.id === change.rowId)!.translation], after: change.parts }));
+  expect((await undoReferenceRebuild(current, compiled.receipt, recorded)).value).toBe(before);
+  const edits = editsFor(plan); edits[0]!.text[1] = ";";
+  await expect(materializeReferenceRebuild(view, plan, edits)).rejects.toThrow("ProtectedText");
+  vi.stubGlobal("game", { system: { id: "crucible" }, modules: new Map([["ember", { active: true, version: "0.6.3" }]]) });
+  await expect(materializeReferenceRebuild(view, plan, editsFor(plan))).rejects.toThrow("Conflict");
+});
+
 const SOURCE_GUIDE = "JournalEntry.original", COPY_GUIDE = "Compendium.world.translations.JournalEntry.copy";
 function relativeSnapshot(source: string, translation: string, reverse = new Map([[COPY_GUIDE, SOURCE_GUIDE]])) {
   const view = snapshot(source, translation, reverse);

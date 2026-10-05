@@ -20,6 +20,12 @@ index ze `sourceReferences` v čerstvém `live_get_context`; nepřijímá vlastn
 UUID ani cesty. Vrací pouze povolená textová pole, bez makra, konfigurace
 automatizace či zápisu do originálu. Pro další pole pokračuj přes `nextOffset`.
 
+Rekonstrukce může bezpečně obnovit jednu chybějící interpunkční část z originálu.
+U Emberu 0.6.2 podporuje také prázdnou značku v neaktivní větvi
+`system-swap-inline`. Zachová značky, atributy, ostatní český text i odkazy;
+oprava má vlastní historii a přesnou možnost vrácení. Neopravuje libovolně
+poškozené HTML a nepřekládá obsah neaktivní systémové větve.
+
 Pokud se oprava zablokuje, asistent může použít `live_get_field_diagnostic`.
 Nejprve musí znovu načíst dotčený řádek přes `live_get_context` a převzít jeho
 `documentId`, `fieldId` a čerstvou `revision`. Diagnostika ukáže skutečnou
