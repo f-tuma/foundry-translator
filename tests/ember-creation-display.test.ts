@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseHTML } from "linkedom";
 import { itemSourceHash } from "../src/translation/item";
+import { journalSourceHash } from "../src/translation/journal";
+import * as journal from "../src/translation/journal";
 import { registerEmberCreationDisplay, translateEmberCreationContext, translateEmberCreationFeatureHtml } from "../src/translation/ember-creation-display";
 
 const identity = vi.hoisted(() => ({ resolve: vi.fn(), source: vi.fn(), identity: vi.fn() }));
@@ -54,6 +56,25 @@ function pagePair(sourceItem: any) {
   return { source, target, original, translated };
 }
 
+async function ancestryOverviewPair() {
+  const f = await itemPair(), p = pagePair(f.source);
+  journals.delete("emberCultures000"); journals.set("emberAncestries0", p.original);
+  p.original.uuid = "JournalEntry.emberAncestries0";
+  p.source.uuid = `${p.original.uuid}.JournalEntryPage.p`;
+  p.source.type = p.target.type = "ember.ancestry";
+  p.source.system = { ...p.source.system, content: { overview: "<p>Native overview 3.</p>" } } as any;
+  p.target.system = { ...p.target.system, content: { overview: "<p>Český přehled 3.</p>" } } as any;
+  const sourceData = { name: "Ancestries", pages: [{ _id: p.source.id, name: p.source.name, type: p.source.type, system: p.source.system }] };
+  Object.assign(p.original, { toObject: () => sourceData });
+  Object.assign(p.translated.flags["foundry-translate"].translation!, { sourceUuid: p.original.uuid, sourceHash: await journalSourceHash(sourceData) });
+  f.data.system.description = `<p>Item prose.</p><p>@Embed[${p.source.uuid} overview inline]</p>`;
+  identity.resolve.mockImplementation(async uuid => uuid === p.source.uuid
+    ? { status: "mapped", sourceUuid: uuid, translatedUuid: p.target.uuid } : { status: "source-only" });
+  const summary = `<p>Item prose.</p><document-embed class="inline" data-uuid="${p.source.uuid}" data-action="open"><p style="">Native overview 3.</p></document-embed><p>After.</p>`;
+  const option = Object.freeze({ identifier: "arcturian", name: f.source.name, item: f.source, summary });
+  return { ...f, ...p, sourceData, summary, option, context: Object.freeze({ ancestry: option, ancestries: Object.freeze([option]) }) };
+}
+
 describe("Ember creation display overlay", () => {
   it("clones option and tab presentation while retaining original Items, mechanics, references and state", async () => {
     const f = await itemPair(), features = Object.freeze([{ items: ["<p>Native feature</p>"], id: "talents" }]);
@@ -90,6 +111,81 @@ describe("Ember creation display overlay", () => {
     const result = await translateEmberCreationContext(context) as any;
     expect(result.culture.name).toBe("Arktuřan"); expect(result.culture.figure).toEqual({ src: "image.webp", caption: "Duše přetrvá." });
     expect(result.culture.summary).toBe("Native Item summary"); expect(enrich).not.toHaveBeenCalled();
+  });
+  it("uses a fresh paired overview only inside the exact native source-page embed without an Item copy", async () => {
+    const f = await ancestryOverviewPair();
+    const result = await translateEmberCreationContext(f.context) as any;
+    expect(result.ancestry.summary).toBe(f.summary.replace('<p style="">Native overview 3.</p>', "<p>Český přehled 3.</p>"));
+    expect(result.ancestries[0]).toBe(result.ancestry); expect(result.ancestry.item).toBe(f.option.item);
+    expect(f.context.ancestry.summary).toBe(f.summary); expect(f.data.system.description).toContain(`@Embed[${f.source.uuid} overview inline]`);
+    expect(enrich).toHaveBeenCalledWith("<p>Český přehled 3.</p>", { relativeTo: f.source, secrets: false });
+  });
+  it("snapshots and hashes a shared ancestry parent once per render and rechecks it once before returning", async () => {
+    const f = await ancestryOverviewPair(), hash = vi.spyOn(journal, "journalSourceHash");
+    const snapshot = vi.spyOn(f.original as any, "toObject");
+    const context = { ancestries: Array.from({ length: 17 }, () => ({ ...f.option })) };
+    const first = await translateEmberCreationContext(context) as any;
+    expect(first.ancestries.every((option: any) => option.summary.includes("Český přehled 3."))).toBe(true);
+    expect(hash).toHaveBeenCalledTimes(1); expect(snapshot).toHaveBeenCalledTimes(2);
+    await translateEmberCreationContext(context);
+    expect(hash).toHaveBeenCalledTimes(2); expect(snapshot).toHaveBeenCalledTimes(4);
+  });
+  it("accepts only whitespace in the native empty style attribute", async () => {
+    const f = await ancestryOverviewPair();
+    const summary = f.summary.replace('style=""', 'style="   "');
+    const result = await translateEmberCreationContext({ ancestry: { ...f.option, summary } }) as any;
+    expect(result.ancestry.summary).toBe(f.summary.replace('<p style="">Native overview 3.</p>', "<p>Český přehled 3.</p>"));
+  });
+  it("allows the completed ancestry page in a partial journal and canonicalizes translated links before enrichment", async () => {
+    const f = await ancestryOverviewPair();
+    const before = '<p>Native @UUID[JournalEntry.other.JournalEntryPage.child]{name} 3.</p>';
+    (f.source.system as any).content.overview = before;
+    (f.target.system as any).content.overview = '<p>České @UUID[Compendium.world.foundry-translate-translations.JournalEntry.other.JournalEntryPage.child]{jméno} 3.</p>';
+    Object.assign(f.translated.flags["foundry-translate"].translation!, { partial: true, processedPageIds: ["p"], sourceHash: await journalSourceHash(f.sourceData) });
+    identity.source.mockResolvedValue("JournalEntry.other.JournalEntryPage.child");
+    const summary = f.summary.replace('<p style="">Native overview 3.</p>', before);
+    const result = await translateEmberCreationContext({ ancestry: { ...f.option, summary } }) as any;
+    expect(result.ancestry.summary).toContain('@UUID[JournalEntry.other.JournalEntryPage.child]{jméno}');
+    expect(result.ancestry.summary).toContain(`data-uuid="${f.source.uuid}"`);
+    expect(enrich).toHaveBeenCalledWith('<p>České @UUID[JournalEntry.other.JournalEntryPage.child]{jméno} 3.</p>', { relativeTo: f.source, secrets: false });
+  });
+  it.each(["no-embed-command", "full-page-mode", "foreign-embed", "changed-native-prose", "duplicate-embed", "stale-journal", "unprocessed-page", "hidden-parent", "hidden-target", "hidden-target-parent", "fallback", "changed-structure", "changed-numbers", "preference-off", "foreign-language", "empty-item-identifier", "missing-item-identifier", "translated-source-item", "nonempty-native-style", "other-native-attribute"])("retains native ancestry summary for %s", async reason => {
+    const f = await ancestryOverviewPair(); let summary = f.summary, locale = "cs";
+    if (reason === "no-embed-command") f.data.system.description = "Unrelated Item prose";
+    if (reason === "full-page-mode") f.data.system.description = `@Embed[${f.source.uuid} inline]`;
+    if (reason === "foreign-embed") summary = summary.replace(f.source.uuid, "JournalEntry.foreign.JournalEntryPage.p");
+    if (reason === "changed-native-prose") summary = summary.replace("Native overview", "Different overview");
+    if (reason === "duplicate-embed") summary += summary;
+    if (reason === "stale-journal") f.sourceData.name = "Changed source journal";
+    if (reason === "unprocessed-page") Object.assign(f.translated.flags["foundry-translate"].translation!, { partial: true, processedPageIds: [] });
+    if (reason === "hidden-parent") f.original.visible = false;
+    if (reason === "hidden-target") f.target.visible = false;
+    if (reason === "hidden-target-parent") f.translated.visible = false;
+    if (reason === "fallback") Object.assign(f.translated.flags["foundry-translate"].translation!, { fallbackTextSegments: 1 });
+    if (reason === "changed-structure") (f.target.system as any).content.overview = "<p onclick=\"unsafe()\">Český přehled 3.</p>";
+    if (reason === "changed-numbers") (f.target.system as any).content.overview = "<p>Český přehled 5.</p>";
+    if (reason === "preference-off") preference = false;
+    if (reason === "foreign-language") locale = "de";
+    if (reason === "empty-item-identifier") f.data.system.identifier = " ";
+    if (reason === "missing-item-identifier") delete (f.data.system as any).identifier;
+    if (reason === "translated-source-item") identity.identity.mockImplementation(doc => doc === f.option.item ? { targetLanguage: "cs" } : null);
+    if (reason === "nonempty-native-style") summary = summary.replace('style=""', 'style="color: red"');
+    if (reason === "other-native-attribute") summary = summary.replace('style=""', 'style="" class="unexpected"');
+    const result = await translateEmberCreationContext({ ancestry: { ...f.option, summary } }, locale) as any;
+    expect(result.ancestry.summary).toBe(summary); expect(enrich).not.toHaveBeenCalled();
+  });
+  it.each(["source-journal", "source-item", "target-page", "preference", "language", "user"])("discards overview changes when %s changes during enrichment", async reason => {
+    const f = await ancestryOverviewPair();
+    enrich.mockImplementation(async () => {
+      if (reason === "source-journal") f.sourceData.name = "Changed";
+      if (reason === "source-item") f.data.system.description = "Changed";
+      if (reason === "target-page") (f.target.system as any).content.overview = "Changed";
+      if (reason === "preference") preference = false;
+      if (reason === "language") targetLanguage = "en";
+      if (reason === "user") (game as any).user = {};
+      return "<p>Český přehled 3.</p>";
+    });
+    expect(await translateEmberCreationContext(f.context)).toBe(f.context);
   });
   it.each(["partial", "hidden-parent", "duplicate-page", "mismatched-caption"])("keeps untrusted page-derived captions for %s", async reason => {
     const f = await itemPair(); identity.resolve.mockResolvedValue({ status: "source-only" }); const p = pagePair(f.source);
