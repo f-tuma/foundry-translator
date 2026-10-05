@@ -30,8 +30,10 @@
   "FOUNDRY_TRANSLATE.Settings.SourceLanguage.Auto": "Detect automatically",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Name": "Target language",
   "FOUNDRY_TRANSLATE.Settings.TargetLanguage.Hint": "Language of the translated adventure.",
-  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Name": "Open available translations automatically",
-  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Hint": "When a document link has a stored translation in the target language, open that translation instead of the source document. Disable this to keep Foundry's original link behavior.",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Name": "Prefer translations",
+  "FOUNDRY_TRANSLATE.Settings.AutoOpenTranslations.Hint": "Open available translated journals and links, and show translated map labels. Off: open originals and use the journal header to open a stored translation manually. Missing or inaccessible translations retain the original.",
+  "FOUNDRY_TRANSLATE.Desk.PreferTranslations": "Prefer translations",
+  "FOUNDRY_TRANSLATE.Desk.PreferTranslationsHint": "On: available translations open automatically. Off: open a journal translation manually from its header. Applies to the whole world.",
   "FOUNDRY_TRANSLATE.Settings.PrivacyOpenAI": "Text is sent directly from the GM browser to the configured server. The address, model, and optional token are stored only in this browser.",
   "FOUNDRY_TRANSLATE.Settings.Test": "Test connection",
   "FOUNDRY_TRANSLATE.Settings.Save": "Save settings",
@@ -765,5 +767,13 @@
   "FOUNDRY_TRANSLATE.Reader.LightCancelled": "Preparation cancelled. Previous library retained.",
   "FOUNDRY_TRANSLATE.Reader.LightFailed": "Could not prepare the library. Previous copy retained; check access to original books and available browser storage.",
   "FOUNDRY_TRANSLATE.Reader.LightServerHtmlRequired": "The server is not serving the reader as HTML. Ask the administrator to set Content-Type: text/html; charset=utf-8 in the reverse proxy only for /modules/foundry-translate/reader/index.html. The library is unchanged. See docs/reader-hosting.md in the module repository.",
-  "FOUNDRY_TRANSLATE.Reader.LightChecking": "Checking the reader page…"
+  "FOUNDRY_TRANSLATE.Reader.LightChecking": "Checking the reader page…",
+  "FOUNDRY_TRANSLATE.Creation.Culture": "Culture",
+  "FOUNDRY_TRANSLATE.Creation.Path": "Path",
+  "FOUNDRY_TRANSLATE.Creation.Attunement": "Attunement",
+  "FOUNDRY_TRANSLATE.Creation.Token": "Token",
+  "FOUNDRY_TRANSLATE.Creation.AsterProgression": "Aster Progression",
+  "FOUNDRY_TRANSLATE.Creation.SoulboundProgression": "Soulbound Progression",
+  "FOUNDRY_TRANSLATE.Creation.Rarity": "Rarity",
+  "FOUNDRY_TRANSLATE.Creation.Lifespan": "Lifespan"
 }

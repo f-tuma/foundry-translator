@@ -2,7 +2,8 @@ import { activateHelpTooltips, renderHelpTooltip } from "./help-tooltip";
 import { GlossaryApplication } from "../glossary/glossary-app";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { TranslatorSettingsApplication } from "../settings/translator-settings-app";
-import { getTranslatorSettings } from "../settings/settings";
+import { getTranslatorSettings, preferTranslations, SETTINGS } from "../settings/settings";
+import { MODULE_ID } from "../constants";
 import { BundleApplication } from "../bundles/bundle-app";
 import { JournalTranslationApplication } from "../translation/journal-translation-app";
 import { openActiveTranslationsOverview } from "../translation/active-translations-app";
@@ -24,6 +25,7 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
     root.className = "ft-settings ft-desk";
     root.innerHTML = `<header class="ft-settings__intro"><span class="ft-settings__brand-icon"><i class="fa-solid fa-language" aria-hidden="true"></i></span><div><div class="ft-heading-with-help"><h2>${t("Heading")}</h2>${renderHelpTooltip(t("PageTip"), t("Heading"))}</div><p>${t("Intro")}</p></div></header>
       <div class="ft-desk__status"><strong data-desk-language></strong><span data-desk-provider></span></div>
+      <label class="ft-desk__preference"><input type="checkbox" data-desk-preference><span><strong>${t("PreferTranslations")}</strong><small>${t("PreferTranslationsHint")}</small></span></label>
       <div class="ft-desk__actions">
         <button type="button" data-desk-action="settings"><i class="fa-solid fa-plug" aria-hidden="true"></i><span><strong>${t("Settings")}</strong><small>${t("SettingsHint")}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-desk-action="glossary"><i class="fa-solid fa-book-bookmark" aria-hidden="true"></i><span><strong>${t("Glossary")}</strong><small>${t("GlossaryHint").replace("{count}", String(glossary.filter((e) => e.enabled !== false).length))}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
@@ -34,11 +36,19 @@ export class TranslationDesk extends foundry.applications.api.ApplicationV2 {
       <footer class="ft-settings__actions"><button type="button" class="ft-button ft-button--secondary" data-desk-action="active">${t("Active")}</button><button type="button" class="ft-button ft-button--primary" data-desk-action="journal">${t("Journal")}</button></footer>`;
     root.querySelector("[data-desk-language]")!.textContent = settings.targetLanguage.toUpperCase();
     root.querySelector("[data-desk-provider]")!.textContent = "OpenAI API · " + (settings.openAiModel || t("NotConfigured"));
+    root.querySelector<HTMLInputElement>("[data-desk-preference]")!.checked = preferTranslations();
     activateHelpTooltips(root);
     return root;
   }
   protected _replaceHTML(result: HTMLElement, content: HTMLElement): void { content.replaceChildren(result); }
   protected async _onRender(): Promise<void> {
+    const preference = this.element.querySelector<HTMLInputElement>("[data-desk-preference]");
+    preference?.addEventListener("change", () => {
+      preference.disabled = true;
+      void game.settings.set(MODULE_ID, SETTINGS.AUTO_OPEN_TRANSLATIONS, preference.checked)
+        .catch(error => { preference.checked = preferTranslations(); ui.notifications.error(String(error)); })
+        .finally(() => { preference.disabled = false; });
+    });
     const open = (child: FoundryApplicationV2) => {
       child.addEventListener("close", () => { if (this.element?.isConnected) void this.render({ force: true }); }, { once: true });
       return child.render(true);

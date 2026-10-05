@@ -22,6 +22,11 @@ import { registerReviewHeaderControl } from "./review/header-control";
 import { registerUiOverrides } from "./review/ui-catalog";
 import { registerAdventureReader } from "./reader/header-control";
 
+import { registerJournalOpenPreference } from "./translation/journal-open-preference";
+import { registerEmberJournalHeadings } from "./translation/ember-journal-headings";
+import { registerEmberCreationDisplay } from "./translation/ember-creation-display";
+import { registerTranslatedItemTooltips } from "./translation/translated-item-tooltips";
+
 let ready = false;
 
 Hooks.once("init", () => {
@@ -57,6 +62,10 @@ Hooks.once("ready", () => {
   registerTranslatedQuestSummaries();
   registerTranslatedLinkNavigation();
   registerDisplayTextView();
+  registerJournalOpenPreference();
+  registerEmberJournalHeadings();
+  registerEmberCreationDisplay();
+  registerTranslatedItemTooltips();
   void organizeExistingStoragePacks().catch((error) => {
     logger.error("Translation compendia could not be organized.", error);
   });

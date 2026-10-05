@@ -2,6 +2,7 @@ import { MODULE_ID } from "../constants";
 import { logger } from "../logger";
 import { SETTINGS } from "../settings/settings";
 import { parseDocumentReference, resolveSourceReference, resolveTranslationReference, TRANSLATION_IDENTITIES } from "./document-identity";
+import { renderOriginalJournal } from "./journal-open-preference";
 
 function targetLanguage(): string {
   return String(game.settings.get(MODULE_ID, SETTINGS.TARGET_LANGUAGE) ?? "cs");
@@ -20,7 +21,7 @@ export function translatedEmbeddedUuid(sourceUuid: string, translatedRootUuid: s
   return `${target.root}${source.suffix}${source.anchor}`;
 }
 
-async function renderReference(uuid: string): Promise<boolean> {
+async function renderReference(uuid: string, originalView = false): Promise<boolean> {
   const ref = parseDocumentReference(uuid);
   if (!ref) return false;
   const document = await fromUuid(`${ref.root}${ref.suffix}`);
@@ -30,8 +31,10 @@ async function renderReference(uuid: string): Promise<boolean> {
     sheet?: { render(options: Record<string, unknown>): unknown };
   };
   if (!owner?.sheet) return false;
-  await owner.sheet.render({ force: true, ...(isPage ? { pageId: document.id } : {}),
-    ...(ref.anchor ? { anchor: ref.anchor.slice(1) } : {}) });
+  const options = { force: true, ...(isPage ? { pageId: document.id } : {}),
+    ...(ref.anchor ? { anchor: ref.anchor.slice(1) } : {}) };
+  if (originalView && owner.documentName === "JournalEntry") await renderOriginalJournal(owner.sheet, options);
+  else await owner.sheet.render(options);
   return true;
 }
 
@@ -46,7 +49,7 @@ export function openTranslationReference(uuid: string, options: { view: "source"
   const work = (async () => {
     if (options.view === "source") {
       const source = await resolveSourceReference(uuid);
-      return source ? renderReference(source) : false;
+      return source ? renderReference(source, true) : false;
     }
     const pair = await resolveTranslationReference(uuid, language);
     if (pair.status === "invalid" || pair.status === "missing") return false;

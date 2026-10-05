@@ -12,6 +12,7 @@ import { JournalTranslationService, TranslationCancelledError } from "./journal-
 import { openTranslationReference } from "./translated-link-navigation";
 import { resolveTranslationReference } from "./document-identity";
 import { MODULE_ID } from "../constants";
+import { renderOriginalJournal } from "./journal-open-preference";
 
 interface JournalEntrySheetApplication {
   entry?: FoundryJournalDocument;
@@ -115,7 +116,11 @@ async function showDocument(
 ): Promise<void> {
   const pageId = activePageId(application);
   await application.close?.();
-  document.sheet?.render({ force: true, ...(pageId ? { pageId } : {}) });
+  if (document.sheet) {
+    const options = { force: true, ...(pageId ? { pageId } : {}) };
+    if (readJournalTranslationFlag(document.flags)) await document.sheet.render(options);
+    else await renderOriginalJournal(document.sheet, options);
+  }
 }
 
 async function translateFromHeader(
@@ -275,7 +280,9 @@ async function addPlayerJournalReadToggle(application: JournalEntrySheetApplicat
       if (!fresh || !fresh.canRead()) {
         ui.notifications.warn(localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference")); return;
       }
-      await fresh.target.sheet!.render({ force: true, ...(fresh.pageId ? { pageId: fresh.pageId } : {}) });
+      const options = { force: true, ...(fresh.pageId ? { pageId: fresh.pageId } : {}) };
+      if (direction === "source") await renderOriginalJournal(fresh.target.sheet!, options);
+      else await fresh.target.sheet!.render(options);
       await application.close?.();
     })().catch(error => {
       logger.warn("Stored journal read toggle could not be opened.", error);

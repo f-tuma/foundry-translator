@@ -83,6 +83,32 @@ Přístup se kontroluje znovu při kliknutí.
 Editor při úpravě okolního textu zachová také nezměněný prázdný popisek
 odkazu `@UUID` či `@Embed`. Popisky lze nadále záměrně změnit nebo vymazat.
 
+## Přednostní zobrazování překladů
+
+Od verze **0.34.6** je v hlavním menu přepínač **Preferovat překlady**.
+Platí pro celý svět a mění jej GM. Zapnutý používá dostupné, přístupné
+překlady při běžném otevírání deníků ze seznamu, mapových poznámek a odkazů.
+Zachovává otevřenou stránku i její kotvu. **Zobrazit originál** nadále funguje.
+Vypnutý ponechá originály; přeložený deník otevřeš ručně tlačítkem v záhlaví.
+Oddělená popout okna a neznámé vlastní způsoby otevření zůstávají nativní.
+
+Na mapě Emberu se přesné, jednoznačné názvy poznámek zobrazují podle
+aktivního glosáře. Přeložený text scény má přednost. UUID, prokliky a uložená
+scéna se nemění. Nápisy zapečené přímo v obrázku mapy tím nepřeložíš.
+
+Tvorba postavy používá dostupné překlady názvů a popisů Itemů a přesné
+názvy z glosáře. Popisky talentů v denících a jejich nativní náhledy také
+použijí přístupný, aktuální překlad. Pravidla, předpoklady, ovládání a původní
+identifikátory zůstávají napojené na originál. Nepřístupné, nejednoznačné,
+neúplné či zastaralé kopie se nepoužijí. Chybějící překlad se automaticky
+nevytváří; některé konfigurační popisy a mechanické štítky mohou zůstat
+v původním jazyce. Ručně otevřený přeložený deník si při vypnuté preferenci
+ponechá podporované přeložené náhledy.
+
+Modul nyní zahrnuje do překladu, editoru a exportu také ověřená pole
+citací v banneru stránek Emberu a příkazů božstev. Dříve vytvořené kopie tato
+pole automaticky nepřepisuje; lze je následně samostatně doplnit v editoru.
+
 ## České rozhraní
 
 V **Nastavení hry → Preferovaný jazyk** vyber **Čeština**, ulož nastavení a
