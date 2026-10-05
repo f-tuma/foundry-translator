@@ -135,3 +135,36 @@ it("keeps legacy drafts without option state compatible and command-only units v
   const plan = planReviewText(`<p>${command}</p>`, 'html');
   expect(plan.units).toHaveLength(1); expect(plan.units[0]!.parts).toEqual([command]);
 });
+
+it.each([
+  '@UUID[Actor.a]{}', '@UUID[Actor.a]{ }', '@UUID[Actor.a]',
+  '@Embed[Actor.a inline]{}', '@Embed[Actor.a inline]{ }', '@Embed[Actor.a inline]',
+])("preserves untouched reference syntax when correcting surrounding prose: %s", command => {
+  const draft = maskReviewParts([`Before ${command}.`]);
+  draft.text = ['Před ⟦1⟧.'];
+  const after = restoreReviewParts(draft);
+  expect(after).toEqual([`Před ${command}.`]);
+  expect(() => assertPortableText(`Before ${command}.`, after[0]!, 'text')).not.toThrow();
+});
+
+it("preserves empty braces while changing Embed text options and moving references", () => {
+  const original = ['@Embed[Actor.a caption="Scout" count=2]{} near ', '@UUID[Actor.b]{}'];
+  const draft = maskReviewParts(original);
+  draft.references[0]![0]!.options![0]!.value = 'Zvěd';
+  draft.text = ['⟦2⟧ vedle ', '⟦1⟧'];
+  expect(restoreReviewParts(draft)).toEqual(['@UUID[Actor.b]{} vedle ', '@Embed[Actor.a caption="Zvěd" count=2]{}']);
+});
+
+it("still accepts explicit label edits and clearing while retaining resolver fallback syntax", () => {
+  for (const [original, cleared] of [
+    ['@UUID[Actor.a]{Name}', '@UUID[Actor.a]'],
+    ['@Embed[Actor.a inline]{Name}', '@Embed[Actor.a inline]'],
+    ['@ref[actor.name]{Name}', '@ref[actor.name]{}'],
+  ]) {
+    const draft = maskReviewParts([original!]);
+    draft.references[0]![0]!.label = '';
+    expect(restoreReviewParts(draft)).toEqual([cleared]);
+    draft.references[0]![0]!.label = 'Jméno';
+    expect(restoreReviewParts(draft)[0]).toBe(original!.replace('{Name}', '{Jméno}'));
+  }
+});

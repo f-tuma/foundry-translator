@@ -68,6 +68,21 @@ zobrazuje v běžném deníku i ve čtečce. Stav události a zaškrtávací ovl
 zůstávají napojené na původní událost. Pokud překlad neprojde kontrolou nebo
 není jednoznačně spárovaný, zobrazí se původní text.
 
+## Přepnutí deníku na uložený překlad
+
+Od verze **0.34.5** mají i hráči v záhlaví deníku tlačítko **Zobrazit překlad**
+a v překladu tlačítko pro návrat k originálu. Přepnutí zachová otevřenou stránku
+podle jejího ID; nespouští nový překlad.
+
+Hráč musí mít právo číst originál i přeloženou kopii v kompendiu
+**Foundry Translate — Translations**, včetně právě otevřené stránky. GM musí
+potřebný přístup nastavit ve Foundry; tlačítko oprávnění nemění. Pokud kopie
+chybí, není jednoznačně spárovaná nebo není přístupná, tlačítko se nezobrazí.
+Přístup se kontroluje znovu při kliknutí.
+
+Editor při úpravě okolního textu zachová také nezměněný prázdný popisek
+odkazu `@UUID` či `@Embed`. Popisky lze nadále záměrně změnit nebo vymazat.
+
 ## České rozhraní
 
 V **Nastavení hry → Preferovaný jazyk** vyber **Čeština**, ulož nastavení a

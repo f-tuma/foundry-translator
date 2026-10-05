@@ -1,6 +1,6 @@
 import { logger } from "../logger";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
-import { getTranslatorSettings } from "../settings/settings";
+import { getTranslatorSettings, SETTINGS } from "../settings/settings";
 import { activeTranslations } from "./active-translations";
 import { openActiveTranslationsOverview } from "./active-translations-app";
 import {
@@ -10,6 +10,8 @@ import {
 import { readJournalTranslationFlag, type JournalTranslationProgress } from "./journal";
 import { JournalTranslationService, TranslationCancelledError } from "./journal-service";
 import { openTranslationReference } from "./translated-link-navigation";
+import { resolveTranslationReference } from "./document-identity";
+import { MODULE_ID } from "../constants";
 
 interface JournalEntrySheetApplication {
   entry?: FoundryJournalDocument;
@@ -214,6 +216,75 @@ async function translateFromHeader(
   }
 }
 
+interface ReadableJournal extends FoundryUuidDocument {
+  testUserPermission?(user: unknown, level: string): boolean;
+  sheet?: { render(options: Record<string, unknown>): unknown };
+}
+
+/** A read toggle is independent of GM-only translation actions. Both copies,
+ * including the selected page, retain their own native visibility. */
+async function addPlayerJournalReadToggle(application: JournalEntrySheetApplication): Promise<void> {
+  const entry = application.entry, frame = application.window;
+  if (!entry?.uuid || !frame || frame.header.querySelector(".ft-journal-read-toggle")) return;
+  const user = game.user;
+  if (!user || user.isGM) return;
+  const initialUuid = entry.uuid;
+  const direction = readJournalTranslationFlag(entry.flags) ? "source" : "translation";
+  const readPair = async () => {
+    if (game.user !== user || application.entry?.uuid !== initialUuid) return null;
+    const flag = readJournalTranslationFlag(application.entry.flags);
+    if ((!!flag) !== (direction === "source")) return null;
+    const language = flag?.targetLanguage ?? String(game.settings.get(MODULE_ID, SETTINGS.TARGET_LANGUAGE) ?? "cs");
+    const pair = await resolveTranslationReference(initialUuid, language);
+    if (pair.status !== "mapped" || !pair.translatedUuid) return null;
+    const original = await fromUuid(pair.sourceUuid) as ReadableJournal | null;
+    const translated = await fromUuid(pair.translatedUuid) as ReadableJournal | null;
+    if (original?.uuid !== pair.sourceUuid || translated?.uuid !== pair.translatedUuid
+      || original.documentName !== "JournalEntry" || translated.documentName !== "JournalEntry") return null;
+    const readable: ReadableJournal[] = [original, translated];
+    const pageId = activePageId(application);
+    if (pageId) {
+      for (const root of [original, translated]) {
+        const uuid = `${root.uuid}.JournalEntryPage.${pageId}`;
+        const page = await fromUuid(uuid) as ReadableJournal | null;
+        if (page?.uuid !== uuid || page.documentName !== "JournalEntryPage" || page.parent?.uuid !== root.uuid) return null;
+        readable.push(page);
+      }
+    }
+    const canRead = () => {
+      const currentFlag = readJournalTranslationFlag(translated.flags);
+      return game.user === user && application.entry?.uuid === initialUuid
+        && activePageId(application) === pageId && !user.isGM
+        && !readJournalTranslationFlag(original.flags)
+        && currentFlag?.sourceUuid === original.uuid && currentFlag.targetLanguage === language
+        && readable.every(doc => doc.testUserPermission?.(user, "OBSERVER") === true);
+    };
+    if (!canRead()) return null;
+    const target = direction === "source" ? original : translated;
+    if (!target.sheet) return null;
+    return { target, pageId, canRead };
+  };
+  if (!await readPair() || !frame.header.isConnected || frame.header.querySelector(".ft-journal-read-toggle")) return;
+  const label = localized(`FOUNDRY_TRANSLATE.JournalTranslation.Header.${direction === "source" ? "Original" : "ShowTranslation"}`);
+  const button = document.createElement("button"); button.type = "button";
+  button.className = `header-control icon fa-solid ${direction === "source" ? "fa-arrow-left ft-journal-show-original" : "fa-book-open ft-journal-show-translation"} ft-journal-read-toggle`;
+  button.title = label; button.setAttribute("aria-label", label);
+  button.addEventListener("click", () => {
+    void (async () => {
+      const fresh = await readPair();
+      if (!fresh || !fresh.canRead()) {
+        ui.notifications.warn(localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference")); return;
+      }
+      await fresh.target.sheet!.render({ force: true, ...(fresh.pageId ? { pageId: fresh.pageId } : {}) });
+      await application.close?.();
+    })().catch(error => {
+      logger.warn("Stored journal read toggle could not be opened.", error);
+      ui.notifications.warn(localized("FOUNDRY_TRANSLATE.JournalTranslation.Status.UnavailableReference"));
+    });
+  });
+  frame.controls.before(button);
+}
+
 /**
  * Adds a small icon button that switches to an already stored translation
  * without starting a new translation run. Async because the stored
@@ -223,7 +294,7 @@ async function translateFromHeader(
 export async function addShowTranslationHeaderButton(
   application: JournalEntrySheetApplication,
 ): Promise<void> {
-  if (!game.user?.isGM) return;
+  if (!game.user?.isGM) return addPlayerJournalReadToggle(application);
   const journal = worldJournal(application.entry);
   const frame = application.window;
   if (!journal || sourceJournal(application.entry) || !frame) return;

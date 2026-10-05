@@ -103,7 +103,12 @@ export function restoreReviewParts(draft: ReviewTextDraft): string[] {
     if (counts.get(reference.marker) !== 1 || /[{}\r\n]|@[A-Za-z][A-Za-z0-9]*\[|\[\[/u.test(reference.label)) throw new Error("Review.ReferenceChanged");
     const keepEmptyFallback = /^@ref\[/iu.test(reference.command) && /\{[^}\r\n]*\}$/u.test(reference.command);
     const baseline = applyEmbedTextOptions(reference.command, reference.options ?? []);
-    const command = reference.editable ? baseline.replace(/\{[^}\r\n]*\}$/u, "") + (reference.label || keepEmptyFallback ? `{${reference.label}}` : "") : baseline;
+    const originalLabel = /\{([^}\r\n]*)\}$/u.exec(reference.command)?.[1] ?? "";
+    // Keeping a label unchanged must also keep its original syntax, including
+    // empty braces. Rebuilding it would silently change untouched references.
+    const command = reference.editable && reference.label !== originalLabel
+      ? baseline.replace(/\{[^}\r\n]*\}$/u, "") + (reference.label || keepEmptyFallback ? `{${reference.label}}` : "")
+      : baseline;
     return [reference.marker, command];
   }));
   if (replacements.size !== references.length) throw new Error("Review.ReferenceChanged");
