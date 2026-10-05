@@ -40,6 +40,21 @@ and the recommended implementation order.
 
 ## Current work log
 
+- 2026-10-05, v0.34.8 preparation: GM Translation Desk adds a bounded preview
+  for missing Ember Crucible creation Items and their explicitly granted talents.
+  Exact native option identifiers and UUIDs select at most 256 original Items;
+  foreign packs and recursive dependencies are excluded. Existing identities,
+  including malformed, partial, stale or manually corrected copies, are reserved.
+  The Item-only service shares translation busy/pause/cancel controls and cache;
+  runtime, source, glossary and final repository-await drift fail closed before
+  creation. No original mechanics or references are changed. Repeating a run skips
+  completed copies. Independent offline review and 1,365 module tests pass (four
+  optional live-model suites skipped); typecheck, build and release metadata pass.
+  The actual planning application was rendered with synthetic browser data: counts,
+  disabled empty-plan Start, layout and console passed. Native production creation
+  and live-model translation remain pending; no local Foundry was used. Guards are
+  optimistic browser-side checks, not a server transaction across GM clients.
+
 - 2026-10-01, in-Foundry MCP guide: Translation Desk and module settings now offer
   **Korektura přes MCP / MCP proofreading**. The guide generates Codex TOML and
   generic JSON stdio configurations from explicit assistant-computer paths, saves

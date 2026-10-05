@@ -775,5 +775,20 @@
   "FOUNDRY_TRANSLATE.Creation.AsterProgression": "Vývoj Asteru",
   "FOUNDRY_TRANSLATE.Creation.SoulboundProgression": "Vývoj Duševního Pouta",
   "FOUNDRY_TRANSLATE.Creation.Rarity": "Vzácnost",
-  "FOUNDRY_TRANSLATE.Creation.Lifespan": "Délka Života"
+  "FOUNDRY_TRANSLATE.Creation.Lifespan": "Délka Života",
+  "FOUNDRY_TRANSLATE.CreationItems.Title": "Doplnit překlady tvorby postavy",
+  "FOUNDRY_TRANSLATE.CreationItems.DeskHint": "Doplnit chybějící překlady původu, kultury, cesty a udělených talentů Emberu.",
+  "FOUNDRY_TRANSLATE.CreationItems.Scope": "Pouze možnosti tvorby postavy Ember Crucible a jejich přímo udělené talenty. Existující překlady včetně nedokončených kopií zůstanou zachované. Jiné balíčky a odkazované deníky se nepřekládají. Limit: {limit} Itemů.",
+  "FOUNDRY_TRANSLATE.CreationItems.Plan": "Překlady k doplnění: {missing}. Zachované existující kopie: {existing}.",
+  "FOUNDRY_TRANSLATE.CreationItems.Start": "Doplnit chybějící překlady",
+  "FOUNDRY_TRANSLATE.CreationItems.Running": "Překládám možnosti tvorby postavy…",
+  "FOUNDRY_TRANSLATE.CreationItems.Done": "Vytvořené překlady: {created}. Zachované existující kopie: {existing}.",
+  "FOUNDRY_TRANSLATE.CreationItems.Complete": "Překlady tvorby postavy byly doplněny.",
+  "FOUNDRY_TRANSLATE.CreationItems.Review": "Překlady tvorby postavy byly doplněny s některými úseky v originále. Zkontrolujte záznam překladu.",
+  "FOUNDRY_TRANSLATE.CreationItems.Refresh": "Obnovit plán",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidSource": "Podporovány jsou pouze čitelné původní Itemy typu ancestry, background a talent z ember.crucible-character.",
+  "FOUNDRY_TRANSLATE.CreationItems.AmbiguousSource": "Více zdrojových Itemů má stejný identifikátor možnosti tvorby postavy. Plán byl zastaven.",
+  "FOUNDRY_TRANSLATE.CreationItems.SourceChanged": "Zdrojová možnost tvorby postavy se změnila. Před dalším pokusem obnovte plán.",
+  "FOUNDRY_TRANSLATE.CreationItems.RuntimeChanged": "Akce vyžaduje Game Mastera, systém Crucible a aktivní Ember. Svět, oprávnění a nastavení překladu se během běhu nesmějí změnit.",
+  "FOUNDRY_TRANSLATE.CreationItems.TooMany": "Plán překračuje limit {limit} unikátních Itemů. Nic nebylo přeloženo."
 }
