@@ -6,6 +6,7 @@ import { GlossaryCompendiumRepository } from "../glossary/compendium-repository"
 import { logger } from "../logger";
 import { createTranslationProvider } from "../providers/factory";
 import type { ChromeLocalProviderStatus } from "../providers/chrome-local";
+import type { TranslationProvider } from "../providers/types";
 import { getTranslatorSettings } from "../settings/settings";
 import {
   ACTOR_TRANSLATION_ENGINE_REVISION,
@@ -62,6 +63,7 @@ import { containsTranslationPromptLeak, glossaryFingerprint } from "./unit-trans
 import { availableDocumentReferences } from "./available-references";
 import { DISPLAY_TEXT_REVISION, displayFields, displaySourceHash, isDisplayDocument, readDisplayTextFlag, readDisplayTranslation, translateDisplayText, type DisplayDocument } from "./display-text";
 import { CompendiumDisplayTextRepository } from "./compendium-display-text-repository";
+import { creationRuntimeGuard, creationSourceGuard, planMissingCreationItems, type CreationItemDocument } from "./ember-creation-items";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
@@ -75,6 +77,12 @@ export interface JournalTranslationResult extends TranslatedJournal {
   processedDocuments: number;
   reusedDocuments: number;
   dependencyWarnings: readonly JournalDependencyWarning[];
+}
+
+export interface MissingItemsTranslationResult {
+  createdDocuments: number;
+  skippedDocuments: number;
+  fallbackTextSegments: number;
 }
 
 export class TranslationCancelledError extends Error {
@@ -422,6 +430,100 @@ export class JournalTranslationService {
 
   async translateDisplay(sourceDocument: DisplayDocument): Promise<JournalTranslationResult> {
     return this.#run(sourceDocument, {});
+  }
+
+  /** Explicit Ember creation Items only. Existing identities are reserved even
+   * when partial/stale/malformed; no dependency scan or reference rewrite. */
+  async translateMissingItems(sourceDocuments: readonly CreationItemDocument[]): Promise<MissingItemsTranslationResult> {
+    if (translationInProgress) throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.AlreadyRunning"));
+    translationInProgress = true;
+    let runId: number | undefined;
+    try {
+      const assertRuntime = creationRuntimeGuard(), settings = getTranslatorSettings();
+      const plan = await planMissingCreationItems(sourceDocuments, settings.targetLanguage); assertRuntime();
+      this.#onPlan?.({ totalDocuments: plan.missing.length, totalUnits: plan.missing.length });
+      const result: MissingItemsTranslationResult = { createdDocuments: 0, skippedDocuments: plan.existing, fallbackTextSegments: 0 };
+      if (!plan.missing.length) return result;
+      if (game.packs.get("world.foundry-translate-items")?.locked) throw new Error("Compendium s přeloženými Itemy je zamčené.");
+      const sourceChecks = new Map<CreationItemDocument, () => Promise<void>>();
+      for (const source of plan.missing) { sourceChecks.set(source, await creationSourceGuard(source)); assertRuntime(); }
+      runId = activeTranslations.start(game.i18n.localize("FOUNDRY_TRANSLATE.CreationItems.Title"), settings.targetLanguage);
+      const activeRunId = runId;
+      activeTranslations.update(runId, { plan: { totalDocuments: plan.missing.length, totalUnits: plan.missing.length } });
+      const provider = createTranslationProvider(settings, {
+        ...(this.#onChromeStatus ? { onChromeStatus: this.#onChromeStatus } : {}),
+        onProviderMetrics: metrics => activeTranslations.recordProviderMetrics(activeRunId, metrics),
+      });
+      await provider.prepare?.({ texts: [plan.missing[0]!.name], sourceLanguage: settings.sourceLanguage, targetLanguage: settings.targetLanguage, format: "text" });
+      assertRuntime();
+      const glossary = await new GlossaryCompendiumRepository().prepareForTranslation({
+        shouldCancel: () => activeTranslations.isCancelRequested(activeRunId),
+        onProgress: ({ completed, total }) => activeTranslations.update(activeRunId, { state: "glossary", glossaryCompleted: completed, glossaryTotal: total }),
+      });
+      assertRuntime(); await checkpointControl(activeRunId); assertRuntime();
+      const runtime: TranslationRuntime = {
+        runId: activeRunId, rootUuid: "",
+        glossaryHash: await glossaryFingerprint(glossary),
+        providerHash: await providerFingerprint(settings.provider, provider, settings.sourceLanguage),
+        settings, provider, glossary, cache: new CompendiumTranslationCache(),
+        translations: new CompendiumJournalTranslationRepository(), actorTranslations: new CompendiumActorTranslationRepository(),
+        itemTranslations: new CompendiumItemTranslationRepository(), displayTranslations: new CompendiumDisplayTextRepository(),
+      };
+      const assertGlossary = async () => {
+        assertRuntime();
+        if (await glossaryFingerprint(await new GlossaryCompendiumRepository().loadExisting()) !== runtime.glossaryHash) {
+          throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.CreationItems.RuntimeChanged"));
+        }
+        assertRuntime();
+      };
+      let currentSourceCheck: (() => Promise<void>) | undefined;
+      // Reject changed runtime/source results before they enter the unit cache,
+      // including name translation, which precedes Item beforeBatch callbacks.
+      const translate = async (request: Parameters<TranslationProvider["translate"]>[0]) => {
+        assertRuntime(); await assertGlossary(); await currentSourceCheck?.(); assertRuntime();
+        const output = await provider.translate(request);
+        assertRuntime(); await assertGlossary(); await currentSourceCheck?.(); assertRuntime();
+        return output;
+      };
+      runtime.provider = new Proxy(provider, { get(target, key) {
+        if (key === "translate") return translate;
+        const value = Reflect.get(target, key, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      } });
+      for (const source of plan.missing) {
+        await checkpointControl(activeRunId); assertRuntime();
+        const assertSource = sourceChecks.get(source)!;
+        currentSourceCheck = assertSource;
+        await assertSource(); await assertGlossary();
+        const current = await planMissingCreationItems([source], settings.targetLanguage); assertRuntime();
+        if (!current.missing.length) { result.skippedDocuments++; }
+        else {
+          const validate = async () => { assertRuntime(); await assertGlossary(); await assertSource(); assertRuntime(); };
+          activeTranslations.update(activeRunId, { state: "translating", currentDocument: source.name });
+          const translated = await this.#translateItemOne(source, runtime, progress => {
+            assertRuntime();
+            this.#onProgress?.({ ...progress, overallCompletedUnits: result.createdDocuments + result.skippedDocuments - plan.existing,
+              overallTotalUnits: plan.missing.length, completedDocuments: result.createdDocuments + result.skippedDocuments - plan.existing });
+          }, true, validate);
+          if (translated.reused) result.skippedDocuments++;
+          else result.createdDocuments++;
+          result.fallbackTextSegments += translated.fallbackTextSegments;
+        }
+        activeTranslations.update(activeRunId, {
+          completedDocuments: result.createdDocuments + result.skippedDocuments - plan.existing,
+          completedUnits: result.createdDocuments + result.skippedDocuments - plan.existing,
+        });
+      }
+      await checkpointControl(activeRunId); await assertGlossary();
+      activeTranslations.finish(activeRunId); return result;
+    } catch (error) {
+      if (error instanceof GlossarySyncCancelledError) error = new TranslationCancelledError();
+      if (runId !== undefined) {
+        if (error instanceof TranslationCancelledError) activeTranslations.finishCancelled(runId);
+        else activeTranslations.finish(runId, error instanceof Error ? error.message : String(error));
+      }
+      throw error;
+    } finally { translationInProgress = false; }
   }
 
   /**
@@ -1191,7 +1293,10 @@ export class JournalTranslationService {
     sourceDocument: FoundryItemWorldDocument,
     runtime: TranslationRuntime,
     onProgress: (progress: JournalTranslationProgress) => void,
+    onlyMissing = false,
+    validate?: () => Promise<void>,
   ): Promise<GraphTranslationResult> {
+    await validate?.();
     const source = sourceDocument.toObject() as ItemData;
     const sourceHash = await itemSourceHash(source);
     const existing = await runtime.itemTranslations.find(
@@ -1201,6 +1306,8 @@ export class JournalTranslationService {
     const existingFlag = existing ? readItemTranslationFlag(existing.flags) : null;
     const existingData = existing?.toObject() as ItemData | undefined;
     const guard = await captureTranslationWriteGuard(existing);
+    await validate?.();
+    if (onlyMissing && existing) return { data: existingData!, document: existing, reused: true, fallbackTextSegments: 0 };
     await this.#checkExisting(existingData, existingFlag, sourceHash, ITEM_TRANSLATION_ENGINE_REVISION, runtime);
     if (existing && existingFlag &&
       canReuseItemTranslation(existingFlag, sourceHash, runtime.glossaryHash, runtime.providerHash)) {
@@ -1223,7 +1330,7 @@ export class JournalTranslationService {
       },
       systemHtmlFieldPaths: itemHtmlFieldPaths(sourceDocument, source),
       cache: runtime.cache,
-      beforeBatch: () => checkpointControl(runtime.runId),
+      beforeBatch: async () => { await checkpointControl(runtime.runId); await validate?.(); },
       onQualityFallback: (fallback) => {
         logger.warn("Item translation quality fallback kept the original fragment.", fallback);
         activeTranslations.addIssue(runtime.runId, {
@@ -1247,9 +1354,19 @@ export class JournalTranslationService {
         documentName: sourceDocument.name,
       }),
     });
+    if (onlyMissing) {
+      await checkpointControl(runtime.runId); await validate?.();
+      if (!(await planMissingCreationItems([sourceDocument as CreationItemDocument], runtime.settings.targetLanguage)).missing.length) {
+        throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.OutputChanged"));
+      }
+      await validate?.();
+    }
     await assertItemSourceUnchanged(sourceDocument, sourceHash);
     await stampItemOutputHash(translated.data);
-    const document = await runtime.itemTranslations.save(translated.data, guard);
+    await validate?.();
+    const document = await runtime.itemTranslations.save(translated.data, onlyMissing ? null : guard, onlyMissing ? async () => {
+      await checkpointControl(runtime.runId); await validate?.(); throwIfCancelled(runtime.runId);
+    } : undefined);
     return { ...translated, data: document.toObject() as GraphData, document, reused: false };
   }
 }

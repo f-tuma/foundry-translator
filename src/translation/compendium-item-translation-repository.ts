@@ -1,4 +1,4 @@
-import { assertTranslationWriteGuard, type TranslationWriteGuard } from "./write-guard";
+import { assertTranslationWriteGuard, TranslationConflictError, type TranslationWriteGuard } from "./write-guard";
 import { MODULE_ID, MODULE_TITLE } from "../constants";
 import { organizeCompendiumPack } from "../storage/compendium-folder";
 import { readItemTranslationFlag, type ItemData, type ItemTranslationFlag } from "./item";
@@ -42,6 +42,7 @@ async function ensurePack(): Promise<FoundryCompendiumCollection> {
 export class CompendiumItemTranslationRepository {
   #pack?: Promise<FoundryCompendiumCollection>;
   #index: Promise<Map<string, string>> | undefined;
+  #reservedIdentities = new Set<string>();
 
   async find(sourceUuid: string, targetLanguage: string): Promise<FoundryItemWorldDocument | null> {
     const pack = await this.#getPack();
@@ -50,7 +51,7 @@ export class CompendiumItemTranslationRepository {
     return id ? (await pack.getDocument(id) as FoundryItemWorldDocument | undefined) ?? null : null;
   }
 
-  async save(data: ItemData, guard?: TranslationWriteGuard | null): Promise<FoundryItemWorldDocument> {
+  async save(data: ItemData, guard?: TranslationWriteGuard | null, beforeCreate?: () => Promise<void>): Promise<FoundryItemWorldDocument> {
     const flag = readItemTranslationFlag(data.flags);
     if (!flag) throw new Error("Přeložený Item nemá platná metadata.");
     const pack = await this.#getPack();
@@ -59,6 +60,11 @@ export class CompendiumItemTranslationRepository {
     const index = await this.#getIndex(pack);
     const key = translationKey(flag.sourceUuid, flag.targetLanguage);
     const existingId = index.get(key);
+    // A create-only caller must also respect malformed identities which the
+    // parsed lookup cannot reuse. This uses the same freshly loaded index.
+    if (guard === null && this.#reservedIdentities.has(key)) {
+      throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.OutputChanged"));
+    }
     await assertTranslationWriteGuard(existingId ? (await pack.getDocument(existingId)) ?? null : null, guard);
     if (existingId) {
       await foundry.documents.Item.implementation.updateDocuments(
@@ -69,6 +75,9 @@ export class CompendiumItemTranslationRepository {
       if (!updated) throw new Error("Aktualizovaný překlad Itemu se nepodařilo načíst.");
       return updated;
     }
+    // Only create-only workflows opt in. Recheck their runtime/source/cancel
+    // state after the repository's awaits, immediately before the mutation.
+    if (guard === null && beforeCreate) await beforeCreate();
     const [created] = await foundry.documents.Item.implementation.createDocuments(
       [data],
       { pack: pack.collection, keepId: false },
@@ -86,10 +95,14 @@ export class CompendiumItemTranslationRepository {
   async #getIndex(pack: FoundryCompendiumCollection): Promise<Map<string, string>> {
     this.#index ??= pack.getIndex({ fields: [ITEM_TRANSLATION_FLAG_PATH] }).then((entries) => {
       const index = new Map<string, string>();
+      const reserved = new Set<string>();
       for (const entry of entries.values()) {
+        const raw = entry.flags?.[MODULE_ID]?.itemTranslation as Partial<ItemTranslationFlag> | undefined;
+        if (raw && typeof raw.sourceUuid === "string" && typeof raw.targetLanguage === "string") reserved.add(translationKey(raw.sourceUuid, raw.targetLanguage));
         const flag = indexFlag(entry);
         if (flag) index.set(translationKey(flag.sourceUuid, flag.targetLanguage), entry._id);
       }
+      this.#reservedIdentities = reserved;
       return index;
     });
     return this.#index;

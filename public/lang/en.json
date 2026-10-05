@@ -775,5 +775,20 @@
   "FOUNDRY_TRANSLATE.Creation.AsterProgression": "Aster Progression",
   "FOUNDRY_TRANSLATE.Creation.SoulboundProgression": "Soulbound Progression",
   "FOUNDRY_TRANSLATE.Creation.Rarity": "Rarity",
-  "FOUNDRY_TRANSLATE.Creation.Lifespan": "Lifespan"
+  "FOUNDRY_TRANSLATE.Creation.Lifespan": "Lifespan",
+  "FOUNDRY_TRANSLATE.CreationItems.Title": "Complete character creation translations",
+  "FOUNDRY_TRANSLATE.CreationItems.DeskHint": "Create missing Ember ancestry, culture, path and granted talent translations.",
+  "FOUNDRY_TRANSLATE.CreationItems.Scope": "Ember Crucible character options and their directly granted talents only. Existing translations, including unfinished copies, are kept. Other packs and linked journals are excluded. Limit: {limit} Items.",
+  "FOUNDRY_TRANSLATE.CreationItems.Plan": "{missing} missing translations; {existing} existing copies will be kept.",
+  "FOUNDRY_TRANSLATE.CreationItems.Start": "Create missing translations",
+  "FOUNDRY_TRANSLATE.CreationItems.Running": "Translating character options…",
+  "FOUNDRY_TRANSLATE.CreationItems.Done": "Created {created} translations; kept {existing} existing copies.",
+  "FOUNDRY_TRANSLATE.CreationItems.Complete": "Character creation translations completed.",
+  "FOUNDRY_TRANSLATE.CreationItems.Review": "Character creation translations completed with source-text fallbacks. Review the translation log.",
+  "FOUNDRY_TRANSLATE.CreationItems.Refresh": "Refresh plan",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidSource": "Only readable original ancestry, background and talent Items from ember.crucible-character are supported.",
+  "FOUNDRY_TRANSLATE.CreationItems.AmbiguousSource": "More than one source Item has the same character option identifier. The plan was stopped.",
+  "FOUNDRY_TRANSLATE.CreationItems.SourceChanged": "A source character option changed. Refresh the plan before trying again.",
+  "FOUNDRY_TRANSLATE.CreationItems.RuntimeChanged": "This action requires a Game Master, the Crucible system and active Ember. The world, permissions and translation settings must remain unchanged during the run.",
+  "FOUNDRY_TRANSLATE.CreationItems.TooMany": "The plan exceeds the limit of {limit} unique Items. Nothing was translated."
 }

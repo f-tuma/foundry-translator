@@ -108,6 +108,20 @@ nevytváří; některé konfigurační popisy a mechanické štítky mohou zůst
 v původním jazyce. Ručně otevřený přeložený deník si při vypnuté preferenci
 ponechá podporované přeložené náhledy.
 
+Od verze **0.34.8** může GM v hlavním menu použít **Doplnit překlady tvorby
+postavy**. Okno nejprve ukáže počet chybějících a existujících kopií. Po
+potvrzení přeloží pouze chybějící možnosti původu, kultury a cesty z balíčku
+Ember Crucible a jejich přímo udělené talenty; maximálně 256 unikátních Itemů.
+Potřebuje stejné připojení k modelu a glosář jako běžný překlad. Nespouští
+překlad odkazovaných deníků ani dalších závislostí.
+
+Existující kopie přeskočí i tehdy, když jsou ručně upravené, nedokončené nebo
+zastaralé. Takové kopie tato akce neopravuje. Běh lze pozastavit nebo zrušit
+v přehledu aktivních překladů; další spuštění zachová hotové kopie a doplní
+jen zbývající. Originály, herní hodnoty a identifikátory se nemění. Výsledek
+není automaticky označen jako ověřený; případné úseky ponechané v originále
+jsou uvedené v záznamu překladu.
+
 Modul nyní zahrnuje do překladu, editoru a exportu také ověřená pole
 citací v banneru stránek Emberu a příkazů božstev. Dříve vytvořené kopie tato
 pole automaticky nepřepisuje; lze je následně samostatně doplnit v editoru.
