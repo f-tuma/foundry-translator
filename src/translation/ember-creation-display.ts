@@ -377,6 +377,33 @@ export async function translateEmberCreationContext(context: unknown, locale = l
   };
   for (const list of LISTS) if (Array.isArray(source[list])) result[list] = await Promise.all(source[list].map((option: unknown) => overlay(option, list === "ancestries" ? "ancestry" : list.slice(0, -1))));
   for (const selected of SELECTED) if (source[selected]) result[selected] = await overlay(source[selected], selected);
+  // Crucible prepares equipment as plain rendering records, without an .item.
+  // Resolve their original UUIDs; retain those UUIDs for selection, tooltips and
+  // purchase handlers, and change only the escaped name/search caption.
+  if (preference && locale === selectedLanguage) {
+    const equipment = new Map<string, Promise<DisplayDocument | null>>();
+    const equipmentName = async (value: unknown): Promise<unknown> => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+      const row = value as Option, uuid = row.uuid, name = row.name;
+      if (typeof uuid !== "string" || !uuid || typeof name !== "string") return value;
+      try {
+        let resolved = equipment.get(uuid);
+        if (!resolved) { resolved = fromUuid(uuid) as Promise<DisplayDocument | null>; equipment.set(uuid, resolved); }
+        const item = await resolved;
+        if (!readable(item) || item.uuid !== uuid || item.documentName !== "Item" || item.name !== name
+          || translationIdentity(item, "Item")) return value;
+        guards.push(() => row.uuid === uuid && row.name === name && readable(item) && item.uuid === uuid
+          && item.documentName === "Item" && item.name === name && !translationIdentity(item, "Item"));
+        const target = await lookup(item);
+        const replacement = typeof target?.name === "string" && target.name.trim()
+          ? target.name : mapGlossaryLabel(labels, name);
+        return replacement && replacement !== name ? { ...row, name: replacement } : value;
+      } catch (error) { logger.warn("Creation equipment caption unavailable; keeping native name.", error); return value; }
+    };
+    for (const list of ["equipmentItems", "equipmentSelected"] as const) if (Array.isArray(source[list])) {
+      result[list] = await Promise.all(source[list].map(equipmentName));
+    }
+  }
   if (source.tabs && typeof source.tabs === "object" && !Array.isArray(source.tabs)) {
     result.tabs = { ...source.tabs };
     for (const [id, tab] of Object.entries(source.tabs)) if (tab && typeof tab === "object" && typeof (tab as any).label === "string") {

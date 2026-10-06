@@ -331,6 +331,117 @@ describe("Ember creation display overlay", () => {
   });
 });
 
+async function equipmentPair() {
+  const f = await itemPair();
+  f.data.name = f.source.name = "Longsword"; f.data.type = f.source.type = f.target.type = "weapon";
+  f.target.name = "Dlouhý Meč";
+  f.target.flags["foundry-translate"].itemTranslation!.sourceHash = await itemSourceHash(f.data);
+  documents.set(f.source.uuid, f.source);
+  const tags = Object.freeze(["One-handed", Object.freeze({ label: "Sword", unmet: true, tooltip: "Needs training" })]);
+  const row = Object.freeze({ uuid: f.source.uuid, name: f.source.name, img: "sword.webp", tags,
+    scaledPrice: 35, quantity: 2, unaffordable: true });
+  const selected = Object.freeze({ ...row, totalCost: 70 });
+  const state = Object.freeze({ equipment: Object.freeze({ [f.source.uuid]: Object.freeze({ item: f.source, quantity: 2, scaledPrice: 35 }) }) });
+  const context = Object.freeze({ equipmentItems: Object.freeze([row]), equipmentSelected: Object.freeze([selected]), equipmentRemaining: 9, state });
+  return { ...f, row, selected, context };
+}
+
+describe("native creation equipment captions", () => {
+  it("translates available and selected plain records without changing purchase identity, mechanics, tags or native state", async () => {
+    const f = await equipmentPair(), resolve = vi.fn(async (uuid: string) => documents.get(uuid) ?? null);
+    vi.stubGlobal("fromUuid", resolve);
+    const result = await translateEmberCreationContext(f.context) as any;
+    expect(result.equipmentItems[0]).toEqual({ ...f.row, name: "Dlouhý Meč" });
+    expect(result.equipmentSelected[0]).toEqual({ ...f.selected, name: "Dlouhý Meč" });
+    expect(result.equipmentItems[0]).not.toBe(f.row); expect(result.equipmentSelected[0]).not.toBe(f.selected);
+    expect(result.equipmentItems[0].tags).toBe(f.row.tags);
+    expect(result.state).toBe(f.context.state); expect(result.equipmentRemaining).toBe(9);
+    expect(f.row.name).toBe("Longsword"); expect(f.selected.name).toBe("Longsword");
+    expect(f.context.state.equipment[f.source.uuid]!.item).toBe(f.source);
+    expect(f.source.name).toBe("Longsword"); expect(identity.resolve).toHaveBeenCalledTimes(1);
+    expect(resolve.mock.calls.filter(([uuid]) => uuid === f.source.uuid)).toHaveLength(1);
+    expect(enrich).not.toHaveBeenCalled();
+  });
+  it.each(["unreadable-source", "unreadable-target", "stale-source", "wrong-source-uuid", "wrong-source-kind", "translated-source",
+    "wrong-target-uuid", "wrong-target-kind", "wrong-target-type", "wrong-pair-source", "wrong-flag-source", "foreign-target-language",
+    "ambiguous", "partial", "fallback", "missing-source", "resolve-error", "different-row-name", "preference-off", "foreign-render-language"])(
+    "keeps native equipment names for %s", async reason => {
+      const f = await equipmentPair(); let context: any = f.context, locale = "cs";
+      const translation = f.target.flags["foundry-translate"].itemTranslation!;
+      if (reason === "unreadable-source") f.source.visible = false;
+      if (reason === "unreadable-target") f.target.visible = false;
+      if (reason === "stale-source") f.data.system.description = "Changed original";
+      if (reason === "wrong-source-uuid") f.source.uuid = "Item.other";
+      if (reason === "wrong-source-kind") f.source.documentName = "Actor";
+      if (reason === "translated-source") identity.identity.mockImplementation(doc => doc === f.source ? { targetLanguage: "cs" } : null);
+      if (reason === "wrong-target-uuid") f.target.uuid = "Item.other";
+      if (reason === "wrong-target-kind") f.target.documentName = "Actor";
+      if (reason === "wrong-target-type") f.target.type = "talent";
+      if (reason === "wrong-pair-source") identity.resolve.mockResolvedValue({ status: "mapped", sourceUuid: "Item.other", translatedUuid: f.target.uuid });
+      if (reason === "wrong-flag-source") translation.sourceUuid = "Item.other";
+      if (reason === "foreign-target-language") translation.targetLanguage = "de";
+      if (reason === "ambiguous") identity.resolve.mockResolvedValue({ status: "ambiguous" });
+      if (reason === "partial") Object.assign(translation, { partial: true });
+      if (reason === "fallback") translation.fallbackTextSegments = 1;
+      if (reason === "missing-source") documents.delete(f.source.uuid);
+      if (reason === "resolve-error") vi.stubGlobal("fromUuid", vi.fn(async () => { throw new Error("Unavailable pack"); }));
+      if (reason === "different-row-name") context = { equipmentItems: [{ ...f.row, name: "Author caption" }] };
+      if (reason === "preference-off") preference = false;
+      if (reason === "foreign-render-language") locale = "de";
+      const result = await translateEmberCreationContext(context, locale) as any;
+      expect(result.equipmentItems).toEqual(context.equipmentItems);
+      if (context.equipmentSelected) expect(result.equipmentSelected).toEqual(context.equipmentSelected);
+      expect(enrich).not.toHaveBeenCalled();
+    });
+  it("uses only unambiguous exact whole glossary labels for readable original Items, independently of copy completeness", async () => {
+    const f = await equipmentPair(); f.target.flags["foundry-translate"].itemTranslation!.fallbackTextSegments = 1;
+    glossary.load.mockResolvedValue([{ source: "Longsword", replacement: "Dlouhý Meč", aliases: [] }]);
+    expect((await translateEmberCreationContext(f.context) as any).equipmentItems[0].name).toBe("Dlouhý Meč");
+    glossary.load.mockResolvedValue([{ source: "Longsword", replacement: "Dlouhý Meč", aliases: [] }, { source: "Longsword", replacement: "Jiný Meč", aliases: [] }]);
+    expect((await translateEmberCreationContext(f.context) as any).equipmentItems[0].name).toBe("Longsword");
+    glossary.load.mockResolvedValue([{ source: "Sword", replacement: "Meč", aliases: [] }]);
+    expect((await translateEmberCreationContext(f.context) as any).equipmentItems[0].name).toBe("Longsword");
+    glossary.load.mockResolvedValue([{ source: "Longsword", replacement: "Dlouhý Meč", aliases: [] }]); f.source.visible = false;
+    expect((await translateEmberCreationContext(f.context) as any).equipmentItems[0].name).toBe("Longsword");
+  });
+  it.each(["source-visibility", "target-visibility", "source-name", "target-name", "source-mechanics", "target-flag", "row-name", "row-uuid", "source-kind", "user", "world", "language", "preference"])(
+    "discards equipment overlay if %s changes during lookup", async reason => {
+      const f = await equipmentPair(), row = { ...f.row }, context = { equipmentItems: [row] };
+      vi.stubGlobal("fromUuid", async (uuid: string) => {
+        if (uuid !== f.target.uuid) return documents.get(uuid) ?? null;
+        // The target name is pinned before asynchronous source hashing. Mutate
+        // after resolution to exercise the final render guards as well.
+        queueMicrotask(() => queueMicrotask(() => {
+          if (reason === "source-visibility") f.source.visible = false;
+          if (reason === "target-visibility") f.target.visible = false;
+          if (reason === "source-name") f.source.name = "Other source";
+          if (reason === "target-name") f.target.name = "Other target";
+          if (reason === "source-mechanics") f.data.system.identifier = "changed";
+          if (reason === "target-flag") f.target.flags["foundry-translate"].itemTranslation!.sourceHash = "changed";
+          if (reason === "row-name") row.name = "Other caption";
+          if (reason === "row-uuid") row.uuid = "Item.other";
+          if (reason === "source-kind") f.source.documentName = "Actor";
+          if (reason === "user") (game as any).user = {};
+          if (reason === "world") (game as any).world = {};
+          if (reason === "language") targetLanguage = "de";
+          if (reason === "preference") preference = false;
+        }));
+        return f.target;
+      });
+      const result = await translateEmberCreationContext(context) as any;
+      expect(result.equipmentItems[0].name).toBe(row.name);
+    });
+  it("leaves unsupported row shapes and unresolved source identities untouched", async () => {
+    const f = await equipmentPair(), rows = [null, 7, "Longsword", [], {}, { name: "Longsword" }, { uuid: f.source.uuid },
+      { uuid: "JournalEntry.unknown", name: "Longsword" }, { uuid: f.source.uuid, name: 4 }];
+    const context = { equipmentItems: rows, equipmentSelected: "custom" };
+    const result = await translateEmberCreationContext(context) as any;
+    expect(result.equipmentItems).toEqual(rows); expect(result.equipmentSelected).toBe("custom");
+    expect(result.equipmentItems.every((row: unknown, index: number) => row === rows[index])).toBe(true);
+    expect(identity.resolve).not.toHaveBeenCalled();
+  });
+});
+
 async function talentPair() {
   const f = await itemPair(); f.source.type = f.target.type = f.data.type = "talent";
   f.source.name = f.data.name = "Personalized Crafting"; f.target.name = "Osobní Řemeslo";

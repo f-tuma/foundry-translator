@@ -20,8 +20,10 @@ interface CardItem extends FoundryUuidDocument {
 }
 interface JournalApp { element?: HTMLElement | null; document?: FoundryUuidDocument; entry?: FoundryUuidDocument }
 interface JournalScope { app: JournalApp; root: HTMLElement; journal: FoundryUuidDocument; proof: string; language: string }
-interface HoverJob { event: Event; scope: JournalScope | null; language: string; user: typeof game.user; uuid: string }
+interface HoverJob { event: Event; scope: JournalScope | null; language: string; user: typeof game.user; uuid: string; equipmentProof?: string }
 const ITEM_TOOLTIPS = new Set(["equipment", "accessory", "armor", "backpack", "spell", "talent", "toolbelt", "weapon"]);
+const CREATION_EQUIPMENT = "#crucible-hero-creation-equipment .equipment-list > li.line-item.equipment-entry[data-uuid][data-item-name][data-crucible-tooltip=equipment], "
+  + "#crucible-hero-creation-equipment .equipment-selected > li.line-item.selected-entry[data-uuid][data-crucible-tooltip=equipment]";
 const scopes = new WeakMap<HTMLElement, JournalScope>();
 const appRoots = new WeakMap<JournalApp, HTMLElement>();
 const jobs = new WeakMap<HTMLElement, HoverJob>();
@@ -315,9 +317,14 @@ function replay(element: HTMLElement, event: Event): void {
   const next = new (event.constructor as typeof Event)(event.type, event);
   replays.add(next); element.dispatchEvent(next);
 }
+function equipmentProof(element: HTMLElement): string | undefined {
+  if (!element.matches(CREATION_EQUIPMENT)) return undefined;
+  // The translated creation context may localize this display/search name. It
+  // must stay stable during the request, but never identifies the source Item.
+  return JSON.stringify([element.classList.contains("equipment-entry") ? "available" : "selected", element.dataset.itemName ?? null]);
+}
 function current(element: HTMLElement, job: HoverJob): boolean {
-  return jobs.get(element) === job && element.isConnected && element.dataset.uuid === job.uuid && game.user === job.user
-    && (job.scope ? scopeValid(job.scope, job.user) : preferTranslations() && getTranslatorSettings().targetLanguage === job.language);
+  return jobs.get(element) === job && currentWithoutJob(element, job);
 }
 async function produce(element: HTMLElement, job: HoverJob): Promise<void> {
   let html: string | null = null;
@@ -345,6 +352,7 @@ async function produce(element: HTMLElement, job: HoverJob): Promise<void> {
 }
 function currentWithoutJob(element: HTMLElement, job: HoverJob): boolean {
   return element.isConnected && element.dataset.uuid === job.uuid && game.user === job.user
+    && (job.equipmentProof === undefined || equipmentProof(element) === job.equipmentProof)
     && (job.scope ? scopeValid(job.scope, job.user) : preferTranslations() && getTranslatorSettings().targetLanguage === job.language);
 }
 
@@ -372,14 +380,15 @@ export function registerTranslatedItemTooltips(): void {
     if (replays.has(event)) return;
     for (const stale of owned) if (!stale.isConnected) { jobs.delete(stale); delete stale.dataset.tooltipHtml; owned.delete(stale); }
     const element = event.target;
-    if (!(element instanceof HTMLElement) || !element.matches("a.content-link[data-link][data-uuid], div.crucible-item-inline.line-item.talent[data-uuid][data-crucible-tooltip=talent]")
+    if (!(element instanceof HTMLElement) || !element.matches(`a.content-link[data-link][data-uuid], div.crucible-item-inline.line-item.talent[data-uuid][data-crucible-tooltip=talent], ${CREATION_EQUIPMENT}`)
       || element.closest(".editor-content.ProseMirror, .ft-adventure-reader, [data-ft-reader-content], .ft-reader, [data-reader-prose]")
       || !ITEM_TOOLTIPS.has(element.dataset.crucibleTooltip ?? "") || "tooltipHtml" in element.dataset) return;
-    const scope = translatedScope(element), user = game.user;
+    const proof = equipmentProof(element), scope = proof === undefined ? translatedScope(element) : null, user = game.user;
     if (!user || (scope ? !scopeValid(scope, user) : !preferTranslations())) return;
     const ref = parseDocumentReference(element.dataset.uuid!);
     if (!ref || ref.type !== "Item" || ref.suffix || ref.anchor) return;
-    const job: HoverJob = { event, scope, language: scope?.language ?? getTranslatorSettings().targetLanguage, user, uuid: element.dataset.uuid! };
+    const job: HoverJob = { event, scope, language: scope?.language ?? getTranslatorSettings().targetLanguage, user, uuid: element.dataset.uuid!,
+      ...(proof === undefined ? {} : { equipmentProof: proof }) };
     jobs.set(element, job); owned.add(element); element.dataset.tooltipHtml = "";
     void produce(element, job);
   }, true);
