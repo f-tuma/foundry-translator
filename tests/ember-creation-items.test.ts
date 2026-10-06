@@ -3,7 +3,7 @@ import { parseHTML } from "linkedom";
 import { JournalTranslationService } from "../src/translation/journal-service";
 import { activeTranslations } from "../src/translation/active-translations";
 import { readItemTranslationFlag } from "../src/translation/item";
-import { collectEmberCreationItems, creationSourceGuard, EMBER_CREATION_PACK, MAX_CREATION_ITEMS, planMissingCreationItems } from "../src/translation/ember-creation-items";
+import { collectEmberCreationItems, collectCrucibleCreationEquipment, creationRuntimeGuard, creationSourceGuard, assertCreationItem, CRUCIBLE_EQUIPMENT_PACK, EMBER_CREATION_PACK, MAX_CREATION_ITEMS, planMissingCreationItems } from "../src/translation/ember-creation-items";
 
 const mock = vi.hoisted(() => ({ translate: vi.fn(), prepare: vi.fn(), create: vi.fn(), glossary: [] as any[], settings: {} as any }));
 vi.mock("../src/providers/factory", () => ({ createTranslationProvider: (...args: unknown[]) => {
@@ -19,7 +19,7 @@ let tables: Map<string, Map<string, Row>>, packs: Map<string, any>, documents: M
 let writes: { pack: string; data: Row; kind: string }[], nextId: number;
 const targetPack = "world.foundry-translate-items";
 function stored(pack: string, id: string) {
-  const type = pack === EMBER_CREATION_PACK || pack === targetPack ? "Item" : "JournalEntry", uuid = `Compendium.${pack}.${type}.${id}`;
+  const type = pack === EMBER_CREATION_PACK || pack === CRUCIBLE_EQUIPMENT_PACK || pack === targetPack ? "Item" : "JournalEntry", uuid = `Compendium.${pack}.${type}.${id}`;
   if (documents.has(uuid)) return documents.get(uuid);
   const rows = tables.get(pack)!;
   const doc = { id, uuid, documentName: type, parent: null,
@@ -300,4 +300,116 @@ describe("missing-only creation Item service", () => {
     expect(itemWrites()).toHaveLength(1);
     const result = await new JournalTranslationService().translateMissingItems([a, b]); expect(result).toMatchObject({ createdDocuments: 1, skippedDocuments: 1 });
   });
+});
+
+function equipment(id: string, price: unknown = 100, type = "weapon", category = "blade") {
+  const row = { _id: id, name: `English ${id}`, type, system: { price, category, description: `<p>English equipment ${id} 3.</p>`,
+    damage: 5, references: [{ item: "Compendium.other.pack.Item.untouched" }] } };
+  tables.get(CRUCIBLE_EQUIPMENT_PACK)!.set(id, row); return stored(CRUCIBLE_EQUIPMENT_PACK, id);
+}
+function equipmentSetup() {
+  makePack(CRUCIBLE_EQUIPMENT_PACK);
+  Object.assign(game.system!, { CONFIG: { packs: { equipment: new Set([CRUCIBLE_EQUIPMENT_PACK, "other.equipment"]) } },
+    CONST: { ACTOR: { STARTING_EQUIPMENT_BUDGET: 2500 } } });
+  vi.stubGlobal("crucible", game.system);
+}
+
+describe("separate missing starting equipment scope", () => {
+  beforeEach(equipmentSetup);
+  it("matches native positive-price/budget/non-scroll selection in exactly the base equipment pack", async () => {
+    const cheap = equipment("cheap", 1), equal = equipment("equal", 2500), fraction = equipment("fraction", 22.5, "armor");
+    equipment("too-expensive", 2500.01); equipment("free", 0); equipment("negative", -1); equipment("string", "100");
+    equipment("nan", NaN); equipment("infinity", Infinity); equipment("missing"); delete tables.get(CRUCIBLE_EQUIPMENT_PACK)!.get("missing")!.system.price;
+    equipment("scroll", 20, "consumable", "scroll"); const potion = equipment("potion", 20, "consumable", "potion");
+    equipment("hidden", 10); tables.get(CRUCIBLE_EQUIPMENT_PACK)!.get("hidden")!.visible = false;
+    equipment("translated", 10); tables.get(CRUCIBLE_EQUIPMENT_PACK)!.get("translated")!.flags = { "foundry-translate": { itemTranslation: { schemaVersion: 1, sourceUuid: cheap.uuid, targetLanguage: "cs", sourceLanguage: "en", sourceHash: "hash", providerId: "openai-compatible", translatedAt: "now", translatedHtmlFields: 1, fallbackTextSegments: 0 } } };
+    const foreign = makePack("other.equipment"); foreign.getDocuments.mockResolvedValue([equipment("foreign-in-other-pack")]);
+    tables.get(CRUCIBLE_EQUIPMENT_PACK)!.delete("foreign-in-other-pack");
+    expect((await collectCrucibleCreationEquipment()).map(doc => doc.uuid)).toEqual([cheap, equal, fraction, potion].map(doc => doc.uuid).sort());
+    expect(foreign.getDocuments).not.toHaveBeenCalled(); expect(writes).toEqual([]); expect(mock.create).not.toHaveBeenCalled();
+  });
+  it("retains default creation scope and rejects mixed, foreign, embedded and translated sources", async () => {
+    const item = equipment("a"), creation = source("ancestry");
+    await expect(planMissingCreationItems([item], "cs")).rejects.toThrow("InvalidSource");
+    await expect(planMissingCreationItems([creation], "cs", "equipment")).rejects.toThrow("InvalidEquipmentSource");
+    for (const bad of [{ ...freshDocument(item), uuid: "Compendium.other.equipment.Item.a" }, { ...freshDocument(item), parent: {} },
+      { ...freshDocument(item), documentName: "Actor" }, { ...freshDocument(item), visible: false },
+      { ...freshDocument(item), flags: { "foundry-translate": { itemTranslation: {} } } }]) {
+      expect(() => assertCreationItem(bad as any, "equipment")).toThrow("InvalidEquipmentSource");
+    }
+    expect(mock.create).not.toHaveBeenCalled(); expect(writes).toEqual([]);
+  });
+  it("rejects invalid scope before reading output or contacting the provider, including an empty batch", async () => {
+    const item = equipment("a");
+    expect(() => creationRuntimeGuard("other" as any)).toThrow("InvalidScope");
+    await expect(planMissingCreationItems([], "cs", "other" as any)).rejects.toThrow("InvalidScope");
+    await expect(new JournalTranslationService().translateMissingItems([item], "other" as any)).rejects.toThrow("InvalidScope");
+    expect(mock.create).not.toHaveBeenCalled(); expect(writes).toEqual([]);
+  });
+  it.each(["no-config", "foreign-only", "missing-pack", "invalid-budget", "different-global"])("fails closed on unsupported native equipment runtime: %s", async reason => {
+    equipment("a"); const runtime = game.system as any;
+    if (reason === "no-config") delete runtime.CONFIG;
+    if (reason === "foreign-only") runtime.CONFIG.packs.equipment = new Set(["other.equipment"]);
+    if (reason === "missing-pack") packs.delete(CRUCIBLE_EQUIPMENT_PACK);
+    if (reason === "invalid-budget") runtime.CONST.ACTOR.STARTING_EQUIPMENT_BUDGET = NaN;
+    if (reason === "different-global") vi.stubGlobal("crucible", { ...runtime });
+    await expect(collectCrucibleCreationEquipment()).rejects.toThrow(); expect(mock.create).not.toHaveBeenCalled(); expect(writes).toEqual([]);
+  });
+  it("accepts fully equal fresh getDocuments/cache instances without mutating any source", async () => {
+    const item = equipment("a"); packs.get(CRUCIBLE_EQUIPMENT_PACK).getDocuments.mockResolvedValue([freshDocument(item)]);
+    expect(await collectCrucibleCreationEquipment()).toEqual([item]); const check = await creationSourceGuard(item, "equipment");
+    documents.set(item.uuid, freshDocument(item)); await check(); expect(writes).toEqual([]);
+  });
+  it.each(["canonical-price", "fetched-content", "canonical-permission", "canonical-uuid", "duplicate-id", "earlier-source-change"])(
+    "rejects %s before allowing a starting equipment plan", async reason => {
+      const a = equipment("a"), b = equipment("b");
+      const fetched = freshDocument(a);
+      packs.get(CRUCIBLE_EQUIPMENT_PACK).getDocuments.mockResolvedValue(reason === "duplicate-id" ? [fetched, freshDocument(a)] : [fetched, freshDocument(b)]);
+      if (reason === "canonical-price") tables.get(CRUCIBLE_EQUIPMENT_PACK)!.get("a")!.system.price = 101;
+      if (reason === "fetched-content") { const row = a.toObject(); row.system.damage = 8; packs.get(CRUCIBLE_EQUIPMENT_PACK).getDocuments.mockResolvedValue([freshDocument(a, row)]); }
+      if (reason === "canonical-permission") tables.get(CRUCIBLE_EQUIPMENT_PACK)!.get("a")!.visible = false;
+      if (reason === "canonical-uuid") documents.set(a.uuid, { ...freshDocument(a), uuid: "Compendium.crucible.equipment.Item.other" });
+      if (reason === "earlier-source-change") vi.mocked(fromUuid).mockImplementation(async uuid => {
+        if (uuid === b.uuid) tables.get(CRUCIBLE_EQUIPMENT_PACK)!.get("a")!.system.damage = 8; return documents.get(uuid) ?? null;
+      });
+      await expect(collectCrucibleCreationEquipment()).rejects.toThrow(); expect(writes).toEqual([]);
+    });
+  it("rejects more than256 native candidates before any provider preparation", async () => {
+    Array.from({ length: MAX_CREATION_ITEMS + 1 }, (_, i) => equipment(`a${i}`));
+    await expect(collectCrucibleCreationEquipment()).rejects.toThrow("TooMany");
+    await expect(new JournalTranslationService().translateMissingItems([...documents.values()].filter(doc => doc.uuid.startsWith("Compendium.crucible.equipment.")), "equipment")).rejects.toThrow("TooMany");
+    expect(mock.create).not.toHaveBeenCalled(); expect(writes).toEqual([]);
+  });
+  it("creates only missing equipment, preserving every reserved correction and original price/mechanics/reference", async () => {
+    const a = equipment("a"), b = equipment("b", 2500), c = equipment("c"); reserve(b, "manual"); reserve(b, "duplicate", { partial: true }); reserve(c, "partial", { partial: true, sourceHash: "old" });
+    const before = structuredClone([...tables.get(CRUCIBLE_EQUIPMENT_PACK)!]), copies = structuredClone([...tables.get(targetPack)!]);
+    const result = await new JournalTranslationService().translateMissingItems([a, b, c], "equipment");
+    expect(result).toMatchObject({ createdDocuments: 1, skippedDocuments: 2 }); expect(itemWrites()).toHaveLength(1);
+    expect(itemWrites()[0]!.kind).toBe("create"); expect(itemWrites()[0]!.data.system).toMatchObject({ price: 100, damage: 5, references: a.toObject().system.references });
+    expect(itemWrites()[0]!.data.system.description).toBe("<p>Český equipment a 3.</p>");
+    expect([...tables.get(CRUCIBLE_EQUIPMENT_PACK)!]).toEqual(before);
+    for (const [id, copy] of copies) expect(tables.get(targetPack)!.get(id)).toEqual(copy);
+  });
+  it("does not contact a provider when every equipment identity is reserved, including malformed copies", async () => {
+    const a = equipment("a"); reserve(a);
+    expect(await new JournalTranslationService().translateMissingItems([a], "equipment")).toMatchObject({ createdDocuments: 0, skippedDocuments: 1 });
+    expect(mock.create).not.toHaveBeenCalled(); expect(writes).toEqual([]);
+  });
+  it.each(["price", "scroll", "visibility", "budget", "pack-config", "pack-instance", "source", "permission", "copy-race"])(
+    "blocks %s changes during the provider request before any Item write", async reason => {
+      const a = equipment("a"); mock.translate.mockImplementation(async ({ texts }: { texts: string[] }) => {
+        const data = tables.get(CRUCIBLE_EQUIPMENT_PACK)!.get("a")!, runtime = game.system as any;
+        if (reason === "price") data.system.price = 101;
+        if (reason === "scroll") { data.type = "consumable"; data.system.category = "scroll"; }
+        if (reason === "visibility") data.visible = false;
+        if (reason === "budget") runtime.CONST.ACTOR.STARTING_EQUIPMENT_BUDGET = 3000;
+        if (reason === "pack-config") runtime.CONFIG.packs.equipment.add("new.equipment");
+        if (reason === "pack-instance") packs.set(CRUCIBLE_EQUIPMENT_PACK, { ...packs.get(CRUCIBLE_EQUIPMENT_PACK) });
+        if (reason === "source") data.system.damage = 8;
+        if (reason === "permission") (game as any).user.isGM = false;
+        if (reason === "copy-race") reserve(a);
+        return texts.map(text => ({ translatedText: text.replaceAll("English", "Český") }));
+      });
+      await expect(new JournalTranslationService().translateMissingItems([a], "equipment")).rejects.toThrow(); expect(itemWrites()).toEqual([]);
+    });
 });

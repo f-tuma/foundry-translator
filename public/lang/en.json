@@ -804,5 +804,12 @@
   "FOUNDRY_TRANSLATE.Creation.UnknownLifespan": "Unknown",
   "FOUNDRY_TRANSLATE.Creation.VariedLifespan": "Varied",
   "FOUNDRY_TRANSLATE.Creation.ExampleCharacter": "An example {name} character.",
-  "FOUNDRY_TRANSLATE.Creation.RarityExtinct": "Extinct"
+  "FOUNDRY_TRANSLATE.Creation.RarityExtinct": "Extinct",
+  "FOUNDRY_TRANSLATE.CreationItems.Selection": "What to complete",
+  "FOUNDRY_TRANSLATE.CreationItems.CharacterChoice": "Ember character options",
+  "FOUNDRY_TRANSLATE.CreationItems.EquipmentChoice": "Starting equipment",
+  "FOUNDRY_TRANSLATE.CreationItems.EquipmentScope": "Creates missing translations for items available during character creation. Completed and unfinished translations are kept. Maximum: {limit} items.",
+  "FOUNDRY_TRANSLATE.CreationItems.EquipmentUnavailable": "The original crucible.equipment pack is not an active equipment source, or the character creation budget is unavailable.",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidEquipmentSource": "Only readable original starting equipment from crucible.equipment with a valid price within the budget, excluding spell scrolls, is supported.",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidScope": "Unknown character creation translation scope."
 }

@@ -145,6 +145,11 @@ potvrzení přeloží pouze chybějící možnosti původu, kultury a cesty z ba
 Ember Crucible a jejich přímo udělené talenty; maximálně 256 unikátních Itemů.
 Verze **0.34.9** opravuje odmítnutí nezměněných položek při opakovaném
 načtení kompendia.
+Od verze **0.34.15** můžeš v tomto okně přepnout **Co doplnit** na
+**Počáteční vybavení**. Tato volba doplní pouze chybějící kopie předmětů z původního
+balíčku Crucible Equipment, které jsou dostupné v nákupu počátečního
+vybavení. Vybavení a možnosti původu, kultury a cesty mají samostatný plán;
+číselné ceny, pravidla nákupu a původní předměty se nemění.
 Potřebuje stejné připojení k modelu a glosář jako běžný překlad. Nespouští
 překlad odkazovaných deníků ani dalších závislostí.
 
