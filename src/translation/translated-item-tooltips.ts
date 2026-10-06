@@ -94,7 +94,9 @@ export async function translatedItemCard(source: CardItem, native: string, langu
     const secrets = typeof source.system.description === "string" && source.isOwner === true && target.isOwner === true;
     const actionSecrets = source.isOwner === true && target.isOwner === true;
     if (body && before !== undefined && after !== undefined) {
-      enriched = await enrichProse(before, after, source, target, source, secrets);
+      enriched = await enrichProse(before, after, source, target, source, secrets, {
+        name: displayName(source.name, target.name),
+      });
     }
     await translateIncludedActions(card, source, target, sourceData, targetData, actionSecrets);
     // Native source and copy are checked again after hashing, lookup and enrichment.
@@ -117,7 +119,7 @@ export async function translatedItemCard(source: CardItem, native: string, langu
 }
 
 async function enrichProse(before: string, after: string, source: CardItem, target: CardItem,
-  relativeTo: CardItem | CardAction, secrets: boolean): Promise<string> {
+  relativeTo: CardItem | CardAction, secrets: boolean, names: DisplayNames = {}): Promise<string> {
   const replacements = [];
   for (const { sourceUuid } of discoverDocumentDependencies(after)) {
     const absolute = absoluteReference(sourceUuid, target.uuid);
@@ -130,7 +132,125 @@ async function enrichProse(before: string, after: string, source: CardItem, targ
   if (JSON.stringify(proseNumbers([before])) !== JSON.stringify(proseNumbers([normalized]))) throw new Error("Action prose changed numbers");
   const editor = (CONFIG as unknown as { ux?: { TextEditor?: { enrichHTML(html: string, options: Record<string, unknown>): Promise<string> } } }).ux?.TextEditor;
   if (!editor) throw new Error("Native text editor unavailable");
-  return editor.enrichHTML(normalized, { relativeTo, secrets });
+  return enrichDisplayNames(normalized, names, secrets,
+    html => editor.enrichHTML(html, { relativeTo, secrets }));
+}
+
+interface DisplayNames { name?: string | undefined; itemName?: string | undefined }
+const NAME_REFERENCE = /^@ref\[(name|item\.name)\](?:\{[^}]+\})?$/u;
+const EXCLUDED_NAME_TEXT = "script,style,code,pre,textarea,noscript,template";
+
+function displayName(before: string, after: string): string | undefined {
+  if (!before.trim() || !after.trim()) return undefined;
+  try {
+    assertPortableText(before, after, "text");
+    if (JSON.stringify(proseNumbers([before])) !== JSON.stringify(proseNumbers([after]))) return undefined;
+    return after;
+  } catch { return undefined; }
+}
+
+function textNodes(root: Node): Text[] {
+  const nodes: Text[] = [];
+  const visit = (node: Node): void => {
+    if (node.nodeType === 3) nodes.push(node as Text);
+    else for (const child of node.childNodes) visit(child);
+  };
+  visit(root); return nodes;
+}
+
+/** Consume a whole outer command before considering a name token. In particular,
+ * bracketed @ref text in quoted Embed options or brace labels is never editable. */
+function nameReferences(text: string): { start: number; end: number; path: "name" | "item.name" }[] {
+  const starts = /@[A-Za-z][A-Za-z0-9]*\[|&(?:amp;)?[Rr]eference\[|\[\[/gu;
+  const references: ReturnType<typeof nameReferences> = [];
+  const endOf = (start: number, open: string, close: string, quoted: boolean): number => {
+    let depth = 0, quote = "";
+    for (let index = start; index < text.length; index++) {
+      const char = text[index];
+      if (quote) {
+        if (char === "\\") index++;
+        else if (char === quote) quote = "";
+      } else if (quoted && (char === '"' || char === "'")) quote = char;
+      else if (char === open) depth++;
+      else if (char === close && --depth === 0) return index + 1;
+    }
+    return -1;
+  };
+  for (let found = starts.exec(text); found; found = starts.exec(text)) {
+    const start = found.index, bracket = start + found[0].indexOf("[");
+    let end = endOf(bracket, "[", "]", true);
+    if (end < 0) return []; // Ambiguous/malformed nesting never grants a text binding.
+    if (text[end] === "{") {
+      end = endOf(end, "{", "}", false);
+      if (end < 0) return [];
+    }
+    const match = NAME_REFERENCE.exec(text.slice(start, end));
+    if (match) references.push({ start, end, path: match[1] as "name" | "item.name" });
+    starts.lastIndex = end;
+  }
+  return references;
+}
+
+/** Terminal display text only. Native enrichment still receives the exact source
+ * Action/Item: costs, IDs, other @ref paths, rolls and hooks cannot resolve against
+ * a copy. Names are filled AFTER enrichers, never interpreted as HTML or commands. */
+async function enrichDisplayNames(html: string, names: DisplayNames, secrets: boolean,
+  enrich: (html: string) => Promise<string>): Promise<string> {
+  if (names.name === undefined && names.itemName === undefined) return enrich(html);
+  const root = document.createElement("div"); root.innerHTML = html;
+  let prefix: string;
+  do {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    prefix = `FTCARDNAME${[...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("")}TOKEN`;
+  } while (html.includes(prefix) || Object.values(names).some(name => name?.includes(prefix)));
+  const values = new Map<string, string>();
+  const nodes = textNodes(root), references = nameReferences(nodes.map(node => node.data).join(""));
+  let offset = 0;
+  let hiddenNameReference = false;
+  for (const node of nodes) {
+    const start = offset; offset += node.data.length;
+    // Native text nodes can split an outer label around markup. Scan the joined
+    // text first so an inner @ref does not gain eligibility in its own child node;
+    // only references wholly contained in one original Text node may be filled.
+    const local = references.filter(reference => reference.start >= start && reference.end <= offset)
+      .map(reference => ({ ...reference, start: reference.start - start, end: reference.end - start }));
+    if (node.parentElement?.closest(EXCLUDED_NAME_TEXT)) continue;
+    if (!secrets && node.parentElement?.closest("section.secret:not(.revealed)")) {
+      hiddenNameReference ||= local.some(reference => (reference.path === "name" ? names.name : names.itemName) !== undefined);
+      continue;
+    }
+    // Match outermost existing commands, not a name reference nested in another
+    // UUID label, embed configuration, inline roll or HTML attribute.
+    let cursor = 0, masked = "";
+    for (const reference of local) {
+      const name = reference.path === "name" ? names.name : names.itemName;
+      if (name === undefined) continue;
+      const marker = `${prefix}${values.size}END`;
+      values.set(marker, name);
+      masked += node.data.slice(cursor, reference.start) + marker;
+      cursor = reference.end;
+    }
+    if (cursor) node.data = masked + node.data.slice(cursor);
+  }
+  // Keep the raw baseline byte-for-byte when no eligible displayed reference was found.
+  if (!values.size && !hiddenNameReference) return enrich(html);
+  const output = await enrich(values.size ? root.innerHTML : html), result = document.createElement("div"); result.innerHTML = output;
+  if (!secrets && result.querySelector("section.secret:not(.revealed)")) throw new Error("Unrevealed source secret survived enrichment");
+  if (!values.size) return output;
+  for (const element of result.querySelectorAll("*")) {
+    if ([...element.attributes].some(attribute => attribute.value.includes(prefix))) throw new Error("Name marker moved into an attribute");
+  }
+  const pattern = new RegExp(`${prefix}\\d+END`, "gu"), counts = new Map<string, number>();
+  for (const node of textNodes(result)) {
+    for (const [marker] of node.data.matchAll(pattern)) {
+      if (!values.has(marker) || node.parentElement?.closest(EXCLUDED_NAME_TEXT)) throw new Error("Unknown or misplaced name marker");
+      counts.set(marker, (counts.get(marker) ?? 0) + 1);
+    }
+  }
+  if ([...values.keys()].some(marker => counts.get(marker) !== 1)) throw new Error("Name marker missing or duplicated after enrichment");
+  for (const node of textNodes(result)) node.data = node.data.replace(pattern, marker => values.get(marker)!);
+  if (result.innerHTML.includes(prefix)) throw new Error("Unrestored name marker");
+  return result.innerHTML;
 }
 
 /** Only reviewed native included-action cards. Never install translated Action
@@ -162,7 +282,9 @@ async function translateIncludedActions(card: HTMLElement, source: CardItem, tar
       assertPortableText(original.name, translated.name, "text");
       if (JSON.stringify(proseNumbers([original.name])) !== JSON.stringify(proseNumbers([translated.name]))) continue;
       const prose = body && typeof original.description === "string" && typeof translated.description === "string"
-        ? await enrichProse(original.description, translated.description, source, target, action, secrets) : undefined;
+        ? await enrichProse(original.description, translated.description, source, target, action, secrets, {
+          name: translated.name, itemName: displayName(source.name, target.name),
+        }) : undefined;
       const conditionElements = row.querySelectorAll<HTMLElement>(":scope > p.condition.activation > em");
       const condition = conditionElements.length === 1 ? conditionElements[0] : undefined;
       const conditionText = conditionIndexes.has(index) && action.condition === original.condition
