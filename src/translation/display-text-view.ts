@@ -9,6 +9,7 @@ import { DISPLAY_TEXT_PACK, isDisplayDocument, readDisplayField, readDisplayText
   type DisplayDocument, type DisplayTextFlag } from "./display-text";
 import type { JournalData } from "./journal";
 import { JournalTranslationService } from "./journal-service";
+import { isAffixActionDisplayPath } from "./affix-action-display";
 
 type TextRecord = { flag: DisplayTextFlag; fields: Map<string, { source: string; translation: string | null }> };
 const records = new Map<string, TextRecord>();
@@ -20,7 +21,7 @@ const replaced = new Map<Text, { source: string; translation: string }>();
 const localize = (key: string) => game.i18n.localize(`FOUNDRY_TRANSLATE.DisplayText.${key}`);
 
 /** Strictly a display lookup: callers keep the original Document and UUID. */
-export function lookupDisplayText(doc: DisplayDocument, path: string[]): string | null {
+export function lookupDisplayText(doc: DisplayDocument, path: string[], affixSourceHash?: string): string | null {
   let uuid = doc.uuid;
   // Actor/Item copies retain embedded IDs. Resolve their effect text through
   // explicit source metadata, never through names or a global UUID override.
@@ -32,6 +33,10 @@ export function lookupDisplayText(doc: DisplayDocument, path: string[]): string 
   }
   const record = records.get(`${uuid}\0${getTranslatorSettings().targetLanguage}`);
   if (!record || record.flag.documentType !== doc.documentName) return null;
+  // Prepared Affix Actions are bound to the complete original effect, including
+  // its mechanics. A text-only match cannot grant an Action overlay.
+  if (isAffixActionDisplayPath(path) && (!affixSourceHash || record.flag.affixSourceHash !== affixSourceHash
+    || record.flag.fallbackTextSegments > 0)) return null;
   const field = record.fields.get(JSON.stringify(path));
   if (!field) return null;
   // Read raw text only. Cloning a whole Scene and reparsing HTML during every

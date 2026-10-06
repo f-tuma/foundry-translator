@@ -1,3 +1,5 @@
+import { canonicalAffixActionDisplayPath } from "../translation/affix-action-display";
+import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, machineProofreadingSchemaProof, type MachineProofreadingReceipt } from "./machine-proofreading";
 import { readEditorial, editorialKey, writeEditorial, EDITORIAL_SETTING, type EditorialRecord, type EditorialState } from "./editorial";
 import type { PortableReviewMetadata } from "./project-format";
 import { hasManualOutputEdits } from "../translation/output-hash";
@@ -134,7 +136,7 @@ export async function loadReview(entry: ReviewDocument, knownCatalog?: ReviewDoc
     let stable: (string | number)[], target: HtmlFieldPath;
     let translated: unknown;
     if (display) {
-      stable = [...field.path];
+      stable = canonicalAffixActionDisplayPath(data, field.path) ?? [...field.path];
       if (typeof stable[1] === "number") stable[1] = (data[stable[0]!] as { _id: string }[])[stable[1]]!._id;
       const metadata = display.fields.find(saved => JSON.stringify(saved.path) === JSON.stringify(stable));
       const pageIndex = (output as JournalData).pages.findIndex(page => page._id === metadata?.pageId);
@@ -291,6 +293,7 @@ export interface ReviewHistoryEntry {
   referenceRepair?: true;
   identifierRepair?: true;
   referenceRebuild?: ReferenceRebuildReceipt;
+  machineProofreading?: { before: MachineProofreadingReceipt | null; after: MachineProofreadingReceipt };
   rows: { rowId: string; before: string[]; after: string[]; label: string; group: string }[];
   undoneAt?: string;
 }
@@ -535,12 +538,77 @@ export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string
   return value;
 }
 
+/** Metadata-only machine attestation; it never rewrites prose, fallback counts or human review entries. */
+export async function saveMachineProofreading(snapshot: ReviewSnapshot, rowIds: string[], coverageHash: string,
+  options: { id: string; label: string; reason: string; agentRequestHash: string; canWrite: () => boolean; beforeWrite: () => Promise<void> }): Promise<ReviewSnapshot> {
+  gmOnly();
+  const idle = () => { if (activeTranslations.list().some(run => run.finishedAt === undefined)) fail("PauseFirst"); };
+  idle();
+  const fresh = await loadReview(snapshot.entry);
+  if (fresh.guard.fingerprint !== snapshot.guard.fingerprint || fresh.sourceHash !== snapshot.sourceHash) fail("Conflict");
+  const pack = game.packs.get(fresh.entry.pack)!;
+  const target = await pack.getDocument(fresh.entry.id) as WritableReviewDocument | undefined;
+  const source = await fromUuid(fresh.entry.sourceUuid) as PortableDocument | null;
+  if (!target || !source || source.uuid !== fresh.entry.sourceUuid || source.documentName !== "Item") fail("Conflict");
+  const data = target.toObject() as ItemData, sourceProof = JSON.stringify(source.toObject()), targetProof = JSON.stringify(data);
+  const schemaProof = machineProofreadingSchemaProof(source);
+  const plan = await prepareMachineProofreading(fresh, source, data);
+  assertMachineProofreadingCoverage(plan, rowIds, coverageHash);
+  if (!/^[a-zA-Z0-9-]{1,80}$/u.test(options.id) || !/^[a-f0-9]{64}$/u.test(options.agentRequestHash) || options.reason.trim().length < 5 || options.reason.length > 3000 || options.label !== `MCP: ${options.reason}` || !game.user?.id) fail("MissingField");
+  if (readReviewHistory(target.flags).some(item => item.id === options.id)) fail("Conflict");
+  const receipt: MachineProofreadingReceipt = { version: 1, kind: "Item", operationId: options.id, at: new Date().toISOString(),
+    userId: game.user!.id!, reason: options.reason, documentId: plan.documentId, sourceUuid: plan.sourceUuid, language: plan.language,
+    sourceHash: plan.sourceHash, fullSourceHash: plan.fullSourceHash, outputHash: plan.outputHash, coverageHash: plan.coverageHash,
+    metadataHash: plan.metadataHash, rowIds: plan.rowIds };
+  const history: ReviewHistoryEntry = { id: options.id, at: receipt.at, userName: (game.user as { name?: string }).name ?? "GM",
+    sourceHash: fresh.sourceHash, label: options.label, agentRequestHash: options.agentRequestHash, rows: [],
+    machineProofreading: { before: readMachineProofreading(data), after: receipt } };
+  await options.beforeWrite();
+  const latest = await loadReview(fresh.entry), latestSource = await fromUuid(fresh.entry.sourceUuid) as PortableDocument | null;
+  if (latest.guard.fingerprint !== fresh.guard.fingerprint || latest.sourceHash !== fresh.sourceHash || latest.warning || latest.partial ||
+    !latestSource || latestSource.uuid !== source.uuid || latestSource.documentName !== "Item" || JSON.stringify(latestSource.toObject()) !== sourceProof) fail("Conflict");
+  await options.beforeWrite();
+  // Synchronous final checks close mutations during final asynchronous validation.
+  if (JSON.stringify(source.toObject()) !== sourceProof || JSON.stringify(latestSource.toObject()) !== sourceProof || JSON.stringify(target.toObject()) !== targetProof || machineProofreadingSchemaProof(source) !== schemaProof || machineProofreadingSchemaProof(latestSource) !== schemaProof) fail("Conflict");
+  if (pack.locked) fail("Locked"); idle(); gmOnly();
+  if (!options.canWrite()) throw new Error("Live.Disconnected");
+  await target.update({ [`flags.${MODULE_ID}.machineProofreading`]: receipt, [`flags.${MODULE_ID}.reviewHistory.${history.id}`]: history });
+  return loadReview(fresh.entry);
+}
+
+async function undoMachineProofreading(snapshot: ReviewSnapshot, operation: ReviewHistoryEntry, canWrite?: () => boolean): Promise<ReviewSnapshot> {
+  const record = operation.machineProofreading;
+  if (!record || operation.rows.length || operation.undoneAt) fail("UndoConflict");
+  if (activeTranslations.list().some(run => run.finishedAt === undefined)) fail("PauseFirst");
+  const pack = game.packs.get(snapshot.entry.pack)!, target = await pack.getDocument(snapshot.entry.id) as WritableReviewDocument | undefined;
+  const source = await fromUuid(snapshot.entry.sourceUuid) as PortableDocument | null;
+  if (!target || !source || source.uuid !== snapshot.entry.sourceUuid || source.documentName !== "Item") fail("UndoConflict");
+  const data = target.toObject() as ItemData, sourceProof = JSON.stringify(source.toObject()), targetProof = JSON.stringify(data);
+  if (JSON.stringify(readMachineProofreading(data)) !== JSON.stringify(record.after)) fail("UndoConflict");
+  const schemaProof = machineProofreadingSchemaProof(source);
+  const plan = await prepareMachineProofreading(snapshot, source, data);
+  if (plan.fullSourceHash !== record.after.fullSourceHash || plan.outputHash !== record.after.outputHash || plan.metadataHash !== record.after.metadataHash) fail("UndoConflict");
+  assertMachineProofreadingCoverage(plan, record.after.rowIds, record.after.coverageHash);
+  const latest = await loadReview(snapshot.entry), latestSource = await fromUuid(snapshot.entry.sourceUuid) as PortableDocument | null;
+  if (latest.guard.fingerprint !== snapshot.guard.fingerprint || latest.sourceHash !== snapshot.sourceHash || !latestSource || latestSource.uuid !== source.uuid ||
+    JSON.stringify(latestSource.toObject()) !== sourceProof || JSON.stringify(source.toObject()) !== sourceProof || JSON.stringify(target.toObject()) !== targetProof || machineProofreadingSchemaProof(source) !== schemaProof || machineProofreadingSchemaProof(latestSource) !== schemaProof) fail("UndoConflict");
+  if (pack.locked) fail("Locked"); gmOnly();
+  if (activeTranslations.list().some(run => run.finishedAt === undefined)) fail("PauseFirst");
+  if (canWrite && !canWrite()) throw new Error("Live.Disconnected");
+  const at = new Date().toISOString(), undoId = crypto.randomUUID();
+  await target.update({ [`flags.${MODULE_ID}.machineProofreading`]: record.before, [`flags.${MODULE_ID}.reviewHistory.${operation.id}.undoneAt`]: at,
+    [`flags.${MODULE_ID}.reviewHistory.${undoId}`]: { id: undoId, at, sourceHash: snapshot.sourceHash, label: "Undo machine proofreading",
+      userName: (game.user as { name?: string }).name ?? "GM", rows: [] } });
+  return loadReview(snapshot.entry);
+}
+
 /** Undo only unchanged affected paragraphs, preserving subsequent edits elsewhere. */
 export async function undoReview(entry: ReviewDocument, operationId: string, canWrite?: () => boolean): Promise<ReviewSnapshot> {
   gmOnly();
   const snapshot = await loadReview(entry), doc = await game.packs.get(entry.pack)!.getDocument(entry.id);
   const operation = readReviewHistory(doc?.flags).find(item => item.id === operationId);
   if (!operation || operation.undoneAt || operation.sourceHash !== snapshot.sourceHash) fail("UndoConflict");
+  if (operation.machineProofreading) return undoMachineProofreading(snapshot, operation, canWrite);
   const changes = operation.rows.map(change => {
     const row = snapshot.rows.find(row => row.id === change.rowId);
     if (!row || row.blocked || JSON.stringify(row.translation) !== JSON.stringify(change.after)) fail("UndoConflict");

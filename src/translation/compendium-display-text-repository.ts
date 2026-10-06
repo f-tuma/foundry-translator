@@ -22,7 +22,7 @@ export class CompendiumDisplayTextRepository {
     return document;
   }
 
-  async save(data: JournalData, guard: TranslationWriteGuard | null): Promise<FoundryJournalDocument> {
+  async save(data: JournalData, guard: TranslationWriteGuard | null, beforeWrite?: () => void): Promise<FoundryJournalDocument> {
     const flag = readDisplayTextFlag(data.flags);
     if (!flag) throw new Error("Invalid scene/effect translation metadata.");
     let pack = game.packs.get(DISPLAY_TEXT_PACK);
@@ -37,6 +37,7 @@ export class CompendiumDisplayTextRepository {
     await organizeCompendiumPack(pack);
     const existing = await this.find(flag.sourceUuid, flag.targetLanguage);
     await assertTranslationWriteGuard(existing, guard);
+    beforeWrite?.();
     if (existing?.id) {
       await foundry.documents.JournalEntry.implementation.updateDocuments([{ ...data, _id: existing.id }], { pack: pack.collection });
       return (await pack.getDocument(existing.id))!;

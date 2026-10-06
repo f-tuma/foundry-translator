@@ -8,8 +8,14 @@ import { parseDocumentReference, resolveSourceReference, resolveTranslationRefer
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "./item";
 import { readJournalTranslationFlag } from "./journal";
 import { discoverCrucibleActionNameFieldPaths, discoverCrucibleActionConditionFieldPaths } from "./system-html-fields";
+import { isMachineProofreadingCurrent } from "../review/machine-proofreading";
+import type { PortableDocument } from "../bundles/fields";
+import { resolveAffixActionDisplay, type NativeAffixItem, type NativeAffixAction } from "./affix-action-display";
+import { lookupDisplayText } from "./display-text-view";
+import type { DisplayDocument } from "./display-text";
 
-interface CardAction { id: string; name: string; description?: string; condition?: string; item?: CardItem; toObject?(source: boolean): Record<string, unknown> }
+interface CardEffect { name: string }
+interface CardAction { id: string; name: string; description?: string; condition?: string; effects?: readonly CardEffect[]; item?: CardItem; toObject?(source: boolean): Record<string, unknown> }
 interface CardItem extends FoundryUuidDocument {
   name: string; type: string; isOwner?: boolean;
   system: { description?: string | { public?: string } };
@@ -40,7 +46,8 @@ function description(item: CardItem): string | undefined {
 }
 function actionProof(item: CardItem): string {
   return JSON.stringify(item.actions?.map(action => ({ id: action.id, name: action.name,
-    description: action.description, owned: action.item === item, prepared: action.toObject?.(false) })));
+    description: action.description, effects: action.effects?.map(effect => effect.name),
+    owned: action.item === item, prepared: action.toObject?.(false) })));
 }
 function scopeDocument(app: JournalApp): FoundryUuidDocument | null {
   const doc = app.entry ?? app.document;
@@ -77,10 +84,12 @@ export async function translatedItemCard(source: CardItem, native: string, langu
     const flag = readItemTranslationFlag(target?.flags);
     if (!target || target.uuid !== pair.translatedUuid || target.documentName !== "Item" || target.type !== source.type
       || !readable(target, user) || !flag || flag.sourceUuid !== source.uuid || flag.targetLanguage !== language
-      || flag.sourceHash !== sourceHash || flag.fallbackTextSegments > 0
+      || flag.sourceHash !== sourceHash
       || (target.flags?.["foundry-translate"]?.itemTranslation as { partial?: boolean } | undefined)?.partial) return native;
     if (!target.toObject) return native;
     const targetData = target.toObject(), targetProof = JSON.stringify(targetData);
+    if (flag.fallbackTextSegments > 0 && !await isMachineProofreadingCurrent(source as unknown as PortableDocument,
+      targetData, language, target.uuid)) return native;
     const flagProof = JSON.stringify(flag), after = description(target), name = target.name;
     const holder = document.createElement("div"); holder.innerHTML = native;
     if (holder.children.length !== 1) return native;
@@ -101,8 +110,9 @@ export async function translatedItemCard(source: CardItem, native: string, langu
       });
     }
     await translateIncludedActions(card, source, target, sourceData, targetData, actionSecrets);
+    const affixCurrent = await translateAffixActions(card, source, target, actionSecrets, language);
     // Native source and copy are checked again after hashing, lookup and enrichment.
-    if (game.user !== user || !readable(source, user) || !readable(target, user)
+    if (!affixCurrent() || game.user !== user || !readable(source, user) || !readable(target, user)
       || source.uuid !== pair.sourceUuid || target.uuid !== pair.translatedUuid || target.type !== source.type
       || readItemTranslationFlag(source.flags) || JSON.stringify(source.toObject()) !== sourceProof
       || actionProof(source) !== nativeActionsProof
@@ -120,16 +130,54 @@ export async function translatedItemCard(source: CardItem, native: string, langu
   } catch (error) { logger.warn("Translated Item tooltip unavailable; keeping the native card.", error); return native; }
 }
 
+/** Affix Actions have separate display records. Native execution, references,
+ * buttons and effects continue to use the original prepared Action. */
+async function translateAffixActions(card: HTMLElement, source: CardItem, target: CardItem, secrets: boolean, language: string): Promise<() => boolean> {
+  if (getTranslatorSettings().targetLanguage !== language) return () => true;
+  const rows = [...card.querySelectorAll<HTMLElement>(":scope > section.actions > div.action.line-item[data-action-id]")];
+  if (new Set(rows.map(row => row.dataset.actionId)).size !== rows.length) return () => true;
+  const checks: (() => boolean)[] = [];
+  for (const row of rows) {
+    const matches = source.actions?.filter(action => action.id === row.dataset.actionId) ?? [];
+    if (matches.length !== 1) continue;
+    const action = matches[0]!, heading = row.querySelector<HTMLElement>(":scope > header.action-header > .title > h4");
+    if (!heading || heading.childElementCount || heading.textContent !== action.name) continue;
+    const lookup = (doc: Parameters<typeof lookupDisplayText>[0], path: readonly string[], hash: string) => lookupDisplayText(doc, [...path], hash);
+    const display = await resolveAffixActionDisplay(source as unknown as NativeAffixItem, action as NativeAffixAction,
+      (doc, path, hash) => lookup(doc as unknown as DisplayDocument, path, hash));
+    if (!display) continue;
+    const values = (["name", "description", "condition"] as const).filter(key => display[key] !== undefined);
+    const current = () => getTranslatorSettings().targetLanguage === language && display.current() && values.every(key => lookup(display.source as unknown as DisplayDocument,
+      ["system", "actions", action.id, key], display.sourceHash) === display[key]);
+    const body = row.querySelector<HTMLElement>(":scope > .description");
+    const prose = body && action.description !== undefined && display.description !== undefined
+      ? await enrichProse(action.description, display.description, source, source, action, secrets,
+        { name: display.name, itemName: displayName(source.name, target.name) }, display.source.uuid) : undefined;
+    if (!current()) throw new Error("Affix display changed during native enrichment");
+    const conditions = row.querySelectorAll<HTMLElement>(":scope > p.condition.activation > em"), condition = conditions[0];
+    const conditionText = conditions.length === 1 && condition?.textContent === action.condition
+      && action.condition !== undefined && display.condition !== undefined ? safeConditionText(action.condition, display.condition) : undefined;
+    if (display.name !== undefined) heading.textContent = display.name;
+    if (body && prose !== undefined) body.innerHTML = prose;
+    if (condition && conditionText !== undefined) condition.textContent = conditionText;
+    const image = row.querySelector<HTMLImageElement>(":scope > header.action-header img");
+    if (display.name !== undefined && image?.alt === action.name) image.alt = display.name;
+    if (display.name !== undefined && image?.title === action.name) image.title = display.name;
+    checks.push(current);
+  }
+  return () => checks.every(check => check());
+}
+
 async function enrichProse(before: string, after: string, source: CardItem, target: CardItem,
-  relativeTo: CardItem | CardAction, secrets: boolean, names: DisplayNames = {}): Promise<string> {
+  relativeTo: CardItem | CardAction, secrets: boolean, names: DisplayNames = {}, referenceContext?: string): Promise<string> {
   const replacements = [];
   for (const { sourceUuid } of discoverDocumentDependencies(after)) {
-    const absolute = absoluteReference(sourceUuid, target.uuid);
+    const absolute = absoluteReference(sourceUuid, referenceContext ?? target.uuid);
     if (!absolute) continue;
     const original = await resolveSourceReference(absolute);
     if (original && original !== sourceUuid) replacements.push({ sourceUuid, translatedUuid: original });
   }
-  const normalized = sourceReferenceNotation(before, rewriteDocumentReferences(after, replacements), source.uuid);
+  const normalized = sourceReferenceNotation(before, rewriteDocumentReferences(after, replacements), referenceContext ?? source.uuid);
   assertPortableText(before, normalized, "html");
   if (JSON.stringify(proseNumbers([before])) !== JSON.stringify(proseNumbers([normalized]))) throw new Error("Action prose changed numbers");
   const editor = (CONFIG as unknown as { ux?: { TextEditor?: { enrichHTML(html: string, options: Record<string, unknown>): Promise<string> } } }).ux?.TextEditor;
@@ -265,7 +313,8 @@ async function translateIncludedActions(card: HTMLElement, source: CardItem, tar
   const after = targetData.system.actions as CardAction[] | undefined;
   if (!paths.length || !before || !after || !source.actions
     || !discoverCrucibleActionNameFieldPaths(fields, targetData.system).length
-    || before.length !== after.length || before.some((action, index) => action.id !== after[index]?.id)) return;
+    || before.length !== after.length || new Set(before.map(action => action.id)).size !== before.length
+    || before.some((action, index) => action.id !== after[index]?.id)) return;
   const runtime = new Map(source.actions.map(action => [action.id, action]));
   if (runtime.size !== source.actions.length) return;
   const conditionIndexes = new Set(discoverCrucibleActionConditionFieldPaths(fields, sourceData.system).map(path => path[1]));
@@ -293,14 +342,49 @@ async function translateIncludedActions(card: HTMLElement, source: CardItem, tar
         && condition?.textContent === original.condition && typeof original.condition === "string"
         && typeof translated.condition === "string" && translated.condition.trim()
         ? safeConditionText(original.condition, translated.condition) : undefined;
+      const effects = translatedEffectHeadings(row, original, action, source, target);
       heading.textContent = translated.name;
       if (body && prose !== undefined) body.innerHTML = prose;
       if (condition && conditionText !== undefined) condition.textContent = conditionText;
+      for (const effect of effects) effect.heading.textContent = effect.text;
       const image = row.querySelector<HTMLImageElement>(":scope > header.action-header img");
       if (image?.alt === original.name) image.alt = translated.name;
       if (image?.title === original.name) image.title = translated.name;
     } catch (error) { logger.warn("Included Action translation unavailable; keeping its native presentation.", error); }
   }
+}
+
+/** The native card has already chosen which effects it exposes. Only an effect
+ * bearing the exact original Item name receives its validated display name;
+ * stored/prepared names and the complete native list must agree first. Nothing
+ * from the copy's effect model participates in rendering or execution. */
+function translatedEffectHeadings(row: HTMLElement, original: CardAction, action: CardAction,
+  source: CardItem, target: CardItem): { heading: HTMLElement; text: string }[] {
+  const name = displayName(source.name, target.name);
+  if (name === undefined || !Array.isArray(original.effects) || !original.effects.length || !Array.isArray(action.effects)) return [];
+  const prepared = action.toObject?.(false).effects;
+  if (!Array.isArray(prepared)) return [];
+  const names = original.effects.map(effect => effect?.name);
+  if (names.some(value => typeof value !== "string") || new Set(names).size !== names.length
+    || action.effects.length !== names.length || prepared.length !== names.length
+    || names.some((value, index) => action.effects?.[index]?.name !== value || prepared[index]?.name !== value)) return [];
+  const lists = row.querySelectorAll<HTMLElement>(":scope > ol.effects");
+  if (lists.length !== 1) return [];
+  const list = lists[0]!, entries = [...list.children];
+  if (entries.length !== names.length || entries.some(entry => !entry.matches("li.effect.line-item"))) return [];
+  const template = game.i18n?.localize("ACTION.EffectSpecific");
+  if (typeof template !== "string" || template.split("{effect}").length !== 2
+    || /\{[^}]+\}/u.test(template.replace("{effect}", ""))) return [];
+  const result: { heading: HTMLElement; text: string }[] = [];
+  for (const [index, entry] of entries.entries()) {
+    const titles = entry.querySelectorAll<HTMLElement>(":scope > .title"),
+      headings = entry.querySelectorAll<HTMLElement>(":scope > .title > h4");
+    const heading = headings[0], effectName = names[index]!;
+    if (titles.length !== 1 || headings.length !== 1 || !heading || heading.childElementCount !== 0
+      || heading.textContent !== template.replace("{effect}", () => effectName)) return [];
+    if (effectName === source.name) result.push({ heading, text: template.replace("{effect}", () => name) });
+  }
+  return result;
 }
 
 /** The native trigger sentence is display-only text. Invalid copies leave that

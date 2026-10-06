@@ -811,5 +811,14 @@
   "FOUNDRY_TRANSLATE.CreationItems.EquipmentScope": "Creates missing translations for items available during character creation. Completed and unfinished translations are kept. Maximum: {limit} items.",
   "FOUNDRY_TRANSLATE.CreationItems.EquipmentUnavailable": "The original crucible.equipment pack is not an active equipment source, or the character creation budget is unavailable.",
   "FOUNDRY_TRANSLATE.CreationItems.InvalidEquipmentSource": "Only readable original starting equipment from crucible.equipment with a valid price within the budget, excluding spell scrolls, is supported.",
-  "FOUNDRY_TRANSLATE.CreationItems.InvalidScope": "Unknown character creation translation scope."
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidScope": "Unknown character creation translation scope.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixStart": "Translate enchantment Actions",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixScope": "Creates missing display translations for starting equipment enchantment Actions. Existing records are kept; item rules are unchanged.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixPlan": "New Action records: {missing}. Legacy records to extend: {extendable}. Existing records to keep: {existing}.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixRunning": "Translating enchantment Actions…",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidAffixSource": "An enchantment Action cannot be safely matched to its original starting equipment. Refresh the plan.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixTooMany": "The plan exceeds the limit of {limit} enchantments. Nothing was translated.",
+  "FOUNDRY_TRANSLATE.Review.MachineProofreading": "Complete Item machine proofreading",
+  "FOUNDRY_TRANSLATE.Review.MachineProofreadingDetails": "The agent recorded proofreading every passage. Text and human verification were not changed.",
+  "FOUNDRY_TRANSLATE.Review.MachineProofreadingUndoWarning": "Revoke only this machine proofreading receipt. Text corrections and human verification remain unchanged."
 }

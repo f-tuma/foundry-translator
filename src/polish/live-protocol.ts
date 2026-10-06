@@ -1,9 +1,9 @@
 export const LIVE_PROTOCOL = 1;
 export const LIVE_PORT = 3112;
-export type LiveMethod = "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_field_diagnostic" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "prepare_reference_rebuild" | "validate_reference_rebuild" | "apply_reference_rebuild" | "list_history" | "undo_correction";
+export type LiveMethod = "prepare_machine_proofreading" | "commit_machine_proofreading" | "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_field_diagnostic" | "get_reference_context" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "prepare_reference_rebuild" | "validate_reference_rebuild" | "apply_reference_rebuild" | "list_history" | "undo_correction";
 export interface LiveArgs {
   documentId?: string; rowId?: string; rowIds?: string[]; revision?: string; operationId?: string;
-  fieldId?: string; planHash?: string;
+  fieldId?: string; planHash?: string; coverageHash?: string;
   edits?: { rowId: string; text: string[]; labels?: { marker: string; label: string }[] }[];
   text?: string[]; labels?: { marker: string; label: string }[]; reason?: string;
   options?: { marker: string; key: "readaloud" | "caption" | "label"; value: string }[];
@@ -15,8 +15,8 @@ export interface LiveArgs {
 export interface LiveRequest { id: string; method: LiveMethod; args: Record<string, unknown> }
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
-const methods: readonly string[] = ["status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_field_diagnostic", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild", "list_history", "undo_correction"];
-const keys = new Set(["documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits"]);
+const methods: readonly string[] = ["prepare_machine_proofreading", "commit_machine_proofreading", "status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_field_diagnostic", "get_reference_context", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild", "list_history", "undo_correction"];
+const keys = new Set(["documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits", "coverageHash"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
   const fail = (): never => { throw new Error("Live.InvalidRequest"); };
@@ -45,9 +45,16 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
       (request.method === "apply_reference_rebuild" && !input.operationId)) fail();
   } else if (["fieldId", "planHash", "edits"].some(key => input[key] !== undefined) && !fieldDiagnostic) fail();
   if (request.method === "get_context_batch" && (Object.keys(input).some(key => !["documentId", "rowIds"].includes(key)) || !input.documentId || input.rowIds === undefined)) fail();
+  const machine = ["prepare_machine_proofreading", "commit_machine_proofreading"].includes(request.method);
+  if (machine) {
+    const preparing = request.method === "prepare_machine_proofreading";
+    const allowed = new Set(["documentId", ...(preparing ? [] : ["rowIds", "revision", "coverageHash", "reason", "operationId"])]);
+    if (Object.keys(input).some(key => !allowed.has(key)) || !input.documentId || (!preparing &&
+      (!input.rowIds || !input.revision || !input.coverageHash || !input.operationId || typeof input.reason !== "string" || input.reason.trim().length < 5))) fail();
+  } else if (input.coverageHash !== undefined) fail();
   const args: LiveArgs = { offset: 0, limit: 20, query: "", radius: 2, fuzzy: false };
   if (input.rowIds !== undefined) {
-    if (request.method !== "get_context_batch" || !Array.isArray(input.rowIds) || input.rowIds.length < 1 || input.rowIds.length > 10 ||
+    if (!(request.method === "get_context_batch" || request.method === "commit_machine_proofreading") || !Array.isArray(input.rowIds) || input.rowIds.length < 1 || input.rowIds.length > (machine ? 1000 : 10) ||
       input.rowIds.some(id => typeof id !== "string" || !/^[a-f0-9]{64}$/u.test(id)) || new Set(input.rowIds).size !== input.rowIds.length) fail();
     args.rowIds = input.rowIds as string[];
   }
@@ -65,11 +72,11 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   }
   if (input.fuzzy !== undefined) { if (typeof input.fuzzy !== "boolean") fail(); args.fuzzy = input.fuzzy as boolean; }
   if (input.query !== undefined) { if (typeof input.query !== "string" || input.query.length > 160) fail(); args.query = input.query as string; }
-  for (const key of ["documentId", "rowId", "revision", "operationId", "reason", "fieldId", "planHash"] as const) if (input[key] !== undefined) {
+  for (const key of ["documentId", "rowId", "revision", "operationId", "reason", "fieldId", "planHash", "coverageHash"] as const) if (input[key] !== undefined) {
     const s = input[key]; if (typeof s !== "string" || !s.trim() || s.length > (key === "reason" ? 3000 : key === "fieldId" ? 1000 : 500)) fail();
     args[key] = s as string;
   }
-  for (const key of ["rowId", "revision", "planHash"] as const) if (args[key] && !/^[a-f0-9]{64}$/u.test(args[key]!)) fail();
+  for (const key of ["rowId", "revision", "planHash", "coverageHash"] as const) if (args[key] && !/^[a-f0-9]{64}$/u.test(args[key]!)) fail();
   if (args.operationId && !/^[a-zA-Z0-9-]{1,80}$/u.test(args.operationId)) fail();
   if (input.edits !== undefined) {
     if (!rebuild || request.method === "prepare_reference_rebuild" || !Array.isArray(input.edits) || input.edits.length < 1 || input.edits.length > 100) fail();

@@ -153,6 +153,16 @@ vybavení. Vybavení a možnosti původu, kultury a cesty mají samostatný plá
 Potřebuje stejné připojení k modelu a glosář jako běžný překlad. Nespouští
 překlad odkazovaných deníků ani dalších závislostí.
 
+
+Od verze **0.34.16** má počáteční vybavení také samostatné tlačítko
+**Přeložit Akce očarování**. Uloží texty původních Affix efektů do oddělených
+záznamů. U staršího záznamu, který obsahuje pouze název a popis očarování,
+může přidat chybějící stránky Akcí; uložený název, popis, historie a opravy
+zůstávají zachované. Nejasné, duplicitní nebo poškozené záznamy přeskočí.
+Náhled předmětu používá původní připravené Akce a jejich hodnoty; český název,
+popis a podmínka se vkládají pouze do zobrazení. Po změně zdroje se neaktuální
+text nepoužije. Nové Akce je potřeba projít v editoru; nejsou lidsky ověřené.
+
 Existující kopie přeskočí i tehdy, když jsou ručně upravené, nedokončené nebo
 zastaralé. Takové kopie tato akce neopravuje. Běh lze pozastavit nebo zrušit
 v přehledu aktivních překladů; další spuštění zachová hotové kopie a doplní

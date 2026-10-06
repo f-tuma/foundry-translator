@@ -1,10 +1,13 @@
+import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, isMachineProofreadingCurrent, machineProofreadingSchemaProof } from "../review/machine-proofreading";
+import { type PortableDocument } from "../bundles/fields";
+import { type ItemData } from "../translation/item";
 import { readFieldDiagnostic } from "./field-diagnostic";
 import { MODULE_ID } from "../constants";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { sha256 } from "../translation/hash";
 import { activeTranslations } from "../translation/active-translations";
 import { diagnosePortableText } from "../bundles/format";
-import { loadReview, portableReviewText, readReviewHistory, reviewCatalog, saveReviewRows, undoReview, validateReviewCorrection, type ReviewSnapshot } from "../review/service";
+import { loadReview, portableReviewText, readReviewHistory, reviewCatalog, saveReviewRows, saveMachineProofreading, undoReview, validateReviewCorrection, type ReviewSnapshot } from "../review/service";
 import { displayParts, findTextMatches } from "../review/search";
 import { maskReviewParts } from "../review/text-plan";
 import { referenceRepairDraft, type ReferenceRepairDraft } from "../review/reference-repair";
@@ -190,6 +193,40 @@ export function createLiveHandler(language: string, connected: () => boolean) {
       }
       const target = await game.packs.get(entry.pack)!.getDocument(entry.id);
       const history = readReviewHistory(target?.flags).sort((a, b) => b.at.localeCompare(a.at));
+      if (["prepare_machine_proofreading", "commit_machine_proofreading"].includes(request.method)) {
+        const source = await fromUuid(entry.sourceUuid) as PortableDocument | null;
+        if (entry.kind !== "Item" || !source || source.uuid !== entry.sourceUuid || source.documentName !== "Item" || !target?.toObject) throw new Error("Review.MachineProofreadingInvalid");
+        const data = target.toObject() as ItemData, targetProof = JSON.stringify(data), sourceProof = JSON.stringify(source.toObject()), schemaProof = machineProofreadingSchemaProof(source);
+        const requestHash = await sha256(JSON.stringify(["machine-proofreading-v1", documentId, args.revision, args.rowIds, args.coverageHash, args.reason]));
+        if (request.method === "commit_machine_proofreading") {
+          const previous = history.find(item => item.id === args.operationId);
+          if (previous) {
+            if (!previous.machineProofreading || previous.undoneAt || previous.agentRequestHash !== requestHash ||
+              JSON.stringify(readMachineProofreading(data)) !== JSON.stringify(previous.machineProofreading.after) ||
+              !await isMachineProofreadingCurrent(source, data, language, entry.uuid)) throw new Error("Live.OperationConflict");
+            check();
+            if (JSON.stringify(target.toObject()) !== targetProof || JSON.stringify(source.toObject()) !== sourceProof || machineProofreadingSchemaProof(source) !== schemaProof) throw new Error("Review.Conflict");
+            if (activeTranslations.list().some(run => run.finishedAt === undefined) || snapshot.warning || snapshot.partial) throw new Error("Review.MachineProofreadingInvalid");
+            return { ok: true, value: { alreadyApplied: true, operationId: previous.id, documentId, verified: false, machineProofread: true } };
+          }
+        }
+        if (activeTranslations.list().some(run => run.finishedAt === undefined)) throw new Error("Review.PauseFirst");
+        const plan = await prepareMachineProofreading(snapshot, source, data);
+        const machineRevision = await sha256(JSON.stringify(["machine-proofreading-v1", revision, plan.fullSourceHash, plan.outputHash, plan.coverageHash, plan.metadataHash]));
+        check();
+        if (JSON.stringify(target.toObject()) !== targetProof || JSON.stringify(source.toObject()) !== sourceProof || machineProofreadingSchemaProof(source) !== schemaProof) throw new Error("Review.Conflict");
+        if (request.method === "prepare_machine_proofreading") return { ok: true, value: { ...plan, revision: machineRevision,
+          instruction: "Read all complete source/target rows before committing. Structural/numerical checks do not prove semantic quality. This machine receipt never human-verifies and never clears historical fallback counts." } };
+        if (machineRevision !== args.revision) throw new Error("Review.Conflict");
+        assertMachineProofreadingCoverage(plan, args.rowIds!, args.coverageHash!);
+        const saved = await saveMachineProofreading(snapshot, args.rowIds!, args.coverageHash!, { id: args.operationId!, label: `MCP: ${args.reason!}`,
+          reason: args.reason!, agentRequestHash: requestHash, canWrite, beforeWrite: async () => {
+            check(); if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict"); check();
+          } });
+        Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
+        return { ok: true, value: { saved: true, operationId: args.operationId, documentId, machineProofread: true, verified: false,
+          coverageHash: plan.coverageHash, revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])) } };
+      }
       if (request.method === "list_history") return { ok: true, value: page(history.map(operation => ({ ...operation, totalRows: operation.rows.length,
         rows: operation.rows.slice(0, 20).map(change => ({ ...change, excerpt: true,
           before: [change.before.join("").slice(0, 1500)], after: [change.after.join("").slice(0, 1500)] })) })), args.offset, Math.min(args.limit, 10)) };
