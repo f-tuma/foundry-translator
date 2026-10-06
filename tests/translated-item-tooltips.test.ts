@@ -444,3 +444,201 @@ describe("included native Action trigger sentence", () => {
     expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
   });
 });
+
+// Synthetic equivalent of Crucible's Text-node @ref enricher. It deliberately
+// resolves every path against the supplied original runtime model, including code
+// text and nested command labels, as native TextEditor traversal does.
+function nativeReferences(value: string, options: any): string {
+  const root = html(value);
+  if (!options.secrets) for (const secret of root.querySelectorAll("section.secret:not(.revealed)")) secret.remove();
+  const visit = (node: Node): void => {
+    if (node.nodeType === 3) {
+      node.textContent = node.textContent!.replace(/@ref\[([\w.]+)\](?:\{([^}]+)\})?/gu, (command, path, fallback) => {
+        const resolved = path.split(".").reduce((object: any, key: string) => object?.[key], options.relativeTo);
+        return String(resolved || fallback || command);
+      });
+    } else for (const child of [...node.childNodes]) visit(child);
+  };
+  visit(root); return root.innerHTML;
+}
+async function referenceFixture(before: string, after: string) {
+  const f = await actionFixture();
+  f.source.system.actions[0].description = before;
+  f.source.actions[0].description = before;
+  f.target.system.actions[0].description = after;
+  f.native = f.native.replace("<p>Spend 1 hour.</p>", before);
+  f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+  return f;
+}
+describe("terminal display names in native @ref prose", () => {
+  it("distinguishes Action name from Item name while retaining prepared mechanics and repeated references", async () => {
+    const f = await referenceFixture(
+      "<p>@ref[name] uses @ref[item.name]. Range @ref[range.maximum]. @ref[name]{Fallback}.</p>",
+      "<p>@ref[name] používá @ref[item.name]. Dosah @ref[range.maximum]. @ref[name]{Náhrada}.</p>");
+    f.source.actions[0].range = { maximum: 5 };
+    f.target.system.actions[0].range = { maximum: 99 };
+    const original = JSON.stringify(f.source.toObject()), copy = JSON.stringify(f.target.toObject());
+    const prepared = JSON.stringify(f.source.actions[0].toObject(false));
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".actions .description")?.textContent).toBe("Sestrojit Společníka používá Meč. Dosah 5. Sestrojit Společníka.");
+    expect(enrich.mock.calls.find(([value]) => value.includes("Dosah"))?.[1]).toEqual({ relativeTo: f.source.actions[0], secrets: false });
+    expect(JSON.stringify(f.source.toObject())).toBe(original);
+    expect(JSON.stringify(f.target.toObject())).toBe(copy);
+    expect(JSON.stringify(f.source.actions[0].toObject(false))).toBe(prepared);
+    expect(result.querySelector(".actions button")?.getAttribute("data-action-id")).toBe("companion");
+    expect(f.target.renderCard).not.toHaveBeenCalled();
+  });
+  it("binds top-level Item name only and retains the native fallback for unproven item.name", async () => {
+    const f = await fixture(true);
+    f.source.system.description = "<p>@ref[name]. @ref[item.name]{Fallback}.</p>";
+    f.target.system.description = "<p>@ref[name]. @ref[item.name]{Náhrada}.</p>";
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".description")?.textContent).toBe("Meč. Náhrada.");
+    expect(enrich.mock.calls[0]?.[1]).toEqual({ relativeTo: f.source, secrets: false });
+  });
+  it("leaves attributes, excluded code, nested labels, Embed options and roll commands to native enrichment", async () => {
+    const nested = '<p title="@ref[name]">@ref[name] @UUID[Actor.stable]{@ref[name]} '
+      + '@Embed[Actor.stable readaloud="@ref[name] and @ref[item.name]"] '
+      + '[[1 + @ref[range.maximum]]] <code>@ref[name]</code></p>';
+    const f = await referenceFixture(nested, nested);
+    f.source.actions[0].range = { maximum: 5 };
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    const input = enrich.mock.calls.find(([value]) => value.includes("@Embed"))?.[0];
+    expect(input).toContain('title="@ref[name]"');
+    expect(input).toContain("@UUID[Actor.stable]{@ref[name]}");
+    expect(input).toContain('@Embed[Actor.stable readaloud="@ref[name] and @ref[item.name]"]');
+    expect(input).toContain("[[1 + @ref[range.maximum]]]");
+    expect(input).toContain("<code>@ref[name]</code>");
+    const body = result.querySelector(".actions .description")!;
+    expect(body.querySelector("p")?.getAttribute("title")).toBe("@ref[name]");
+    expect(body.querySelector("code")?.textContent).toBe("Construct Companion");
+    expect(body.textContent).toContain("Sestrojit Společníka @UUID[Actor.stable]{Construct Companion}");
+    expect(body.textContent).toContain('@Embed[Actor.stable readaloud="Construct Companion and Sword"]');
+  });
+  it("keeps ambiguous malformed nesting unchanged rather than granting an inner name binding", async () => {
+    const f = await referenceFixture('<p>@Embed[Actor.stable readaloud="@ref[name] @ref[item.name]</p>',
+      '<p>@Embed[Actor.stable readaloud="@ref[name] @ref[item.name]</p>');
+    await api.translatedItemCard(f.source, f.native, "cs");
+    expect(enrich).toHaveBeenCalledWith(f.target.system.actions[0].description, { relativeTo: f.source.actions[0], secrets: false });
+  });
+  it.each([
+    '@UUID[Item.other]{<em>@ref[name]</em>}',
+    '@Embed[Actor.stable caption="<em>@ref[name]</em> and @ref[item.name]"]',
+  ])("does not bind names inside an outer command split across text nodes: %s", async command => {
+    const text = `<p>${command} @ref[name].</p>`, f = await referenceFixture(text, text);
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    const input = enrich.mock.calls.find(([value]) => value.includes("<em>"))?.[0];
+    expect(input).toContain(command);
+    expect(result.querySelector(".actions .description em")?.textContent).toBe("Construct Companion");
+    expect(result.querySelector(".actions .description")?.textContent).toContain("Sestrojit Společníka.");
+  });
+  it("keeps a split outer label protected across a hidden-section boundary", async () => {
+    const text = '<div>@UUID[Item.other]{<section class="secret"><p>@ref[name]</p></section>}</div><p>@ref[item.name].</p>';
+    const f = await referenceFixture(text, text);
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(enrich.mock.calls.find(([value]) => value.includes("secret"))?.[0]).toContain('<section class="secret"><p>@ref[name]</p></section>');
+    expect(result.querySelector(".actions .secret")).toBeNull();
+    expect(result.querySelector(".actions .description")?.textContent).toBe("@UUID[Item.other]{}Meč.");
+  });
+  it("inserts copied command-like names as terminal Text, never through an enricher or executable HTML", async () => {
+    const f = await referenceFixture("<p>@ref[item.name].</p>", "<p>@ref[item.name].</p>");
+    f.source.name = "Sword @UUID[Actor.stable]"; f.target.name = "Meč @UUID[Actor.stable]";
+    f.native = f.native.replace('<h2>Sword</h2>', '<h2>Sword @UUID[Actor.stable]</h2>');
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    enrich.mockImplementation(async (value, options) => {
+      expect(value).not.toContain("Meč @UUID");
+      // A command passed into native enrichment would become an active link.
+      return nativeReferences(value, options).replace("@UUID[Actor.stable]", '<a data-uuid="Actor.stable">Actor</a>');
+    });
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".actions .description")?.textContent).toBe("Meč @UUID[Actor.stable].");
+    expect(result.querySelector(".actions .description a")).toBeNull();
+    expect(f.source.name).toBe("Sword @UUID[Actor.stable]");
+  });
+  it.each(["new-command", "new-markup", "changed-number", "blank"])("leaves an unproven Item name reference native for %s", async problem => {
+    const f = await referenceFixture("<p>@ref[item.name].</p>", "<p>@ref[item.name].</p>");
+    if (problem === "new-command") f.target.name = "Meč @UUID[Actor.foreign]";
+    if (problem === "new-markup") f.target.name = '<img src="foreign">Meč';
+    if (problem === "changed-number") f.target.name = "Meč 7";
+    if (problem === "blank") f.target.name = " ";
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".actions .description")?.textContent).toBe(problem === "blank" ? "@ref[item.name]." : "Sword.");
+    expect(result.querySelector(".actions .description img")).toBeNull();
+  });
+  it.each(["missing", "duplicate", "unknown", "attribute", "code"])("fails the affected Action presentation closed for an enriched %s marker", async problem => {
+    const f = await referenceFixture("<p>@ref[name].</p>", "<p>@ref[name].</p>");
+    enrich.mockImplementation(async value => {
+      const marker = value.match(/FTCARDNAME[0-9a-f]+TOKEN0END/u)?.[0];
+      if (!marker) return value;
+      if (problem === "missing") return value.replace(marker, "");
+      if (problem === "duplicate") return value + marker;
+      if (problem === "unknown") return value + marker.replace("0END", "99END");
+      if (problem === "attribute") return value.replace(marker, `<span title="${marker}"></span>`);
+      return value.replace(marker, `<code>${marker}</code>`);
+    });
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".actions")?.outerHTML).toBe(html(f.native).querySelector(".actions")?.outerHTML);
+    expect(result.innerHTML).not.toContain("FTCARDNAME");
+  });
+  it("uses source/copy secret intersection and never binds names inside hidden source blocks", async () => {
+    const f = await referenceFixture('<section class="secret"><p>@ref[name].</p></section><p>@ref[item.name].</p>',
+      '<section class="secret"><p>@ref[name].</p></section><p>@ref[item.name].</p>');
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    const input = enrich.mock.calls.find(([value]) => value.includes("secret"))?.[0];
+    expect(input).toContain('<section class="secret"><p>@ref[name].</p></section>');
+    expect(result.querySelector(".actions .secret")).toBeNull();
+    expect(result.querySelector(".actions .description")?.textContent).toBe("Meč.");
+    expect(enrich.mock.calls.find(([value]) => value.includes("secret"))?.[1]?.secrets).toBe(false);
+  });
+  it("fails closed if native enrichment returns a hidden source block alongside a name marker", async () => {
+    const f = await referenceFixture('<section class="secret"><p>@ref[name].</p></section><p>@ref[item.name].</p>',
+      '<section class="secret"><p>@ref[name].</p></section><p>@ref[item.name].</p>');
+    // The real native card has already suppressed the source secret.
+    f.native = f.native.replace('<section class="secret"><p>@ref[name].</p></section>', "");
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".actions")?.outerHTML).toBe(html(f.native).querySelector(".actions")?.outerHTML);
+    expect(result.querySelector(".actions .secret")).toBeNull();
+  });
+  it("also checks native secrecy when every relevant name reference is hidden", async () => {
+    const secret = '<section class="secret"><p>@ref[name].</p></section>';
+    const f = await referenceFixture(secret, secret);
+    f.native = f.native.replace(secret, "<p>Visible native prose.</p>");
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(enrich).toHaveBeenCalledWith(secret, { relativeTo: f.source.actions[0], secrets: false });
+    expect(result.querySelector(".actions")?.outerHTML).toBe(html(f.native).querySelector(".actions")?.outerHTML);
+    expect(result.querySelector(".actions .secret")).toBeNull();
+  });
+  it("works with insecure-origin crypto that exposes getRandomValues but no randomUUID", async () => {
+    const f = await referenceFixture("<p>@ref[name].</p>", "<p>@ref[name].</p>");
+    const random = crypto.getRandomValues.bind(crypto);
+    vi.stubGlobal("crypto", { getRandomValues: random, subtle: crypto.subtle });
+    enrich.mockImplementation(async (value, options) => nativeReferences(value, options));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".actions .description")?.textContent).toBe("Sestrojit Společníka.");
+  });
+  it.each(["source-name", "copy-name", "action-name", "prepared-range", "ownership", "user"])("discards name overlays after asynchronous %s drift", async change => {
+    const f = await referenceFixture("<p>@ref[name] @ref[item.name] @ref[range.maximum].</p>",
+      "<p>@ref[name] @ref[item.name] @ref[range.maximum].</p>");
+    f.source.actions[0].range = { maximum: 5 };
+    enrich.mockImplementation(async (value, options) => {
+      if (value.includes("FTCARDNAME")) {
+        if (change === "source-name") f.source.name = "Changed";
+        if (change === "copy-name") f.target.name = "Changed";
+        if (change === "action-name") f.source.actions[0].name = "Changed";
+        if (change === "prepared-range") f.source.actions[0].range.maximum = 9;
+        if (change === "ownership") f.source.isOwner = true;
+        if (change === "user") game.user = { id: "different", isGM: false };
+      }
+      return nativeReferences(value, options);
+    });
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+  });
+});

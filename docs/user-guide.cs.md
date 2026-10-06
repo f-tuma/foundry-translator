@@ -132,6 +132,11 @@ větu. Překládá se jako věta, nikoli jako název; účinky a spouštěcí sk
 zůstávají původní. Starší kopie je potřeba doplnit v editoru a samotná
 aktualizace jejich text automaticky nepřepisuje.
 
+Od verze **0.34.13** podporované náhledy přebírají i české názvy vložené
+dynamickými odkazy `@ref[name]` a `@ref[item.name]`. Název Akce a název
+jejího předmětu zůstávají rozlišené; dosahy, ceny a ostatní dynamické hodnoty
+se nadále vyhodnocují z původní Akce. Tato úprava mění pouze zobrazený text.
+
 Od verze **0.34.8** může GM v hlavním menu použít **Doplnit překlady tvorby
 postavy**. Okno nejprve ukáže počet chybějících a existujících kopií. Po
 potvrzení přeloží pouze chybějící možnosti původu, kultury a cesty z balíčku
