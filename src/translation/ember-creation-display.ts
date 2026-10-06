@@ -10,6 +10,8 @@ import { discoverDocumentDependencies, rewriteDocumentReferences } from "./docum
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "./item";
 import { journalSourceHash, readJournalTranslationFlag, type JournalData } from "./journal";
 import { translateAttunementSummary } from "./ember-creation-attunement";
+import { isMachineProofreadingCurrent } from "../review/machine-proofreading";
+import type { PortableDocument } from "../bundles/fields";
 
 interface DisplayDocument extends FoundryUuidDocument {
   name?: string; type?: string; visible?: boolean; isOwner?: boolean;
@@ -89,12 +91,19 @@ function presentationLookup(locale: string, guards: (() => boolean)[]) {
         || target.documentName !== source.documentName || target.type !== source.type) return null;
       const sourceProof = JSON.stringify(source.toObject?.() ?? source.system), sourceFlags = JSON.stringify(source.flags);
       const targetProof = JSON.stringify([target.name, target.type, target.system]);
+      let machineTargetProof: string | undefined;
       let proof: string;
       if (source.documentName === "Item") {
         const flag = readItemTranslationFlag(target.flags);
-        if (flag?.sourceUuid !== source.uuid || flag.targetLanguage !== locale || flag.fallbackTextSegments > 0
+        if (flag?.sourceUuid !== source.uuid || flag.targetLanguage !== locale
           || (target.flags?.["foundry-translate"]?.itemTranslation as { partial?: boolean } | undefined)?.partial || !source.toObject
           || flag.sourceHash !== await itemSourceHash(source.toObject() as ItemData)) return null;
+        if (flag.fallbackTextSegments > 0) {
+          if (!target.toObject) return null;
+          const targetData = target.toObject() as ItemData;
+          machineTargetProof = JSON.stringify(targetData);
+          if (!await isMachineProofreadingCurrent(source as PortableDocument, targetData, locale, target.uuid)) return null;
+        }
         proof = JSON.stringify(flag);
       } else if (source.documentName === "JournalEntryPage") {
         const flag = readJournalTranslationFlag(target.parent?.flags);
@@ -111,6 +120,7 @@ function presentationLookup(locale: string, guards: (() => boolean)[]) {
         && JSON.stringify(source.flags) === sourceFlags && !translationIdentity(source, source.documentName ?? "")
         && JSON.stringify(source.toObject?.() ?? source.system) === sourceProof
         && JSON.stringify([target.name, target.type, target.system]) === targetProof
+        && (machineTargetProof === undefined || JSON.stringify(target.toObject?.()) === machineTargetProof)
         && (source.documentName === "Item" ? JSON.stringify(readItemTranslationFlag(target.flags)) === proof
           : readable(source.parent as DisplayDocument) && readable(target.parent as DisplayDocument)
             && source.uuid === `${source.parent?.uuid}.JournalEntryPage.${source.id}`

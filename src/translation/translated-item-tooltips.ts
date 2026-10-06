@@ -342,7 +342,7 @@ async function translateIncludedActions(card: HTMLElement, source: CardItem, tar
         && condition?.textContent === original.condition && typeof original.condition === "string"
         && typeof translated.condition === "string" && translated.condition.trim()
         ? safeConditionText(original.condition, translated.condition) : undefined;
-      const effects = translatedEffectHeadings(row, original, action, source, target);
+      const effects = translatedEffectHeadings(row, original, action, translated.name, source, target);
       heading.textContent = translated.name;
       if (body && prose !== undefined) body.innerHTML = prose;
       if (condition && conditionText !== undefined) condition.textContent = conditionText;
@@ -355,19 +355,22 @@ async function translateIncludedActions(card: HTMLElement, source: CardItem, tar
 }
 
 /** The native card has already chosen which effects it exposes. Only an effect
- * bearing the exact original Item name receives its validated display name;
+ * bearing the exact original Item name receives its validated display name.
+ * Crucible's literal empty effect name defaults to its owning Action's name;
+ * only that proven default receives the already validated Action caption.
  * stored/prepared names and the complete native list must agree first. Nothing
  * from the copy's effect model participates in rendering or execution. */
 function translatedEffectHeadings(row: HTMLElement, original: CardAction, action: CardAction,
-  source: CardItem, target: CardItem): { heading: HTMLElement; text: string }[] {
+  actionName: string, source: CardItem, target: CardItem): { heading: HTMLElement; text: string }[] {
   const name = displayName(source.name, target.name);
   if (name === undefined || !Array.isArray(original.effects) || !original.effects.length || !Array.isArray(action.effects)) return [];
   const prepared = action.toObject?.(false).effects;
   if (!Array.isArray(prepared)) return [];
   const names = original.effects.map(effect => effect?.name);
-  if (names.some(value => typeof value !== "string") || new Set(names).size !== names.length
+  const displayedNames = names.map(value => value === "" ? original.name : value);
+  if (names.some(value => typeof value !== "string") || new Set(displayedNames).size !== names.length
     || action.effects.length !== names.length || prepared.length !== names.length
-    || names.some((value, index) => action.effects?.[index]?.name !== value || prepared[index]?.name !== value)) return [];
+    || names.some((value, index) => action.effects?.[index]?.name !== displayedNames[index] || prepared[index]?.name !== value)) return [];
   const lists = row.querySelectorAll<HTMLElement>(":scope > ol.effects");
   if (lists.length !== 1) return [];
   const list = lists[0]!, entries = [...list.children];
@@ -379,10 +382,11 @@ function translatedEffectHeadings(row: HTMLElement, original: CardAction, action
   for (const [index, entry] of entries.entries()) {
     const titles = entry.querySelectorAll<HTMLElement>(":scope > .title"),
       headings = entry.querySelectorAll<HTMLElement>(":scope > .title > h4");
-    const heading = headings[0], effectName = names[index]!;
+    const heading = headings[0], effectName = names[index]!, displayedName = displayedNames[index]!;
     if (titles.length !== 1 || headings.length !== 1 || !heading || heading.childElementCount !== 0
-      || heading.textContent !== template.replace("{effect}", () => effectName)) return [];
-    if (effectName === source.name) result.push({ heading, text: template.replace("{effect}", () => name) });
+      || heading.textContent !== template.replace("{effect}", () => displayedName)) return [];
+    if (effectName === "") result.push({ heading, text: template.replace("{effect}", () => actionName) });
+    else if (effectName === source.name) result.push({ heading, text: template.replace("{effect}", () => name) });
   }
   return result;
 }
