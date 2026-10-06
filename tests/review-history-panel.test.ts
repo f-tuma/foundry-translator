@@ -46,3 +46,17 @@ it("invalidates outstanding loading on navigation and does not modify the detach
   const root = panel.render(); panel.invalidate(); complete(history); await Promise.resolve();
   expect(root.querySelectorAll("article")).toHaveLength(0);
 });
+it("shows the complete machine proofreading coverage and a metadata-only undo explanation", async () => {
+  const { panel, read, history, Event } = await fixture();
+  const op = history[0]!.operations[0]!;
+  op.rows = []; op.label = "MCP: Full source/target review";
+  op.machineProofreading = { before: null, after: { rowIds: ["a", "b", "c"], reason: "Read every passage" } } as any;
+  read.mockResolvedValue(history); const root = panel.render(); await Promise.resolve();
+  expect(root.textContent).toContain("Passages: 3");
+  const details = root.querySelector("details")!; expect(details.textContent).toContain("MachineProofreading");
+  details.open = true; details.dispatchEvent(new Event("toggle"));
+  expect(details.textContent).toContain("Read every passage"); expect(details.textContent).toContain("MachineProofreadingDetails");
+  [...root.querySelectorAll("button")].find(button => button.textContent?.endsWith(".Undo"))!.click();
+  expect(root.textContent).toContain("MachineProofreadingUndoWarning");
+  expect(root.textContent).toContain("ConfirmUndo");
+});

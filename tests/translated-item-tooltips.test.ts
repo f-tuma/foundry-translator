@@ -736,3 +736,162 @@ describe("terminal display names in native @ref prose", () => {
     expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
   });
 });
+
+async function effectHeadingFixture(feature = false) {
+  const f = await actionFixture(feature);
+  const effects = [{ name: "Sword", statuses: ["slowed"], duration: { value: 3, units: "rounds" } },
+    { name: "Other Effect", statuses: ["poisoned"], duration: { value: 6, units: "rounds" } }];
+  f.source.system.actions[0].effects = structuredClone(effects);
+  f.source.actions[0].effects = structuredClone(effects);
+  // Copied effects may not supply mechanics or display names.
+  f.target.system.actions[0].effects = [{ name: "Foreign copied effect", statuses: ["foreign"] }];
+  (game as any).i18n = { lang: "cs", localize: vi.fn(() => "Efekt: {effect}") };
+  f.native = f.native.replace('<ul class="effects"><li>Original effect</li></ul>',
+    '<ol class="effects"><li class="effect line-item"><div class="title"><h4>Efekt: Sword</h4></div>'
+      + '<div class="tags effect-tags"><span>Slowed 3</span></div></li>'
+      + '<li class="effect line-item"><div class="title"><h4>Efekt: Other Effect</h4></div>'
+      + '<div class="tags effect-tags"><span>Poisoned 6</span></div></li></ol>');
+  f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+  return f;
+}
+describe("same-name native effect headings", () => {
+  it.each([false, true])("changes only the proven Item-name heading, retaining the original effect models (feature=%s)", async feature => {
+    const f = await effectHeadingFixture(feature);
+    const source = JSON.stringify(f.source.toObject()), prepared = JSON.stringify(f.source.actions[0].toObject(false)),
+      target = JSON.stringify(f.target.toObject());
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect([...result.querySelectorAll("ol.effects h4")].map(node => node.textContent)).toEqual(["Efekt: Meč", "Efekt: Other Effect"]);
+    expect(result.querySelector(".effects li:nth-child(2)")?.outerHTML).toBe(html(f.native).querySelector(".effects li:nth-child(2)")?.outerHTML);
+    expect([...result.querySelectorAll(".effect-tags")].map(node => node.outerHTML))
+      .toEqual([...html(f.native).querySelectorAll(".effect-tags")].map(node => node.outerHTML));
+    expect(result.querySelector(".actions button")?.outerHTML).toBe(html(f.native).querySelector(".actions button")?.outerHTML);
+    expect(JSON.stringify(f.source.toObject())).toBe(source);
+    expect(JSON.stringify(f.source.actions[0].toObject(false))).toBe(prepared);
+    expect(JSON.stringify(f.target.toObject())).toBe(target);
+  });
+  it.each(["missing-stored", "missing-prepared", "extra-prepared", "reordered-prepared", "renamed-prepared", "serialized-mismatch", "duplicate-stored", "missing-native", "extra-native", "duplicate-native", "duplicate-list", "foreign-heading", "nested-heading", "duplicate-heading", "unknown-entry", "unknown-list", "nested-markup", "unknown-template", "duplicate-placeholder"])
+    ("keeps the entire native effect list for an unproven %s", async problem => {
+      const f = await effectHeadingFixture();
+      if (problem === "missing-stored") delete f.source.system.actions[0].effects;
+      if (problem === "missing-prepared") delete f.source.actions[0].effects;
+      if (problem === "extra-prepared") f.source.actions[0].effects.push({ name: "Extra" });
+      if (problem === "reordered-prepared") f.source.actions[0].effects.reverse();
+      if (problem === "renamed-prepared") f.source.actions[0].effects[1].name = "Different";
+      if (problem === "serialized-mismatch") {
+        const action = f.source.actions[0], serialize = action.toObject.bind(action);
+        action.toObject = () => ({ ...serialize(false), effects: [{ name: "Unrelated serialized effect" }] });
+      }
+      if (problem === "duplicate-stored") {
+        f.source.system.actions[0].effects[1].name = "Sword";
+        f.source.actions[0].effects[1].name = "Sword";
+        f.native = f.native.replace("Efekt: Other Effect", "Efekt: Sword");
+      }
+      const root = html(f.native), list = root.querySelector("ol.effects")!;
+      if (problem === "missing-native") list.lastElementChild!.remove();
+      if (problem === "extra-native") list.append(list.firstElementChild!.cloneNode(true));
+      if (problem === "duplicate-native") list.lastElementChild!.innerHTML = list.firstElementChild!.innerHTML;
+      if (problem === "duplicate-list") list.after(list.cloneNode(true));
+      if (problem === "foreign-heading") list.querySelector("h4")!.textContent = "Efekt: Different";
+      if (problem === "nested-heading") list.querySelector(".title")!.innerHTML = "<span><h4>Efekt: Sword</h4></span>";
+      if (problem === "duplicate-heading") list.querySelector(".title")!.append(list.querySelector("h4")!.cloneNode(true));
+      if (problem === "unknown-entry") list.firstElementChild!.classList.remove("effect");
+      if (problem === "unknown-list") list.outerHTML = list.outerHTML.replaceAll("ol", "ul");
+      if (problem === "nested-markup") list.querySelector("h4")!.innerHTML = "Efekt: <span>Sword</span>";
+      if (problem === "unknown-template") (game as any).i18n.localize.mockReturnValue("ACTION.EffectSpecific");
+      if (problem === "duplicate-placeholder") (game as any).i18n.localize.mockReturnValue("{effect}: {effect}");
+      f.native = root.innerHTML;
+      f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+      const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+      expect(result.querySelector(".actions")!.querySelector(".effects")?.outerHTML)
+        .toBe(html(f.native).querySelector(".actions .effects")?.outerHTML);
+      expect(result.querySelector(".actions > .action > header h4")?.textContent).toBe("Sestrojit Společníka");
+    });
+  it.each(["source-denied", "target-denied", "partial", "fallback", "stale"])("keeps the whole native card for %s", async problem => {
+    const f = await effectHeadingFixture();
+    if (problem === "source-denied") f.source.testUserPermission.mockReturnValue(false);
+    if (problem === "target-denied") f.target.testUserPermission.mockReturnValue(false);
+    if (problem === "partial") f.target.flags["foundry-translate"].itemTranslation.partial = true;
+    if (problem === "fallback") f.target.flags["foundry-translate"].itemTranslation.fallbackTextSegments = 1;
+    if (problem === "stale") f.target.flags["foundry-translate"].itemTranslation.sourceHash = "old";
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+  });
+  it.each(["source-effect", "prepared-effect", "prepared-extra", "source-item", "target-item", "source-denied", "target-denied"])
+    ("discards the overlay when %s changes during asynchronous Action enrichment", async problem => {
+      const f = await effectHeadingFixture();
+      enrich.mockImplementation(async value => {
+        if (value.includes("hodinu")) {
+          if (problem === "source-effect") f.source.system.actions[0].effects[0].name = "Changed";
+          if (problem === "prepared-effect") f.source.actions[0].effects[0].name = "Changed";
+          if (problem === "prepared-extra") f.source.actions[0].effects.push({ name: "Changed" });
+          if (problem === "source-item") f.source.name = "Changed";
+          if (problem === "target-item") f.target.name = "Changed";
+          if (problem === "source-denied") f.source.testUserPermission.mockReturnValue(false);
+          if (problem === "target-denied") f.target.testUserPermission.mockReturnValue(false);
+        }
+        return value;
+      });
+      expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+    });
+  it.each(["foreign-action", "duplicate-action", "missing-action", "duplicate-row"])("does not grant effect-name localization to %s", async problem => {
+    const f = await effectHeadingFixture();
+    if (problem === "foreign-action") f.source.actions[0].item = f.target;
+    if (problem === "duplicate-action") {
+      f.source.system.actions.push(structuredClone(f.source.system.actions[0]));
+      f.target.system.actions.push(structuredClone(f.target.system.actions[0]));
+    }
+    if (problem === "missing-action") f.source.actions = [];
+    if (problem === "duplicate-row") {
+      const root = html(f.native), section = root.querySelector("section.actions")!;
+      section.append(section.querySelector(".action")!.cloneNode(true)); f.native = root.innerHTML;
+    }
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector("section.actions")?.outerHTML).toBe(html(f.native).querySelector("section.actions")?.outerHTML);
+  });
+  it("uses escaped terminal display text instead of inserting HTML or interpreting replacement patterns", async () => {
+    const f = await effectHeadingFixture(); f.target.name = 'Meč & „$&“';
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector("ol.effects h4")?.textContent).toBe('Efekt: Meč & „$&“');
+    expect(result.querySelector("ol.effects h4")?.innerHTML).toContain("&amp;");
+    expect(result.querySelector("ol.effects h4")?.childElementCount).toBe(0);
+  });
+  it.each(["markup", "command", "number"])("keeps native effects for an unsafe copied Item name: %s", async problem => {
+    const f = await effectHeadingFixture();
+    f.target.name = problem === "markup" ? '<img src="x" onerror="alert()">' : problem === "command" ? "@UUID[Actor.foreign]" : "Meč 9";
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector("ol.effects")?.outerHTML).toBe(html(f.native).querySelector("ol.effects")?.outerHTML);
+    expect(result.querySelector("ol.effects img")).toBeNull();
+  });
+});
+
+describe("fully proofread fallback recovery", () => {
+  it("accepts a current complete receipt while leaving fallback and human verification metadata untouched", async () => {
+    const f = await fixture(); f.target.flags["foundry-translate"].itemTranslation.fallbackTextSegments = 1;
+    const proof = await import("../src/review/machine-proofreading");
+    const validate = vi.spyOn(proof, "isMachineProofreadingCurrent").mockResolvedValue(true);
+    const before = JSON.stringify(f.target.flags);
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector("h4")?.textContent).toBe("Meč");
+    expect(validate).toHaveBeenCalledWith(f.source, f.target.toObject(), "cs", f.target.uuid);
+    expect(JSON.stringify(f.target.flags)).toBe(before);
+  });
+  it("keeps native when a receipt is absent, stale or incomplete", async () => {
+    const f = await fixture(); f.target.flags["foundry-translate"].itemTranslation.fallbackTextSegments = 2;
+    const proof = await import("../src/review/machine-proofreading");
+    vi.spyOn(proof, "isMachineProofreadingCurrent").mockResolvedValue(false);
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+    expect(enrich).not.toHaveBeenCalled();
+  });
+  it("rejects a target mutation during asynchronous receipt validation", async () => {
+    const f = await fixture(); f.target.flags["foundry-translate"].itemTranslation.fallbackTextSegments = 1;
+    const proof = await import("../src/review/machine-proofreading");
+    vi.spyOn(proof, "isMachineProofreadingCurrent").mockImplementation(async () => { f.target.name = "Changed"; return true; });
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+  });
+  it("does not ask for a receipt on a normal complete translation", async () => {
+    const f = await fixture(), proof = await import("../src/review/machine-proofreading");
+    const validate = vi.spyOn(proof, "isMachineProofreadingCurrent");
+    expect(html(await api.translatedItemCard(f.source, f.native, "cs")).querySelector("h4")?.textContent).toBe("Meč");
+    expect(validate).not.toHaveBeenCalled();
+  });
+});

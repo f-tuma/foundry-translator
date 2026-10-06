@@ -55,24 +55,28 @@ export class ReviewHistoryPanel {
     for (const { doc, operation } of entries.slice(this.#page * 20, (this.#page + 1) * 20)) {
       const item = el("article", "ft-workbench__hit"), header = el("header");
       header.append(el("strong", "", doc.entry.name), button(t("OpenPassage"), () => this.#host.run(() => this.#host.open(doc.entry.uuid, operation.rows[0]?.group, operation.rows[0]?.rowId))));
-      item.append(header, el("small", "", `${new Date(operation.at).toLocaleString()} · ${operation.userName} · ${t("Passages")}: ${operation.rows.length} · ${["Undo", "Correction", "ProjectImport"].includes(operation.label) ? t(operation.label) : operation.label}`));
+      item.append(header, el("small", "", `${new Date(operation.at).toLocaleString()} · ${operation.userName} · ${t("Passages")}: ${operation.machineProofreading?.after.rowIds.length ?? operation.rows.length} · ${["Undo", "Correction", "ProjectImport"].includes(operation.label) ? t(operation.label) : operation.label}`));
       const details = el("details"), body = el("div"); let rowPage = 0;
       const paintChanges = () => {
         body.replaceChildren(); if (!details.open) return;
+        if (operation.machineProofreading) {
+          body.append(el("p", "", t("MachineProofreadingDetails")), el("p", "", operation.machineProofreading.after.reason));
+          return;
+        }
         for (const row of operation.rows.slice(rowPage * 20, (rowPage + 1) * 20)) {
           const pair = el("div", "ft-workbench__pair"); pair.append(diffText(displayParts(row.before), displayParts(row.after), false), diffText(displayParts(row.before), displayParts(row.after), true)); body.append(pair);
         }
         if (operation.rows.length > 20) body.append(pager(operation.rows.length, rowPage, 20, page => { rowPage = page; paintChanges(); }));
       };
       details.open = this.#confirm === `${doc.entry.uuid}:${operation.id}`;
-      details.append(el("summary", "", t("ShowChanges")), body);
+      details.append(el("summary", "", t(operation.machineProofreading ? "MachineProofreading" : "ShowChanges")), body);
       details.addEventListener("toggle", paintChanges); if (details.open) paintChanges();
       item.append(details);
       if (operation.undoneAt) item.append(el("span", "ft-review__badge", t("Undone")));
       else {
         const id = `${doc.entry.uuid}:${operation.id}`;
         item.append(button(t("Undo"), () => { this.#confirm = id; this.#paint(); }));
-        if (this.#confirm === id) item.append(el("p", "ft-workbench__warning", t("UndoWarning")), button(t("ConfirmUndo"), () => this.#host.run(async () => {
+        if (this.#confirm === id) item.append(el("p", "ft-workbench__warning", t(operation.machineProofreading ? "MachineProofreadingUndoWarning" : "UndoWarning")), button(t("ConfirmUndo"), () => this.#host.run(async () => {
           await undoReview(doc.entry, operation.id); this.invalidate(); this.#host.status(t("UndoDone"));
         })), button(t("Cancel"), () => { this.#confirm = null; this.#paint(); }));
       }

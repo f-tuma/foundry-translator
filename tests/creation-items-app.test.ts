@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseHTML } from "linkedom";
-const mock = vi.hoisted(() => ({ collect: vi.fn(), equipment: vi.fn(), runtime: vi.fn(), plan: vi.fn(), check: vi.fn(), source: vi.fn(), run: vi.fn(), active: vi.fn(), progress: undefined as any }));
+const mock = vi.hoisted(() => ({ collect: vi.fn(), equipment: vi.fn(), runtime: vi.fn(), plan: vi.fn(), check: vi.fn(), source: vi.fn(), run: vi.fn(), active: vi.fn(), affixPlan: vi.fn(), affixGuard: vi.fn(), affixRun: vi.fn(), progress: undefined as any }));
 vi.mock("../src/translation/ember-creation-items", () => ({ MAX_CREATION_ITEMS: 256, collectEmberCreationItems: mock.collect, collectCrucibleCreationEquipment: mock.equipment,
   planMissingCreationItems: mock.plan, creationRuntimeGuard: mock.runtime, creationSourceGuard: async () => mock.source }));
+vi.mock("../src/translation/equipment-affixes", () => ({ planMissingEquipmentAffixes: mock.affixPlan, equipmentAffixSourceGuard: async () => mock.affixGuard }));
 vi.mock("../src/settings/settings", () => ({ getTranslatorSettings: () => ({ targetLanguage: "cs" }) }));
 vi.mock("../src/translation/active-translations-app", () => ({ openActiveTranslationsOverview: mock.active }));
 vi.mock("../src/translation/journal-service", () => ({ JournalTranslationService: class {
-  constructor(options: any) { mock.progress = options.onProgress; } translateMissingItems = mock.run;
+  constructor(options: any) { mock.progress = options.onProgress; } translateMissingItems = mock.run; translateMissingEquipmentAffixes = mock.affixRun;
 }, TranslationCancelledError: class extends Error {} }));
 let sources: any[];
 beforeEach(() => {
@@ -30,6 +31,8 @@ beforeEach(() => {
   mock.plan.mockReset().mockResolvedValue({ sources, missing: sources, existing: 12 });
   mock.equipment.mockReset().mockResolvedValue([]); mock.runtime.mockReset().mockReturnValue(mock.check);
   mock.check.mockReset(); mock.source.mockReset().mockResolvedValue(undefined); mock.run.mockReset().mockResolvedValue({ createdDocuments: 1, skippedDocuments: 12, fallbackTextSegments: 0 }); mock.active.mockClear();
+  mock.affixPlan.mockReset().mockResolvedValue({ sources: [], missing: [], extendable: [], existing: 0 });
+  mock.affixGuard.mockReset().mockResolvedValue(undefined); mock.affixRun.mockReset().mockResolvedValue({ createdDocuments: 1, skippedDocuments: 0, fallbackTextSegments: 0 });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function app() { const { CreationItemsApplication } = await import("../src/translation/creation-items-app"); const application = new CreationItemsApplication(); await application.render(true); return application; }
@@ -122,5 +125,65 @@ describe("explicit starting equipment choice", () => {
     chooseScope(application, "equipment"); expect(mock.equipment).not.toHaveBeenCalled();
     finish({ createdDocuments: 1, skippedDocuments: 0, fallbackTextSegments: 0 });
     await vi.waitFor(() => expect(ui.notifications.info).toHaveBeenCalledOnce());
+  });
+});
+
+async function equipmentApp() {
+  const owners = [{ uuid: "Compendium.crucible.equipment.Item.sword" }]; mock.equipment.mockResolvedValue(owners);
+  mock.plan.mockResolvedValue({ sources: owners, missing: [], existing: 1 });
+  const application = await app(); chooseScope(application, "equipment");
+  await vi.waitFor(() => expect(application.element.querySelector<HTMLSelectElement>("select")!.disabled).toBe(false));
+  return { application, owners };
+}
+describe("explicit enchantment Action translation", () => {
+  it("shows an independent readonly plan and can fill Actions when all Item copies already exist", async () => {
+    const effect = { uuid: "Compendium.crucible.equipment.Item.sword.ActiveEffect.affix" };
+    mock.affixPlan.mockResolvedValue({ sources: [effect], missing: [effect], extendable: [], existing: 2 });
+    const { application, owners } = await equipmentApp();
+    expect(application.element.querySelector<HTMLButtonElement>("[data-creation-items-start]")!.disabled).toBe(true);
+    expect(application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.disabled).toBe(false);
+    expect(mock.affixRun).not.toHaveBeenCalled(); expect(mock.run).not.toHaveBeenCalled();
+    application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.click();
+    await vi.waitFor(() => expect(mock.affixRun).toHaveBeenCalledWith(owners));
+    expect(mock.affixGuard).toHaveBeenCalled(); expect(mock.run).not.toHaveBeenCalled();
+  });
+  it("also offers append-only legacy candidates while retaining completed records", async () => {
+    const effect = { uuid: "Compendium.crucible.equipment.Item.sword.ActiveEffect.affix" };
+    mock.affixPlan.mockResolvedValue({ sources: [effect], missing: [], extendable: [effect], existing: 2 });
+    const { application, owners } = await equipmentApp();
+    application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.click();
+    await vi.waitFor(() => expect(mock.affixRun).toHaveBeenCalledWith(owners));
+  });
+  it("disables the Action button for no eligible work and never shows it for character options", async () => {
+    const initial = await app(); expect(initial.element.querySelector("[data-creation-affixes-start]")).toBeNull(); await initial.close();
+    const { application } = await equipmentApp();
+    expect(application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.disabled).toBe(true);
+    expect(mock.affixRun).not.toHaveBeenCalled();
+  });
+  it("does not call the service when an embedded source changes after the plan", async () => {
+    const effect = { uuid: "Compendium.crucible.equipment.Item.sword.ActiveEffect.affix" };
+    mock.affixPlan.mockResolvedValue({ sources: [effect], missing: [effect], extendable: [], existing: 0 });
+    const { application } = await equipmentApp(); mock.affixGuard.mockRejectedValue(new Error("Affix changed"));
+    application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.click();
+    await vi.waitFor(() => expect(application.element.textContent).toContain("Affix changed")); expect(mock.affixRun).not.toHaveBeenCalled();
+  });
+  it("rejects expanded affix selections instead of silently expanding a reviewed plan", async () => {
+    const effect = { uuid: "Compendium.crucible.equipment.Item.sword.ActiveEffect.affix" };
+    mock.affixPlan.mockResolvedValue({ sources: [effect], missing: [effect], extendable: [], existing: 0 });
+    const { application } = await equipmentApp(); mock.affixPlan.mockResolvedValue({ sources: [effect, { uuid: "other" }], missing: [effect], extendable: [], existing: 0 });
+    application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.click();
+    await vi.waitFor(() => expect(application.element.textContent).toContain("SourceChanged")); expect(mock.affixRun).not.toHaveBeenCalled();
+  });
+  it("locks both start buttons while the Action run is pending and does not reopen a closed window", async () => {
+    const effect = { uuid: "Compendium.crucible.equipment.Item.sword.ActiveEffect.affix" };
+    mock.affixPlan.mockResolvedValue({ sources: [effect], missing: [effect], extendable: [], existing: 0 });
+    let finish!: (value: any) => void; mock.affixRun.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const { application } = await equipmentApp(); application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.click();
+    await vi.waitFor(() => expect(mock.affixRun).toHaveBeenCalledOnce());
+    expect(application.element.querySelector<HTMLButtonElement>("[data-creation-items-start]")!.disabled).toBe(true);
+    expect(application.element.querySelector<HTMLButtonElement>("[data-creation-affixes-start]")!.disabled).toBe(true);
+    const root = application.element, text = root.textContent; await application.close(); mock.progress({ documentName: "Late" });
+    finish({ createdDocuments: 1, skippedDocuments: 0, fallbackTextSegments: 0 });
+    await vi.waitFor(() => expect(ui.notifications.info).toHaveBeenCalledOnce()); expect(root.textContent).toBe(text); expect(application.element).toBeNull();
   });
 });

@@ -6,6 +6,8 @@ import type { JournalData } from "./journal";
 import type { TranslateItemOptions } from "./item";
 import { translateDocumentNames } from "./document-names";
 import { translateHtmlFields } from "./html-field-translation";
+import { affixActionDisplayFields, affixActionSourceHash, isAffixActionDisplayPath,
+  readAffixActionDisplayField, type AffixSchemaRuntime } from "./affix-action-display";
 
 export const DISPLAY_TEXT_REVISION = 1;
 export const DISPLAY_TEXT_PACK = "world.foundry-translate-display-text";
@@ -32,6 +34,10 @@ export interface DisplayTextFlag {
   providerId: ProviderId;
   translatedAt: string;
   fallbackTextSegments: number;
+  /** Full source Affix proof. Nested Action text cannot rely on name/description alone. */
+  affixSourceHash?: string;
+  /** Optional generated/extended display record proof; legacy records remain readable. */
+  outputHash?: string;
   fields: (DisplayField & { pageId: string })[];
 }
 
@@ -39,14 +45,17 @@ export function isDisplayDocument(document: FoundryUuidDocument): document is Di
   return ["Scene", "ActiveEffect"].includes(document.documentName ?? "") && typeof document.toObject === "function";
 }
 
-export function displayFields(kind: DisplayDocumentKind, source: Record<string, unknown>): DisplayField[] {
+export function displayFields(kind: DisplayDocumentKind, source: Record<string, unknown>, runtime?: AffixSchemaRuntime): DisplayField[] {
   const fields: DisplayField[] = [];
   const add = (path: string[], format: DisplayField["format"] = "text") => {
     const value = readDisplayField(source, path);
     if (typeof value === "string" && value.trim()) fields.push({ path, format, source: value });
   };
   add(["name"]);
-  if (kind === "ActiveEffect") add(["description"], "html");
+  if (kind === "ActiveEffect") {
+    add(["description"], "html");
+    fields.push(...affixActionDisplayFields(source, runtime));
+  }
   else {
     add(["navName"]);
     for (const [collection, property] of [["drawings", "text"], ["notes", "text"], ["levels", "name"], ["regions", "name"]]) {
@@ -60,6 +69,8 @@ export function displayFields(kind: DisplayDocumentKind, source: Record<string, 
 }
 
 export function readDisplayField(source: unknown, path: readonly string[]): unknown {
+  if (isAffixActionDisplayPath(path)) return source && typeof source === "object" && !Array.isArray(source)
+    ? readAffixActionDisplayField(source as Record<string, unknown>, path) ?? undefined : undefined;
   let value = source;
   for (const part of path) {
     if (Array.isArray(value)) value = value.find(member => member?._id === part);
@@ -71,10 +82,13 @@ export function readDisplayField(source: unknown, path: readonly string[]): unkn
 
 export async function displaySourceHash(kind: DisplayDocumentKind, source: Record<string, unknown>): Promise<string> {
   // Runtime state, positions, durations and rules are deliberately not translated or copied.
-  return sha256(JSON.stringify({ kind, fields: displayFields(kind, source).sort((a, b) => JSON.stringify(a.path).localeCompare(JSON.stringify(b.path))) }));
+  const fields = displayFields(kind, source).sort((a, b) => JSON.stringify(a.path).localeCompare(JSON.stringify(b.path)));
+  return sha256(JSON.stringify({ kind, fields, ...(kind === "ActiveEffect" && fields.some(field => isAffixActionDisplayPath(field.path))
+    ? { affixSourceHash: await affixActionSourceHash(source) } : {}) }));
 }
 
 export function isDisplayFieldPath(kind: DisplayDocumentKind, path: readonly string[], format: string): boolean {
+  if (kind === "ActiveEffect" && isAffixActionDisplayPath(path, format)) return true;
   if (path.length === 1) return (path[0] === "name" && format === "text") ||
     (kind === "Scene" && path[0] === "navName" && format === "text") ||
     (kind === "ActiveEffect" && path[0] === "description" && format === "html");
@@ -93,6 +107,10 @@ export function readDisplayTextFlag(flags: FoundryJournalDocument["flags"]): Dis
     typeof flag.glossaryFingerprint !== "string" || typeof flag.providerFingerprint !== "string" ||
     !Number.isSafeInteger(flag.fallbackTextSegments) || flag.fallbackTextSegments < 0 ||
     !Array.isArray(flag.fields) || flag.fields.length > 10000) return null;
+  const actionFields = flag.fields.some(field => field && Array.isArray(field.path) && isAffixActionDisplayPath(field.path));
+  if (flag.outputHash !== undefined && (typeof flag.outputHash !== "string" || !/^[a-f0-9]{64}$/u.test(flag.outputHash))) return null;
+  if ((flag.affixSourceHash !== undefined && (flag.documentType !== "ActiveEffect" || typeof flag.affixSourceHash !== "string" || !/^[a-f0-9]{64}$/u.test(flag.affixSourceHash)))
+    || (actionFields && !flag.affixSourceHash)) return null;
   const ids = new Set<string>();
   const paths = new Set<string>();
   for (const field of flag.fields) {
@@ -140,9 +158,21 @@ export async function translateDisplayText(options: Omit<TranslateItemOptions, "
   kind: DisplayDocumentKind;
   glossaryHash: string;
   providerHash: string;
+  /** Append-only record extension: translate an exact nonempty source-derived subset. */
+  onlyPaths?: readonly (readonly string[])[];
   onField?: (completed: number, total: number, field: string) => void;
 }): Promise<JournalData> {
-  const fields = displayFields(options.kind, options.source);
+  const available = displayFields(options.kind, options.source);
+  let fields = available;
+  if (options.onlyPaths !== undefined) {
+    const requested = options.onlyPaths.map(path => JSON.stringify(path));
+    const allowed = new Set(available.map(field => JSON.stringify(field.path)));
+    if (!requested.length || new Set(requested).size !== requested.length || requested.some(path => !allowed.has(path))) {
+      throw new Error("Invalid display text field selection.");
+    }
+    const selected = new Set(requested);
+    fields = available.filter(field => selected.has(JSON.stringify(field.path)));
+  }
   const pages: JournalData["pages"] = [];
   const metadata: DisplayTextFlag["fields"] = [];
   let fallbacks = 0;
@@ -185,6 +215,14 @@ export async function buildDisplayTextRecord(
     ...provenance, schemaVersion: 1, engineRevision: DISPLAY_TEXT_REVISION, documentType: kind,
     sourceHash: await displaySourceHash(kind, source), fields,
   };
+  // Derived from the original data, never accepted from external provenance.
+  delete flag.affixSourceHash;
+  if (kind === "ActiveEffect" && fields.some(field => isAffixActionDisplayPath(field.path))) {
+    const allowed = new Set(affixActionDisplayFields(source).map(field => JSON.stringify([field.path, field.format, field.source])));
+    if (fields.some(field => isAffixActionDisplayPath(field.path)
+      && !allowed.has(JSON.stringify([field.path, field.format, field.source])))) throw new Error("Invalid native Affix Action field.");
+    flag.affixSourceHash = await affixActionSourceHash(source);
+  }
   const data: JournalData = { name: String(source.name), pages,
     flags: { [MODULE_ID]: { displayTranslation: flag } } };
   const name = fields.find(f => f.path.length === 1 && f.path[0] === "name");

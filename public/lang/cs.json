@@ -811,5 +811,14 @@
   "FOUNDRY_TRANSLATE.CreationItems.EquipmentScope": "Doplní chybějící překlady předmětů dostupných při tvorbě postavy. Hotové i rozpracované překlady zachová. Maximálně {limit} předmětů.",
   "FOUNDRY_TRANSLATE.CreationItems.EquipmentUnavailable": "Původní balíček crucible.equipment není aktivním zdrojem vybavení nebo není dostupný platný rozpočet tvorby postavy.",
   "FOUNDRY_TRANSLATE.CreationItems.InvalidEquipmentSource": "Podporováno je pouze čitelné původní počáteční vybavení z crucible.equipment s platnou cenou v rozpočtu, bez kouzelných svitků.",
-  "FOUNDRY_TRANSLATE.CreationItems.InvalidScope": "Neznámý rozsah překladu tvorby postavy."
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidScope": "Neznámý rozsah překladu tvorby postavy.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixStart": "Přeložit Akce očarování",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixScope": "Doplní chybějící překlady Akcí očarování počátečního vybavení. Existující záznamy zachová; pravidla předmětů nemění.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixPlan": "Nové překlady Akcí: {missing}. Doplnění do starších záznamů: {extendable}. Zachované existující záznamy: {existing}.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixRunning": "Překládám Akce očarování…",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidAffixSource": "Akci očarování nelze bezpečně přiřadit k původnímu počátečnímu vybavení. Obnovte plán.",
+  "FOUNDRY_TRANSLATE.CreationItems.AffixTooMany": "Plán překračuje limit {limit} očarování. Nic nebylo přeloženo.",
+  "FOUNDRY_TRANSLATE.Review.MachineProofreading": "Strojová kontrola celého předmětu",
+  "FOUNDRY_TRANSLATE.Review.MachineProofreadingDetails": "Agent zaznamenal kontrolu všech pasáží. Text ani lidské ověření se tím nezměnily.",
+  "FOUNDRY_TRANSLATE.Review.MachineProofreadingUndoWarning": "Odstraní se pouze tento strojový záznam kontroly; opravy textu a lidské ověření zůstanou zachované."
 }

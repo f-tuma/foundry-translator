@@ -237,3 +237,24 @@ stažení s kontrolním součtem a odmítnutí změněného spustitelného soubo
 Starší explicitní CLI exportní režim zůstává interně kompatibilní; ve Foundry MCP
 menu není nabídnut. Běžné sdílení překladů a glosáře přes export/import zůstává
 součástí editoru pro komunitní práci, nezávisle na MCP.
+
+
+### Úplná strojová korektura předmětu
+
+Historické `fallbackTextSegments` se při dílčí opravě nesnižuje. Od verze
+0.34.16 lze po skutečném přečtení všech pasáží použít
+`live_prepare_machine_proofreading(documentId)` a následně
+`live_commit_machine_proofreading(documentId, revision, rowIds, coverageHash, reason, operationId)`.
+Příprava vrátí úplný seznam řádků a otisk pokrytí. Agent nejprve načte jejich
+čerstvý kontext, porovná originál a překlad a případné opravy uloží běžnými
+nástroji. Po opravách musí přípravu zopakovat; pro potvrzení předá všechny
+vrácené řádky, přesnou revizi a konkrétní důvod.
+
+Potvrzení ukládá pouze strojový záznam kontroly s historií a možností vrácení.
+Nepřepisuje text, historické počty fallbacků ani lidské ověření. Při platném
+záznamu smí náhled použít opravený překlad předmětu. Otisk zahrnuje celý
+uložený zdroj včetně efektů, výstup, metadata překladu a pole odvozená z
+aktuálního schématu. Jejich změna záznam zneplatní. Samotná strukturální
+validace nedokazuje správnost významu; potvrzení je výslovné tvrzení agenta,
+že zkontroloval všechny pasáže. Aktivní běh překladu, i pozastavený, potvrzení
+blokuje. Tato obnova je dostupná pouze pro Itemy.

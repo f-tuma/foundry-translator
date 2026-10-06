@@ -176,6 +176,25 @@ it("exposes live tools through the actual STDIO SDK and forwards browser results
       await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: request.id, result: value }) });
       expect(JSON.parse(((await pending).content as { text: string }[])[0]!.text)).toEqual(value);
     }
+    const machineArgs = { documentId: 'translated', rowIds: ['a'.repeat(64), 'b'.repeat(64)], revision: 'c'.repeat(64), coverageHash: 'd'.repeat(64), reason: 'Read every full Item source and target', operationId: 'machine-1' };
+    for (const name of ['live_prepare_machine_proofreading', 'live_commit_machine_proofreading']) {
+      const tool = tools.tools.find(t => t.name === name)!;
+      expect(tool).toBeDefined(); expect(tool.inputSchema.additionalProperties).toBe(false);
+      expect(tool.annotations?.readOnlyHint).toBe(name === 'live_prepare_machine_proofreading');
+    }
+    for (const forbidden of [{ text: ['pretend reviewed'] }, { rowIds: [] }, { rowIds: [machineArgs.rowIds[0], machineArgs.rowIds[0]] }, { coverageHash: 'invalid' }])
+      expect((await client.callTool({ name: 'live_commit_machine_proofreading', arguments: { ...machineArgs, ...forbidden } })).isError).toBe(true);
+    for (const [name, method, args] of [
+      ['live_prepare_machine_proofreading', 'prepare_machine_proofreading', { documentId: machineArgs.documentId }],
+      ['live_commit_machine_proofreading', 'commit_machine_proofreading', machineArgs],
+    ] as const) {
+      const pending = client.callTool({ name, arguments: args });
+      const request = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;
+      expect(request).toMatchObject({ method, args });
+      const reply = { ok: true, value: { machineProofread: name.includes('commit'), verified: false } };
+      await fetch(`${connection.address}/reply`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: request.id, result: reply }) });
+      expect(JSON.parse(((await pending).content as { text: string }[])[0]!.text)).toEqual(reply);
+    }
     const repairArgs = { documentId: 'translated', rowId: 'a'.repeat(64), revision: 'b'.repeat(64), reason: 'Restore exact source IDs', operationId: 'repair-1' };
     const repairPending = client.callTool({ name: 'live_restore_reference_identifiers', arguments: repairArgs });
     const repairRequest = await (await fetch(`${connection.address}/poll`, { headers: { Origin: origin, Authorization: `Bearer ${sessionToken}` } })).json() as any;

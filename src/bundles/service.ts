@@ -19,6 +19,8 @@ import { glossaryFingerprint } from "../translation/unit-translator";
 import { portableFields, type PortableDocument, type BundleDocumentKind } from "./fields";
 import { BUNDLE_FORMAT, assertPortableText, parseTranslationBundle, type BundleDocument, type TranslationBundle } from "./format";
 import { referenceContext, sourceReferenceNotation } from "./reference-notation";
+import { affixActionSourceHash, canonicalAffixActionDisplayPath, isAffixActionDisplayPath,
+  type AffixSchemaRuntime } from "../translation/affix-action-display";
 
 const SPECS = [
   { kind: "JournalEntry", pack: TRANSLATIONS_PACK_ID, flagPath: TRANSLATION_FLAG_PATH, flagKey: "translation", read: readJournalTranslationFlag },
@@ -144,11 +146,13 @@ export async function exportTranslationBundle(language: string, onProgress?: (me
       if (flag.sourceHash !== await sourceHash(item.kind, data)) throw new Error("source has changed since translation");
       const translated = displayKind(item.kind) ? item.document.toObject() : remapBundleReferences(item.document.toObject(), reverse);
       const displayFlag = displayKind(item.kind) ? readDisplayTextFlag(item.document.flags)! : null;
+      if (displayFlag?.fields.some(field => isAffixActionDisplayPath(field.path))
+        && displayFlag.affixSourceHash !== await affixActionSourceHash(data)) throw new Error("Native Affix source proof is invalid.");
       const patches = portableFields(source, data).flatMap((field) => {
         const original = readPath(data, field.path);
         let translation: unknown;
         if (displayFlag) {
-          const stable = [...field.path].map(String);
+          const stable = canonicalAffixActionDisplayPath(data, field.path, source as AffixSchemaRuntime) ?? [...field.path].map(String);
           if (typeof field.path[1] === "number") stable[1] = (data[field.path[0]!] as { _id: string }[])[field.path[1]]!._id;
           const metadata = displayFlag.fields.find(f => JSON.stringify(f.path) === JSON.stringify(stable));
           translation = metadata && readDisplayTranslation(translated as JournalData, metadata);
@@ -253,7 +257,7 @@ export async function importTranslationBundle(plan: BundleImportPlan, onProgress
       if (displayKind(entry.kind) && isDisplayDocument(source)) {
         if (entry.engineRevision !== DISPLAY_TEXT_REVISION) throw new Error("Unsupported scene/effect translation revision.");
         const sourceData = source.toObject();
-        const fields = displayFields(entry.kind, sourceData);
+        const fields = displayFields(entry.kind, sourceData, source as AffixSchemaRuntime);
         const portable = portableFields(source, sourceData);
         const metadata = await Promise.all(fields.map(async field => ({ ...field, pageId: (await sha256(JSON.stringify(field.path))).slice(0, 16) })));
         const pages = metadata.map((field, index) => {

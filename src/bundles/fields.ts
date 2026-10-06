@@ -1,6 +1,7 @@
 import { displayFields, isDisplayDocument } from "../translation/display-text";
 import type { JournalData } from "../translation/journal";
 import { discoverSystemHtmlFieldPaths, discoverEmberTextFieldPaths, discoverCrucibleActionNameFieldPaths, discoverCrucibleActionConditionFieldPaths, readPath, type HtmlFieldPath } from "../translation/system-html-fields";
+import { affixActionIndexPath, isAffixActionDisplayPath, type AffixSchemaRuntime } from "../translation/affix-action-display";
 
 export type BundleDocumentKind = "JournalEntry" | "Actor" | "Item" | "Scene" | "ActiveEffect";
 export type FieldFormat = "text" | "html" | "markdown";
@@ -15,10 +16,14 @@ export interface PortableDocument extends FoundryJournalDocument {
 
 /** The import allowlist is derived from local schemas, never from a bundle. */
 export function portableFields(document: PortableDocument, data = document.toObject()): PortableField[] {
-  if (isDisplayDocument(document)) return displayFields(document.documentName, data).map(field => {
+  if (isDisplayDocument(document)) return displayFields(document.documentName, data, document as AffixSchemaRuntime).flatMap(field => {
+    if (isAffixActionDisplayPath(field.path)) {
+      const path = affixActionIndexPath(data, field.path, document as AffixSchemaRuntime);
+      return path ? [{ path, format: field.format }] : [];
+    }
     const path: (string | number)[] = [...field.path];
     if (path.length === 3) path[1] = (data[path[0]!] as { _id: string }[]).findIndex(row => row._id === field.path[1]);
-    return { path, format: field.format };
+    return [{ path, format: field.format }];
   });
   const fields: PortableField[] = [];
   const addSystem = (runtime: { system?: FoundryRuntimeSystem } | undefined, value: unknown, prefix: HtmlFieldPath): void => {
