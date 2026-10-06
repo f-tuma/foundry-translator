@@ -5,8 +5,8 @@ export function labelFor(path: string): string {
     "system.details.taxonomy.description": "Taxonomy", "system.details.biography.appearance": "Appearance",
     "system.details.biography.public": "PublicBiography", "system.details.biography.private": "PrivateBiography" } as Record<string, string>)[path];
   if (key) return t(key);
-  const action = /^system\.actions\.(\d+)\.(name|description)$/u.exec(path);
-  if (action) return t(action[2] === "name" ? "ActionName" : "ActionDescription")
+  const action = /^system\.actions\.(\d+)\.(name|description|condition)$/u.exec(path);
+  if (action) return t(action[2] === "name" ? "ActionName" : action[2] === "condition" ? "ActionCondition" : "ActionDescription")
     .replace("{number}", String(Number(action[1]) + 1));
   const outcome = /^system\.outcomes\.(\d+)\.label$/u.exec(path);
   if (outcome) return t("Outcome").replace("{number}", String(Number(outcome[1]) + 1));

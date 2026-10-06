@@ -8,14 +8,17 @@ import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { translateHtmlFields } from "./html-field-translation";
 import { translatedOutputHash } from "./output-hash";
-import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
+import { assertSystemActionFieldIdentity, readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
+import { assertPortableText } from "../bundles/format";
+import { proseNumbers } from "../polish/quality-guards";
 import {
   glossaryFingerprint,
+  translateUnits,
   type TranslationQualityFallback,
 } from "./unit-translator";
 
 export const ITEM_TRANSLATION_SCHEMA_VERSION = 1;
-export const ITEM_TRANSLATION_ENGINE_REVISION = 8;
+export const ITEM_TRANSLATION_ENGINE_REVISION = 9;
 
 export interface ItemData extends Record<string, unknown> {
   _id?: string;
@@ -63,6 +66,8 @@ export interface TranslateItemOptions {
   systemHtmlFieldPaths: readonly HtmlFieldPath[];
   /** Plain names selected by the local Crucible action schema allowlist. */
   actionNameFieldPaths?: readonly HtmlFieldPath[];
+  /** Displayed trigger sentences selected by the local Crucible schema. */
+  actionConditionFieldPaths?: readonly HtmlFieldPath[];
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
@@ -137,6 +142,56 @@ export async function stampItemOutputHash(data: ItemData): Promise<string> {
   return outputHash;
 }
 
+export interface ActionConditionTranslationTarget {
+  owner: unknown;
+  path: HtmlFieldPath;
+  itemName?: string;
+}
+
+/** Translate one complete trigger sentence per unit. Conditions never pass
+ * through canonical-title substitution or any title-casing operation. */
+export async function translateActionConditions(
+  targets: readonly ActionConditionTranslationTarget[],
+  options: Pick<TranslateItemOptions, "glossary" | "provider" | "settings" | "cache" | "nonceFactory" | "beforeBatch" | "onQualityFallback">,
+  documentTitle: string,
+): Promise<number> {
+  const pending = targets.flatMap(target => {
+    const { path } = target;
+    if (path.length !== 3 || path[0] !== "actions" || typeof path[1] !== "number"
+      || !Number.isInteger(path[1]) || path[1] < 0 || path[2] !== "condition") return [];
+    const source = readPath(target.owner, path);
+    if (typeof source !== "string" || !source.trim()) return [];
+    assertSystemActionFieldIdentity({ system: target.owner }, { system: target.owner }, ["system", ...path]);
+    return [{ target, source }];
+  });
+  let fallbacks = 0;
+  for (let start = 0; start < pending.length; start += 4) {
+    await options.beforeBatch?.();
+    const batch = pending.slice(start, start + 4);
+    const output = await translateUnits({ ...options, units: batch.map(field => [field.source]),
+      contexts: batch.map(({ target }) => ({ documentTitle, field: target.path.join("."),
+        ...(target.itemName ? { sectionTitle: target.itemName } : {}) })),
+      onQualityFallback: issue => { fallbacks += issue.occurrences; options.onQualityFallback?.(issue); },
+    });
+    batch.forEach(({ target, source }, index) => {
+      let text = output[index]?.[0] ?? source;
+      try {
+        assertPortableText(source, text, "text");
+        if (JSON.stringify(proseNumbers([source])) !== JSON.stringify(proseNumbers([text]))) {
+          throw new Error("Action condition numbers changed");
+        }
+      } catch (error) {
+        text = source;
+        fallbacks += 1;
+        options.onQualityFallback?.({ reason: "integrity", sourcePreview: source.slice(0, 200),
+          detail: error instanceof Error ? error.message : String(error), attempts: 1, occurrences: 1 });
+      }
+      if (!writePath(target.owner, target.path, text)) throw new Error(`Cannot write Action condition: ${target.path.join(".")}`);
+    });
+  }
+  return fallbacks;
+}
+
 export async function translateItemData(options: TranslateItemOptions): Promise<TranslatedItem> {
   const copy = structuredClone(options.source);
   delete copy._id;
@@ -156,6 +211,10 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
       throw new Error(`Nepodařilo se zapsat název akce Itemu: ${path.join(".")}`);
     }
   });
+
+  const conditionFallbacks = await translateActionConditions(
+    (options.actionConditionFieldPaths ?? []).map(path => ({ owner: copy.system, path })), options, options.source.name,
+  );
 
   const fields = await translateHtmlFields({
     ...(options.beforeBatch ? { beforeBatch: options.beforeBatch } : {}),
@@ -178,7 +237,7 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
     }),
   });
   const translatedHtmlFields = fields.translatedHtmlFields;
-  const fallbackTextSegments = fields.fallbackTextSegments + names.fallbacks;
+  const fallbackTextSegments = fields.fallbackTextSegments + names.fallbacks + conditionFallbacks;
 
   const sourceHash = await itemSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);

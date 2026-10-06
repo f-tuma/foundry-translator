@@ -120,7 +120,7 @@ describe("native Item card prose", () => {
 
 class StringField {}
 class HTMLField {}
-class CrucibleActionField { fields = { id: new StringField(), name: new StringField(), description: new HTMLField() }; }
+class CrucibleActionField { fields = { id: new StringField(), name: new StringField(), description: new HTMLField(), condition: new StringField() }; }
 class ArrayField { element = new CrucibleActionField(); }
 async function actionFixture(feature = true) {
   const f = await fixture(feature);
@@ -388,5 +388,59 @@ describe("scoped native hover producer", () => {
     expect(anchor.dataset.tooltipHtml).toBeUndefined();
     document.body.append(anchor); enter(anchor); await settle();
     expect(f.source.renderCard).toHaveBeenCalledTimes(2); expect(anchor.dataset.tooltipHtml).toContain("Zranění 3.");
+  });
+});
+
+async function conditionFixture(feature = true) {
+  const f = await actionFixture(feature);
+  f.source.system.actions[0].condition = "You become Weakened within 6 rounds.";
+  f.source.actions[0].condition = f.source.system.actions[0].condition;
+  f.target.system.actions[0].condition = "Stanete se Oslabenými do 6 kol.";
+  f.native = f.native.replace('<p class="activation">hasTalent</p>', '<p class="condition activation"><strong>Stav:</strong> <em>You become Weakened within 6 rounds.</em></p>');
+  f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+  return f;
+}
+describe("included native Action trigger sentence", () => {
+  it.each([false, true])("overlays only the escaped UI sentence without replacing execution context (feature=%s)", async feature => {
+    const f = await conditionFixture(feature);
+    const original = JSON.stringify(f.source.toObject()), prepared = JSON.stringify(f.source.actions[0].toObject(false));
+    const target = JSON.stringify(f.target.toObject());
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".condition em")?.textContent).toBe("Stanete se Oslabenými do 6 kol.");
+    expect(result.querySelector(".condition strong")?.textContent).toBe("Stav:");
+    expect(result.querySelector(".actions .tags")?.outerHTML).toBe(html(f.native).querySelector(".actions .tags")?.outerHTML);
+    expect(result.querySelector(".actions button")?.outerHTML).toBe(html(f.native).querySelector(".actions button")?.outerHTML);
+    expect(JSON.stringify(f.source.toObject())).toBe(original);
+    expect(JSON.stringify(f.source.actions[0].toObject(false))).toBe(prepared);
+    expect(JSON.stringify(f.target.toObject())).toBe(target);
+    expect(enrich).toHaveBeenCalledWith("<p>Věnujte tomu 1 hodinu.</p>", { relativeTo: f.source.actions[0], secrets: false });
+  });
+  it.each(["unknown-schema", "wrong-schema", "runtime-sentence", "native-sentence", "changed-number", "new-command", "blank", "non-string", "nested-em", "duplicate-em"])("retains native condition for %s while allowing validated names and prose", async problem => {
+    const f = await conditionFixture();
+    if (problem === "unknown-schema") delete f.source.system.constructor.schema.fields.actions.element.fields.condition;
+    if (problem === "wrong-schema") f.source.system.constructor.schema.fields.actions.element.fields.condition = new HTMLField();
+    if (problem === "runtime-sentence") f.source.actions[0].condition = "Other condition";
+    if (problem === "native-sentence") f.native = f.native.replace('<em>You become Weakened within 6 rounds.</em>', '<em>Other condition</em>');
+    if (problem === "changed-number") f.target.system.actions[0].condition = "Stanete se Oslabenými do 7 kol.";
+    if (problem === "new-command") f.target.system.actions[0].condition = "Stanete se Oslabenými do 6 kol. @UUID[Actor.foreign]";
+    if (problem === "blank") f.target.system.actions[0].condition = " ";
+    if (problem === "non-string") f.target.system.actions[0].condition = 6;
+    if (problem === "nested-em") f.native = f.native.replace('<em>You become Weakened within 6 rounds.</em>', '<span><em>You become Weakened within 6 rounds.</em></span>');
+    if (problem === "duplicate-em") f.native = f.native.replace('</em>', '</em><em>You become Weakened within 6 rounds.</em>');
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".condition")?.outerHTML).toBe(html(f.native).querySelector(".condition")?.outerHTML);
+    expect(result.querySelector(".actions h4")?.textContent).toBe("Sestrojit Společníka");
+    expect(result.querySelector(".actions .description")?.innerHTML).toBe("<p>Věnujte tomu 1 hodinu.</p>");
+  });
+  it("escapes copied condition text instead of interpreting HTML", async () => {
+    const f = await conditionFixture();
+    f.target.system.actions[0].condition = "Když řeknete <img src=x onerror=alert()> do 6 kol.";
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".condition em img")).toBeNull();
+  });
+  it("discards the overlay if the runtime condition changes during enrichment", async () => {
+    const f = await conditionFixture();
+    enrich.mockImplementation(async value => { if (value.includes("hodinu")) f.source.actions[0].condition = "Changed"; return value; });
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
   });
 });

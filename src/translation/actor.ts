@@ -11,6 +11,7 @@ import {
   type HtmlFieldTranslationTarget,
 } from "./html-field-translation";
 import { translatedOutputHash } from "./output-hash";
+import { translateActionConditions } from "./item";
 import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
@@ -18,7 +19,7 @@ import {
 } from "./unit-translator";
 
 export const ACTOR_TRANSLATION_SCHEMA_VERSION = 1;
-export const ACTOR_TRANSLATION_ENGINE_REVISION = 8;
+export const ACTOR_TRANSLATION_ENGINE_REVISION = 9;
 
 export interface ActorItemData extends Record<string, unknown> {
   _id?: string;
@@ -76,6 +77,7 @@ export interface TranslateActorOptions {
   itemHtmlFieldPaths: readonly (readonly HtmlFieldPath[])[];
   /** Paths relative to each embedded Item system, selected by its local Crucible schema. */
   itemActionNameFieldPaths?: readonly (readonly HtmlFieldPath[])[];
+  itemActionConditionFieldPaths?: readonly (readonly HtmlFieldPath[])[];
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
@@ -183,6 +185,13 @@ export async function translateActorData(options: TranslateActorOptions): Promis
   });
   for (const item of copy.items ?? []) delete item._stats;
 
+  const conditionFallbacks = await translateActionConditions(
+    (options.itemActionConditionFieldPaths ?? []).flatMap((paths, itemIndex) => paths.map(path => ({
+      owner: copy.items?.[itemIndex]?.system, path,
+      ...(options.source.items?.[itemIndex]?.name ? { itemName: options.source.items[itemIndex]!.name! } : {}),
+    }))), options, options.source.name,
+  );
+
   const targets: HtmlFieldTranslationTarget[] = options.systemHtmlFieldPaths.map((path) => ({
     owner: copy.system,
     path,
@@ -219,7 +228,7 @@ export async function translateActorData(options: TranslateActorOptions): Promis
     }),
   });
   const translatedHtmlFields = fields.translatedHtmlFields;
-  const fallbackTextSegments = fields.fallbackTextSegments + names.fallbacks;
+  const fallbackTextSegments = fields.fallbackTextSegments + names.fallbacks + conditionFallbacks;
 
   const sourceHash = await actorSourceHash(options.source);
   const glossaryHash = await glossaryFingerprint(options.glossary);

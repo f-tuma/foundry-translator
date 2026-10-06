@@ -1,5 +1,5 @@
 import { parseHTML } from "linkedom";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TranslationProvider } from "../src/providers/types";
 import {
@@ -9,6 +9,9 @@ import {
   translateActorData,
   type ActorData,
 } from "../src/translation/actor";
+
+beforeEach(() => vi.stubGlobal("document", parseHTML("<html><body></body></html>").document));
+afterEach(() => vi.unstubAllGlobals());
 
 const provider: TranslationProvider = {
   async translate({ texts }) {
@@ -194,8 +197,8 @@ describe("Actor translation", () => {
     expect(result.data.items).toEqual(expected.items);
     expect(result.fallbackTextSegments).toBe(0);
     const flag = readActorTranslationFlag(result.data.flags)!;
-    expect(flag.engineRevision).toBe(8);
-    expect(canReuseActorTranslation({ ...flag, engineRevision: 7 }, flag.sourceHash)).toBe(false);
+    expect(flag.engineRevision).toBe(9);
+    expect(canReuseActorTranslation({ ...flag, engineRevision: 8 }, flag.sourceHash)).toBe(false);
   });
 
   it("counts embedded action-name fallback without modifying its mechanical number", async () => {
@@ -213,4 +216,28 @@ describe("Actor translation", () => {
     expect(readActorTranslationFlag(result.data.flags)?.fallbackTextSegments).toBe(1);
   });
 
+});
+
+it("translates only selected embedded Action conditions as sentences at their original Item indexes", async () => {
+  const source: ActorData = { name: "Scholar", type: "adversary", system: {}, items: [
+    { _id: "unnamed", system: { actions: [{ id: "first", condition: "After 3 rounds.", cost: { action: 3 } }] } },
+    { _id: "talent", name: "Talent", system: { actions: [{ id: "second", condition: "When you fall.",
+      effects: [{ condition: "Keep predicate", name: "Keep name" }] }] } },
+  ] };
+  const before = structuredClone(source);
+  const result = await translateActorData({ source, sourceUuid: "Actor.scholar", glossary: [],
+    provider: { async translate({ texts }) { return texts.map(text => ({ translatedText: text
+      .replaceAll("After 3 rounds.", "Po 3 kolech.").replaceAll("When you fall.", "Když upadnete.") })); }, async testConnection() {} },
+    settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" },
+    systemHtmlFieldPaths: [], itemHtmlFieldPaths: [[], []], itemActionConditionFieldPaths: [
+      [["actions", 0, "condition"]], [["actions", 0, "condition"], ["actions", 0, "effects", 0, "condition"]],
+    ],
+  });
+  expect(source).toEqual(before);
+  const expected = structuredClone(source.items);
+  (expected![0]!.system!.actions as any[])[0].condition = "Po 3 kolech.";
+  (expected![1]!.system!.actions as any[])[0].condition = "Když upadnete.";
+  expect(result.data.items).toEqual(expected);
+  expect(result.fallbackTextSegments).toBe(0);
+  expect(readActorTranslationFlag(result.data.flags)?.engineRevision).toBe(9);
 });

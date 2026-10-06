@@ -12,11 +12,11 @@ import { GlossaryCompendiumRepository } from "../src/glossary/compendium-reposit
 
 class StringField {}
 class HTMLField {}
-class CrucibleActionField { fields = { id: new StringField(), name: new StringField(), description: new HTMLField() }; }
+class CrucibleActionField { fields = { id: new StringField(), name: new StringField(), description: new HTMLField(), condition: new StringField() }; }
 class ArrayField { constructor(readonly element: unknown) {} }
 const runtime = { system: { constructor: { schema: { fields: { actions: new ArrayField(new CrucibleActionField()) } } } } };
-const originalActions = () => [{ id: "first", name: "First", description: "<p>First action.</p>", cost: 3 },
-  { id: "second", name: "Second", description: "<p>Second action.</p>", cost: 1 }];
+const originalActions = () => [{ id: "first", name: "First", description: "<p>First action.</p>", condition: "When you become Weakened.", cost: 3 },
+  { id: "second", name: "Second", description: "<p>Second action.</p>", condition: "After 1 round.", cost: 1 }];
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 it("checks the actual corresponding Item systems after top-level collection ID remapping", () => {
@@ -39,7 +39,7 @@ it.each(["reordered", "duplicate", "missing", "empty", "invalid", "deleted"])(
     if (mutation === "empty") actions[1].id = " ";
     if (mutation === "invalid") actions[1] = null;
     if (mutation === "deleted") actions.pop();
-    for (const tail of [["name"], ["description"], ["effects", 0, "description"]]) {
+    for (const tail of [["name"], ["condition"], ["description"], ["effects", 0, "description"]]) {
       expect(() => assertSystemActionFieldIdentity(source, copy, ["system", "actions", 0, ...tail])).toThrow("identity");
     }
     expect(() => assertSystemActionFieldIdentity(copy, source, ["system", "actions", 0, "description"])).toThrow("identity");
@@ -52,6 +52,8 @@ async function fixture(kind: "Item" | "Actor", mutation: string) {
   const output = structuredClone(data);
   const system = kind === "Item" ? output.system : output.items[0].system;
   system.actions[0].name = "První"; system.actions[0].description = "<p>První akce.</p>";
+  system.actions[0].condition = "Když se stanete Oslabenými.";
+  system.actions[1].condition = "Po 1 kole.";
   system.actions[1].name = "Druhá"; system.actions[1].description = "<p>Druhá akce.</p>";
   if (mutation === "reordered") system.actions.reverse();
   if (mutation === "duplicate") system.actions[1].id = system.actions[0].id;
@@ -82,12 +84,15 @@ it.each(["Item", "Actor"] as const)("retains correctly paired %s action fields t
   const before = JSON.stringify(data);
   const view = await loadReview((await reviewCatalog("cs"))[0]!);
   const rows = view.rows.filter(row => row.fieldId.includes('"actions"'));
-  expect(rows).toHaveLength(4);
+  expect(rows).toHaveLength(6);
   expect(rows.every(row => row.blocked === null)).toBe(true);
   expect(rows.some(row => row.translation[0] === "První")).toBe(true);
+  expect(rows.filter(row => row.fieldId.endsWith('"condition"]')).map(row => row.translation[0])).toEqual([
+    "Když se stanete Oslabenými.", "Po 1 kole.",
+  ]);
   const exported = await exportTranslationBundle("cs");
   expect(exported.skipped).toEqual([]);
-  expect(exported.bundle.documents[0]!.patches.filter(patch => patch.path.includes("actions"))).toHaveLength(4);
+  expect(exported.bundle.documents[0]!.patches.filter(patch => patch.path.includes("actions"))).toHaveLength(6);
   expect(JSON.stringify(source.toObject())).toBe(before);
 });
 
@@ -97,7 +102,7 @@ it.each((["Item", "Actor"] as const).flatMap(kind => ["reordered", "duplicate", 
     const original = JSON.stringify(data), translated = JSON.stringify(output);
     const view = await loadReview((await reviewCatalog("cs"))[0]!);
     const rows = view.rows.filter(row => row.fieldId.includes('"actions"'));
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(6);
     expect(rows.every(row => row.blocked === "MissingField")).toBe(true);
     const exported = await exportTranslationBundle("cs");
     expect(exported.bundle.documents).toEqual([]);
