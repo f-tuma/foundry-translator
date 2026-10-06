@@ -7,10 +7,13 @@ import { discoverDocumentDependencies, rewriteDocumentReferences } from "./docum
 import { parseDocumentReference, resolveSourceReference, resolveTranslationReference } from "./document-identity";
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "./item";
 import { readJournalTranslationFlag } from "./journal";
+import { discoverCrucibleActionNameFieldPaths } from "./system-html-fields";
 
+interface CardAction { id: string; name: string; description?: string; item?: CardItem; toObject?(source: boolean): Record<string, unknown> }
 interface CardItem extends FoundryUuidDocument {
   name: string; type: string; isOwner?: boolean;
   system: { description?: string | { public?: string } };
+  actions?: readonly CardAction[];
   testUserPermission?(user: unknown, level: string): boolean;
   toObject?(): ItemData;
   renderCard?(): Promise<string>;
@@ -33,6 +36,10 @@ function description(item: CardItem): string | undefined {
   const value = item.system?.description;
   return typeof value === "string" ? value : value?.public;
 }
+function actionProof(item: CardItem): string {
+  return JSON.stringify(item.actions?.map(action => ({ id: action.id, name: action.name,
+    description: action.description, owned: action.item === item, prepared: action.toObject?.(false) })));
+}
 function scopeDocument(app: JournalApp): FoundryUuidDocument | null {
   const doc = app.entry ?? app.document;
   return doc?.documentName === "JournalEntryPage" ? doc.parent ?? null : doc?.documentName === "JournalEntry" ? doc : null;
@@ -51,7 +58,7 @@ function scopeValid(scope: JournalScope, user: unknown): boolean {
     && JSON.stringify(readJournalTranslationFlag(scope.journal.flags)) === scope.proof;
 }
 
-/** Replace prose only inside the source's native card. Its IDs, tags, actions,
+/** Replace prose only inside the source's native card. Its IDs, tags, action mechanics,
  * prerequisites, controls and native visibility decisions retain source data.
  * Unsupported/embedded Item types and stale or malformed copies fail closed. */
 export async function translatedItemCard(source: CardItem, native: string, language: string): Promise<string> {
@@ -59,7 +66,8 @@ export async function translatedItemCard(source: CardItem, native: string, langu
     const user = game.user, ref = parseDocumentReference(source.uuid);
     if (!user || source.documentName !== "Item" || !ref || ref.type !== "Item" || ref.suffix || ref.anchor
       || !readable(source, user) || readItemTranslationFlag(source.flags) || !source.toObject) return native;
-    const sourceData = source.toObject(), sourceProof = JSON.stringify(sourceData), before = description(source);
+    const sourceData = source.toObject(), sourceProof = JSON.stringify(sourceData), nativeActionsProof = actionProof(source),
+      nativeActions = [...source.actions ?? []], before = description(source);
     const sourceHash = await itemSourceHash(sourceData);
     const pair = await resolveTranslationReference(source.uuid, language);
     if (pair.status !== "mapped" || pair.sourceUuid !== source.uuid || !pair.translatedUuid) return native;
@@ -69,6 +77,8 @@ export async function translatedItemCard(source: CardItem, native: string, langu
       || !readable(target, user) || !flag || flag.sourceUuid !== source.uuid || flag.targetLanguage !== language
       || flag.sourceHash !== sourceHash || flag.fallbackTextSegments > 0
       || (target.flags?.["foundry-translate"]?.itemTranslation as { partial?: boolean } | undefined)?.partial) return native;
+    if (!target.toObject) return native;
+    const targetData = target.toObject(), targetProof = JSON.stringify(targetData);
     const flagProof = JSON.stringify(flag), after = description(target), name = target.name;
     const holder = document.createElement("div"); holder.innerHTML = native;
     if (holder.children.length !== 1) return native;
@@ -82,26 +92,20 @@ export async function translatedItemCard(source: CardItem, native: string, langu
     if (!heading || heading.textContent !== source.name || !name?.trim()) return native;
     let enriched: string | undefined;
     const secrets = typeof source.system.description === "string" && source.isOwner === true && target.isOwner === true;
+    const actionSecrets = source.isOwner === true && target.isOwner === true;
     if (body && before !== undefined && after !== undefined) {
-      const replacements = [];
-      for (const { sourceUuid } of discoverDocumentDependencies(after)) {
-        const absolute = absoluteReference(sourceUuid, target.uuid);
-        if (!absolute) continue;
-        const original = await resolveSourceReference(absolute);
-        if (original && original !== sourceUuid) replacements.push({ sourceUuid, translatedUuid: original });
-      }
-      const normalized = sourceReferenceNotation(before, rewriteDocumentReferences(after, replacements), source.uuid);
-      assertPortableText(before, normalized, "html");
-      if (JSON.stringify(proseNumbers([before])) !== JSON.stringify(proseNumbers([normalized]))) return native;
-      const editor = (CONFIG as unknown as { ux?: { TextEditor?: { enrichHTML(html: string, options: Record<string, unknown>): Promise<string> } } }).ux?.TextEditor;
-      if (!editor) return native;
-      enriched = await editor.enrichHTML(normalized, { relativeTo: source, secrets });
+      enriched = await enrichProse(before, after, source, target, source, secrets);
     }
+    await translateIncludedActions(card, source, target, sourceData, targetData, actionSecrets);
     // Native source and copy are checked again after hashing, lookup and enrichment.
     if (game.user !== user || !readable(source, user) || !readable(target, user)
       || source.uuid !== pair.sourceUuid || target.uuid !== pair.translatedUuid || target.type !== source.type
       || readItemTranslationFlag(source.flags) || JSON.stringify(source.toObject()) !== sourceProof
+      || actionProof(source) !== nativeActionsProof
+      || nativeActions.length !== (source.actions?.length ?? 0) || nativeActions.some((action, index) => source.actions?.[index] !== action)
+      || JSON.stringify(target.toObject()) !== targetProof
       || JSON.stringify(readItemTranslationFlag(target.flags)) !== flagProof || description(target) !== after || target.name !== name
+      || actionSecrets !== (source.isOwner === true && target.isOwner === true)
       || secrets !== (typeof source.system.description === "string" && source.isOwner === true && target.isOwner === true)) return native;
     heading.textContent = name;
     if (body && enriched !== undefined) body.innerHTML = enriched;
@@ -110,6 +114,61 @@ export async function translatedItemCard(source: CardItem, native: string, langu
     if (image?.title === source.name) image.title = name;
     return holder.innerHTML;
   } catch (error) { logger.warn("Translated Item tooltip unavailable; keeping the native card.", error); return native; }
+}
+
+async function enrichProse(before: string, after: string, source: CardItem, target: CardItem,
+  relativeTo: CardItem | CardAction, secrets: boolean): Promise<string> {
+  const replacements = [];
+  for (const { sourceUuid } of discoverDocumentDependencies(after)) {
+    const absolute = absoluteReference(sourceUuid, target.uuid);
+    if (!absolute) continue;
+    const original = await resolveSourceReference(absolute);
+    if (original && original !== sourceUuid) replacements.push({ sourceUuid, translatedUuid: original });
+  }
+  const normalized = sourceReferenceNotation(before, rewriteDocumentReferences(after, replacements), source.uuid);
+  assertPortableText(before, normalized, "html");
+  if (JSON.stringify(proseNumbers([before])) !== JSON.stringify(proseNumbers([normalized]))) throw new Error("Action prose changed numbers");
+  const editor = (CONFIG as unknown as { ux?: { TextEditor?: { enrichHTML(html: string, options: Record<string, unknown>): Promise<string> } } }).ux?.TextEditor;
+  if (!editor) throw new Error("Native text editor unavailable");
+  return editor.enrichHTML(normalized, { relativeTo, secrets });
+}
+
+/** Only reviewed native included-action cards. Never install translated Action
+ * models: execution and @ref enrichment keep the original runtime context. */
+async function translateIncludedActions(card: HTMLElement, source: CardItem, target: CardItem,
+  sourceData: ItemData, targetData: ItemData, secrets: boolean): Promise<void> {
+  const fields = (source.system.constructor as { schema?: { fields?: Record<string, unknown> } })?.schema?.fields;
+  const paths = discoverCrucibleActionNameFieldPaths(fields, sourceData.system);
+  const before = sourceData.system.actions as CardAction[] | undefined;
+  const after = targetData.system.actions as CardAction[] | undefined;
+  if (!paths.length || !before || !after || !source.actions
+    || !discoverCrucibleActionNameFieldPaths(fields, targetData.system).length
+    || before.length !== after.length || before.some((action, index) => action.id !== after[index]?.id)) return;
+  const runtime = new Map(source.actions.map(action => [action.id, action]));
+  if (runtime.size !== source.actions.length) return;
+  const rows = [...card.querySelectorAll<HTMLElement>(":scope > section.actions > div.action.line-item[data-action-id]")];
+  if (new Set(rows.map(row => row.dataset.actionId)).size !== rows.length) return;
+  for (const row of rows) {
+    const index = before.findIndex(action => action.id === row.dataset.actionId);
+    if (index < 0) continue;
+    const original = before[index]!, translated = after[index]!, action = runtime.get(original.id);
+    const heading = row.querySelector<HTMLElement>(":scope > header.action-header > .title > h4");
+    const body = row.querySelector<HTMLElement>(":scope > .description");
+    if (!action || typeof action.toObject !== "function" || action.item !== source || action.name !== original.name || action.description !== original.description
+      || !heading || heading.textContent !== original.name || typeof translated.name !== "string" || !translated.name.trim()) continue;
+    try {
+      // Finish validation and enrichment before replacing any part of this row.
+      assertPortableText(original.name, translated.name, "text");
+      if (JSON.stringify(proseNumbers([original.name])) !== JSON.stringify(proseNumbers([translated.name]))) continue;
+      const prose = body && typeof original.description === "string" && typeof translated.description === "string"
+        ? await enrichProse(original.description, translated.description, source, target, action, secrets) : undefined;
+      heading.textContent = translated.name;
+      if (body && prose !== undefined) body.innerHTML = prose;
+      const image = row.querySelector<HTMLImageElement>(":scope > header.action-header img");
+      if (image?.alt === original.name) image.alt = translated.name;
+      if (image?.title === original.name) image.title = translated.name;
+    } catch (error) { logger.warn("Included Action translation unavailable; keeping its native presentation.", error); }
+  }
 }
 
 function replay(element: HTMLElement, event: Event): void {
@@ -127,9 +186,11 @@ async function produce(element: HTMLElement, job: HoverJob): Promise<void> {
     const item = await fromUuid(job.uuid) as CardItem | null;
     if (item?.uuid === job.uuid && item.documentName === "Item") source = item;
     if (current(element, job) && source && readable(source, job.user) && typeof source.renderCard === "function") {
-      const proof = JSON.stringify(source.toObject?.());
+      const proof = JSON.stringify(source.toObject?.()), actionsProof = actionProof(source), actions = [...source.actions ?? []];
       const native = await source.renderCard();
-      if (current(element, job) && readable(source, job.user) && JSON.stringify(source.toObject?.()) === proof) {
+      if (current(element, job) && readable(source, job.user) && JSON.stringify(source.toObject?.()) === proof
+        && actionProof(source) === actionsProof && actions.length === (source.actions?.length ?? 0)
+        && actions.every((action, index) => source?.actions?.[index] === action)) {
         html = await translatedItemCard(source, native, job.language);
       }
     }

@@ -13,7 +13,7 @@ import { CompendiumJournalTranslationRepository, TRANSLATIONS_PACK_ID, TRANSLATI
 import { CompendiumActorTranslationRepository, ACTOR_TRANSLATIONS_PACK_ID, ACTOR_TRANSLATION_FLAG_PATH } from "../translation/compendium-actor-translation-repository";
 import { CompendiumItemTranslationRepository, ITEM_TRANSLATIONS_PACK_ID, ITEM_TRANSLATION_FLAG_PATH } from "../translation/compendium-item-translation-repository";
 import { discoverObjectDependencies, rewriteDocumentReferences } from "../translation/document-dependencies";
-import { readPath, writePath, type HtmlFieldPath } from "../translation/system-html-fields";
+import { assertSystemActionFieldIdentity, readPath, writePath, type HtmlFieldPath } from "../translation/system-html-fields";
 import { translatedOutputHash } from "../translation/output-hash";
 import { glossaryFingerprint } from "../translation/unit-translator";
 import { portableFields, type PortableDocument, type BundleDocumentKind } from "./fields";
@@ -119,9 +119,12 @@ function translatedField(source: Record<string, unknown>, translated: Record<str
     if (id) {
       const copyIndex = copyRows?.findIndex((row) => (row._id ?? row.id) === id) ?? -1;
       if (copyIndex < 0) throw new Error(`translated ${collection} entry is missing: ${id}`);
-      return readPath(translated, [collection, copyIndex, ...path.slice(2)]);
+      const target = [collection, copyIndex, ...path.slice(2)];
+      assertSystemActionFieldIdentity(source, translated, path, target);
+      return readPath(translated, target);
     }
   }
+  assertSystemActionFieldIdentity(source, translated, path);
   return readPath(translated, path);
 }
 

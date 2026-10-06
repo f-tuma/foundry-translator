@@ -117,6 +117,15 @@ V českém rozhraní také překládá známé hodnoty vzácnosti, věku a vých
 popisek ukázkové postavy. Autorské popisky a neznámé hodnoty nepřepisuje.
 Po aktualizaci modulu obnov kartu světa a znovu otevři tvorbu postavy.
 
+Od verze **0.34.11** náhled talentu či kouzla přebírá také uložený překlad
+názvů a popisů jeho Akcí. Ovládání, ceny, dosahy a původní ID zůstávají
+z originálu; dynamické odkazy se vyhodnocují proti původní Akci. Neplatný
+nebo nejednoznačný překlad se nepoužije. Názvy Akcí jsou nově dostupné
+v editoru korektur i při novém překladu. Starší kopie mohou mít název Akce
+stále anglický — oprav jej v editoru; aktualizace modulu nepřepisuje uložené
+ruční korektury. Změněné pořadí či identifikátory Akcí vyžadují samostatnou
+kontrolu, aby se nepřiřadil text jiné schopnosti.
+
 Od verze **0.34.8** může GM v hlavním menu použít **Doplnit překlady tvorby
 postavy**. Okno nejprve ukáže počet chybějících a existujících kopií. Po
 potvrzení přeloží pouze chybějící možnosti původu, kultury a cesty z balíčku

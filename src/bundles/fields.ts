@@ -1,6 +1,6 @@
 import { displayFields, isDisplayDocument } from "../translation/display-text";
 import type { JournalData } from "../translation/journal";
-import { discoverSystemHtmlFieldPaths, discoverEmberTextFieldPaths, readPath, type HtmlFieldPath } from "../translation/system-html-fields";
+import { discoverSystemHtmlFieldPaths, discoverEmberTextFieldPaths, discoverCrucibleActionNameFieldPaths, readPath, type HtmlFieldPath } from "../translation/system-html-fields";
 
 export type BundleDocumentKind = "JournalEntry" | "Actor" | "Item" | "Scene" | "ActiveEffect";
 export type FieldFormat = "text" | "html" | "markdown";
@@ -26,6 +26,11 @@ export function portableFields(document: PortableDocument, data = document.toObj
       fields.push({ path: [...prefix, ...path], format: "html" });
     }
   };
+  const addActionNames = (runtime: { system?: FoundryRuntimeSystem } | undefined, value: unknown, prefix: HtmlFieldPath): void => {
+    for (const path of discoverCrucibleActionNameFieldPaths(runtime?.system?.constructor?.schema?.fields, value)) {
+      fields.push({ path: [...prefix, ...path], format: "text" });
+    }
+  };
   if (document.documentName === "JournalEntry") {
     const journal = data as JournalData;
     fields.push({ path: ["name"], format: "text" });
@@ -44,11 +49,14 @@ export function portableFields(document: PortableDocument, data = document.toObj
   } else {
     fields.push({ path: ["name"], format: "text" });
     addSystem(document, data.system, ["system"]);
+    if (document.documentName === "Item") addActionNames(document, data.system, ["system"]);
     if (document.documentName === "Actor") {
       fields.push({ path: ["prototypeToken", "name"], format: "text" });
       if (Array.isArray(data.items)) data.items.forEach((item: Record<string, unknown>, index) => {
         fields.push({ path: ["items", index, "name"], format: "text" });
-        addSystem(document.items?.contents.find((i) => i.id === item._id), item.system, ["items", index, "system"]);
+        const runtime = document.items?.contents.find((i) => i.id === item._id);
+        addSystem(runtime, item.system, ["items", index, "system"]);
+        addActionNames(runtime, item.system, ["items", index, "system"]);
       });
     }
   }

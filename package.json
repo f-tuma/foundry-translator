@@ -1,6 +1,6 @@
 {
   "name": "foundry-translate",
-  "version": "0.34.10",
+  "version": "0.34.11",
   "private": true,
   "type": "module",
   "description": "Reliable, glossary-aware adventure translation for Foundry VTT v14.",

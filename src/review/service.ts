@@ -16,7 +16,7 @@ import { actorSourceHash, readActorTranslationFlag, type ActorData } from "../tr
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "../translation/item";
 import { journalSourceHash, readJournalTranslationFlag, type JournalData } from "../translation/journal";
 import { DISPLAY_TEXT_PACK, displaySourceHash, escapeDisplayText, readDisplayTextFlag, readDisplayTranslation, readDisplayTranslationContent } from "../translation/display-text";
-import { readPath, writePath, type HtmlFieldPath } from "../translation/system-html-fields";
+import { assertSystemActionFieldIdentity, readPath, writePath, type HtmlFieldPath } from "../translation/system-html-fields";
 import { captureTranslationWriteGuard, type TranslationWriteGuard } from "../translation/write-guard";
 import { activeTranslations } from "../translation/active-translations";
 import { sha256 } from "../translation/hash";
@@ -90,6 +90,7 @@ function fieldPaths(source: Record<string, unknown>, copy: Record<string, unknow
     if (index < 0) fail("MissingField");
     target[1] = index;
   }
+  assertSystemActionFieldIdentity(source, copy, path, target);
   return { stable, target };
 }
 

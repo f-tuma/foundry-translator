@@ -366,6 +366,8 @@
   "FOUNDRY_TRANSLATE.Review.LinkLabel": "Popisek odkazu",
   "FOUNDRY_TRANSLATE.Review.AutomaticLabel": "Automatický název dokumentu",
   "FOUNDRY_TRANSLATE.Review.ProtectedCommand": "Chráněný herní příkaz",
+  "FOUNDRY_TRANSLATE.Review.ActionName": "Akce {number} · Název",
+  "FOUNDRY_TRANSLATE.Review.ActionDescription": "Akce {number} · Popis",
   "FOUNDRY_TRANSLATE.Review.Name": "Název",
   "FOUNDRY_TRANSLATE.Review.Text": "Text",
   "FOUNDRY_TRANSLATE.Review.TokenName": "Název tokenu",

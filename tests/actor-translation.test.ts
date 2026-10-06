@@ -161,4 +161,56 @@ describe("Actor translation", () => {
       description: "<p>Přeloženo: Precise attack.</p>",
     });
   });
+  it("keeps original embedded indexes when Item names are missing and action names follow the token name", async () => {
+    const source: ActorData = { name: "Scholar", type: "adversary", prototypeToken: { name: "Token" },
+      system: { armor: 10 }, items: [
+        { _id: "unnamed", system: { actions: [{ id: "first", name: "First Action", cost: { action: 3 } }] } },
+        { _id: "named", name: "Talent", system: { actions: [{ id: "constructedCompanion", name: "Construct Companion",
+          condition: "Keep condition", effects: [{ name: "Keep effect" }], target: { number: 1 } }] } },
+        { _id: "blank", name: "", system: { actions: [{ id: "inherited", name: "" }] } },
+      ] };
+    const before = structuredClone(source);
+    const replacements: Record<string, string> = { Scholar: "Učenec", Talent: "Nadání", Token: "Žeton",
+      "First Action": "První Akce", "Construct Companion": "Sestrojit Společníka" };
+    const result = await translateActorData({ source, sourceUuid: "Actor.scholar", glossary: [],
+      provider: { async translate({ texts }) { return texts.map(text => ({ translatedText:
+        Object.entries(replacements).reduce((value, [from, to]) => value.replaceAll(from, to), text) })); }, async testConnection() {} },
+      settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" },
+      systemHtmlFieldPaths: [], itemHtmlFieldPaths: [[], [], []], itemActionNameFieldPaths: [
+        [["actions", 0, "name"]], [["actions", 0, "name"], ["actions", 0, "id"], ["actions", 0, "condition"]],
+        [["actions", 0, "name"]],
+      ],
+    });
+    expect(source).toEqual(before);
+    const expected = structuredClone(source);
+    expected.name = "Učenec";
+    (expected.prototypeToken as { name: string }).name = "Žeton";
+    expected.items![1]!.name = "Nadání";
+    (expected.items![0]!.system!.actions as { name: string }[])[0]!.name = "První Akce";
+    (expected.items![1]!.system!.actions as { name: string }[])[0]!.name = "Sestrojit Společníka";
+    expect(result.data.name).toBe(expected.name);
+    expect(result.data.prototypeToken).toEqual(expected.prototypeToken);
+    expect(result.data.system).toEqual(expected.system);
+    expect(result.data.items).toEqual(expected.items);
+    expect(result.fallbackTextSegments).toBe(0);
+    const flag = readActorTranslationFlag(result.data.flags)!;
+    expect(flag.engineRevision).toBe(8);
+    expect(canReuseActorTranslation({ ...flag, engineRevision: 7 }, flag.sourceHash)).toBe(false);
+  });
+
+  it("counts embedded action-name fallback without modifying its mechanical number", async () => {
+    const source: ActorData = { name: "Scholar", type: "adversary", system: {}, items: [
+      { _id: "talent", system: { actions: [{ id: "summon", name: "Construct 3 Companions", cost: { action: 3 } }] } },
+    ] };
+    const result = await translateActorData({ source, sourceUuid: "Actor.scholar", glossary: [],
+      provider: { async translate({ texts }) { return texts.map(text => ({ translatedText:
+        text.includes("Construct 3 Companions") ? "" : text })); }, async testConnection() {} },
+      settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" },
+      systemHtmlFieldPaths: [], itemHtmlFieldPaths: [[]], itemActionNameFieldPaths: [[["actions", 0, "name"]]],
+    });
+    expect(result.data.items).toEqual(source.items);
+    expect(result.fallbackTextSegments).toBe(1);
+    expect(readActorTranslationFlag(result.data.flags)?.fallbackTextSegments).toBe(1);
+  });
+
 });

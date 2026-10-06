@@ -56,6 +56,7 @@ import { hasManualOutputEdits } from "./output-hash";
 import {
   discoverSystemHtmlFieldPaths,
   discoverEmberTextFieldPaths,
+  discoverCrucibleActionNameFieldPaths,
   readPath,
   type HtmlFieldPath,
 } from "./system-html-fields";
@@ -380,6 +381,7 @@ function actorHtmlFieldPaths(
 ): {
   system: readonly HtmlFieldPath[];
   items: readonly (readonly HtmlFieldPath[])[];
+  actionNames: readonly (readonly HtmlFieldPath[])[];
 } {
   const system = discoverSystemHtmlFieldPaths(
     sourceDocument.system?.constructor?.schema?.fields,
@@ -397,7 +399,13 @@ function actorHtmlFieldPaths(
       item.system,
     );
   });
-  return { system, items };
+  const actionNames = (source.items ?? []).map((item) => {
+    const runtime = item._id ? runtimeItems.get(item._id) : undefined;
+    return discoverCrucibleActionNameFieldPaths(
+      runtime?.system?.constructor?.schema?.fields, item.system,
+    );
+  });
+  return { system, items, actionNames };
 }
 
 function documentTranslationUnits(document: GraphSourceDocument): number {
@@ -1258,6 +1266,7 @@ export class JournalTranslationService {
       },
       systemHtmlFieldPaths: paths.system,
       itemHtmlFieldPaths: paths.items,
+      itemActionNameFieldPaths: paths.actionNames,
       cache: runtime.cache,
       beforeBatch: () => checkpointControl(runtime.runId),
       onQualityFallback: (fallback) => {
@@ -1329,6 +1338,9 @@ export class JournalTranslationService {
         targetLanguage: runtime.settings.targetLanguage,
       },
       systemHtmlFieldPaths: itemHtmlFieldPaths(sourceDocument, source),
+      actionNameFieldPaths: discoverCrucibleActionNameFieldPaths(
+        sourceDocument.system?.constructor?.schema?.fields, source.system,
+      ),
       cache: runtime.cache,
       beforeBatch: async () => { await checkpointControl(runtime.runId); await validate?.(); },
       onQualityFallback: (fallback) => {

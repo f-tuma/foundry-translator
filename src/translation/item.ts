@@ -8,14 +8,14 @@ import type { TranslationCache } from "./cache";
 import { sha256 } from "./hash";
 import { translateHtmlFields } from "./html-field-translation";
 import { translatedOutputHash } from "./output-hash";
-import type { HtmlFieldPath } from "./system-html-fields";
+import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
   type TranslationQualityFallback,
 } from "./unit-translator";
 
 export const ITEM_TRANSLATION_SCHEMA_VERSION = 1;
-export const ITEM_TRANSLATION_ENGINE_REVISION = 7;
+export const ITEM_TRANSLATION_ENGINE_REVISION = 8;
 
 export interface ItemData extends Record<string, unknown> {
   _id?: string;
@@ -61,6 +61,8 @@ export interface TranslateItemOptions {
     targetLanguage: string;
   };
   systemHtmlFieldPaths: readonly HtmlFieldPath[];
+  /** Plain names selected by the local Crucible action schema allowlist. */
+  actionNameFieldPaths?: readonly HtmlFieldPath[];
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
@@ -140,8 +142,20 @@ export async function translateItemData(options: TranslateItemOptions): Promise<
   delete copy._id;
   delete copy._stats;
   delete copy.folder;
-  const names = await translateDocumentNames([copy.name], options);
+  const actionNames = (options.actionNameFieldPaths ?? []).flatMap((path) => {
+    // Never let a plain-text option reach adjacent action configuration.
+    if (path.length !== 3 || path[0] !== "actions" || typeof path[1] !== "number"
+      || !Number.isInteger(path[1]) || path[1] < 0 || path[2] !== "name") return [];
+    const name = readPath(copy.system, path);
+    return typeof name === "string" && name.trim() ? [{ path, name }] : [];
+  });
+  const names = await translateDocumentNames([copy.name, ...actionNames.map(({ name }) => name)], options);
   copy.name = names.names[0]!;
+  actionNames.forEach(({ path }, index) => {
+    if (!writePath(copy.system, path, names.names[index + 1]!)) {
+      throw new Error(`Nepodařilo se zapsat název akce Itemu: ${path.join(".")}`);
+    }
+  });
 
   const fields = await translateHtmlFields({
     ...(options.beforeBatch ? { beforeBatch: options.beforeBatch } : {}),

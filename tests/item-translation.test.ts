@@ -121,4 +121,44 @@ describe("Item translation", () => {
     expect(result.translatedHtmlFields).toBe(5);
     expect(result.data.system.five).toBe("<p>Přeloženo: five field.</p>");
   });
+  it("translates schema-selected action names with the Item title without changing IDs or mechanics", async () => {
+    const source: ItemData = { name: "Talent", type: "talent", system: { actions: [
+      { id: "constructedCompanion", name: "Construct Companion", description: "", cost: { action: 3 },
+        condition: "original condition", tags: ["summon"], effects: [{ name: "Unchanged Effect" }] },
+      { id: "inherited", name: "", cost: { action: 1 } },
+    ] } };
+    const before = structuredClone(source);
+    const result = await translateItemData({ source, sourceUuid: "Item.talent", glossary: [],
+      provider: { async translate({ texts }) { return texts.map(text => ({ translatedText: text
+        .replaceAll("Talent", "Nadání").replaceAll("Construct Companion", "Sestrojit Společníka") })); }, async testConnection() {} },
+      settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" },
+      systemHtmlFieldPaths: [], actionNameFieldPaths: [["actions", 0, "name"], ["actions", 1, "name"],
+        ["actions", 0, "condition"], ["actions", 0, "id"], ["actions", 0, "effects", 0, "name"]],
+    });
+    expect(source).toEqual(before);
+    expect(result.data.name).toBe("Nadání");
+    const expected = structuredClone(source.system);
+    (expected.actions as { name: string }[])[0]!.name = "Sestrojit Společníka";
+    expect(result.data.system).toEqual(expected);
+    expect(result.translatedHtmlFields).toBe(0);
+    const flag = readItemTranslationFlag(result.data.flags)!;
+    expect(flag.engineRevision).toBe(8);
+    expect(canReuseItemTranslation({ ...flag, engineRevision: 7 }, flag.sourceHash)).toBe(false);
+  });
+
+  it("counts action-name integrity fallback and keeps the original action name", async () => {
+    const source: ItemData = { name: "Talent", type: "talent", system: { actions: [
+      { id: "summon", name: "Construct 3 Companions", cost: { action: 3 } },
+    ] } };
+    const result = await translateItemData({ source, sourceUuid: "Item.talent", glossary: [],
+      provider: { async translate({ texts }) { return texts.map(text => ({ translatedText:
+        text.includes("Construct 3 Companions") ? "" : text })); }, async testConnection() {} },
+      settings: { providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs" },
+      systemHtmlFieldPaths: [], actionNameFieldPaths: [["actions", 0, "name"]],
+    });
+    expect(result.data.system).toEqual(source.system);
+    expect(result.fallbackTextSegments).toBe(1);
+    expect(readItemTranslationFlag(result.data.flags)?.fallbackTextSegments).toBe(1);
+  });
+
 });
