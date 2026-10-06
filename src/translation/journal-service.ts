@@ -65,7 +65,7 @@ import { containsTranslationPromptLeak, glossaryFingerprint } from "./unit-trans
 import { availableDocumentReferences } from "./available-references";
 import { DISPLAY_TEXT_REVISION, displayFields, displaySourceHash, isDisplayDocument, readDisplayTextFlag, readDisplayTranslation, translateDisplayText, type DisplayDocument } from "./display-text";
 import { CompendiumDisplayTextRepository } from "./compendium-display-text-repository";
-import { creationRuntimeGuard, creationSourceGuard, planMissingCreationItems, type CreationItemDocument } from "./ember-creation-items";
+import { creationRuntimeGuard, creationSourceGuard, planMissingCreationItems, type CreationItemDocument, type CreationItemsScope, type CreationSourceCheck } from "./ember-creation-items";
 
 export interface JournalTranslationServiceOptions {
   onChromeStatus?: (status: ChromeLocalProviderStatus) => void;
@@ -451,19 +451,19 @@ export class JournalTranslationService {
 
   /** Explicit Ember creation Items only. Existing identities are reserved even
    * when partial/stale/malformed; no dependency scan or reference rewrite. */
-  async translateMissingItems(sourceDocuments: readonly CreationItemDocument[]): Promise<MissingItemsTranslationResult> {
+  async translateMissingItems(sourceDocuments: readonly CreationItemDocument[], scope: CreationItemsScope = "creation"): Promise<MissingItemsTranslationResult> {
     if (translationInProgress) throw new Error(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.AlreadyRunning"));
     translationInProgress = true;
     let runId: number | undefined;
     try {
-      const assertRuntime = creationRuntimeGuard(), settings = getTranslatorSettings();
-      const plan = await planMissingCreationItems(sourceDocuments, settings.targetLanguage); assertRuntime();
+      const assertRuntime = creationRuntimeGuard(scope), settings = getTranslatorSettings();
+      const plan = await planMissingCreationItems(sourceDocuments, settings.targetLanguage, scope); assertRuntime();
       this.#onPlan?.({ totalDocuments: plan.missing.length, totalUnits: plan.missing.length });
       const result: MissingItemsTranslationResult = { createdDocuments: 0, skippedDocuments: plan.existing, fallbackTextSegments: 0 };
       if (!plan.missing.length) return result;
       if (game.packs.get("world.foundry-translate-items")?.locked) throw new Error("Compendium s přeloženými Itemy je zamčené.");
-      const sourceChecks = new Map<CreationItemDocument, () => Promise<void>>();
-      for (const source of plan.missing) { sourceChecks.set(source, await creationSourceGuard(source)); assertRuntime(); }
+      const sourceChecks = new Map<CreationItemDocument, CreationSourceCheck>();
+      for (const source of plan.missing) { sourceChecks.set(source, await creationSourceGuard(source, scope)); assertRuntime(); }
       runId = activeTranslations.start(game.i18n.localize("FOUNDRY_TRANSLATE.CreationItems.Title"), settings.targetLanguage);
       const activeRunId = runId;
       activeTranslations.update(runId, { plan: { totalDocuments: plan.missing.length, totalUnits: plan.missing.length } });
@@ -512,7 +512,7 @@ export class JournalTranslationService {
         const assertSource = sourceChecks.get(source)!;
         currentSourceCheck = assertSource;
         await assertSource(); await assertGlossary();
-        const current = await planMissingCreationItems([source], settings.targetLanguage); assertRuntime();
+        const current = await planMissingCreationItems([source], settings.targetLanguage, scope); assertRuntime();
         if (!current.missing.length) { result.skippedDocuments++; }
         else {
           const validate = async () => { assertRuntime(); await assertGlossary(); await assertSource(); assertRuntime(); };
@@ -521,7 +521,9 @@ export class JournalTranslationService {
             assertRuntime();
             this.#onProgress?.({ ...progress, overallCompletedUnits: result.createdDocuments + result.skippedDocuments - plan.existing,
               overallTotalUnits: plan.missing.length, completedDocuments: result.createdDocuments + result.skippedDocuments - plan.existing });
-          }, true, validate);
+          }, true, validate, scope, () => {
+            assertRuntime(); assertSource.assertCurrent(); throwIfCancelled(activeRunId);
+          });
           if (translated.reused) result.skippedDocuments++;
           else result.createdDocuments++;
           result.fallbackTextSegments += translated.fallbackTextSegments;
@@ -1314,6 +1316,8 @@ export class JournalTranslationService {
     onProgress: (progress: JournalTranslationProgress) => void,
     onlyMissing = false,
     validate?: () => Promise<void>,
+    missingScope: CreationItemsScope = "creation",
+    beforeCommit?: () => void,
   ): Promise<GraphTranslationResult> {
     await validate?.();
     const source = sourceDocument.toObject() as ItemData;
@@ -1381,7 +1385,7 @@ export class JournalTranslationService {
     });
     if (onlyMissing) {
       await checkpointControl(runtime.runId); await validate?.();
-      if (!(await planMissingCreationItems([sourceDocument as CreationItemDocument], runtime.settings.targetLanguage)).missing.length) {
+      if (!(await planMissingCreationItems([sourceDocument as CreationItemDocument], runtime.settings.targetLanguage, missingScope)).missing.length) {
         throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.OutputChanged"));
       }
       await validate?.();
@@ -1391,7 +1395,7 @@ export class JournalTranslationService {
     await validate?.();
     const document = await runtime.itemTranslations.save(translated.data, onlyMissing ? null : guard, onlyMissing ? async () => {
       await checkpointControl(runtime.runId); await validate?.(); throwIfCancelled(runtime.runId);
-    } : undefined);
+    } : undefined, onlyMissing ? beforeCommit : undefined);
     return { ...translated, data: document.toObject() as GraphData, document, reused: false };
   }
 }

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseHTML } from "linkedom";
-const mock = vi.hoisted(() => ({ collect: vi.fn(), plan: vi.fn(), check: vi.fn(), source: vi.fn(), run: vi.fn(), active: vi.fn(), progress: undefined as any }));
-vi.mock("../src/translation/ember-creation-items", () => ({ MAX_CREATION_ITEMS: 256, collectEmberCreationItems: mock.collect,
-  planMissingCreationItems: mock.plan, creationRuntimeGuard: () => mock.check, creationSourceGuard: async () => mock.source }));
+const mock = vi.hoisted(() => ({ collect: vi.fn(), equipment: vi.fn(), runtime: vi.fn(), plan: vi.fn(), check: vi.fn(), source: vi.fn(), run: vi.fn(), active: vi.fn(), progress: undefined as any }));
+vi.mock("../src/translation/ember-creation-items", () => ({ MAX_CREATION_ITEMS: 256, collectEmberCreationItems: mock.collect, collectCrucibleCreationEquipment: mock.equipment,
+  planMissingCreationItems: mock.plan, creationRuntimeGuard: mock.runtime, creationSourceGuard: async () => mock.source }));
 vi.mock("../src/settings/settings", () => ({ getTranslatorSettings: () => ({ targetLanguage: "cs" }) }));
 vi.mock("../src/translation/active-translations-app", () => ({ openActiveTranslationsOverview: mock.active }));
 vi.mock("../src/translation/journal-service", () => ({ JournalTranslationService: class {
@@ -28,6 +28,7 @@ beforeEach(() => {
   sources = [{ uuid: "Compendium.ember.crucible-character.Item.a" }];
   mock.collect.mockReset().mockResolvedValue(sources);
   mock.plan.mockReset().mockResolvedValue({ sources, missing: sources, existing: 12 });
+  mock.equipment.mockReset().mockResolvedValue([]); mock.runtime.mockReset().mockReturnValue(mock.check);
   mock.check.mockReset(); mock.source.mockReset().mockResolvedValue(undefined); mock.run.mockReset().mockResolvedValue({ createdDocuments: 1, skippedDocuments: 12, fallbackTextSegments: 0 }); mock.active.mockClear();
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -69,5 +70,57 @@ describe("creation translation plan window", () => {
     finish({ createdDocuments: 1, skippedDocuments: 12, fallbackTextSegments: 0 });
     await vi.waitFor(() => expect(ui.notifications.info).toHaveBeenCalledOnce());
     expect(root.textContent).toBe(text); expect(application.element).toBeNull();
+  });
+});
+
+function chooseScope(application: any, value: string) {
+  const select = application.element.querySelector("[data-creation-items-scope]")!;
+  for (const option of select.options) option.selected = option.value === value;
+  select.dispatchEvent(new document.defaultView!.Event("change"));
+}
+
+describe("explicit starting equipment choice", () => {
+  it("keeps creation as the default and builds a separate equipment plan only after selection", async () => {
+    const equipment = [{ uuid: "Compendium.crucible.equipment.Item.sword" }]; mock.equipment.mockResolvedValue(equipment);
+    mock.plan.mockImplementation(async (items: any[]) => ({ sources: items, missing: items, existing: 0 }));
+    const application = await app(); expect(application.element.querySelector<HTMLSelectElement>("select")!.value).toBe("creation");
+    expect(mock.equipment).not.toHaveBeenCalled(); expect(mock.run).not.toHaveBeenCalled();
+    chooseScope(application, "equipment");
+    await vi.waitFor(() => expect(mock.plan).toHaveBeenLastCalledWith(equipment, "cs", "equipment"));
+    await vi.waitFor(() => expect(application.element.querySelector<HTMLSelectElement>("select")!.disabled).toBe(false));
+    expect(application.element.textContent).toContain("EquipmentScope");
+    application.element.querySelector<HTMLButtonElement>("[data-creation-items-start]")!.click();
+    await vi.waitFor(() => expect(mock.run).toHaveBeenCalledWith(equipment, "equipment"));
+    expect(mock.runtime).toHaveBeenLastCalledWith("equipment");
+  });
+  it("does not reuse the creation plan when equipment preview fails", async () => {
+    const application = await app(); mock.equipment.mockRejectedValue(new Error("Equipment unavailable"));
+    chooseScope(application, "equipment");
+    await vi.waitFor(() => expect(application.element.textContent).toContain("Equipment unavailable"));
+    expect(application.element.querySelector<HTMLButtonElement>("[data-creation-items-start]")!.disabled).toBe(true);
+    application.element.querySelector<HTMLButtonElement>("[data-creation-items-start]")!.click();
+    expect(mock.run).not.toHaveBeenCalled();
+  });
+  it("pins the equipment preview and rejects a changed native purchase selection at Start", async () => {
+    const equipment = [{ uuid: "Compendium.crucible.equipment.Item.sword" }]; mock.equipment.mockResolvedValue(equipment);
+    mock.plan.mockImplementation(async (items: any[]) => ({ sources: items, missing: items, existing: 0 }));
+    const application = await app(); chooseScope(application, "equipment");
+    await vi.waitFor(() => {
+      expect(application.element.querySelector<HTMLSelectElement>("select")!.value).toBe("equipment");
+      expect(application.element.querySelector<HTMLSelectElement>("select")!.disabled).toBe(false);
+    });
+    mock.equipment.mockResolvedValue([...equipment, { uuid: "Compendium.crucible.equipment.Item.new" }]);
+    application.element.querySelector<HTMLButtonElement>("[data-creation-items-start]")!.click();
+    await vi.waitFor(() => expect(application.element.textContent).toContain("SourceChanged")); expect(mock.run).not.toHaveBeenCalled();
+  });
+  it("prevents changing scope while a translation runs, including synthetic change events", async () => {
+    let finish!: (value: any) => void;
+    mock.run.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const application = await app(); application.element.querySelector<HTMLButtonElement>("[data-creation-items-start]")!.click();
+    await vi.waitFor(() => expect(mock.run).toHaveBeenCalledOnce());
+    expect(application.element.querySelector<HTMLSelectElement>("select")!.disabled).toBe(true);
+    chooseScope(application, "equipment"); expect(mock.equipment).not.toHaveBeenCalled();
+    finish({ createdDocuments: 1, skippedDocuments: 0, fallbackTextSegments: 0 });
+    await vi.waitFor(() => expect(ui.notifications.info).toHaveBeenCalledOnce());
   });
 });

@@ -804,5 +804,12 @@
   "FOUNDRY_TRANSLATE.Creation.UnknownLifespan": "Neznámá",
   "FOUNDRY_TRANSLATE.Creation.VariedLifespan": "Proměnlivá",
   "FOUNDRY_TRANSLATE.Creation.ExampleCharacter": "Ukázková postava ({name}).",
-  "FOUNDRY_TRANSLATE.Creation.RarityExtinct": "Vyhynulý"
+  "FOUNDRY_TRANSLATE.Creation.RarityExtinct": "Vyhynulý",
+  "FOUNDRY_TRANSLATE.CreationItems.Selection": "Co doplnit",
+  "FOUNDRY_TRANSLATE.CreationItems.CharacterChoice": "Tvorba postavy Ember",
+  "FOUNDRY_TRANSLATE.CreationItems.EquipmentChoice": "Počáteční vybavení",
+  "FOUNDRY_TRANSLATE.CreationItems.EquipmentScope": "Doplní chybějící překlady předmětů dostupných při tvorbě postavy. Hotové i rozpracované překlady zachová. Maximálně {limit} předmětů.",
+  "FOUNDRY_TRANSLATE.CreationItems.EquipmentUnavailable": "Původní balíček crucible.equipment není aktivním zdrojem vybavení nebo není dostupný platný rozpočet tvorby postavy.",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidEquipmentSource": "Podporováno je pouze čitelné původní počáteční vybavení z crucible.equipment s platnou cenou v rozpočtu, bez kouzelných svitků.",
+  "FOUNDRY_TRANSLATE.CreationItems.InvalidScope": "Neznámý rozsah překladu tvorby postavy."
 }

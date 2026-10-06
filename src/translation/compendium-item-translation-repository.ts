@@ -51,13 +51,13 @@ export class CompendiumItemTranslationRepository {
     return id ? (await pack.getDocument(id) as FoundryItemWorldDocument | undefined) ?? null : null;
   }
 
-  async save(data: ItemData, guard?: TranslationWriteGuard | null, beforeCreate?: () => Promise<void>): Promise<FoundryItemWorldDocument> {
+  async save(data: ItemData, guard?: TranslationWriteGuard | null, beforeCreate?: () => Promise<void>, beforeCommit?: () => void): Promise<FoundryItemWorldDocument> {
     const flag = readItemTranslationFlag(data.flags);
     if (!flag) throw new Error("Přeložený Item nemá platná metadata.");
     const pack = await this.#getPack();
     if (pack.locked) throw new Error("Compendium s přeloženými Itemy je zamčené.");
     if (guard !== undefined) this.#index = undefined;
-    const index = await this.#getIndex(pack);
+    let index = await this.#getIndex(pack);
     const key = translationKey(flag.sourceUuid, flag.targetLanguage);
     const existingId = index.get(key);
     // A create-only caller must also respect malformed identities which the
@@ -77,7 +77,22 @@ export class CompendiumItemTranslationRepository {
     }
     // Only create-only workflows opt in. Recheck their runtime/source/cancel
     // state after the repository's awaits, immediately before the mutation.
-    if (guard === null && beforeCreate) await beforeCreate();
+    if (guard === null) {
+      await beforeCreate?.();
+      // The callback may await source/glossary validation while another client
+      // creates a copy. Rebuild reservations afterwards; never reuse the index
+      // captured before that callback for the create-only decision. This is a
+      // client-side conflict check, not a server-side uniqueness constraint.
+      this.#index = undefined;
+      index = await this.#getIndex(pack);
+      if (this.#reservedIdentities.has(key) || index.has(key)) {
+        throw new TranslationConflictError(game.i18n.localize("FOUNDRY_TRANSLATE.JournalTranslation.Status.OutputChanged"));
+      }
+      if (pack.locked) throw new Error("Compendium s přeloženými Itemy je zamčené.");
+      // A caller may synchronously check its already captured runtime/source
+      // proofs after the final index await. Do not introduce another await here.
+      beforeCommit?.();
+    }
     const [created] = await foundry.documents.Item.implementation.createDocuments(
       [data],
       { pack: pack.collection, keepId: false },
