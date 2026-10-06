@@ -84,23 +84,34 @@ export async function planMissingCreationItems(sourceDocuments: readonly Creatio
   return { sources: ordered, missing, existing: ordered.length - missing.length };
 }
 
-export async function creationSourceGuard(source: CreationItemDocument, scope: CreationItemsScope = "creation"): Promise<() => Promise<void>> {
+export type CreationSourceCheck = (() => Promise<void>) & { assertCurrent(): void };
+
+/** Async resolution/hash proof plus a synchronous check of the original and
+ * last resolved canonical Item. The latter closes the final index-read await
+ * without introducing another asynchronous gap before createDocuments. */
+export async function creationSourceGuard(source: CreationItemDocument, scope: CreationItemsScope = "creation"): Promise<CreationSourceCheck> {
   assertCreationItem(source, scope);
   const equipmentProof = scope === "equipment" ? JSON.stringify([source.system?.price, source.system?.category]) : null;
   const data = source.toObject(), uuid = source.uuid, type = source.type, proof = JSON.stringify(data), hash = await itemSourceHash(data as ItemData);
-  const check = async () => {
-    assertSourceProof(source, uuid, type, proof, "SourceChanged", scope);
+  let lastCanonical = source;
+  const assertDocument = (document: CreationItemDocument) => {
+    assertSourceProof(document, uuid, type, proof, "SourceChanged", scope);
+    if (equipmentProof !== null && JSON.stringify([document.system?.price, document.system?.category]) !== equipmentProof) {
+      throw new Error(t("SourceChanged"));
+    }
+  };
+  const assertCurrent = () => { assertDocument(source); assertDocument(lastCanonical); };
+  const check = Object.assign(async () => {
+    assertCurrent();
     const canonical = await fromUuid(uuid) as CreationItemDocument;
-    assertSourceProof(canonical, uuid, type, proof, "SourceChanged", scope);
+    assertDocument(canonical);
     if (await itemSourceHash(source.toObject() as ItemData) !== hash
       || await itemSourceHash(canonical.toObject() as ItemData) !== hash) throw new Error(t("SourceChanged"));
-    if (equipmentProof !== null && [source, canonical].some(document =>
-      JSON.stringify([document.system?.price, document.system?.category]) !== equipmentProof)) throw new Error(t("SourceChanged"));
-    // Compendium caches may replace instances. Recheck both proofs after every
-    // asynchronous resolution/hash, including the originally captured object.
-    assertSourceProof(source, uuid, type, proof, "SourceChanged", scope);
-    assertSourceProof(canonical, uuid, type, proof, "SourceChanged", scope);
-  };
+    // Pin only a fully resolved and validated object. Recheck both objects
+    // after every await even when compendium caches rehydrate the instance.
+    assertDocument(source); assertDocument(canonical);
+    lastCanonical = canonical;
+  }, { assertCurrent });
   await check(); return check;
 }
 

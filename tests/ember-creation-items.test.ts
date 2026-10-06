@@ -413,3 +413,52 @@ describe("separate missing starting equipment scope", () => {
       await expect(new JournalTranslationService().translateMissingItems([a], "equipment")).rejects.toThrow(); expect(itemWrites()).toEqual([]);
     });
 });
+
+describe("missing-only final refreshed-index commit guard", () => {
+  it.each(["creation", "equipment"] as const)("rejects source/runtime/cancel changes during the final index read for %s scope", async scope => {
+    if (scope === "equipment") equipmentSetup();
+    const a = scope === "equipment" ? equipment("a") : source("a");
+    const pack = packs.get(targetPack), getIndex = pack.getIndex.getMockImplementation();
+    pack.getIndex.mockImplementation(async (...args: any[]) => {
+      if (pack.getIndex.mock.calls.length === 6) {
+        // This sixth read is after async beforeCreate completed. It was the
+        // formerly unguarded await introduced by the reservation refresh.
+        activeTranslations.requestCancel(latestRun().id);
+      }
+      return getIndex(...args);
+    });
+    await expect(new JournalTranslationService().translateMissingItems([a], scope)).rejects.toThrow(/zrušen/);
+    expect(pack.getIndex).toHaveBeenCalledTimes(6); expect(itemWrites()).toEqual([]);
+  });
+  it.each(["source", "canonical", "canonical-visibility", "permission", "world", "settings", "source-pack", "equipment-price", "equipment-budget", "equipment-config", "canonical-prepared-price"])(
+    "blocks %s mutation after the last async validation, before creation", async reason => {
+      const equipmentScope = reason.startsWith("equipment-") || reason === "canonical-prepared-price";
+      if (equipmentScope) equipmentSetup();
+      const scope = equipmentScope ? "equipment" : "creation", a = equipmentScope ? equipment("a") : source("a");
+      const canonical = freshDocument(a);
+      documents.set(a.uuid, canonical);
+      const pack = packs.get(targetPack), getIndex = pack.getIndex.getMockImplementation();
+      pack.getIndex.mockImplementation(async (...args: any[]) => {
+        if (pack.getIndex.mock.calls.length === 6) {
+          const sourceRow = tables.get(equipmentScope ? CRUCIBLE_EQUIPMENT_PACK : EMBER_CREATION_PACK)!.get("a")!;
+          if (reason === "source") sourceRow.system.description = "Changed source after last proof";
+          if (reason === "canonical") {
+            const changed = canonical.toObject(); changed.system.description = "Changed canonical after last proof";
+            canonical.toObject = () => structuredClone(changed);
+          }
+          if (reason === "canonical-visibility") Object.defineProperty(canonical, "visible", { value: false });
+          if (reason === "permission") (game as any).user.isGM = false;
+          if (reason === "world") (game as any).world = {};
+          if (reason === "settings") mock.settings.targetLanguage = "de";
+          if (reason === "source-pack") packs.set(EMBER_CREATION_PACK, { ...packs.get(EMBER_CREATION_PACK) });
+          if (reason === "equipment-price") sourceRow.system.price = 101;
+          if (reason === "equipment-budget") (game.system as any).CONST.ACTOR.STARTING_EQUIPMENT_BUDGET = 3000;
+          if (reason === "equipment-config") (game.system as any).CONFIG.packs.equipment.add("foreign.equipment");
+          if (reason === "canonical-prepared-price") Object.defineProperty(canonical, "system", { get: () => ({ ...canonical.toObject().system, price: 101 }) });
+        }
+        return getIndex(...args);
+      });
+      await expect(new JournalTranslationService().translateMissingItems([a], scope)).rejects.toThrow();
+      expect(pack.getIndex).toHaveBeenCalledTimes(6); expect(itemWrites()).toEqual([]);
+    });
+});
