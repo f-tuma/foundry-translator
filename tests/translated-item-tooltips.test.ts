@@ -755,6 +755,39 @@ async function effectHeadingFixture(feature = false) {
   return f;
 }
 describe("same-name native effect headings", () => {
+  async function defaultEffectFixture(feature = false) {
+    const f = await effectHeadingFixture(feature), action = f.source.actions[0];
+    f.source.system.actions[0].effects[0].name = "";
+    action.effects[0].name = action.name;
+    const serialize = action.toObject.bind(action);
+    action.toObject = () => ({ ...serialize(false), effects: structuredClone(f.source.system.actions[0].effects) });
+    f.native = f.native.replace("Efekt: Sword", "Efekt: Construct Companion");
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    return f;
+  }
+  it.each([false, true])("translates the proven native empty-name default using the owning Action, preserving models and controls (feature=%s)", async feature => {
+    const f = await defaultEffectFixture(feature);
+    const original = JSON.stringify(f.source.toObject()), prepared = JSON.stringify(f.source.actions[0].toObject(false));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect([...result.querySelectorAll("ol.effects h4")].map(node=>node.textContent)).toEqual(["Efekt: Sestrojit Společníka", "Efekt: Other Effect"]);
+    expect(result.querySelector(".effect-tags")?.outerHTML).toBe(html(f.native).querySelector(".effect-tags")?.outerHTML);
+    expect(result.querySelector(".actions button")?.outerHTML).toBe(html(f.native).querySelector(".actions button")?.outerHTML);
+    expect(JSON.stringify(f.source.toObject())).toBe(original); expect(JSON.stringify(f.source.actions[0].toObject(false))).toBe(prepared);
+  });
+  it.each(["different-runtime-default", "missing-stored-name", "null-stored-name", "duplicate-effective-name"])("keeps native effect labels for %s", async problem => {
+    const f = await defaultEffectFixture();
+    if (problem === "different-runtime-default") f.source.actions[0].effects[0].name = "Sword";
+    if (problem === "missing-stored-name") delete f.source.system.actions[0].effects[0].name;
+    if (problem === "null-stored-name") f.source.system.actions[0].effects[0].name = null;
+    if (problem === "duplicate-effective-name") {
+      f.source.system.actions[0].effects[1].name = "Construct Companion";
+      f.source.actions[0].effects[1].name = "Construct Companion";
+      f.native=f.native.replace("Efekt: Other Effect","Efekt: Construct Companion");
+    }
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector("ol.effects")?.outerHTML).toBe(html(f.native).querySelector("ol.effects")?.outerHTML);
+  });
   it.each([false, true])("changes only the proven Item-name heading, retaining the original effect models (feature=%s)", async feature => {
     const f = await effectHeadingFixture(feature);
     const source = JSON.stringify(f.source.toObject()), prepared = JSON.stringify(f.source.actions[0].toObject(false)),

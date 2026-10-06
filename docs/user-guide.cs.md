@@ -154,6 +154,14 @@ Potřebuje stejné připojení k modelu a glosář jako běžný překlad. Nespo
 překlad odkazovaných deníků ani dalších závislostí.
 
 
+Od verze **0.34.17** se úplná strojová korektura předmětu zohledňuje také
+v názvech dostupného a vybraného počátečního vybavení. Dřívější záložní
+části překladu zůstávají zaznamenané; korektura musí být úplná a platná
+pro současný originál i překlad. Další změna textu nebo vrácení korektury
+obnoví bezpečné použití originálu. Lidské ověření je stále samostatné.
+Hovery také překládají výchozí názvy efektů, které Crucible odvozuje
+z názvu jejich Akce. Vlastní odlišné názvy efektů zůstávají zachované.
+
 Od verze **0.34.16** má počáteční vybavení také samostatné tlačítko
 **Přeložit Akce očarování**. Uloží texty původních Affix efektů do oddělených
 záznamů. U staršího záznamu, který obsahuje pouze název a popis očarování,

@@ -7,6 +7,8 @@ import { registerEmberCreationDisplay, translateEmberCreationContext, translateE
 
 const identity = vi.hoisted(() => ({ resolve: vi.fn(), source: vi.fn(), identity: vi.fn() }));
 const glossary = vi.hoisted(() => ({ load: vi.fn() }));
+const machine = vi.hoisted(() => ({ current: vi.fn() }));
+vi.mock("../src/review/machine-proofreading", () => ({ isMachineProofreadingCurrent: machine.current }));
 vi.mock("../src/glossary/compendium-repository", () => ({ GlossaryCompendiumRepository: class { loadExisting = glossary.load; } }));
 vi.mock("../src/translation/document-identity", () => ({ resolveTranslationReference: identity.resolve,
   resolveSourceReference: identity.source, translationIdentity: identity.identity }));
@@ -22,6 +24,7 @@ beforeEach(() => {
   vi.stubGlobal("fromUuid", async (uuid: string) => documents.get(uuid) ?? null);
   identity.identity.mockReturnValue(null); identity.resolve.mockResolvedValue({ status: "source-only" });
   glossary.load.mockResolvedValue([]);
+  machine.current.mockResolvedValue(false);
   identity.source.mockImplementation(async (uuid: string) => uuid);
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -347,6 +350,51 @@ async function equipmentPair() {
 }
 
 describe("native creation equipment captions", () => {
+  it("uses a current complete machine receipt for both equipment lists without clearing fallbacks or changing native state", async () => {
+    const f = await equipmentPair();
+    f.target.flags["foundry-translate"].itemTranslation!.fallbackTextSegments = 1;
+    f.target.toObject = () => ({ name: f.target.name, type: f.target.type, system: f.target.system, flags: f.target.flags });
+    machine.current.mockResolvedValue(true);
+    const result = await translateEmberCreationContext(f.context) as any;
+    expect(result.equipmentItems[0].name).toBe("Dlouhý Meč");
+    expect(result.equipmentSelected[0].name).toBe("Dlouhý Meč");
+    expect(result.state).toBe(f.context.state);
+    expect(f.target.flags["foundry-translate"].itemTranslation!.fallbackTextSegments).toBe(1);
+    expect(machine.current).toHaveBeenCalledTimes(1);
+    expect(machine.current).toHaveBeenCalledWith(f.source, f.target.toObject(), "cs", f.target.uuid);
+  });
+  it("keeps native equipment captions when complete machine validation fails", async () => {
+    const f = await equipmentPair();
+    f.target.flags["foundry-translate"].itemTranslation!.fallbackTextSegments = 1;
+    f.target.toObject = () => ({ name: f.target.name, type: f.target.type, system: f.target.system, flags: f.target.flags });
+    const result = await translateEmberCreationContext(f.context) as any;
+    expect(result.equipmentItems[0].name).toBe("Longsword");
+    expect(result.equipmentSelected[0].name).toBe("Longsword");
+    expect(machine.current).toHaveBeenCalledTimes(1);
+  });
+  it("requires stored target data before accepting a fallback receipt", async () => {
+    const f = await equipmentPair();
+    f.target.flags["foundry-translate"].itemTranslation!.fallbackTextSegments = 1;
+    delete (f.target as any).toObject;
+    machine.current.mockResolvedValue(true);
+    const result = await translateEmberCreationContext(f.context) as any;
+    expect(result.equipmentItems[0].name).toBe("Longsword");
+    expect(machine.current).not.toHaveBeenCalled();
+  });
+  it.each(["receipt", "history", "mechanics"])("rejects a target whose %s changes during machine validation", async reason => {
+    const f = await equipmentPair();
+    f.target.flags["foundry-translate"].itemTranslation!.fallbackTextSegments = 1;
+    f.target.toObject = () => structuredClone({ name: f.target.name, type: f.target.type, system: f.target.system, flags: f.target.flags });
+    machine.current.mockImplementation(async () => {
+      if (reason === "receipt") (f.target.flags["foundry-translate"] as any).machineProofreading = { invalidated: true };
+      if (reason === "history") (f.target.flags["foundry-translate"] as any).reviewHistory = { operation: { undoneAt: "now" } };
+      if (reason === "mechanics") f.target.system.identifier = "changed";
+      return true;
+    });
+    const result = await translateEmberCreationContext(f.context) as any;
+    expect(result.equipmentItems[0].name).toBe("Longsword");
+    expect(result.equipmentSelected[0].name).toBe("Longsword");
+  });
   it("translates available and selected plain records without changing purchase identity, mechanics, tags or native state", async () => {
     const f = await equipmentPair(), resolve = vi.fn(async (uuid: string) => documents.get(uuid) ?? null);
     vi.stubGlobal("fromUuid", resolve);
