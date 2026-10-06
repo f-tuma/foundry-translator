@@ -366,6 +366,8 @@
   "FOUNDRY_TRANSLATE.Review.LinkLabel": "Link label",
   "FOUNDRY_TRANSLATE.Review.AutomaticLabel": "Automatic document name",
   "FOUNDRY_TRANSLATE.Review.ProtectedCommand": "Protected game command",
+  "FOUNDRY_TRANSLATE.Review.ActionName": "Action {number} · Name",
+  "FOUNDRY_TRANSLATE.Review.ActionDescription": "Action {number} · Description",
   "FOUNDRY_TRANSLATE.Review.Name": "Name",
   "FOUNDRY_TRANSLATE.Review.Text": "Text",
   "FOUNDRY_TRANSLATE.Review.TokenName": "Token name",

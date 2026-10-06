@@ -118,6 +118,152 @@ describe("native Item card prose", () => {
   });
 });
 
+class StringField {}
+class HTMLField {}
+class CrucibleActionField { fields = { id: new StringField(), name: new StringField(), description: new HTMLField() }; }
+class ArrayField { element = new CrucibleActionField(); }
+async function actionFixture(feature = true) {
+  const f = await fixture(feature);
+  const source: any = f.source, target: any = f.target;
+  source.system.actions = [{ id: "companion", name: "Construct Companion", description: "<p>Spend 1 hour.</p>",
+    cost: { action: 0 }, condition: "hasTalent", summon: { actorUuid: "Actor.original" }, tags: ["summon"] }];
+  target.system.actions = structuredClone(source.system.actions);
+  target.system.actions[0].name = "Sestrojit Společníka";
+  target.system.actions[0].description = "<p>Věnujte tomu 1 hodinu.</p>";
+  Object.defineProperty(source.system, "constructor", { value: { schema: { fields: { actions: new ArrayField() } } } });
+  source.actions = source.system.actions.map((action: any) => ({ ...structuredClone(action), item: source,
+    toObject() { const { item: _item, toObject: _method, ...data } = this; return structuredClone(data); } }));
+  target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(source.toObject());
+  const action = `<section class="actions"><h3>Akce</h3><div class="action line-item full" data-action-id="companion"><header class="action-header"><img alt="Construct Companion" title="Construct Companion" src="original.webp"><div class="title"><h4>Construct Companion</h4><div class="tags">5 / 0A</div></div></header><p class="activation">hasTalent</p><div class="description"><p>Spend 1 hour.</p></div><ul class="effects"><li>Original effect</li></ul><button data-action="activate" data-action-id="companion">Activate</button></div></section>`;
+  const native = feature ? f.native.replace(/<\/div>$/u, action + "</div>")
+    : f.native.replace(/<section class="actions">[\s\S]*?<\/section>/u, action);
+  return { source, target, native };
+}
+describe("included native Action prose", () => {
+  it("translates names and descriptions in the original Action enrichment context without changing mechanics", async () => {
+    const f = await actionFixture(), beforeSource = JSON.stringify(f.source.toObject()), beforeTarget = JSON.stringify(f.target.toObject());
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs")), row = result.querySelector(".actions > .action")!;
+    expect(row.querySelector("h4")?.textContent).toBe("Sestrojit Společníka");
+    expect(row.querySelector(".description")?.innerHTML).toBe("<p>Věnujte tomu 1 hodinu.</p>");
+    expect(row.querySelector("img")?.alt).toBe("Sestrojit Společníka");
+    expect(row.querySelector("img")?.getAttribute("src")).toBe("original.webp");
+    for (const selector of [".tags", ".activation", ".effects", "button"]) {
+      expect(row.querySelector(selector)?.outerHTML).toBe(html(f.native).querySelector(".actions " + selector)?.outerHTML);
+    }
+    expect(row.getAttribute("data-action-id")).toBe("companion");
+    expect(enrich).toHaveBeenCalledWith("<p>Věnujte tomu 1 hodinu.</p>", { relativeTo: f.source.actions[0], secrets: false });
+    expect(JSON.stringify(f.source.toObject())).toBe(beforeSource);
+    expect(JSON.stringify(f.target.toObject())).toBe(beforeTarget);
+    expect(f.target.renderCard).not.toHaveBeenCalled();
+  });
+  it("preserves physical Item owner-only Action visibility without revealing private Item biography", async () => {
+    const f = await actionFixture(false);
+    f.source.isOwner = true;
+    f.source.system.actions[0].description = '<section class="secret"><p>Spend 1 hour.</p></section>';
+    f.source.actions[0].description = f.source.system.actions[0].description;
+    f.target.system.actions[0].description = '<section class="secret"><p>Věnujte tomu 1 hodinu.</p></section>';
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs"));
+    expect(result.querySelector(".actions h4")?.textContent).toBe("Sestrojit Společníka");
+    expect(enrich).toHaveBeenCalledWith("<p>Zranění 3.</p>", { relativeTo: f.source, secrets: false });
+    expect(enrich).toHaveBeenCalledWith(f.target.system.actions[0].description, { relativeTo: f.source.actions[0], secrets: true });
+  });
+  it.each(["source", "target"])("rechecks physical Action %s ownership after enrichment", async owner => {
+    const f = await actionFixture(false); f.source.isOwner = true;
+    enrich.mockImplementation(async (value: string) => {
+      if (value.includes("hodinu")) f[owner as "source" | "target"].isOwner = false;
+      return value;
+    });
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+  });
+  it.each(["schema", "missing-copy", "foreign-id", "duplicate-copy", "duplicate-runtime", "foreign-runtime", "runtime-text", "foreign-heading", "number", "command", "HTML", "name-command", "duplicate-row", "reorder"])("keeps unsupported or unsafe Action native: %s", async reason => {
+    const f = await actionFixture(); let native = f.native;
+    if (reason === "schema") f.source.system.constructor.schema.fields.actions.element.fields.name = new HTMLField();
+    if (reason === "missing-copy") f.target.system.actions = [];
+    if (reason === "foreign-id") f.target.system.actions[0].id = "foreign";
+    if (reason === "duplicate-copy") f.target.system.actions.push(structuredClone(f.target.system.actions[0]));
+    if (reason === "duplicate-runtime") f.source.actions.push(f.source.actions[0]);
+    if (reason === "foreign-runtime") f.source.actions[0].item = f.target;
+    if (reason === "runtime-text") f.source.actions[0].description = "Other";
+    if (reason === "foreign-heading") native = native.replace("<h4>Construct Companion</h4>", "<h4>Other</h4>");
+    if (reason === "number") f.target.system.actions[0].description = "<p>Věnujte tomu 2 hodiny.</p>";
+    if (reason === "command") f.target.system.actions[0].description = "<p>Věnujte tomu 1 hodinu. @UUID[Actor.foreign]</p>";
+    if (reason === "HTML") f.target.system.actions[0].description = '<p class="unsafe">Věnujte tomu 1 hodinu.</p>';
+    if (reason === "name-command") f.target.system.actions[0].name = "@UUID[Actor.foreign]";
+    if (reason === "duplicate-row") {
+      const container = html(native), section = container.querySelector("section.actions")!;
+      section.append(section.querySelector(".action")!.cloneNode(true)); native = container.innerHTML;
+    }
+    if (reason === "reorder") {
+      const second = { id: "second", name: "Second", description: "<p>Second.</p>" };
+      f.source.system.actions.push(second); f.source.actions.push({ ...second, item: f.source });
+      f.target.system.actions.unshift(structuredClone(second));
+      f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    }
+    const result = html(await api.translatedItemCard(f.source, native, "cs"));
+    expect(result.querySelector("h2")?.textContent).toBe("Meč");
+    expect(result.querySelector("section.actions")?.outerHTML).toBe(html(native).querySelector("section.actions")?.outerHTML);
+  });
+  it.each(["target-action", "source-runtime", "source-data"])("discards the whole overlay when %s changes during enrichment", async reason => {
+    const f = await actionFixture();
+    enrich.mockImplementation(async (value: string) => {
+      if (value.includes("hodinu")) {
+        if (reason === "target-action") f.target.system.actions[0].name = "Changed";
+        if (reason === "source-runtime") f.source.actions[0].name = "Changed";
+        if (reason === "source-data") f.source.system.actions[0].condition = "Changed";
+      }
+      return value;
+    });
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+  });
+  it("uses original prepared @ref values and ignores copy mechanics, effects and summon targets", async () => {
+    const f = await actionFixture();
+    f.source.system.actions[0].description = "<p>Range @ref[range.maximum].</p>";
+    f.source.actions[0].description = f.source.system.actions[0].description;
+    f.source.actions[0].range = { maximum: 5 };
+    f.target.system.actions[0].description = "<p>Dosah @ref[range.maximum].</p>";
+    Object.assign(f.target.system.actions[0], { cost: { action: 99 }, range: { maximum: 99 },
+      effects: [{ name: "Foreign effect" }], summon: { actorUuid: "Actor.foreign" } });
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    enrich.mockImplementation(async (value: string, options: any) => value.replace("@ref[range.maximum]", String(options.relativeTo.range?.maximum)));
+    const result = html(await api.translatedItemCard(f.source, f.native, "cs")), row = result.querySelector(".actions > .action")!;
+    expect(row.querySelector(".description")?.textContent).toBe("Dosah 5.");
+    expect(row.querySelector(".tags")?.textContent).toBe("5 / 0A");
+    expect(row.querySelector(".effects")?.textContent).toBe("Original effect");
+    expect(row.querySelector("button")?.getAttribute("data-action-id")).toBe("companion");
+  });
+  it.each(["range", "cost", "instance"])("discards an overlay after prepared runtime %s changes without any raw source edit", async change => {
+    const f = await actionFixture();
+    f.source.system.actions[0].description = "<p>Range @ref[range.maximum].</p>";
+    f.source.actions[0].description = f.source.system.actions[0].description;
+    f.source.actions[0].range = { maximum: 5 };
+    f.target.system.actions[0].description = "<p>Dosah @ref[range.maximum].</p>";
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    const originalRaw = JSON.stringify(f.source.toObject());
+    enrich.mockImplementation(async (value: string, options: any) => {
+      if (value.includes("@ref")) {
+        if (change === "range") f.source.actions[0].range.maximum = 7;
+        if (change === "cost") f.source.actions[0].cost.action = 7;
+        if (change === "instance") f.source.actions[0] = { ...f.source.actions[0] };
+        return value.replace("@ref[range.maximum]", String(options.relativeTo.range.maximum));
+      }
+      return value;
+    });
+    expect(await api.translatedItemCard(f.source, f.native, "cs")).toBe(f.native);
+    expect(JSON.stringify(f.source.toObject())).toBe(originalRaw);
+  });
+  it("canonicalizes Action links while retaining the native runtime context and secret visibility", async () => {
+    const f = await actionFixture();
+    f.source.system.actions[0].description = "<p>@UUID[Item.sword] Spend 1 hour.</p>";
+    f.source.actions[0].description = f.source.system.actions[0].description;
+    f.target.system.actions[0].description = `<p>@UUID[${f.target.uuid}] Věnujte tomu 1 hodinu.</p>`;
+    f.target.flags["foundry-translate"].itemTranslation.sourceHash = await itemSourceHash(f.source.toObject());
+    mapping.source.mockImplementation(async uuid => uuid === f.target.uuid ? f.source.uuid : uuid);
+    await api.translatedItemCard(f.source, f.native, "cs");
+    expect(enrich).toHaveBeenCalledWith("<p>@UUID[Item.sword] Věnujte tomu 1 hodinu.</p>", { relativeTo: f.source.actions[0], secrets: false });
+  });
+});
+
 describe("scoped native hover producer", () => {
   it("handles the reviewed native creation talent div without changing selection, tooltip or Item identity", async () => {
     const f = await fixture(true);

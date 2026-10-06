@@ -52,6 +52,63 @@ export function discoverSystemHtmlFieldPaths(
   return paths;
 }
 
+/** Only the display name of native Crucible Item actions is plain prose.
+ * Its adjacent ID, conditions, tags, hooks and effects are automation data.
+ * An ambiguous action array cannot establish even one reliable name slot. */
+export function discoverCrucibleActionNameFieldPaths(
+  fields: Record<string, unknown> | undefined,
+  system: unknown,
+): readonly HtmlFieldPath[] {
+  if (!fields || !isRecord(system)) return [];
+  const actions = fields.actions;
+  if (!isRuntimeDataField(actions) || actions.constructor?.name !== "ArrayField"
+    || actions.element?.constructor?.name !== "CrucibleActionField"
+    || actions.element.fields?.id?.constructor?.name !== "StringField"
+    || actions.element.fields?.name?.constructor?.name !== "StringField"
+    || actions.element.fields?.description?.constructor?.name !== "HTMLField"
+    || !Array.isArray(system.actions)) return [];
+  const ids = new Set<string>();
+  for (const action of system.actions) {
+    if (!isRecord(action) || typeof action.id !== "string" || !action.id.trim()
+      || ids.has(action.id)) return [];
+    ids.add(action.id);
+  }
+  return system.actions.flatMap((action, index) =>
+    typeof action.name === "string" ? [["actions", index, "name"] as HtmlFieldPath] : []);
+}
+
+/** Positional action prose is safe only while the native action ID sequence is
+ * identical. Top-level embedded Item/page remapping must happen before this check. */
+export function assertSystemActionFieldIdentity(
+  source: unknown,
+  translated: unknown,
+  sourcePath: HtmlFieldPath,
+  translatedPath: HtmlFieldPath = sourcePath,
+): void {
+  const systemIndex = sourcePath.findIndex((part, index) => part === "system"
+    && sourcePath[index + 1] === "actions" && typeof sourcePath[index + 2] === "number");
+  if (systemIndex < 0) return;
+  const index = sourcePath[systemIndex + 2] as number;
+  const sourceActions = readPath(source, sourcePath.slice(0, systemIndex + 2));
+  const targetActions = readPath(translated, translatedPath.slice(0, systemIndex + 2));
+  const fail = (): never => { throw new Error("Native action identity changed; positional action fields cannot be paired safely."); };
+  if (translatedPath[systemIndex] !== "system" || translatedPath[systemIndex + 1] !== "actions"
+    || translatedPath[systemIndex + 2] !== index || !Number.isInteger(index) || index < 0
+    || !Array.isArray(sourceActions) || !Array.isArray(targetActions)
+    || sourceActions.length !== targetActions.length || index >= sourceActions.length) fail();
+  const ids = (actions: unknown[]): string[] => {
+    const seen = new Set<string>();
+    return actions.map(action => {
+      if (!isRecord(action) || typeof action.id !== "string" || !action.id.trim() || seen.has(action.id)) fail();
+      const id = (action as Record<string, unknown>).id as string;
+      seen.add(id);
+      return id;
+    });
+  };
+  const sourceIds = ids(sourceActions as unknown[]), targetIds = ids(targetActions as unknown[]);
+  if (sourceIds.some((id, position) => id !== targetIds[position])) fail();
+}
+
 /** Reviewed Ember UI strings which are not HTMLFields. Never scan every string:
  * adjacent fields contain IDs, enums, scene configuration and automation data. */
 const EMBER_LORE_PAGE_TYPES = new Set([

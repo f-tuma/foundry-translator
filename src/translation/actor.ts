@@ -11,14 +11,14 @@ import {
   type HtmlFieldTranslationTarget,
 } from "./html-field-translation";
 import { translatedOutputHash } from "./output-hash";
-import type { HtmlFieldPath } from "./system-html-fields";
+import { readPath, writePath, type HtmlFieldPath } from "./system-html-fields";
 import {
   glossaryFingerprint,
   type TranslationQualityFallback,
 } from "./unit-translator";
 
 export const ACTOR_TRANSLATION_SCHEMA_VERSION = 1;
-export const ACTOR_TRANSLATION_ENGINE_REVISION = 7;
+export const ACTOR_TRANSLATION_ENGINE_REVISION = 8;
 
 export interface ActorItemData extends Record<string, unknown> {
   _id?: string;
@@ -74,6 +74,8 @@ export interface TranslateActorOptions {
   };
   systemHtmlFieldPaths: readonly HtmlFieldPath[];
   itemHtmlFieldPaths: readonly (readonly HtmlFieldPath[])[];
+  /** Paths relative to each embedded Item system, selected by its local Crucible schema. */
+  itemActionNameFieldPaths?: readonly (readonly HtmlFieldPath[])[];
   cache?: TranslationCache;
   ownerDocument?: Document;
   nonceFactory?: () => string;
@@ -158,10 +160,27 @@ export async function translateActorData(options: TranslateActorOptions): Promis
   const namedItems = (copy.items ?? []).filter((item): item is ActorItemData & { name: string } => typeof item.name === "string" && !!item.name.trim());
   const prototype = copy.prototypeToken as { name?: unknown } | undefined;
   const tokenName = typeof prototype?.name === "string" && prototype.name.trim() ? prototype.name : undefined;
-  const names = await translateDocumentNames([copy.name, ...namedItems.map(item => item.name), ...(tokenName ? [tokenName] : [])], options);
+  const actionNames = (options.itemActionNameFieldPaths ?? []).flatMap((paths, itemIndex) => {
+    const owner = copy.items?.[itemIndex]?.system;
+    return paths.flatMap((path) => {
+      if (path.length !== 3 || path[0] !== "actions" || typeof path[1] !== "number"
+        || !Number.isInteger(path[1]) || path[1] < 0 || path[2] !== "name") return [];
+      const name = readPath(owner, path);
+      return typeof name === "string" && name.trim() ? [{ owner, path, name }] : [];
+    });
+  });
+  const names = await translateDocumentNames([copy.name, ...namedItems.map(item => item.name),
+    ...(tokenName ? [tokenName] : []), ...actionNames.map(({ name }) => name)], options);
   copy.name = names.names[0]!;
   namedItems.forEach((item, index) => { item.name = names.names[index + 1]!; });
-  if (prototype && tokenName) prototype.name = names.names.at(-1)!;
+  const tokenIndex = namedItems.length + 1;
+  if (prototype && tokenName) prototype.name = names.names[tokenIndex]!;
+  const actionOffset = tokenIndex + (tokenName ? 1 : 0);
+  actionNames.forEach(({ owner, path }, index) => {
+    if (!writePath(owner, path, names.names[actionOffset + index]!)) {
+      throw new Error(`Nepodařilo se zapsat název akce vloženého Itemu: ${path.join(".")}`);
+    }
+  });
   for (const item of copy.items ?? []) delete item._stats;
 
   const targets: HtmlFieldTranslationTarget[] = options.systemHtmlFieldPaths.map((path) => ({
