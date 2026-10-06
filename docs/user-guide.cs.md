@@ -108,6 +108,15 @@ nevytváří; některé konfigurační popisy a mechanické štítky mohou zůst
 v původním jazyce. Ručně otevřený přeložený deník si při vypnuté preferenci
 ponechá podporované přeložené náhledy.
 
+Verze **0.34.10** opravuje převzetí vložených přehledů původu a kultury,
+i když má jejich deník v jiných částech úseky ponechané v originále. Kontroluje
+aktuálnost zdroje, konkrétní vložený text, odkazy, strukturu a čísla.
+Popis naladění skládá ze stejných dvou přeložených částí jako Ember;
+potřebuje dostupný překlad stránky kosmické síly i společné stránky naladění.
+V českém rozhraní také překládá známé hodnoty vzácnosti, věku a výchozí
+popisek ukázkové postavy. Autorské popisky a neznámé hodnoty nepřepisuje.
+Po aktualizaci modulu obnov kartu světa a znovu otevři tvorbu postavy.
+
 Od verze **0.34.8** může GM v hlavním menu použít **Doplnit překlady tvorby
 postavy**. Okno nejprve ukáže počet chybějících a existujících kopií. Po
 potvrzení přeloží pouze chybějící možnosti původu, kultury a cesty z balíčku

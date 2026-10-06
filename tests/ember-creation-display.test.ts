@@ -28,7 +28,7 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 const flag = (key: string, sourceUuid: string, extra = {}) => ({ "foundry-translate": { [key]: { schemaVersion: 1,
   sourceUuid, sourceHash: "hash", providerId: "openai-compatible", sourceLanguage: "en", targetLanguage: "cs",
-  translatedAt: "2026-10-05", translatedTextPages: 1, skippedTextPages: 0, translatedHtmlFields: 1, ...extra } } });
+  translatedAt: "2026-10-05", translatedTextPages: 1, skippedTextPages: 0, translatedHtmlFields: 1, fallbackTextSegments: 0, ...extra } } });
 async function itemPair() {
   const data = { name: "Arcturian", type: "background", system: { identifier: "arcturian", description: "<p>Original culture.</p>", talents: [{ item: "Item.talent" }] } };
   const source = { uuid: "Compendium.ember.crucible-character.Item.culture", documentName: "Item", visible: true,
@@ -149,8 +149,9 @@ describe("Ember creation display overlay", () => {
     expect(result.ancestry.summary).toContain(`data-uuid="${f.source.uuid}"`);
     expect(enrich).toHaveBeenCalledWith('<p>České @UUID[JournalEntry.other.JournalEntryPage.child]{jméno} 3.</p>', { relativeTo: f.source, secrets: false });
   });
-  it.each(["no-embed-command", "full-page-mode", "foreign-embed", "changed-native-prose", "duplicate-embed", "stale-journal", "unprocessed-page", "hidden-parent", "hidden-target", "hidden-target-parent", "fallback", "changed-structure", "changed-numbers", "preference-off", "foreign-language", "empty-item-identifier", "missing-item-identifier", "translated-source-item", "nonempty-native-style", "other-native-attribute"])("retains native ancestry summary for %s", async reason => {
+  it.each(["no-embed-command", "full-page-mode", "foreign-embed", "changed-native-prose", "duplicate-embed", "stale-journal", "unprocessed-page", "hidden-parent", "hidden-target", "hidden-target-parent", "changed-structure", "changed-numbers", "preference-off", "foreign-language", "empty-item-identifier", "missing-item-identifier", "translated-source-item", "nonempty-native-style", "other-native-attribute"])("retains native ancestry summary for %s", async reason => {
     const f = await ancestryOverviewPair(); let summary = f.summary, locale = "cs";
+    f.translated.flags["foundry-translate"].translation!.fallbackTextSegments = 31;
     if (reason === "no-embed-command") f.data.system.description = "Unrelated Item prose";
     if (reason === "full-page-mode") f.data.system.description = `@Embed[${f.source.uuid} inline]`;
     if (reason === "foreign-embed") summary = summary.replace(f.source.uuid, "JournalEntry.foreign.JournalEntryPage.p");
@@ -161,7 +162,6 @@ describe("Ember creation display overlay", () => {
     if (reason === "hidden-parent") f.original.visible = false;
     if (reason === "hidden-target") f.target.visible = false;
     if (reason === "hidden-target-parent") f.translated.visible = false;
-    if (reason === "fallback") Object.assign(f.translated.flags["foundry-translate"].translation!, { fallbackTextSegments: 1 });
     if (reason === "changed-structure") (f.target.system as any).content.overview = "<p onclick=\"unsafe()\">Český přehled 3.</p>";
     if (reason === "changed-numbers") (f.target.system as any).content.overview = "<p>Český přehled 5.</p>";
     if (reason === "preference-off") preference = false;
@@ -173,6 +173,42 @@ describe("Ember creation display overlay", () => {
     if (reason === "other-native-attribute") summary = summary.replace('style=""', 'style="" class="unexpected"');
     const result = await translateEmberCreationContext({ ancestry: { ...f.option, summary } }, locale) as any;
     expect(result.ancestry.summary).toBe(summary); expect(enrich).not.toHaveBeenCalled();
+  });
+  it("uses a valid overview despite unrelated journal fallbacks, including an Item copy that embeds the original page", async () => {
+    const f = await ancestryOverviewPair();
+    f.translated.flags["foundry-translate"].translation!.fallbackTextSegments = 31;
+    const itemTarget = documents.get("Compendium.world.foundry-translate-items.Item.cs");
+    itemTarget.system.description = f.data.system.description;
+    itemTarget.flags["foundry-translate"].itemTranslation!.sourceHash = await itemSourceHash(f.data);
+    const resolve = identity.resolve.getMockImplementation()!;
+    identity.resolve.mockImplementation(async (uuid, locale) => uuid === f.option.item.uuid
+      ? { status: "mapped", sourceUuid: uuid, translatedUuid: itemTarget.uuid } : resolve(uuid, locale));
+    enrich.mockImplementation(async html => html === f.data.system.description ? f.summary : html);
+    const result = await translateEmberCreationContext(f.context) as any;
+    expect(result.ancestry.summary).toContain("Český přehled 3.");
+    expect(result.ancestry.summary).toContain(`data-uuid="${f.source.uuid}"`);
+    expect(result.ancestry.item).toBe(f.option.item);
+    expect(f.translated.flags["foundry-translate"].translation!.fallbackTextSegments).toBe(31);
+  });
+  it("supports the native lowercase culture embed without replacing unrelated prose", async () => {
+    const f = await ancestryOverviewPair();
+    journals.delete("emberAncestries0"); journals.set("emberCultures000", f.original);
+    f.source.type = f.target.type = "ember.culture";
+    f.data.system.description = f.data.system.description.replace("@Embed[", "@embed[");
+    f.translated.flags["foundry-translate"].translation!.sourceHash = await journalSourceHash(f.sourceData);
+    const result = await translateEmberCreationContext({ culture: f.option }) as any;
+    expect(result.culture.summary).toBe(f.summary.replace('<p style="">Native overview 3.</p>', "<p>Český přehled 3.</p>"));
+    expect(f.option.summary).toBe(f.summary);
+  });
+  it("localizes only Ember's synthesized empty ancestry caption", async () => {
+    const f = await ancestryOverviewPair();
+    f.source.system.banner.caption = f.target.system.banner.caption = "";
+    (game.i18n as any).localize = (key: string) => key.endsWith(".ExampleCharacter") ? "Ukázková postava ({name})." : key;
+    const option = { ...f.option, figure: { caption: `An example ${f.option.name} character.`, src: "native.webp" } };
+    const result = await translateEmberCreationContext({ ancestry: option }) as any;
+    expect(result.ancestry.figure).toEqual({ caption: "Ukázková postava (Arktuřan).", src: "native.webp" });
+    const custom = { ...option, figure: { ...option.figure, caption: "Author's caption" } };
+    expect((await translateEmberCreationContext({ ancestry: custom }) as any).ancestry.figure.caption).toBe("Author's caption");
   });
   it.each(["source-journal", "source-item", "target-page", "preference", "language", "user"])("discards overview changes when %s changes during enrichment", async reason => {
     const f = await ancestryOverviewPair();
@@ -200,6 +236,43 @@ describe("Ember creation display overlay", () => {
     const f = await itemPair();
     const result = await translateEmberCreationContext({ attunement: { name: f.source.name, item: f.source, summary: "Config description" } }) as any;
     expect(result.attunement.name).toBe("Arktuřan"); expect(result.attunement.summary).toBe("Config description"); expect(enrich).not.toHaveBeenCalled();
+  });
+  it("integrates the composed attunement with translated presentation while keeping the native Item and selection state", async () => {
+    const f = await itemPair(), p = pagePair(f.source);
+    journals.delete("emberCultures000"); journals.set("emberCosmos00000", p.original);
+    p.original.uuid = "JournalEntry.emberCosmos00000";
+    p.source.uuid = `${p.original.uuid}.JournalEntryPage.p`;
+    p.source.type = p.target.type = "ember.cosmos";
+    p.source.name = "Realm of Air"; p.target.name = "Říše Vzduchu";
+    Object.assign(p.source.system, { content: { overview: "<p>Native realm 3.</p>" } });
+    Object.assign(p.target.system, { content: { overview: "<p>Česká říše 3.</p>" } });
+    const beforeSection = '<section class="block attunement aura"><h4>Ideal</h4><p>Native ideal 2.</p></section>';
+    const afterSection = '<section class="block attunement aura"><h4>Ideál</h4><p>Český ideál 2.</p></section>';
+    const id = "jc7TEnx3yMnUcILK";
+    const lore = { uuid: `${p.original.uuid}.JournalEntryPage.${id}`, id, type: "text", documentName: "JournalEntryPage", visible: true,
+      parent: p.original, text: { content: beforeSection } };
+    const targetLore = { ...lore, uuid: `${p.translated.uuid}.JournalEntryPage.${id}`, parent: p.translated, text: { content: afterSection } };
+    p.original.pages.contents.push(lore);
+    const data = { name: "Cosmos", pages: p.original.pages.contents.map(page => ({ _id: page.id, name: page.name, type: page.type, system: page.system, text: page.text })) };
+    Object.assign(p.original, { toObject: () => data });
+    Object.assign(p.translated.flags["foundry-translate"].translation!, { sourceUuid: p.original.uuid, sourceHash: await journalSourceHash(data), fallbackTextSegments: 55 });
+    identity.resolve.mockImplementation(async uuid => ({ status: "mapped", sourceUuid: uuid,
+      translatedUuid: uuid === p.source.uuid ? p.target.uuid : uuid === lore.uuid ? targetLore.uuid : f.target.uuid }));
+    documents.set(targetLore.uuid, targetLore);
+    const summary = `<p>Native realm 3.</p><div class="ember">${beforeSection}</div>`;
+    vi.stubGlobal("ember", { CONST: { ATTUNEMENT_IDENTIFIERS: { arcturian: Object.freeze({ identifier: "arcturian", pageUuid: p.source.uuid,
+      id: "aura", label: "Air", description: summary }) } } });
+    glossary.load.mockResolvedValue([{ source: "Air", replacement: "Vzduch", aliases: [] }]);
+    (game.i18n as any).localize = (key: string) => key.endsWith(".Attunement") ? "Naladění" : key;
+    const option = Object.freeze({ identifier: "arcturian", item: f.source, name: "Air", title: p.source.name, subtitle: p.source.system.subtitle,
+      summary, figure: Object.freeze({ caption: p.source.system.banner.caption, src: "native.webp" }) });
+    const state = Object.freeze({ attunementId: "arcturian" });
+    const context = { state, attunement: option, tabs: { attunement: { label: "Attunement", selectionLabel: "Air", action: "chooseAttunement" } } };
+    const result = await translateEmberCreationContext(context) as any;
+    expect(result.attunement).toMatchObject({ item: f.source, identifier: "arcturian", name: "Vzduch", title: "Říše Vzduchu", subtitle: "Kultura",
+      summary: `<p>Česká říše 3.</p><div class="ember">${afterSection}</div>`, figure: { caption: "Duše přetrvá.", src: "native.webp" } });
+    expect(result.tabs.attunement).toEqual({ label: "Naladění", selectionLabel: "Vzduch", action: "chooseAttunement" });
+    expect(result.state).toBe(state); expect(context.attunement).toBe(option); expect(option.summary).toBe(summary);
   });
   it("retains source description if translated HTML or command structure changes", async () => {
     const f = await itemPair(); f.target.system.description = '<p onclick="unsafe()">Česká kultura.</p>';
@@ -317,23 +390,42 @@ describe("native creation talent captions", () => {
   });
   it("localizes native tab and progression/trait labels through actual interface dictionaries only", async () => {
     (game.i18n as any).lang = "cs";
-    const values: Record<string, string> = { Culture: "Kultura", AsterProgression: "Vývoj Asterů", Rarity: "Vzácnost", Lifespan: "Délka Života" };
+    const values: Record<string, string> = { Culture: "Kultura", AsterProgression: "Vývoj Asterů", Rarity: "Vzácnost", Lifespan: "Délka Života", Years: "let", RarityUncommon: "Neobvyklý" };
     (game.i18n as any).localize = (key: string) => values[key.replace("FOUNDRY_TRANSLATE.Creation.", "")] ?? key;
     const context = { tabs: { culture: { id: "culture", label: "Culture", action: "chooseCulture" }, custom: { label: "Custom" } },
       aster: { features: [{ label: "Aster Progression", tags: [{ text: "Lifespan: 150 years", id: "lifespan" }, { text: "Rarity: Uncommon" }, { text: "Other: 3" }] }] } };
     const result = await translateEmberCreationContext(context) as any;
     expect(result.tabs.culture).toEqual({ id: "culture", label: "Kultura", action: "chooseCulture" });
     expect(result.tabs.custom).toBe(context.tabs.custom);
-    expect(result.aster.features[0]).toEqual({ label: "Vývoj Asterů", tags: [{ text: "Délka Života: 150 years", id: "lifespan" }, { text: "Vzácnost: Uncommon" }, { text: "Other: 3" }] });
+    expect(result.aster.features[0]).toEqual({ label: "Vývoj Asterů", tags: [{ text: "Délka Života: 150 let", id: "lifespan" }, { text: "Vzácnost: Neobvyklý" }, { text: "Other: 3" }] });
     expect(context.tabs.culture.label).toBe("Culture");
     const html = '<section class="gameplay-traits option-summary crucible"><div class="step-feature"><h4>Aster Progression</h4><div class="tags"><span class="tag">Lifespan: 150 years</span></div></div></section>';
     const after = await translateEmberCreationFeatureHtml(html, "cs");
-    expect(after).toContain("<h4>Vývoj Asterů</h4>"); expect(after).toContain("Délka Života: 150 years");
+    expect(after).toContain("<h4>Vývoj Asterů</h4>"); expect(after).toContain("Délka Života: 150 let");
   });
   it("discards feature label changes after source access or world changes during asynchronous lookup", async () => {
     const f = await talentPair(); const old = identity.resolve.getMockImplementation()!;
     identity.resolve.mockImplementation(async (uuid: string, locale: string) => { const result = await old(uuid, locale); (game as any).world = {}; return result; });
     expect(await translateEmberCreationFeatureHtml(inline(f.source.uuid), "cs")).toBe(inline(f.source.uuid));
+  });
+  it.each([
+    ["Rarity: Rare", "Vzácnost: Vzácný"],
+    ["Rarity: Extinct", "Vzácnost: Vyhynulý"],
+    ["Lifespan: 450 - 600 years.", "Délka Života: 450 - 600 let."],
+    ["Lifespan: 600-800 Years", "Délka Života: 600-800 let"],
+    ["Lifespan: 250 - 300 (Immortal Exceptions)", "Délka Života: 250 - 300 (Výjimečně nesmrtelní)"],
+    ["Lifespan: Unknown", "Délka Života: Neznámá"],
+    ["Lifespan: Varied", "Délka Života: Proměnlivá"],
+    ["Lifespan: About 150 years of uncertain origin", "Délka Života: About 150 years of uncertain origin"],
+    ["Rarity: Secret category", "Vzácnost: Secret category"],
+  ])("localizes supported authored display values and leaves unknown prose alone: %s", async (before, after) => {
+    const values: Record<string, string> = { Rarity: "Vzácnost", Lifespan: "Délka Života", RarityRare: "Vzácný", RarityExtinct: "Vyhynulý", Years: "let",
+      ImmortalExceptions: "Výjimečně nesmrtelní", UnknownLifespan: "Neznámá", VariedLifespan: "Proměnlivá" };
+    (game.i18n as any).localize = (key: string) => values[key.replace("FOUNDRY_TRANSLATE.Creation.", "")] ?? key;
+    const context = { ancestry: { features: [{ id: "traits", tags: [{ text: before, native: true }] }] } };
+    const result = await translateEmberCreationContext(context) as any;
+    expect(result.ancestry.features[0].tags).toEqual([{ text: after, native: true }]);
+    expect(context.ancestry.features[0]!.tags[0]!.text).toBe(before);
   });
   it.each(["unprocessed", "wrong-source-UUID", "source-change"])("keeps native explicit summary for %s", async reason => {
     const f = await talentPair(), p = pagePair(f.source); documents.set(p.source.uuid, p.source);
