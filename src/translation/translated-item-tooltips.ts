@@ -7,9 +7,9 @@ import { discoverDocumentDependencies, rewriteDocumentReferences } from "./docum
 import { parseDocumentReference, resolveSourceReference, resolveTranslationReference } from "./document-identity";
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "./item";
 import { readJournalTranslationFlag } from "./journal";
-import { discoverCrucibleActionNameFieldPaths } from "./system-html-fields";
+import { discoverCrucibleActionNameFieldPaths, discoverCrucibleActionConditionFieldPaths } from "./system-html-fields";
 
-interface CardAction { id: string; name: string; description?: string; item?: CardItem; toObject?(source: boolean): Record<string, unknown> }
+interface CardAction { id: string; name: string; description?: string; condition?: string; item?: CardItem; toObject?(source: boolean): Record<string, unknown> }
 interface CardItem extends FoundryUuidDocument {
   name: string; type: string; isOwner?: boolean;
   system: { description?: string | { public?: string } };
@@ -146,6 +146,7 @@ async function translateIncludedActions(card: HTMLElement, source: CardItem, tar
     || before.length !== after.length || before.some((action, index) => action.id !== after[index]?.id)) return;
   const runtime = new Map(source.actions.map(action => [action.id, action]));
   if (runtime.size !== source.actions.length) return;
+  const conditionIndexes = new Set(discoverCrucibleActionConditionFieldPaths(fields, sourceData.system).map(path => path[1]));
   const rows = [...card.querySelectorAll<HTMLElement>(":scope > section.actions > div.action.line-item[data-action-id]")];
   if (new Set(rows.map(row => row.dataset.actionId)).size !== rows.length) return;
   for (const row of rows) {
@@ -162,13 +163,30 @@ async function translateIncludedActions(card: HTMLElement, source: CardItem, tar
       if (JSON.stringify(proseNumbers([original.name])) !== JSON.stringify(proseNumbers([translated.name]))) continue;
       const prose = body && typeof original.description === "string" && typeof translated.description === "string"
         ? await enrichProse(original.description, translated.description, source, target, action, secrets) : undefined;
+      const conditionElements = row.querySelectorAll<HTMLElement>(":scope > p.condition.activation > em");
+      const condition = conditionElements.length === 1 ? conditionElements[0] : undefined;
+      const conditionText = conditionIndexes.has(index) && action.condition === original.condition
+        && condition?.textContent === original.condition && typeof original.condition === "string"
+        && typeof translated.condition === "string" && translated.condition.trim()
+        ? safeConditionText(original.condition, translated.condition) : undefined;
       heading.textContent = translated.name;
       if (body && prose !== undefined) body.innerHTML = prose;
+      if (condition && conditionText !== undefined) condition.textContent = conditionText;
       const image = row.querySelector<HTMLImageElement>(":scope > header.action-header img");
       if (image?.alt === original.name) image.alt = translated.name;
       if (image?.title === original.name) image.title = translated.name;
     } catch (error) { logger.warn("Included Action translation unavailable; keeping its native presentation.", error); }
   }
+}
+
+/** The native trigger sentence is display-only text. Invalid copies leave that
+ * sentence untouched; neither a condition nor an Action model is executed here. */
+function safeConditionText(before: string, after: string): string | undefined {
+  try {
+    assertPortableText(before, after, "text");
+    if (JSON.stringify(proseNumbers([before])) !== JSON.stringify(proseNumbers([after]))) return undefined;
+    return after;
+  } catch { return undefined; }
 }
 
 function replay(element: HTMLElement, event: Event): void {

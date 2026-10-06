@@ -57,6 +57,7 @@ import {
   discoverSystemHtmlFieldPaths,
   discoverEmberTextFieldPaths,
   discoverCrucibleActionNameFieldPaths,
+  discoverCrucibleActionConditionFieldPaths,
   readPath,
   type HtmlFieldPath,
 } from "./system-html-fields";
@@ -382,6 +383,7 @@ function actorHtmlFieldPaths(
   system: readonly HtmlFieldPath[];
   items: readonly (readonly HtmlFieldPath[])[];
   actionNames: readonly (readonly HtmlFieldPath[])[];
+  actionConditions: readonly (readonly HtmlFieldPath[])[];
 } {
   const system = discoverSystemHtmlFieldPaths(
     sourceDocument.system?.constructor?.schema?.fields,
@@ -405,7 +407,11 @@ function actorHtmlFieldPaths(
       runtime?.system?.constructor?.schema?.fields, item.system,
     );
   });
-  return { system, items, actionNames };
+  const actionConditions = (source.items ?? []).map(item => {
+    const runtime = item._id ? runtimeItems.get(item._id) : undefined;
+    return discoverCrucibleActionConditionFieldPaths(runtime?.system?.constructor?.schema?.fields, item.system);
+  });
+  return { system, items, actionNames, actionConditions };
 }
 
 function documentTranslationUnits(document: GraphSourceDocument): number {
@@ -413,10 +419,13 @@ function documentTranslationUnits(document: GraphSourceDocument): number {
   if (isActorDocument(document)) {
     const source = document.toObject() as ActorData;
     const paths = actorHtmlFieldPaths(document, source);
-    return paths.system.length + paths.items.reduce((total, item) => total + item.length, 0);
+    return paths.system.length + paths.items.reduce((total, item) => total + item.length, 0)
+      + paths.actionConditions.reduce((total, item) => total + item.length, 0);
   }
   if (isItemDocument(document)) {
-    return itemHtmlFieldPaths(document, document.toObject() as ItemData).length;
+    const data = document.toObject() as ItemData;
+    return itemHtmlFieldPaths(document, data).length
+      + discoverCrucibleActionConditionFieldPaths(document.system?.constructor?.schema?.fields, data.system).length;
   }
   return (document.toObject() as JournalData).pages.length;
 }
@@ -1267,6 +1276,7 @@ export class JournalTranslationService {
       systemHtmlFieldPaths: paths.system,
       itemHtmlFieldPaths: paths.items,
       itemActionNameFieldPaths: paths.actionNames,
+      itemActionConditionFieldPaths: paths.actionConditions,
       cache: runtime.cache,
       beforeBatch: () => checkpointControl(runtime.runId),
       onQualityFallback: (fallback) => {
@@ -1339,6 +1349,9 @@ export class JournalTranslationService {
       },
       systemHtmlFieldPaths: itemHtmlFieldPaths(sourceDocument, source),
       actionNameFieldPaths: discoverCrucibleActionNameFieldPaths(
+        sourceDocument.system?.constructor?.schema?.fields, source.system,
+      ),
+      actionConditionFieldPaths: discoverCrucibleActionConditionFieldPaths(
         sourceDocument.system?.constructor?.schema?.fields, source.system,
       ),
       cache: runtime.cache,

@@ -1,6 +1,6 @@
 import { displayFields, isDisplayDocument } from "../translation/display-text";
 import type { JournalData } from "../translation/journal";
-import { discoverSystemHtmlFieldPaths, discoverEmberTextFieldPaths, discoverCrucibleActionNameFieldPaths, readPath, type HtmlFieldPath } from "../translation/system-html-fields";
+import { discoverSystemHtmlFieldPaths, discoverEmberTextFieldPaths, discoverCrucibleActionNameFieldPaths, discoverCrucibleActionConditionFieldPaths, readPath, type HtmlFieldPath } from "../translation/system-html-fields";
 
 export type BundleDocumentKind = "JournalEntry" | "Actor" | "Item" | "Scene" | "ActiveEffect";
 export type FieldFormat = "text" | "html" | "markdown";
@@ -27,7 +27,9 @@ export function portableFields(document: PortableDocument, data = document.toObj
     }
   };
   const addActionNames = (runtime: { system?: FoundryRuntimeSystem } | undefined, value: unknown, prefix: HtmlFieldPath): void => {
-    for (const path of discoverCrucibleActionNameFieldPaths(runtime?.system?.constructor?.schema?.fields, value)) {
+    const schema = runtime?.system?.constructor?.schema?.fields;
+    for (const path of [...discoverCrucibleActionNameFieldPaths(schema, value),
+      ...discoverCrucibleActionConditionFieldPaths(schema, value)]) {
       fields.push({ path: [...prefix, ...path], format: "text" });
     }
   };

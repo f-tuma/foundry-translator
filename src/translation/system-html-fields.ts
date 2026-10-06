@@ -52,29 +52,51 @@ export function discoverSystemHtmlFieldPaths(
   return paths;
 }
 
-/** Only the display name of native Crucible Item actions is plain prose.
- * Its adjacent ID, conditions, tags, hooks and effects are automation data.
- * An ambiguous action array cannot establish even one reliable name slot. */
-export function discoverCrucibleActionNameFieldPaths(
+/** Establish the reviewed native schema and unambiguous Action identities. */
+function nativeCrucibleActionData(
   fields: Record<string, unknown> | undefined,
   system: unknown,
-): readonly HtmlFieldPath[] {
-  if (!fields || !isRecord(system)) return [];
+): Record<string, unknown>[] | null {
+  if (!fields || !isRecord(system)) return null;
   const actions = fields.actions;
   if (!isRuntimeDataField(actions) || actions.constructor?.name !== "ArrayField"
     || actions.element?.constructor?.name !== "CrucibleActionField"
     || actions.element.fields?.id?.constructor?.name !== "StringField"
     || actions.element.fields?.name?.constructor?.name !== "StringField"
     || actions.element.fields?.description?.constructor?.name !== "HTMLField"
-    || !Array.isArray(system.actions)) return [];
+    || !Array.isArray(system.actions)) return null;
   const ids = new Set<string>();
   for (const action of system.actions) {
     if (!isRecord(action) || typeof action.id !== "string" || !action.id.trim()
-      || ids.has(action.id)) return [];
+      || ids.has(action.id)) return null;
     ids.add(action.id);
   }
-  return system.actions.flatMap((action, index) =>
-    typeof action.name === "string" ? [["actions", index, "name"] as HtmlFieldPath] : []);
+  return system.actions as Record<string, unknown>[];
+}
+
+/** Native Action names use the title pipeline. Adjacent IDs, tags, hooks and
+ * effects remain automation data. An ambiguous array exposes no name slots. */
+export function discoverCrucibleActionNameFieldPaths(
+  fields: Record<string, unknown> | undefined,
+  system: unknown,
+): readonly HtmlFieldPath[] {
+  return nativeCrucibleActionData(fields, system)?.flatMap((action, index) =>
+    typeof action.name === "string" ? [["actions", index, "name"] as HtmlFieldPath] : []) ?? [];
+}
+
+/** Crucible's StringField condition is a displayed trigger sentence, not a
+ * predicate: native templates escape it inside p.condition.activation > em.
+ * Never infer this exception from arbitrary data or another field schema. */
+export function discoverCrucibleActionConditionFieldPaths(
+  fields: Record<string, unknown> | undefined,
+  system: unknown,
+): readonly HtmlFieldPath[] {
+  const actions = nativeCrucibleActionData(fields, system);
+  const array = fields?.actions as RuntimeDataField | undefined;
+  if (!actions || array?.element?.fields?.condition?.constructor?.name !== "StringField"
+    || actions.some(action => action.condition != null && typeof action.condition !== "string")) return [];
+  return actions.flatMap((action, index) => typeof action.condition === "string"
+    ? [["actions", index, "condition"] as HtmlFieldPath] : []);
 }
 
 /** Positional action prose is safe only while the native action ID sequence is
