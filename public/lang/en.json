@@ -790,5 +790,16 @@
   "FOUNDRY_TRANSLATE.CreationItems.AmbiguousSource": "More than one source Item has the same character option identifier. The plan was stopped.",
   "FOUNDRY_TRANSLATE.CreationItems.SourceChanged": "A source character option changed. Refresh the plan before trying again.",
   "FOUNDRY_TRANSLATE.CreationItems.RuntimeChanged": "This action requires a Game Master, the Crucible system and active Ember. The world, permissions and translation settings must remain unchanged during the run.",
-  "FOUNDRY_TRANSLATE.CreationItems.TooMany": "The plan exceeds the limit of {limit} unique Items. Nothing was translated."
+  "FOUNDRY_TRANSLATE.CreationItems.TooMany": "The plan exceeds the limit of {limit} unique Items. Nothing was translated.",
+  "FOUNDRY_TRANSLATE.Creation.RarityCommon": "Common",
+  "FOUNDRY_TRANSLATE.Creation.RarityUncommon": "Uncommon",
+  "FOUNDRY_TRANSLATE.Creation.RarityRare": "Rare",
+  "FOUNDRY_TRANSLATE.Creation.RarityVeryRare": "Very Rare",
+  "FOUNDRY_TRANSLATE.Creation.RarityUnique": "Unique",
+  "FOUNDRY_TRANSLATE.Creation.Years": "years",
+  "FOUNDRY_TRANSLATE.Creation.ImmortalExceptions": "Immortal Exceptions",
+  "FOUNDRY_TRANSLATE.Creation.UnknownLifespan": "Unknown",
+  "FOUNDRY_TRANSLATE.Creation.VariedLifespan": "Varied",
+  "FOUNDRY_TRANSLATE.Creation.ExampleCharacter": "An example {name} character.",
+  "FOUNDRY_TRANSLATE.Creation.RarityExtinct": "Extinct"
 }

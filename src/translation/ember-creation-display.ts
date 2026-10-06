@@ -9,6 +9,7 @@ import { resolveSourceReference, resolveTranslationReference, translationIdentit
 import { discoverDocumentDependencies, rewriteDocumentReferences } from "./document-dependencies";
 import { itemSourceHash, readItemTranslationFlag, type ItemData } from "./item";
 import { journalSourceHash, readJournalTranslationFlag, type JournalData } from "./journal";
+import { translateAttunementSummary } from "./ember-creation-attunement";
 
 interface DisplayDocument extends FoundryUuidDocument {
   name?: string; type?: string; visible?: boolean; isOwner?: boolean;
@@ -35,10 +36,29 @@ function uiLabel(source: string): string {
   const key = `FOUNDRY_TRANSLATE.Creation.${UI_LABELS[source]}`, translated = game.i18n.localize(key);
   return translated === key ? source : translated;
 }
+function creationLabel(key: string, fallback: string): string {
+  const full = `FOUNDRY_TRANSLATE.Creation.${key}`, value = game.i18n.localize(full);
+  return value === full ? fallback : value;
+}
+function lifespanLabel(value: string): string {
+  const fixed: Record<string, string> = { Unknown: "UnknownLifespan", Varied: "VariedLifespan" };
+  if (Object.hasOwn(fixed, value)) return creationLabel(fixed[value]!, value);
+  // Native display metadata, not the numerical movement/ability fields. Keep
+  // every number, separator and punctuation exactly as authored.
+  const years = /^(\d+\s*(?:-\s*\d+)?\s+)(years|Years)(\.?)$/u.exec(value);
+  if (years) return `${years[1]}${creationLabel("Years", years[2]!)}${years[3]}`;
+  const immortal = /^(\d+\s*-\s*\d+\s*)\(Immortal Exceptions\)$/u.exec(value);
+  return immortal ? `${immortal[1]}(${creationLabel("ImmortalExceptions", "Immortal Exceptions")})` : value;
+}
 function featureLabel(source: unknown): unknown {
   if (typeof source !== "string") return source;
   if (Object.hasOwn(UI_LABELS, source)) return uiLabel(source);
-  for (const prefix of ["Rarity", "Lifespan"]) if (source.startsWith(`${prefix}: `)) return `${uiLabel(prefix)}: ${source.slice(prefix.length + 2)}`;
+  for (const prefix of ["Rarity", "Lifespan"]) if (source.startsWith(`${prefix}: `)) {
+    const value = source.slice(prefix.length + 2);
+    const rarity = ["Common", "Uncommon", "Rare", "Very Rare", "Unique", "Extinct"].includes(value)
+      ? creationLabel(`Rarity${value.replaceAll(" ", "")}`, value) : value;
+    return `${uiLabel(prefix)}: ${prefix === "Lifespan" ? lifespanLabel(value) : rarity}`;
+  }
   return source;
 }
 
@@ -220,19 +240,19 @@ function overviewComparisonHtml(html: string): string {
   return root.innerHTML;
 }
 
-/** The native Item may embed its own ancestry overview without a translated
- * Item copy. Replace only that proven embed's children, never arbitrary Item
+/** The native Item may embed its own ancestry/culture overview. Replace only
+ * that proven embed's children, never arbitrary Item
  * prose, its surrounding HTML, or its original document identity. */
 async function overviewEmbedHtml(summary: string, item: DisplayDocument, page: DisplayDocument,
   target: DisplayDocument, locale: string, guards: (() => boolean)[], sourceHash: ReturnType<typeof overviewSourceHashes>): Promise<string | null> {
-  if (!preferTranslations() || locale !== language() || page.type !== "ember.ancestry"
+  if (!preferTranslations() || locale !== language() || !["ember.ancestry", "ember.culture"].includes(page.type ?? "")
     || translationIdentity(item, "Item") || typeof item.system?.identifier !== "string" || !item.system.identifier.trim()
     || item.system.identifier !== page.system?.identifier) return null;
   const description = itemDescription(item), before = page.system?.content?.overview, after = target.system?.content?.overview;
   if (typeof description !== "string" || typeof before !== "string" || !before.trim() || typeof after !== "string") return null;
   // Only the observed native overview/inline form is supported. Other modes
   // can contain a full page, a caption, or interactive content.
-  const commands = [...description.matchAll(/@Embed\[([^\]\r\n]+)\](?!\{)/gu)];
+  const commands = [...description.matchAll(/@(?:Embed|embed)\[([^\]\r\n]+)\](?!\{)/gu)];
   if (!commands.some(match => {
     const [uuid, ...options] = match[1]!.trim().split(/\s+/u);
     return uuid === page.uuid && options.length === 2 && new Set(options).size === 2
@@ -243,7 +263,10 @@ async function overviewEmbedHtml(summary: string, item: DisplayDocument, page: D
     .filter(embed => embed.dataset.uuid === page.uuid);
   if (embeds.length !== 1 || overviewComparisonHtml(embeds[0]!.innerHTML) !== overviewComparisonHtml(before)) return null;
   const parent = page.parent as DisplayDocument | undefined, flag = readJournalTranslationFlag(target.parent?.flags);
-  if (!readable(parent) || !flag || flag.fallbackTextSegments > 0 || flag.sourceHash !== await sourceHash(parent)) return null;
+  // Fallback counts cover the entire journal and can concern unrelated pages.
+  // Validate the selected overview itself below, retaining the fresh source
+  // hash, page identity/access, completed-page, structure and number checks.
+  if (!readable(parent) || !flag || flag.sourceHash !== await sourceHash(parent)) return null;
   const itemProof = JSON.stringify(item.toObject?.() ?? item.system);
   guards.push(() => readable(item) && !translationIdentity(item, "Item")
     && JSON.stringify(item.toObject?.() ?? item.system) === itemProof);
@@ -305,9 +328,20 @@ export async function translateEmberCreationContext(context: unknown, locale = l
       }
       const page = originalPage(family, option), targetPage = page && await lookup(page);
       if (page && targetPage) {
-        if (item?.documentName === "Item" && readable(item) && typeof option.summary === "string" && copy.summary === option.summary) {
+        if (family === "attunement" && typeof option.summary === "string") {
+          const html = await translateAttunementSummary(option.summary, page, targetPage, locale, guards, overviewSourceHash, lookup);
+          if (html !== null) copy.summary = html;
+          const config = (globalThis as any).ember?.CONST?.ATTUNEMENT_IDENTIFIERS?.[option.identifier];
+          if (config?.identifier === option.identifier && config.pageUuid === page.uuid && option.name === config.label) {
+            const proof = JSON.stringify(config);
+            guards.push(() => (globalThis as any).ember?.CONST?.ATTUNEMENT_IDENTIFIERS?.[option.identifier] === config
+              && JSON.stringify(config) === proof);
+            copy.name = mapGlossaryLabel(labels, option.name) ?? copy.name;
+          }
+        }
+        if (item?.documentName === "Item" && readable(item) && typeof copy.summary === "string") {
           try {
-            const html = await overviewEmbedHtml(option.summary, item, page, targetPage, locale, guards, overviewSourceHash);
+            const html = await overviewEmbedHtml(copy.summary, item, page, targetPage, locale, guards, overviewSourceHash);
             if (html !== null) copy.summary = html;
           } catch (error) { logger.warn("Creation overview embed validation failed; keeping native prose.", error); }
         }
@@ -319,6 +353,12 @@ export async function translateEmberCreationContext(context: unknown, locale = l
         if (typeof before === "string" && typeof after === "string" && option.figure?.caption === before) {
           try { assertPortableText(before, after, "text"); copy.figure = { ...option.figure, caption: after }; }
           catch { /* A malformed/unrecognized caption keeps the native value. */ }
+        }
+        // Ember synthesizes this caption when the author left it empty. Match
+        // only that exact native fallback; custom captions stay author-owned.
+        if (family === "ancestry" && before === "" && option.figure?.caption === `An example ${option.name} character.`) {
+          const template = creationLabel("ExampleCharacter", "An example {name} character.");
+          copy.figure = { ...option.figure, caption: template.replace("{name}", copy.name) };
         }
       }
       if (Array.isArray(option.features)) copy.features = await Promise.all(option.features.map(async (feature: unknown) => {

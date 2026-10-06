@@ -790,5 +790,16 @@
   "FOUNDRY_TRANSLATE.CreationItems.AmbiguousSource": "Více zdrojových Itemů má stejný identifikátor možnosti tvorby postavy. Plán byl zastaven.",
   "FOUNDRY_TRANSLATE.CreationItems.SourceChanged": "Zdrojová možnost tvorby postavy se změnila. Před dalším pokusem obnovte plán.",
   "FOUNDRY_TRANSLATE.CreationItems.RuntimeChanged": "Akce vyžaduje Game Mastera, systém Crucible a aktivní Ember. Svět, oprávnění a nastavení překladu se během běhu nesmějí změnit.",
-  "FOUNDRY_TRANSLATE.CreationItems.TooMany": "Plán překračuje limit {limit} unikátních Itemů. Nic nebylo přeloženo."
+  "FOUNDRY_TRANSLATE.CreationItems.TooMany": "Plán překračuje limit {limit} unikátních Itemů. Nic nebylo přeloženo.",
+  "FOUNDRY_TRANSLATE.Creation.RarityCommon": "Běžný",
+  "FOUNDRY_TRANSLATE.Creation.RarityUncommon": "Neobvyklý",
+  "FOUNDRY_TRANSLATE.Creation.RarityRare": "Vzácný",
+  "FOUNDRY_TRANSLATE.Creation.RarityVeryRare": "Velmi vzácný",
+  "FOUNDRY_TRANSLATE.Creation.RarityUnique": "Jedinečný",
+  "FOUNDRY_TRANSLATE.Creation.Years": "let",
+  "FOUNDRY_TRANSLATE.Creation.ImmortalExceptions": "Výjimečně nesmrtelní",
+  "FOUNDRY_TRANSLATE.Creation.UnknownLifespan": "Neznámá",
+  "FOUNDRY_TRANSLATE.Creation.VariedLifespan": "Proměnlivá",
+  "FOUNDRY_TRANSLATE.Creation.ExampleCharacter": "Ukázková postava ({name}).",
+  "FOUNDRY_TRANSLATE.Creation.RarityExtinct": "Vyhynulý"
 }
