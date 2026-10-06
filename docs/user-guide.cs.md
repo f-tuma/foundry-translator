@@ -137,6 +137,8 @@ dynamickými odkazy `@ref[name]` a `@ref[item.name]`. Název Akce a název
 jejího předmětu zůstávají rozlišené; dosahy, ceny a ostatní dynamické hodnoty
 se nadále vyhodnocují z původní Akce. Tato úprava mění pouze zobrazený text.
 
+Od verze **0.34.14** se v kroku Vybavení při tvorbě postavy překládají také názvy dostupných a vybraných předmětů a jejich nativní náhledy včetně Akcí. Překlad využívá existující úplnou kopii nebo pro názvy odpovídající heslo glosáře. Výběr, původní UUID, ceny, množství a herní vlastnosti zůstávají původní. Když překlad není dostupný nebo není bezpečně přiřazený k originálu, zůstane původní text. Platí při zapnuté volbě přednostního otevírání překladů.
+
 Od verze **0.34.8** může GM v hlavním menu použít **Doplnit překlady tvorby
 postavy**. Okno nejprve ukáže počet chybějících a existujících kopií. Po
 potvrzení přeloží pouze chybějící možnosti původu, kultury a cesty z balíčku

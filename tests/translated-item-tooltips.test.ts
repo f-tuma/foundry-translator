@@ -41,6 +41,7 @@ async function fixture(feature = false) {
     renderCard: vi.fn(async (): Promise<string> => native) };
   const target = { ...source, id: "csSword", uuid: "Compendium.world.foundry-translate-items.Item.csSword", name: "Meč", isOwner: true,
     system: { description: feature ? "<p>Zranění 3.</p>" : { public: "<p>Zranění 3.</p>" } },
+    renderCard: vi.fn(async (): Promise<string> => native),
     testUserPermission: vi.fn(() => true), flags: flag(source.uuid, await itemSourceHash(source.toObject())) };
   const native = feature
     ? `<div class="crucible-item-card line-item talent" data-uuid="Item.sword"><header><img alt="Sword"><div class="title"><h2>Sword</h2><span class="prerequisite unmet">Requires Strength 4</span></div></header><section class="description"><p>Damage 3.</p></section><button data-uuid="Item.sword" data-action="use">Native</button></div>`
@@ -59,6 +60,18 @@ function link() {
 // Linkedom simulates ancestor capture only for bubbling events; native
 // pointerenter is captured by document without bubbling in browsers.
 function enter(element: HTMLElement) { element.dispatchEvent(new Event("pointerenter", { bubbles: true })); }
+function equipmentRow(selected = false) {
+  const part = document.createElement("section"); part.id = "crucible-hero-creation-equipment";
+  const list = document.createElement("ol"); list.className = selected ? "equipment-selected" : "equipment-list"; part.append(list); document.body.append(part);
+  const row = document.createElement("li");
+  row.className = `line-item ${selected ? "selected-entry" : "equipment-entry"} unaffordable`;
+  Object.assign(row.dataset, { uuid: "Item.sword", crucibleTooltip: "equipment", ...(selected ? {} : { itemName: "Sword" }) });
+  row.innerHTML = '<img class="icon" src="original.webp" alt="Sword"><div class="title"><h4>Sword</h4><span class="tag">Weapon</span></div>'
+    + '<crucible-currency value="5" denomination="gp" readonly></crucible-currency><div class="item-quantity">'
+    + '<button data-action="removeEquipmentItem" disabled aria-label="Remove one Sword"></button><span class="quantity">0</span>'
+    + '<button data-action="addEquipmentItem" disabled aria-label="Add one Sword"></button></div>';
+  list.append(row); return row;
+}
 
 describe("native Item card prose", () => {
   it.each([false, true])("preserves native mechanics, IDs and controls (feature=%s)", async feature => {
@@ -265,6 +278,87 @@ describe("included native Action prose", () => {
 });
 
 describe("scoped native hover producer", () => {
+  it.each([false, true])("translates only the native creation equipment tooltip without changing selection, search, quantities or costs (selected=%s)", async selected => {
+    const f = await fixture(), row = equipmentRow(selected), before = row.innerHTML, render = f.source.renderCard;
+    const source = JSON.stringify(f.source.toObject()), target = JSON.stringify(f.target.toObject());
+    api.registerTranslatedItemTooltips(); let nativeProductions = 0;
+    document.addEventListener("pointerenter", event => {
+      const element = event.target as HTMLElement;
+      if (element.dataset.crucibleTooltip === "equipment" && !("tooltipHtml" in element.dataset)) nativeProductions++;
+    }, true);
+    enter(row); expect(row.dataset.tooltipHtml).toBe(""); await settle();
+    expect(row.dataset.tooltipHtml).toContain("Zranění 3.");
+    expect(html(row.dataset.tooltipHtml!).querySelector("h4")?.textContent).toBe("Meč");
+    expect(row.dataset.uuid).toBe("Item.sword"); expect(row.dataset.itemName).toBe(selected ? undefined : "Sword");
+    expect(row.dataset.crucibleTooltip).toBe("equipment");
+    expect(row.innerHTML).toBe(before); expect(row.className).toBe(`line-item ${selected ? "selected-entry" : "equipment-entry"} unaffordable`);
+    expect(f.source.renderCard).toBe(render); expect(render).toHaveBeenCalledTimes(1); expect(nativeProductions).toBe(0);
+    expect(JSON.stringify(f.source.toObject())).toBe(source); expect(JSON.stringify(f.target.toObject())).toBe(target);
+    expect(f.target.renderCard).not.toHaveBeenCalled();
+  });
+  it.each(["off", "wrong-list", "wrong-part", "nested-row", "other-tag", "missing-name", "other-tooltip", "embedded", "editor", "reader", "cached"])("does not seize equipment requests outside its narrow native scope: %s", async problem => {
+    await fixture(); const row = equipmentRow();
+    if (problem === "off") preference = false;
+    if (problem === "wrong-list") row.parentElement!.className = "other-list";
+    if (problem === "wrong-part") row.closest("section")!.id = "other-equipment";
+    if (problem === "nested-row") { const wrapper = document.createElement("li"); row.replaceWith(wrapper); wrapper.append(row); }
+    if (problem === "other-tag") {
+      const other = document.createElement("div"); other.className = row.className;
+      Object.assign(other.dataset, row.dataset); row.replaceWith(other);
+      api.registerTranslatedItemTooltips(); enter(other); await settle();
+      expect(mapping.pair).not.toHaveBeenCalled(); expect(other.dataset.tooltipHtml).toBeUndefined(); return;
+    }
+    if (problem === "missing-name") delete row.dataset.itemName;
+    if (problem === "other-tooltip") row.dataset.crucibleTooltip = "weapon";
+    if (problem === "embedded") row.dataset.uuid = "Actor.hero.Item.sword";
+    if (problem === "editor" || problem === "reader") {
+      const container = document.createElement("div"); container.className = problem === "editor" ? "editor-content ProseMirror" : "ft-reader";
+      document.body.append(container); container.append(row);
+    }
+    if (problem === "cached") row.dataset.tooltipHtml = "Native cached";
+    api.registerTranslatedItemTooltips(); enter(row); await settle();
+    expect(mapping.pair).not.toHaveBeenCalled(); expect(row.dataset.tooltipHtml).toBe(problem === "cached" ? "Native cached" : undefined);
+  });
+  it("accepts a translated display/search name while resolving the exact original equipment UUID", async () => {
+    const f = await fixture(), row = equipmentRow(); row.dataset.itemName = "Meč";
+    row.querySelector("h4")!.textContent = "Meč"; const before = row.innerHTML;
+    api.registerTranslatedItemTooltips();
+    enter(row); await settle();
+    expect(row.dataset.tooltipHtml).toContain("Zranění 3."); expect(f.source.renderCard).toHaveBeenCalledTimes(1);
+    expect(row.dataset.uuid).toBe("Item.sword"); expect(row.dataset.itemName).toBe("Meč"); expect(row.innerHTML).toBe(before);
+    expect(fromUuid).toHaveBeenCalledWith("Item.sword"); expect(f.target.renderCard).not.toHaveBeenCalled();
+  });
+  it("does not replay a denied equipment source to the unguarded native producer", async () => {
+    const f = await fixture(), row = equipmentRow(); f.source.testUserPermission.mockReturnValue(false);
+    api.registerTranslatedItemTooltips(); let nativeProductions = 0;
+    document.addEventListener("pointerenter", event => {
+      if (!("tooltipHtml" in (event.target as HTMLElement).dataset)) nativeProductions++;
+    }, true);
+    enter(row); await settle();
+    expect(f.source.renderCard).not.toHaveBeenCalled(); expect(row.dataset.tooltipHtml).toBeUndefined(); expect(nativeProductions).toBe(0);
+  });
+  it.each([false, true])("does not publish stale equipment rows after a pending dataset update (selected=%s)", async selected => {
+    const f = await fixture(), row = equipmentRow(selected); let finish!: (value: string) => void;
+    f.source.renderCard.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    api.registerTranslatedItemTooltips(); enter(row); await settle(); row.dataset.itemName = "Changed display name";
+    finish(f.native); await settle();
+    expect(row.dataset.tooltipHtml).toBeUndefined(); expect(mapping.pair).not.toHaveBeenCalled();
+  });
+  it.each(["class", "tooltip", "uuid", "leave", "detach", "preference", "part", "list"])("does not publish equipment tooltip after pending %s changes", async change => {
+    const f = await fixture(), row = equipmentRow(); let finish!: (value: string) => void;
+    f.source.renderCard.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    api.registerTranslatedItemTooltips(); enter(row); await settle();
+    if (change === "class") row.classList.remove("equipment-entry");
+    if (change === "tooltip") row.dataset.crucibleTooltip = "action";
+    if (change === "uuid") row.dataset.uuid = "Item.other";
+    if (change === "leave") row.dispatchEvent(new Event("pointerleave", { bubbles: true }));
+    if (change === "detach") row.remove();
+    if (change === "preference") preference = false;
+    if (change === "part") row.closest("section")!.id = "other-equipment";
+    if (change === "list") row.parentElement!.className = "other-list";
+    finish(f.native); await settle();
+    expect(row.dataset.tooltipHtml).toBeUndefined(); expect(mapping.pair).not.toHaveBeenCalled();
+  });
   it("handles the reviewed native creation talent div without changing selection, tooltip or Item identity", async () => {
     const f = await fixture(true);
     const row = document.createElement("div");
