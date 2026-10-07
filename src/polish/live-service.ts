@@ -1,3 +1,4 @@
+import { unresolvedSourceWarnings } from "../review/unresolved-source-references";
 import { batchEnvironment, batchScope, batchCatalogHash, batchSource, batchObject, batchHash, buildCorrectionBatch, normalizedBatch, batchPayloadHash, batchRequestHash, assertBatchApplicability, batchOperationValue, boundBatch, type BatchPayload } from "./correction-batch";
 import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, isMachineProofreadingCurrent, machineProofreadingSchemaProof } from "../review/machine-proofreading";
 import { type PortableDocument } from "../bundles/fields";
@@ -46,7 +47,7 @@ async function rebuildTargets(plan: ReferenceRebuildPlan) {
     let exists = false;
     try { const document = await fromUuid(target); exists = !!kind && document?.uuid === target && document.documentName === kind; }
     catch { /* Missing/inaccessible targets are a hard barrier, including translated children. */ }
-    targets.push({ ...mapped, exists, availability: exists ? "available" : mapped.required === false ? "missing-preserved-from-source" : "missing-required" });
+    targets.push({ ...mapped, exists, availability: exists ? "available" : mapped.retentionPolicy ? "retained-original-unresolved" : mapped.required === false ? "missing-preserved-from-source" : "missing-required" });
   }
   return targets;
 }
@@ -124,8 +125,9 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         const integrityDetails = field.integrity ?? diagnosePortableText(field.source, portableReviewText(snapshot, field, field.translation), field.format);
         const integrity = integrityDetails?.message ?? null;
         const repair = referenceRepairDraft(snapshot, row), targets = await repairTargets(repair);
+        const unresolvedSourceReferences = await unresolvedSourceWarnings(snapshot, field.id);
         check();
-        return { documentId, rowId: row.id, revision, fieldId: row.fieldId, section: snapshot.groups.find(group => group.id === row.group)?.name,
+        return { unresolvedSourceReferences, documentId, rowId: row.id, revision, fieldId: row.fieldId, section: snapshot.groups.find(group => group.id === row.group)?.name,
           format: row.format, source: row.source, translation: row.translation, edit: draft,
           sourceReferences: sourceReferences(snapshot, field, row),
           referenceRepairEdit: targets.every(target => target.exists) ? repair : null, referenceRepairTargets: targets, nearby,
@@ -289,11 +291,25 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         const matches = readReviewHistory(doc?.flags).filter(h => h.id === operationId);
         if (matches.length > 1) throw new Error("Live.OperationConflict");
         const operation = matches[0];
-        if (!operation?.correctionBatch) throw new Error("Live.UnknownOperation");
-        const value = {...await batchOperationValue(env.snapshot, operation, env.glossary),
-          glossaryCompatible:env.glossaryHash===operation.correctionBatch.glossaryHash,
-          catalogCompatible:await batchCatalogHash(env.catalog)===operation.correctionBatch.catalogHash,
-          scopeCompatible:batchScope()===operation.correctionBatch.scope};
+        if (!operation?.correctionBatch && !operation?.referenceRebuild) throw new Error("Live.UnknownOperation");
+        const rebuild = operation.referenceRebuild, retention = rebuild?.unresolvedSourceRetention;
+        const value = rebuild ? {
+          documentId: entry.uuid, operationId: operation.id, operation, operationHash: await batchHash(operation),
+          revision: env.revision, retainUnresolvedSourceReferences: !!retention,
+          sourceCompatible: env.snapshot.sourceHash === rebuild.sourceHash && (!retention || source.fullSourceHash === retention.fullSourceHash),
+          undoneRowsCompatible: !!operation.undoneAt && operation.rows.every(c => JSON.stringify(env.snapshot.rows.find(r => r.id === c.rowId)?.translation) === JSON.stringify(c.before)),
+          affectedRowsCompatible: !operation.undoneAt && operation.rows.every(c => JSON.stringify(env.snapshot.rows.find(r => r.id === c.rowId)?.translation) === JSON.stringify(c.after)),
+          glossaryCompatible: !retention || env.glossaryHash === retention.glossaryHash,
+          catalogCompatible: !retention || await batchCatalogHash(env.catalog) === retention.catalogHash,
+          scopeCompatible: !retention || batchScope() === retention.scope,
+          rows: operation.rows.map(c => { const row = env.snapshot.rows.find(r => r.id === c.rowId); return row ? {
+            rowId: row.id, fieldId: row.fieldId, source: row.source, translation: row.translation, edit: maskReviewParts(row.translation),
+            sourceReferences: sourceReferences(env.snapshot, env.snapshot.fields.find(f => f.id === row.fieldId)!, row), blocked: row.blocked, currentVerified: !!row.verified } : { rowId: c.rowId, missing: true }; }),
+          unresolvedSourceReferences: await unresolvedSourceWarnings(env.snapshot, rebuild.fieldId), complete: true, willVerify: false,
+        } : {...await batchOperationValue(env.snapshot, operation, env.glossary),
+          glossaryCompatible:env.glossaryHash===operation.correctionBatch!.glossaryHash,
+          catalogCompatible:await batchCatalogHash(env.catalog)===operation.correctionBatch!.catalogHash,
+          scopeCompatible:batchScope()===operation.correctionBatch!.scope};
         const latest = await batchEnvironment(entry), latestSource = await batchSource(latest.snapshot);
         if (latest.revision !== env.revision || await batchCatalogHash(latest.catalog) !== await batchCatalogHash(env.catalog) ||
           latestSource.fullSourceHash !== source.fullSourceHash || batchObject(source.doc.toObject!()) !== source.proof || batchObject(latestSource.doc.toObject!()) !== latestSource.proof || batchScope() !== scope) throw new Error("Review.Conflict");
@@ -359,31 +375,31 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         const field = snapshot.fields.find(item => item.id === fieldId);
         if (!field) throw new Error("Review.MissingField");
         const requestHash = await sha256(JSON.stringify(["reference-rebuild", documentId, fieldId, args.revision, args.planHash,
-          args.edits, args.reason, !!args.restoreSourceNumbers]));
+          args.edits, args.reason, !!args.restoreSourceNumbers, ...(args.retainUnresolvedSourceReferences ? [{ retainUnresolvedSourceReferences: true }] : [])]));
         if (request.method === "apply_reference_rebuild") {
           // Reconcile a committed receipt before preparing again: the repaired
           // field may no longer need a plan, and its revision necessarily changed.
           const previous = history.find(item => item.id === args.operationId);
           if (previous) {
             if (!previous.referenceRebuild || previous.referenceRebuild.fieldId !== fieldId || previous.agentRequestHash !== requestHash ||
-              previous.undoneAt || previous.sourceHash !== snapshot.sourceHash || previous.rows.some(change =>
+              previous.undoneAt || !!previous.referenceRebuild.unresolvedSourceRetention !== !!args.retainUnresolvedSourceReferences || previous.sourceHash !== snapshot.sourceHash || previous.rows.some(change =>
                 JSON.stringify(snapshot.rows.find(item => item.id === change.rowId)?.translation) !== JSON.stringify(change.after))) throw new Error("Live.OperationConflict");
-            return { ok: true, value: { alreadyApplied: true, operationId: previous.id, documentId, fieldId, revision, verified: false } };
+            return completeBatchResult({ ...(await readOperation(previous.id)), alreadyApplied: true, fieldId, verified: false });
           }
         }
         if (args.revision !== undefined && revision !== args.revision) throw new Error("Review.Conflict");
         if (snapshot.warning) throw new Error(`Review.${snapshot.warning}`);
-        const plan = await prepareReferenceRebuild(snapshot, field.id);
+        const plan = await prepareReferenceRebuild(snapshot, field.id, !!args.retainUnresolvedSourceReferences);
         if (!plan) throw new Error("Live.InvalidReferenceRebuild");
         const planHash = await sha256(JSON.stringify(["reference-rebuild-v1", documentId, field.id, revision, snapshot.sourceHash, glossaryHash, systemId, emberActive, emberVersion, plan.proofHash]));
         const targets = await rebuildTargets(plan);
         check();
         const bounded = (value: unknown) => { if (JSON.stringify(value).length > 200000) throw new Error("Live.ContextTooLarge"); return value; };
         if (request.method === "prepare_reference_rebuild") return { ok: true, value: bounded({ documentId, fieldId, revision, planHash, systemId,
-          plan, targets, canApply: targets.every(target => target.required === false || target.exists), willVerify: false,
+          plan, targets, retainUnresolvedSourceReferences: !!plan.unresolvedSourceRetention, unresolvedSourceReferences: plan.unresolvedSourceRetention?.mappings.map(m => ({ sourceTarget: m.sourceTarget, retainedTarget: m.retainedTarget, status: "retained-original-unresolved", humanVerified: false })) ?? [], canApply: targets.every(target => target.required === false || target.exists || target.retentionPolicy === "retain-exact-unresolved-original"), willVerify: false,
           instruction: "Read every full source and current translated part. Explicitly reconstruct only listed partIndices using the source-owned edit markers, including every plan row once. Preserve all unaffected edit.text parts byte-identically. Never supply commands or UUIDs, infer identity from target labels, or guess missing context. Preview before applying. Saving never human-verifies." }) };
         if (planHash !== args.planHash) throw new Error("Review.Conflict");
-        if (targets.some(target => target.required !== false && !target.exists)) throw new Error("Live.ReferenceTargetMissing");
+        if (targets.some(target => target.required !== false && !target.exists && !target.retentionPolicy)) throw new Error("Live.ReferenceTargetMissing");
         const rebuilt = await materializeReferenceRebuild(snapshot, plan, args.edits!, !!args.restoreSourceNumbers);
         const changes = rebuilt.changes.map(change => {
           const row = snapshot.rows.find(item => item.id === change.rowId)!;
@@ -392,21 +408,38 @@ export function createLiveHandler(language: string, connected: () => boolean) {
             planned.partIndices.map(index => change.parts[index]!), glossary);
           return { rowId: row.id, partIndices: planned.partIndices, source: row.source, before: row.translation, after: change.parts, warnings };
         });
-        const preview = { documentId, fieldId, revision, planHash, systemId, changes, targets, numberRepair: {
+        const preview = { documentId, fieldId, revision, planHash, systemId, changes, targets, retainUnresolvedSourceReferences: !!plan.unresolvedSourceRetention, unresolvedSourceReferences: plan.unresolvedSourceRetention?.mappings.map(m => ({ sourceTarget: m.sourceTarget, retainedTarget: m.retainedTarget, status: "retained-original-unresolved", humanVerified: false })) ?? [], numberRepair: {
           requested: !!args.restoreSourceNumbers, allowed: !!args.restoreSourceNumbers, parts: rebuilt.numbers, proof: "Each affected prose part independently checked against its current/source part; commands excluded." }, willVerify: false };
         check();
         bounded(preview);
         if (request.method === "validate_reference_rebuild") return { ok: true, value: preview };
         if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict");
+        // Bound a complete operation/readback before persistence. This is an
+        // explicitly proposed value, never a fabricated saved response.
+        const proposedOperation = { id: "x".repeat(80), at: new Date().toISOString(), userName: game.user?.name ?? "GM",
+          sourceHash: snapshot.sourceHash, label: `MCP: ${args.reason!}`, agentRequestHash: requestHash,
+          referenceRebuild: rebuilt.receipt, rows: rebuilt.changes.map(change => {
+            const row = snapshot.rows.find(r => r.id === change.rowId)!;
+            return { rowId: row.id, before: row.translation, after: change.parts, label: row.label, group: row.group };
+          }) };
+        boundBatch({ documentId, operationId: proposedOperation.id, operation: proposedOperation, operationHash: "x".repeat(64),
+          revision, retainUnresolvedSourceReferences: !!rebuilt.receipt.unresolvedSourceRetention,
+          sourceCompatible: true, affectedRowsCompatible: true, undoneRowsCompatible: false, glossaryCompatible: true,
+          catalogCompatible: true, scopeCompatible: true, complete: true, willVerify: false, saved: true, fieldId,
+          rowIds: rebuilt.changes.map(c => c.rowId), warnings: changes.flatMap(c => c.warnings), verified: false,
+          unresolvedSourceReferences: rebuilt.receipt.unresolvedSourceRetention?.mappings.map(m => ({sourceTarget:m.sourceTarget,retainedTarget:m.retainedTarget,status:"retained-original-unresolved",observedAt:proposedOperation.at,availability:"not-refreshed",humanVerified:false})) ?? [],
+          rows: rebuilt.changes.map(change => { const row = snapshot.rows.find(r => r.id === change.rowId)!;
+            return { rowId:row.id,fieldId:row.fieldId,source:row.source,translation:change.parts,edit:maskReviewParts(change.parts),
+              sourceReferences:sourceReferences(snapshot,field,row),blocked:null,currentVerified:false }; }) }, 512000 - 1024);
         const saved = await saveReviewRows(snapshot, rebuilt.changes, { id: args.operationId!, label: `MCP: ${args.reason!}`,
-          agentRequestHash: requestHash, referenceRebuild: { fieldId: field.id, proofHash: plan.proofHash, restoreSourceNumbers: !!args.restoreSourceNumbers },
+          agentRequestHash: requestHash, referenceRebuild: { fieldId: field.id, proofHash: plan.proofHash, restoreSourceNumbers: !!args.restoreSourceNumbers, retainUnresolvedSourceReferences: !!args.retainUnresolvedSourceReferences },
           beforeWrite: async () => {
             if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict");
             check();
           }, canWrite });
         Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
-        return { ok: true, value: { saved: true, operationId: args.operationId, documentId, fieldId, rowIds: rebuilt.changes.map(change => change.rowId),
-          revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])), warnings: changes.flatMap(change => change.warnings), verified: false } };
+        return completeBatchResult({ ...(await readOperation(args.operationId!)), saved: true, fieldId, rowIds: rebuilt.changes.map(change => change.rowId),
+          warnings: changes.flatMap(change => change.warnings), verified: false });
       }
       if (!row) throw new Error("Review.MissingField");
       fieldId = row.fieldId;

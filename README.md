@@ -2,6 +2,13 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.34.19** adds an explicit MCP reference-rebuild mode that preserves an
+exact original child reference when fresh checks prove that the child is absent
+from both the original and mapped parent documents. The reference remains visibly
+unresolved, with a persistent warning and complete stored-operation readback.
+The default rebuild mode continues to require available targets. See the
+[source-reference retention guide](apps/polish-mcp/README.md#zachování-nevyřešeného-původního-odkazu-od-03419).
+
 Version **0.33.12** extends that display to Ember's inline outcome cards and
 inline event-state links, in native journals and Adventure Reader. It uses saved
 translated labels and summaries with exact source/event/outcome identity. Native

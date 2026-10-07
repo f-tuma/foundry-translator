@@ -11,6 +11,7 @@ export interface LiveArgs {
   options?: { marker: string; key: "readaloud" | "caption" | "label"; value: string }[];
   restoreSourceNumbers?: boolean;
   restoreSourceReferences?: boolean;
+  retainUnresolvedSourceReferences?: boolean;
   referenceIndex?: number;
   offset: number; limit: number; query: string; radius: number; fuzzy: boolean;
 }
@@ -18,7 +19,7 @@ export interface LiveRequest { id: string; method: LiveMethod; args: Record<stri
 export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
 const methods: readonly string[] = ["validate_correction_batch", "save_correction_batch", "get_correction_operation", "prepare_machine_proofreading", "commit_machine_proofreading", "status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_field_diagnostic", "get_reference_context", "get_reference_diagnostic", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild", "list_history", "undo_correction"];
-const keys = new Set(["changes", "documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits", "coverageHash"]);
+const keys = new Set(["changes", "documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits", "coverageHash", "retainUnresolvedSourceReferences"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
   const fail = (): never => { throw new Error("Live.InvalidRequest"); };
@@ -64,7 +65,7 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   const rebuild = ["prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild"].includes(request.method);
   if (rebuild) {
     const preparing = request.method === "prepare_reference_rebuild";
-    const allowed = new Set(["documentId", "fieldId", "revision", ...(preparing ? [] : ["planHash", "edits", "reason", "restoreSourceNumbers"]),
+    const allowed = new Set(["documentId", "fieldId", "revision", "retainUnresolvedSourceReferences", ...(preparing ? [] : ["planHash", "edits", "reason", "restoreSourceNumbers"]),
       ...(request.method === "apply_reference_rebuild" ? ["operationId"] : [])]);
     if (Object.keys(input).some(key => !allowed.has(key)) || !input.documentId || !input.fieldId ||
       (!preparing && (!input.revision || !input.planHash || !Array.isArray(input.edits) || !input.edits.length ||
@@ -88,6 +89,10 @@ export function parseLiveRequest(value: unknown): { request: LiveRequest; args: 
   if (input.referenceIndex !== undefined) {
     if (!["get_reference_context", "get_reference_diagnostic"].includes(request.method) || !Number.isSafeInteger(input.referenceIndex) || (input.referenceIndex as number) < 0 || (input.referenceIndex as number) > 1000) fail();
     args.referenceIndex = input.referenceIndex as number;
+  }
+  if (input.retainUnresolvedSourceReferences !== undefined) {
+    if (!rebuild || typeof input.retainUnresolvedSourceReferences !== "boolean") fail();
+    args.retainUnresolvedSourceReferences = input.retainUnresolvedSourceReferences as boolean;
   }
   for (const key of ["restoreSourceNumbers", "restoreSourceReferences"] as const) if (input[key] !== undefined) {
     if (typeof input[key] !== "boolean" || !(["validate_correction", "save_correction"].includes(request.method) || (key === "restoreSourceNumbers" && rebuild && request.method !== "prepare_reference_rebuild"))) fail();

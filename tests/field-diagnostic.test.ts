@@ -1,4 +1,5 @@
 import { parseHTML } from "linkedom";
+import { MODULE_ID } from "../src/constants";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { diagnoseReferenceRebuild, prepareReferenceRebuild } from "../src/review/reference-rebuild";
 import { restoreSourcePunctuation, type SourcePunctuationDiagnostic } from "../src/review/source-punctuation";
@@ -9,7 +10,11 @@ import { planReviewText } from "../src/review/text-plan";
 import { portableReviewText, type ReviewSnapshot } from "../src/review/service";
 beforeEach(() => {
   vi.stubGlobal("document", parseHTML("<html></html>").document);
-  vi.stubGlobal("game", { system: { id: "crucible" }, modules: new Map([["ember", { active: true, version: "0.6.2" }]]) });
+  const copy = { id: "copy", uuid: "Compendium.world.translations.JournalEntry.copy", documentName: "JournalEntry",
+    flags: { [MODULE_ID]: { reviewHistory: {} } } };
+  const pack = { getDocument: async (id: string) => { if (id !== copy.id) throw new Error("Unexpected fixture copy ID"); return copy; } };
+  vi.stubGlobal("game", { system: { id: "crucible" }, modules: new Map([["ember", { active: true, version: "0.6.2" }]]),
+    packs: new Map([["world.translations", pack]]) });
 });
 afterEach(() => vi.unstubAllGlobals());
 function snapshot(source: string, translation: string, format: "html" | "text" = "html"): ReviewSnapshot {
@@ -26,6 +31,7 @@ it("reports the same successful pure punctuation proof without changing source/c
   const view = snapshot(source, current), before = JSON.stringify(view);
   const result = await readFieldDiagnostic(view, "field", 0, 50);
   expect(result.raw).toEqual({ complete: true, source, current });
+  expect(result.unresolvedSourceReferences).toEqual([]);
   expect(result.rebuild).toMatchObject({ canPrepare: true, stage: "ready", punctuation: { stage: "ready" } });
   expect(result.units[0]).toMatchObject({ sourceParts: 3, currentParts: 2 });
   expect(JSON.stringify(view)).toBe(before);
