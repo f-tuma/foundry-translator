@@ -1,3 +1,4 @@
+import { unresolvedSourceWarnings } from "../review/unresolved-source-references";
 import { diagnosePortableText } from "../bundles/format";
 import { isDecorativeIconText } from "../translation/decorative-text";
 import { sha256 } from "../translation/hash";
@@ -88,7 +89,8 @@ export async function readFieldDiagnostic(snapshot: ReviewSnapshot, fieldId: str
       rowId: row?.id ?? null, rowSourceParts: row?.source.length ?? null, rowCurrentParts: row?.translation.length ?? null,
       blocked: row?.blocked ?? null, verified: !!row?.verified };
   });
-  const value = { fieldId, format: field.format, sourceHash: snapshot.sourceHash,
+  const unresolvedSourceReferences = await unresolvedSourceWarnings(snapshot, fieldId);
+  const value = { unresolvedSourceReferences, fieldId, format: field.format, sourceHash: snapshot.sourceHash,
     fieldSourceHash: await sha256(field.source), fieldCurrentHash: await sha256(field.translation),
     warning: snapshot.warning, raw: rawReason ? { complete: false, omittedReason: rawReason, sourceChars: field.source.length, currentChars: field.translation.length }
       : { complete: true, source: field.source, current: field.translation },

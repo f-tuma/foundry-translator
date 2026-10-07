@@ -91,7 +91,7 @@ provenience nebo poškozené HTML zápis zablokují.
 mezi několika odstavci nestačí. Existující přeložené parametry `@Embed` se touto
 rekonstrukcí nevracejí do angličtiny; taková nejednoznačná oprava se odmítne.
 
-Aktivní odkazy musí mít dostupný cíl. Ember obsahuje také původní větve pro
+Ve výchozím režimu musí mít aktivní odkazy dostupný cíl. Ember obsahuje také původní větve pro
 jiný herní systém, které při vykreslení odstraňuje. Jen u přesně prokázané
 neaktivní větve původního `system-swap` bloku lze zachovat přesný původní odkaz,
 i když v tomto světě neexistuje. Náhled tuto výjimku výslovně ukazuje. Pokud
@@ -105,6 +105,59 @@ původní poškození a znovu zablokovat dané pole; přijímá pouze přesný u
 stav dotčených řádků a nezměněný originál. Po aktualizaci zkopíruj nový MCP JSON
 a restartuj klienta. Běžné opravy textu používají stejné přísné kontroly jako
 dříve; tento postup není obecné povolení měnit odkazy.
+
+### Zachování nevyřešeného původního odkazu od 0.34.19
+
+Původní dokument někdy odkazuje na svou vloženou schopnost nebo stránku, která
+v něm nyní chybí. Při rekonstrukci poškozeného překladu lze výslovně požádat o
+zachování tohoto přesného původního odkazu pomocí
+`retainUnresolvedSourceReferences: true`. Parametr patří pouze k nástrojům
+`live_prepare_reference_rebuild`, `live_validate_reference_rebuild` a
+`live_apply_reference_rebuild`; při vynechání nebo hodnotě `false` platí dosavadní
+přísná kontrola dostupnosti. Běžné opravy textu tento parametr nepřijímají.
+
+Modul odvodí cíl z celého originálu. Zachovat lze pouze vložený `Actor.Item`
+nebo `JournalEntry.JournalEntryPage`, pokud jsou přesně ověřené původní i
+mapované rodičovské dokumenty, jejich typ, přístup a původ přeložené kopie.
+Přímé načtení obou přesných potomků, uložené seznamy potomků obou rodičů i jejich
+načtení potomků přes rodiče musejí souhlasně potvrdit nepřítomnost. Chyba přístupu, výjimka,
+neznámé nebo nesprávné údaje ani chybějící samotný rodič tuto podmínku nesplňují.
+Nejde o závěr, že byl dokument odstraněn.
+
+1. Z čerstvého `live_get_context` převezmi přesné `documentId`, `fieldId` a
+   `revision`. Načti plán přes `live_prepare_reference_rebuild` s výslovným
+   `retainUnresolvedSourceReferences: true` a čti celý originál i překlad.
+2. Zkontroluj `targets` a `unresolvedSourceReferences`. Zachovaný cíl stále má
+   `required: true`, pravidlo `retentionPolicy: retain-exact-unresolved-original`
+   a upozornění `retained-original-unresolved`. Modul použije přesný absolutní
+   původní cíl včetně kotvy. Agent zadává pouze vrácené značky a českou prózu;
+   nenavrhuje náhradní UUID, příkazy ani vlastní cíle.
+3. Zahrň všechny řádky plánu a připrav náhled přes
+   `live_validate_reference_rebuild` se stejným výslovným parametrem, čerstvou
+   revizí a `planHash`. Zachovej všechny neovlivněné části přesně a posuď úplné
+   změny i upozornění. Čísla, struktura a chráněné části příkazů procházejí
+   dosavadními kontrolami.
+4. Po kontrole ulož přes `live_apply_reference_rebuild` se stejným parametrem,
+   přesnými schválenými argumenty, důvodem a jedinečným `operationId`. Modul
+   znovu ověří podklady před zápisem. Ztracená odpověď může znamenat dokončený
+   zápis: nejprve načti jeho skutečný uložený stav pomocí
+   `live_get_correction_operation` s `documentId` a `operationId`.
+
+`live_get_correction_operation` nově vrací také celé uložené operace rekonstrukce
+odkazů, úplné současné řádky, `operationHash` a samostatné příznaky shody
+originálu a dotčených řádků. Výňatky z `live_list_history` tento úplný readback
+nenahrazují. Chyba či překročení limitu odpovědi samo neprokazuje, že se zápis
+neuskutečnil. Případné opakování používá přesně stejné argumenty i ID; konflikt
+vyžaduje nový plán a náhled.
+
+Odkaz zůstává nevyřešený a při otevření nemusí fungovat. Kontext, diagnostika
+pole i uložená operace jej viditelně označují. Upozornění z historie uvádí
+`availability: not-refreshed`: není novou kontrolou dostupnosti a přetrvá i po
+běžné úpravě prózy, pokud zůstává shodný originál, pole a zachovaný příkaz.
+Zápis má historii a řízené vrácení, ale nikdy lidské ověření. Výjimka pro
+prokázanou neaktivní větev Ember `system-swap` zůstává samostatným postupem.
+Foundry ani zde neposkytuje serverové compare-and-swap; používej jednoho
+zapisujícího GM. Po aktualizaci modulu zkopíruj nový MCP JSON a restartuj klienta.
 
 ### Atomická obnova identifikátorů od 0.33.4 / MCP 0.3.4
 

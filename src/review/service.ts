@@ -1,5 +1,6 @@
+import { bindUnresolvedSourceRetention } from "./unresolved-source-references";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
-import { buildCorrectionBatch, assertBatchApplicability, assertBatchFinal, batchRequestHash, type BatchReceipt } from "../polish/correction-batch";
+import { batchObject, buildCorrectionBatch, assertBatchApplicability, assertBatchFinal, batchRequestHash, type BatchReceipt } from "../polish/correction-batch";
 import { canonicalAffixActionDisplayPath } from "../translation/affix-action-display";
 import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, machineProofreadingSchemaProof, type MachineProofreadingReceipt } from "./machine-proofreading";
 import { readEditorial, editorialKey, writeEditorial, EDITORIAL_SETTING, type EditorialRecord, type EditorialState } from "./editorial";
@@ -351,7 +352,7 @@ function abortableHistoryRead<T>(pending: Promise<T>, signal?: AbortSignal): Pro
 
 /** Compile only schema-allowed text updates. One document update includes its embedded
  * changes and undo record, so a lost response can be resolved from persistent history. */
-export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; ordinaryBatch?: BatchReceipt; repairReferences?: boolean; identifierRepair?: boolean; referenceRebuild?: { fieldId: string; proofHash: string; restoreSourceNumbers?: boolean }; restoreEmbedSourceNumbers?: boolean; canWrite?: () => boolean; beforeWrite?: () => Promise<void> } = {}): Promise<ReviewSnapshot> {
+export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; ordinaryBatch?: BatchReceipt; repairReferences?: boolean; identifierRepair?: boolean; referenceRebuild?: { fieldId: string; proofHash: string; restoreSourceNumbers?: boolean; retainUnresolvedSourceReferences?: boolean }; restoreEmbedSourceNumbers?: boolean; canWrite?: () => boolean; beforeWrite?: () => Promise<void> } = {}): Promise<ReviewSnapshot> {
   gmOnly();
   if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   const fresh = await loadReview(snapshot.entry);
@@ -378,16 +379,20 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   } else if (undo?.correctionBatch) await assertBatchApplicability(fresh, undo);
   let batchSynchronousCheck: (() => void) | undefined;
   let rebuildReceipt: ReferenceRebuildReceipt | undefined;
-  let rebuildTargets: { target: string; required: boolean }[] = [];
+  let rebuildTargets: { target: string; required: boolean; sourceTarget?: string; retentionPolicy?: "retain-exact-unresolved-original" }[] = [];
+  let retentionGuard: Awaited<ReturnType<typeof bindUnresolvedSourceRetention>> | undefined;
   if (rebuildMode) {
     if (options.repairReferences || options.identifierRepair || options.restoreEmbedSourceNumbers || (options.referenceRebuild && options.undoId)) fail("ProtectedText");
     if (options.referenceRebuild) {
-      const rebuilt = await validateReferenceRebuildChanges(fresh, options.referenceRebuild.fieldId, options.referenceRebuild.proofHash, changes, options.referenceRebuild.restoreSourceNumbers ?? false);
+      const rebuilt = await validateReferenceRebuildChanges(fresh, options.referenceRebuild.fieldId, options.referenceRebuild.proofHash, changes, options.referenceRebuild.restoreSourceNumbers ?? false, options.referenceRebuild.retainUnresolvedSourceReferences ?? false);
       rebuildTargets = rebuilt.plan.targets;
-      rebuildReceipt = rebuilt.receipt; fieldValues.set(rebuilt.plan.fieldId, rebuilt.value);
+      rebuildReceipt = rebuilt.receipt;
+      if (rebuilt.receipt.unresolvedSourceRetention) retentionGuard = await bindUnresolvedSourceRetention(fresh, rebuilt.receipt.unresolvedSourceRetention);
+      fieldValues.set(rebuilt.plan.fieldId, rebuilt.value);
     } else {
       if (!undo?.referenceRebuild || !exactUndo) fail("UndoConflict");
       const restored = await undoReferenceRebuild(fresh, undo.referenceRebuild, undo.rows);
+      if (undo.referenceRebuild.unresolvedSourceRetention) retentionGuard = await bindUnresolvedSourceRetention(fresh, undo.referenceRebuild.unresolvedSourceRetention);
       fieldValues.set(restored.fieldId, restored.value);
     }
   }
@@ -480,7 +485,12 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
   patch[`flags.${MODULE_ID}.reviewHistory.${history.id}`] = history;
   if (options.undoId) patch[`flags.${MODULE_ID}.reviewHistory.${options.undoId}.undoneAt`] = history.at;
   const checkRebuildTargets = async () => {
+    if (retentionGuard) await retentionGuard.recheck();
     for (const target of rebuildTargets) {
+      if (target.retentionPolicy) {
+        if (!retentionGuard || !rebuildReceipt?.unresolvedSourceRetention?.mappings.some(m => m.sourceTarget === target.sourceTarget && m.retainedTarget === target.target)) fail("Conflict");
+        continue; // Only independently qualified exact unresolved originals.
+      }
       if (!target.required) continue; // Exact source-only, proven inactive Ember branch.
       const uuid = target.target.split("#")[0]!;
       const kind = /(?:^|\.)(Actor|Item|JournalEntry|JournalEntryPage)\.[^.]+$/u.exec(uuid)?.[1];
@@ -514,6 +524,10 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
     if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   }
   if (options.canWrite && !options.canWrite()) throw new Error("Live.Disconnected");
+  if (retentionGuard) {
+    if (batchObject(target.toObject()) !== batchObject(data)) fail("Conflict");
+    retentionGuard.assertUnchanged();
+  }
   batchSynchronousCheck?.();
   await target.update(patch);
   if (displayKind(fresh.entry.kind)) Hooks.callAll("foundryTranslateDisplayTextChanged");

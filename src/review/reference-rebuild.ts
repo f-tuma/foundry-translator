@@ -1,3 +1,4 @@
+import { prepareUnresolvedSourceRetention, type UnresolvedSourceRetention } from "./unresolved-source-references";
 import { assertPortableText, diagnosePortableText, syntaxExpressions } from "../bundles/format";
 import { absoluteReference } from "../bundles/reference-notation";
 import { sha256 } from "../translation/hash";
@@ -12,6 +13,7 @@ import { restoreSourcePunctuation, removeSourcePunctuation, type SourcePunctuati
 export interface RebuildReference {
   partIndex: number; marker: string; sourceCommand: string; command: string;
   sourceTarget?: string; target?: string;
+  retentionPolicy?: "retain-exact-unresolved-original"; mappedTarget?: string;
   required?: boolean; inactiveSystem?: "dnd5e" | "crucible";
 }
 export interface ReferenceRebuildRow {
@@ -25,8 +27,9 @@ export interface ReferenceRebuildPlan {
   version: 1; documentId: string; sourceHash: string; fieldId: string;
   fieldSourceHash: string; beforeHash: string; guardFingerprint: string; proofHash: string;
   systemId: string; emberActive: boolean; emberVersion: string;
+  unresolvedSourceRetention?: UnresolvedSourceRetention;
   punctuation?: SourcePunctuationRestoration;
-  rows: ReferenceRebuildRow[]; targets: { sourceTarget: string; target: string; required: boolean; inactiveSystem?: "dnd5e" | "crucible" }[];
+  rows: ReferenceRebuildRow[]; targets: { sourceTarget: string; target: string; required: boolean; inactiveSystem?: "dnd5e" | "crucible"; retentionPolicy?: "retain-exact-unresolved-original"; mappedTarget?: string }[];
 }
 export interface ReferenceRebuildEdit { rowId: string; text: string[]; labels?: { marker: string; label: string }[] }
 export interface RebuildNumberProof { rowId: string; partIndex: number; source: string[]; before: string[]; after: string[]; restored: boolean }
@@ -34,6 +37,7 @@ export interface ReferenceRebuildReceipt {
   version: 1; fieldId: string; documentId: string; sourceHash: string; fieldSourceHash: string;
   proofHash: string; guardFingerprint: string; beforeHash: string;
   systemId: string; emberActive: boolean; emberVersion: string;
+  unresolvedSourceRetention?: UnresolvedSourceRetention;
   punctuation?: SourcePunctuationRestoration;
   rows: { rowId: string; unitId: string; partIndices: number[]; beforeHash: string; afterHash: string }[];
   /** Canonical bindings are reconstructed on undo; never caller replacements. */
@@ -109,12 +113,15 @@ function forwardTarget(snapshot: ReviewSnapshot, sourceTarget: string): string {
   return copies[0]! + sourceTarget.slice(root.length);
 }
 
-function mapSourceCommand(snapshot: ReviewSnapshot, context: string, command: string, inactiveSystem?: "dnd5e" | "crucible"): { command: string; sourceTarget?: string; target?: string; required?: boolean; inactiveSystem?: "dnd5e" | "crucible" } {
+function mapSourceCommand(snapshot: ReviewSnapshot, context: string, command: string, inactiveSystem?: "dnd5e" | "crucible", retention?: UnresolvedSourceRetention): { retentionPolicy?: "retain-exact-unresolved-original"; mappedTarget?: string; command: string; sourceTarget?: string; target?: string; required?: boolean; inactiveSystem?: "dnd5e" | "crucible" } {
   const parsed = /^(@(?:UUID|Embed)\[)([^\S\r\n]*)([^\]\s]+)([^\]\r\n]*\](?:\{[^}\r\n]*\})?)$/iu.exec(command);
   if (!parsed) return { command };
   const sourceTarget = absoluteReference(parsed[3]!, context);
   if (!sourceTarget || sourceTarget.includes("=")) fail();
-  const target = inactiveSystem ? sourceTarget : forwardTarget(snapshot, sourceTarget);
+  const mappedTarget = inactiveSystem ? sourceTarget : forwardTarget(snapshot, sourceTarget);
+  const retained = retention?.mappings.find(m => m.sourceTarget === sourceTarget);
+  if (retained && (inactiveSystem || retained.mappedTarget !== mappedTarget || retained.retainedTarget !== sourceTarget)) fail("Conflict");
+  const target = retained ? sourceTarget : mappedTarget;
   // Rebuilding is source-owned, so each occurrence has its exact lexical
   // spelling even when the source mixes relative and absolute aliases of one
   // destination. A relative token is safe in the copy only if it resolves to
@@ -127,7 +134,7 @@ function mapSourceCommand(snapshot: ReviewSnapshot, context: string, command: st
   if (parsed[3]!.startsWith(".") && !copiedContext) fail();
   const notation = parsed[3]!.startsWith(".") && copiedContext && absoluteReference(parsed[3]!, copiedContext) === target
     ? parsed[3]! : target;
-  return { command: `${parsed[1]}${parsed[2]}${notation}${parsed[4]}`, sourceTarget, target, required: !inactiveSystem, ...(inactiveSystem ? { inactiveSystem } : {}) };
+  return { command: `${parsed[1]}${parsed[2]}${notation}${parsed[4]}`, sourceTarget, target, required: !inactiveSystem, ...(inactiveSystem ? { inactiveSystem } : {}), ...(retained ? { retentionPolicy: "retain-exact-unresolved-original" as const, mappedTarget } : {}) };
 }
 
 /** Refuse changes to existing embedded descriptions in this first rebuild mode.
@@ -163,11 +170,14 @@ export async function diagnoseReferenceRebuild(snapshot: ReviewSnapshot, fieldId
   }
   return diagnostic;
 }
-export async function prepareReferenceRebuild(snapshot: ReviewSnapshot, fieldId: string): Promise<ReferenceRebuildPlan | null> {
-  try { return await buildPlan(snapshot, fieldId); }
-  catch { return null; }
+export async function prepareReferenceRebuild(snapshot: ReviewSnapshot, fieldId: string, retainUnresolvedSourceReferences = false): Promise<ReferenceRebuildPlan | null> {
+  if (!retainUnresolvedSourceReferences) { try { return await buildPlan(snapshot, fieldId); } catch { return null; } }
+  const strict = await buildPlan(snapshot, fieldId);
+  if (!strict) return null;
+  const retention = await prepareUnresolvedSourceRetention(snapshot, strict.targets);
+  return buildPlan(snapshot, fieldId, undefined, retention);
 }
-async function buildPlan(snapshot: ReviewSnapshot, fieldId: string, diagnostic?: ReferenceRebuildDiagnostic): Promise<ReferenceRebuildPlan | null> {
+async function buildPlan(snapshot: ReviewSnapshot, fieldId: string, diagnostic?: ReferenceRebuildDiagnostic, retention?: UnresolvedSourceRetention): Promise<ReferenceRebuildPlan | null> {
   const stage = (value: string, predicate: string) => { if (diagnostic) { diagnostic.stage = value; diagnostic.predicate = predicate; } };
   const reject = (predicate: string, details: ReferenceRebuildDiagnostic["details"] = {}): null => {
     if (diagnostic) { diagnostic.predicate = predicate; diagnostic.details = details; }
@@ -255,8 +265,8 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string, diagnostic?:
         const canonical = rawTarget && absoluteReference(rawTarget, field.referenceContext ?? snapshot.entry.sourceUuid);
         const gate = gates.get(sourceUnit.id)?.[partIndex] ?? undefined;
         const inactive = gate && canonical && sourceRequirements.get(canonical.split("#")[0]!) === false ? gate : undefined;
-        const ref = mapSourceCommand(snapshot, field.referenceContext ?? snapshot.entry.sourceUuid, command, inactive);
-        refs.push(ref); if (ref.target && ref.sourceTarget) targets.push({ sourceTarget: ref.sourceTarget, target: ref.target, required: ref.required !== false, ...(ref.inactiveSystem ? { inactiveSystem: ref.inactiveSystem } : {}) });
+        const ref = mapSourceCommand(snapshot, field.referenceContext ?? snapshot.entry.sourceUuid, command, inactive, retention);
+        refs.push(ref); if (ref.target && ref.sourceTarget) targets.push({ sourceTarget: ref.sourceTarget, target: ref.target, required: ref.required !== false, ...(ref.inactiveSystem ? { inactiveSystem: ref.inactiveSystem } : {}), ...(ref.retentionPolicy ? { retentionPolicy: ref.retentionPolicy, mappedTarget: ref.mappedTarget! } : {}) });
         return ref.command;
       });
       // Source text with command-like corruption is not a safe rebuilding authority.
@@ -286,7 +296,7 @@ async function buildPlan(snapshot: ReviewSnapshot, fieldId: string, diagnostic?:
   stage("proof-hash", "deterministic-plan-hash");
   const body = { version: 1 as const, documentId: snapshot.entry.uuid, sourceHash: snapshot.sourceHash, fieldId,
     fieldSourceHash: await hash(field.source), beforeHash: await hash(field.translation), guardFingerprint: snapshot.guard.fingerprint,
-    ...environment, ...(punctuation ? { punctuation: punctuation.proof } : {}), rows, targets: targets.filter((target, index) => targets.findIndex(other => equal(other, target)) === index) };
+    ...environment, ...(retention ? { unresolvedSourceRetention: retention } : {}), ...(punctuation ? { punctuation: punctuation.proof } : {}), rows, targets: targets.filter((target, index) => targets.findIndex(other => equal(other, target)) === index) };
   return { ...body, proofHash: await hash(body) };
 }
 
@@ -300,7 +310,7 @@ function replaceRows(value: string, format: ReviewSnapshot["fields"][number]["fo
 
 /** Compile only prose/labels through the fresh source-owned inventory. */
 export async function materializeReferenceRebuild(snapshot: ReviewSnapshot, plan: ReferenceRebuildPlan, edits: ReferenceRebuildEdit[], restoreSourceNumbers = false) {
-  const fresh = await prepareReferenceRebuild(snapshot, plan.fieldId);
+  const fresh = await prepareReferenceRebuild(snapshot, plan.fieldId, !!plan.unresolvedSourceRetention);
   if (!fresh || !equal(plan, fresh)) fail("Conflict");
   if (edits.length !== fresh.rows.length || new Set(edits.map(edit => edit.rowId)).size !== edits.length) fail();
   const changes: ReviewChange[] = [], numbers: RebuildNumberProof[] = [];
@@ -343,6 +353,7 @@ export async function materializeReferenceRebuild(snapshot: ReviewSnapshot, plan
   const receipt: ReferenceRebuildReceipt = { version: 1, fieldId: fresh.fieldId, documentId: fresh.documentId, sourceHash: fresh.sourceHash,
     fieldSourceHash: fresh.fieldSourceHash, proofHash: fresh.proofHash, guardFingerprint: fresh.guardFingerprint, beforeHash: fresh.beforeHash,
     systemId: fresh.systemId, emberActive: fresh.emberActive, emberVersion: fresh.emberVersion,
+    ...(fresh.unresolvedSourceRetention ? { unresolvedSourceRetention: fresh.unresolvedSourceRetention } : {}),
     ...(fresh.punctuation ? { punctuation: fresh.punctuation } : {}),
     rows: await Promise.all(fresh.rows.map(async row => ({ rowId: row.rowId, unitId: row.unitId, partIndices: [...row.partIndices],
       beforeHash: await hash(row.before), afterHash: await hash(changes.find(change => change.rowId === row.rowId)!.parts) }))), referenceMap: fresh.rows.flatMap(row => row.referenceMap) };
@@ -350,8 +361,8 @@ export async function materializeReferenceRebuild(snapshot: ReviewSnapshot, plan
 }
 
 /** Independently prove service callers supplied the exact compiled rebuild. */
-export async function validateReferenceRebuildChanges(snapshot: ReviewSnapshot, fieldId: string, proofHash: string, changes: readonly ReviewChange[], restoreSourceNumbers = false) {
-  const plan = await prepareReferenceRebuild(snapshot, fieldId);
+export async function validateReferenceRebuildChanges(snapshot: ReviewSnapshot, fieldId: string, proofHash: string, changes: readonly ReviewChange[], restoreSourceNumbers = false, retainUnresolvedSourceReferences = false) {
+  const plan = await prepareReferenceRebuild(snapshot, fieldId, retainUnresolvedSourceReferences);
   if (!plan || plan.proofHash !== proofHash || changes.length !== plan.rows.length) fail("Conflict");
   const edits = plan.rows.map(row => {
     const change = changes.find(change => change.rowId === row.rowId);
@@ -400,7 +411,7 @@ export async function undoReferenceRebuild(snapshot: ReviewSnapshot, receipt: Re
     rows: snapshot.rows.map(row => row.fieldId === field.id ? { ...row, translation: beforePlan.units.find(unit => unit.id === row.unitId)?.parts ?? [], blocked: "StructureChanged" } : row) };
   // Later unrelated rows may legitimately differ, so the original field before
   // hash/proof is not reused. Re-prove the same damaged scope and source targets.
-  const plan = await prepareReferenceRebuild(prior, field.id);
+  const plan = await buildPlan(prior, field.id, undefined, receipt.unresolvedSourceRetention);
   if (!plan || !equal(plan.rows.map(row => ({ rowId: row.rowId, unitId: row.unitId, partIndices: row.partIndices })),
     receipt.rows.map(row => ({ rowId: row.rowId, unitId: row.unitId, partIndices: row.partIndices }))) || !equal(plan.rows.flatMap(row => row.referenceMap), receipt.referenceMap) || !equal(plan.punctuation, receipt.punctuation)) fail("UndoConflict");
   const { proofHash: _proof, ...body } = plan;
