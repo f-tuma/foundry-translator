@@ -542,10 +542,10 @@ function padMappedJournal(length: number) {
 it('public source-owned Journal prepare reports mapped normalized size without extra probes or data', async () => {
  const f = await journalRetentionDiagnosticFixture();
  (copy.flags![MODULE_ID] as any).syntheticSecret = 'NEVER_RETURN_RETENTION_SECRET';
- await padMappedJournal(2000001);
+ await padMappedJournal(4000001);
  const result: any = await f.call('prepare_reference_rebuild', f.mode);
  expect(result).toMatchObject({ok:false,error:{code:'Review.UnresolvedSourceRetentionDenied',message:'Review.UnresolvedSourceRetentionDenied',
-  unresolvedSourceRetention:{version:1,phase:'prepare-first',role:'mapped',pairIndex:0,predicate:'normalized-size-exceeded',normalizedCharacters:2000001,limitCharacters:2000000}}});
+  unresolvedSourceRetention:{version:1,phase:'prepare-first',role:'mapped',pairIndex:0,predicate:'normalized-size-exceeded',normalizedCharacters:4000001,limitCharacters:4000000}}});
  expect(sourceDocument.getEmbeddedDocument).toHaveBeenCalledTimes(1); expect(copyDocument.getEmbeddedDocument).not.toHaveBeenCalled();
  const mappedChild = `${f.args.documentId}.JournalEntryPage.missing`;
  expect(f.lookup.mock.calls.filter(([uuid]) => uuid === mappedChild)).toHaveLength(1);
@@ -553,8 +553,8 @@ it('public source-owned Journal prepare reports mapped normalized size without e
  expect(JSON.stringify(result)).not.toContain('NEVER_RETURN_RETENTION_SECRET'); expect(JSON.stringify(result)).not.toContain('syntheticPadding');
  expect(writes).toHaveLength(0);
 });
-it('public Journal prepare at the exact size boundary still requires and returns six absence cues', async () => {
- const f = await journalRetentionDiagnosticFixture(); await padMappedJournal(2000000);
+it.each([2504927, 4000000])('public Journal prepare at %i normalized characters still requires and returns six absence cues', async (length) => {
+ const f = await journalRetentionDiagnosticFixture(); await padMappedJournal(length);
  const result: any = await f.call('prepare_reference_rebuild', f.mode);
  expect(result.ok,JSON.stringify(result)).toBe(true); expect(result.value.canApply).toBe(true);
  expect(result.value.plan.unresolvedSourceRetention.mappings[0].evidence).toEqual({sourceExactAbsent:true,mappedExactAbsent:true,

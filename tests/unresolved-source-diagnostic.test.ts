@@ -6,15 +6,15 @@ it("does not recognize generic or name-matching errors as retention diagnostics"
  }
 });
 it("whitelists fixed fields and rejects invalid enums and numeric metadata", () => {
- const good = new UnresolvedSourceRetentionError({phase:"prepare-first",role:"mapped",pairIndex:0},"normalized-size-exceeded",2000001);
- expect(unresolvedSourceFailureTrace(good)).toEqual({version:1,phase:"prepare-first",role:"mapped",pairIndex:0,predicate:"normalized-size-exceeded",normalizedCharacters:2000001,limitCharacters:2000000});
+ const good = new UnresolvedSourceRetentionError({phase:"prepare-first",role:"mapped",pairIndex:0},"normalized-size-exceeded",4000001);
+ expect(unresolvedSourceFailureTrace(good)).toEqual({version:1,phase:"prepare-first",role:"mapped",pairIndex:0,predicate:"normalized-size-exceeded",normalizedCharacters:4000001,limitCharacters:4000000});
  for (const error of [
   new UnresolvedSourceRetentionError({phase:"SECRET" as any,role:"mapped",pairIndex:0},"serialized-child-present"),
   new UnresolvedSourceRetentionError({phase:"bind",role:"SECRET" as any,pairIndex:0},"serialized-child-present"),
   new UnresolvedSourceRetentionError({phase:"bind",role:"mapped",pairIndex:-1},"serialized-child-present"),
   new UnresolvedSourceRetentionError({phase:"bind",role:"mapped",pairIndex:NaN},"serialized-child-present"),
   new UnresolvedSourceRetentionError({phase:"bind",role:"mapped",pairIndex:0},"SECRET" as any),
-  ...[NaN,Infinity,2000000,2000000.5].map(n=>new UnresolvedSourceRetentionError({phase:"bind",role:"mapped",pairIndex:0},"normalized-size-exceeded",n)),
+  ...[NaN,Infinity,4000000,4000000.5].map(n=>new UnresolvedSourceRetentionError({phase:"bind",role:"mapped",pairIndex:0},"normalized-size-exceeded",n)),
  ]) expect(unresolvedSourceFailureTrace(error)).toBeUndefined();
 });
 

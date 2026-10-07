@@ -52,32 +52,33 @@ describe('current Journal retention guards, synthetic offline fixtures', () => {
     expect(proof.mappings[0]!.retainedTarget).toBe(sourceRoot + suffix);
     expect(f.copy.getEmbeddedDocument).toHaveBeenCalledWith('JournalEntryPage', 'syntheticMissing');
   });
-  it('accepts the exact normalized 2,000,000-character boundary', async () => {
-    padNormalized(f.mapped, 2000000);
+  it('accepts the exact normalized 4,000,000-character boundary', async () => {
+    padNormalized(f.mapped, 4000000);
     await expect(prepare()).resolves.toMatchObject({ version: 1, requested: true });
   });
-  it('rejects 2,000,001 mapped characters before mapped absence probes', async () => {
-    padNormalized(f.mapped, 2000001);
+  it('rejects 4,000,001 mapped characters before mapped absence probes', async () => {
+    padNormalized(f.mapped, 4000001);
     await expect(prepare()).rejects.toThrow(DENIED);
     expect(f.copy.getEmbeddedDocument).not.toHaveBeenCalled();
     // The initial mapped exact target lookup remains required and precedes this bound.
     expect(f.lookup).toHaveBeenCalledWith(mappedRoot + suffix.split('#')[0]);
   });
   it('also rejects an oversized original parent', async () => {
-    padNormalized(f.source, 2000001);
+    padNormalized(f.source, 4000001);
     f.snapshot.sourceHash = await sha256(JSON.stringify(f.source));
     await expect(prepare()).rejects.toThrow(DENIED);
     expect(f.original.getEmbeddedDocument).not.toHaveBeenCalled();
   });
   it('uses actual normalized JSON, excluding _stats but retaining flags/history', async () => {
-    f.mapped._stats = { large: 'x'.repeat(2000001) };
-    expect(batchObject(f.mapped).length).toBeLessThan(2000000);
+    f.mapped._stats = { large: 'x'.repeat(4000001) };
+    expect(batchObject(f.mapped).length).toBeLessThan(4000000);
     await expect(prepare()).resolves.toMatchObject({ requested: true });
-    f.mapped.flags['foundry-translate'].syntheticHistory = 'x'.repeat(2000001);
+    f.mapped.flags['foundry-translate'].syntheticHistory = 'x'.repeat(4000001);
     await expect(prepare()).rejects.toThrow(DENIED);
   });
-  it('denies serialized child presence despite nullish lookup results', async () => {
+  it('denies serialized child presence in an actual-sized parent despite nullish lookups', async () => {
     f.mapped.pages.push({ _id: 'syntheticMissing' });
+    padNormalized(f.mapped, 2504927);
     await expect(prepare()).rejects.toThrow(DENIED);
   });
   it('denies any serialized child without a nonempty string identity', async () => {
@@ -105,7 +106,8 @@ describe('current Journal retention guards, synthetic offline fixtures', () => {
     f.snapshot.reverse.clear();
     await expect(prepare()).rejects.toThrow(DENIED);
   });
-  it('denies mapped body mutation during an absence observation', async () => {
+  it('denies actual-sized mapped body mutation during an absence observation', async () => {
+    padNormalized(f.mapped, 2504927);
     f.copy.getEmbeddedDocument.mockImplementation(() => {
       f.mapped.pages[0].text.content += 'changed'; return null;
     });
