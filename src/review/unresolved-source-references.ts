@@ -1,4 +1,4 @@
-import { UnresolvedSourceRetentionError, type UnresolvedSourceFailureContext, type UnresolvedSourceFailureTrace } from "./unresolved-source-diagnostic";
+import { UNRESOLVED_SOURCE_MAX_NORMALIZED_CHARACTERS, UnresolvedSourceRetentionError, type UnresolvedSourceFailureContext, type UnresolvedSourceFailureTrace } from "./unresolved-source-diagnostic";
 import { sha256 } from "../translation/hash";
 import { planReviewText } from "./text-plan";
 import { parseDocumentReference, translationIdentity, TRANSLATION_IDENTITIES } from "../translation/document-identity";
@@ -41,7 +41,7 @@ async function absentChild(uuid: string, sourceRoot: string, original: boolean, 
   let data: Record<string, unknown>, stamp: string;
   try { data = parent.toObject(); stamp = batchObject(data); } catch { return fail(context, "serialization-threw"); }
   if (!data || typeof data !== "object" || Array.isArray(data)) return fail(context, "serialized-parent-shape");
-  if (stamp.length > 2000000) return fail(context, "normalized-size-exceeded", stamp.length);
+  if (stamp.length > UNRESOLVED_SOURCE_MAX_NORMALIZED_CHARACTERS) return fail(context, "normalized-size-exceeded", stamp.length);
   const collection = data[ref.collection];
   if (!Array.isArray(collection)) return fail(context, "serialized-collection-shape");
   if (collection.some(child => !child || typeof child !== "object" || (typeof child._id !== "string" && typeof child.id !== "string") || (!child._id && !child.id))) return fail(context, "serialized-child-id-invalid");

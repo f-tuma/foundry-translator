@@ -2,6 +2,12 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.34.21** allows source-owned reference checks for complete normalized
+parents up to 4,000,000 UTF-16 characters. This accommodates large translated
+gazetteers while preserving full-document stamps, provenance, repeated checks,
+and all six child-absence cues. Larger parents still fail with an accurate,
+body-free size diagnostic. This is a per-parent bound, not a total memory budget.
+
 Version **0.34.20** explains why a source-owned MCP reference rebuild was
 rejected, with a fixed diagnostic containing the failing check and observation
 phase. An oversized normalized parent reports its character count and the

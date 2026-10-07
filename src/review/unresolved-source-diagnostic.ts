@@ -1,6 +1,8 @@
 /** Fixed, body-free reason for a denied source-derived retention observation.
  * This is diagnostic metadata only, never a proof accepted by a write API. */
 export const UNRESOLVED_SOURCE_RETENTION_DENIED = "Review.UnresolvedSourceRetentionDenied";
+/** Bound the complete normalized parent stamp without omitting proof-bearing fields. */
+export const UNRESOLVED_SOURCE_MAX_NORMALIZED_CHARACTERS = 4_000_000;
 const phases = ["preflight", "prepare-first", "prepare-second", "bind", "recheck"] as const;
 const roles = ["source", "mapped", "pair", "environment"] as const;
 const predicates = [
@@ -26,7 +28,7 @@ export class UnresolvedSourceRetentionError extends Error {
     super(UNRESOLVED_SOURCE_RETENTION_DENIED);
     traces.set(this, Object.freeze({ version: 1, phase: context.phase, role: context.role, pairIndex: context.pairIndex,
       predicate, normalizedCharacters: predicate === "normalized-size-exceeded" ? normalizedCharacters ?? null : null,
-      limitCharacters: predicate === "normalized-size-exceeded" ? 2000000 : null }));
+      limitCharacters: predicate === "normalized-size-exceeded" ? UNRESOLVED_SOURCE_MAX_NORMALIZED_CHARACTERS : null }));
   }
 }
 export function isUnresolvedSourceRetentionError(error: unknown): error is UnresolvedSourceRetentionError {
@@ -40,7 +42,7 @@ export function unresolvedSourceFailureTrace(error: unknown): UnresolvedSourceFa
   if (trace.version !== 1 || !phases.includes(trace.phase) || !roles.includes(trace.role) || !predicates.includes(trace.predicate) ||
     (trace.pairIndex !== null && (!Number.isSafeInteger(trace.pairIndex) || trace.pairIndex < 0))) return;
   if (trace.predicate === "normalized-size-exceeded"
-    ? trace.limitCharacters !== 2000000 || !Number.isSafeInteger(trace.normalizedCharacters) || trace.normalizedCharacters! <= 2000000
+    ? trace.limitCharacters !== UNRESOLVED_SOURCE_MAX_NORMALIZED_CHARACTERS || !Number.isSafeInteger(trace.normalizedCharacters) || trace.normalizedCharacters! <= UNRESOLVED_SOURCE_MAX_NORMALIZED_CHARACTERS
     : trace.normalizedCharacters !== null || trace.limitCharacters !== null) return;
   return { version: 1, phase: trace.phase, role: trace.role, pairIndex: trace.pairIndex, predicate: trace.predicate,
     normalizedCharacters: trace.normalizedCharacters, limitCharacters: trace.limitCharacters };
