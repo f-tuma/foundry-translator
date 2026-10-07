@@ -1,7 +1,7 @@
-import { assertPortableText, diagnosePortableText, syntaxExpressions } from "../bundles/format";
-import { FOUNDRY_EXPRESSION } from "../translation/foundry-syntax";
-import { portableReviewText, type ReviewChange, type ReviewSnapshot } from "./service";
-import { planReviewText } from "./text-plan";
+import { assertPortableText, diagnosePortableText, syntaxExpressions } from "../../src/bundles/format";
+import { FOUNDRY_EXPRESSION } from "../../src/translation/foundry-syntax";
+import { portableReviewText, type ReviewChange, type ReviewSnapshot } from "../../src/review/service";
+import { planReviewText } from "../../src/review/text-plan";
 
 export interface ReferenceIdentifierRepairDraft {
   fieldId: string;
@@ -35,49 +35,6 @@ export function referenceIdentifierRepairDraft(snapshot: ReviewSnapshot, fieldId
   catch { return null; } // Malformed source/target is diagnostic data, never authority to write.
 }
 
-
-/** Two bare IDs in one exact part, anchored by an existing byte-preserved UUID.
- * This never introduces or rewrites any UUID, resolver label, option or prose. */
-function pairedTwoIdentifierRepair(snapshot: ReviewSnapshot, field: ReviewSnapshot["fields"][number],
-  source: readonly string[], before: readonly string[], rowId: string) {
-  const affected = source.flatMap((part, index) => JSON.stringify(syntaxExpressions(part)) ===
-    JSON.stringify(syntaxExpressions(portableReviewText(snapshot, field, before[index]!))) ? [] : [index]);
-  if (affected.length !== 1) return null;
-  const partIndex = affected[0]!, originals = [...source[partIndex]!.matchAll(FOUNDRY_EXPRESSION)],
-    occurrences = [...before[partIndex]!.matchAll(FOUNDRY_EXPRESSION)];
-  if (originals.length !== occurrences.length) return null;
-  const originalIds = originals.filter(match => bareReference(match[0])).map(match => match[0]),
-    currentIds = occurrences.filter(match => bareReference(match[0])).map(match => match[0]);
-  if (originalIds.length !== 2 || currentIds.length !== 2 || new Set(originalIds).size !== 2 ||
-    new Set(currentIds).size !== 2 || currentIds.some(command => originalIds.includes(command))) return null;
-  const replacements: { index: number; before: string; after: string }[] = [];
-  let exactUuidAnchor = false;
-  for (let i = 0; i < originals.length; i++) {
-    const original = originals[i]![0], occurrence = occurrences[i]!;
-    if (bareReference(original)) {
-      if (!bareReference(occurrence[0])) return null;
-      replacements.push({ index: occurrence.index!, before: occurrence[0], after: original });
-    } else {
-      if (bareReference(occurrence[0]) || JSON.stringify(syntaxExpressions(original)) !==
-          JSON.stringify(syntaxExpressions(portableReviewText(snapshot, field, occurrence[0])))) return null;
-      // Identical lexical UUID token already occurs in source and current;
-      // translated fallback labels remain byte-identical to current, never inferred.
-      const sourceUuid = /^@UUID\[([^\]\s]+)\]/u.exec(original)?.[1],
-        currentUuid = /^@UUID\[([^\]\s]+)\]/u.exec(occurrence[0])?.[1];
-      if (sourceUuid && sourceUuid === currentUuid) exactUuidAnchor = true;
-    }
-  }
-  if (!exactUuidAnchor || replacements.length !== 2) return null;
-  const parts = [...before];
-  for (const change of [...replacements].reverse()) {
-    const part = parts[partIndex]!;
-    parts[partIndex] = part.slice(0, change.index) + change.after + part.slice(change.index + change.before.length);
-  }
-  if (JSON.stringify(syntaxExpressions(portableReviewText(snapshot, field, parts).join(""))) !==
-      JSON.stringify(syntaxExpressions(source.join("")))) return null;
-  return { parts, identifiers: replacements.map(({ before, after }) => ({ rowId, before, after })) };
-}
-
 function buildDraft(snapshot: ReviewSnapshot, fieldId: string): ReferenceIdentifierRepairDraft | null {
   const field = snapshot.fields.find(item => item.id === fieldId);
   if (!field || snapshot.warning || !field.translation.trim()) return null;
@@ -98,14 +55,6 @@ function buildDraft(snapshot: ReviewSnapshot, fieldId: string): ReferenceIdentif
     const actual = syntaxExpressions(portableReviewText(snapshot, field, target.parts).join(""));
     const missing = difference(expected, actual), extra = difference(actual, expected);
     if (!missing.length && !extra.length) continue;
-    if (missing.length === 2 && extra.length === 2) {
-      const paired = pairedTwoIdentifierRepair(snapshot, field, unit.parts, target.parts, row.id);
-      if (!paired) return null;
-      draft.changes.push({ rowId: row.id, parts: paired.parts });
-      draft.identifiers.push(...paired.identifiers);
-      draft.value = targetPlan.replace(unit.id, paired.parts);
-      continue;
-    }
     if (missing.length !== 1 || extra.length !== 1) return null;
     const originals = unit.parts.flatMap(part => [...part.matchAll(FOUNDRY_EXPRESSION)].map(match => match[0]))
       .filter(command => syntaxExpressions(command)[0] === missing[0]);

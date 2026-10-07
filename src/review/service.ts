@@ -1,3 +1,5 @@
+import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
+import { buildCorrectionBatch, assertBatchApplicability, assertBatchFinal, batchRequestHash, type BatchReceipt } from "../polish/correction-batch";
 import { canonicalAffixActionDisplayPath } from "../translation/affix-action-display";
 import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, machineProofreadingSchemaProof, type MachineProofreadingReceipt } from "./machine-proofreading";
 import { readEditorial, editorialKey, writeEditorial, EDITORIAL_SETTING, type EditorialRecord, type EditorialState } from "./editorial";
@@ -73,7 +75,7 @@ export async function reviewCatalog(language: string): Promise<ReviewDocument[]>
   return result.sort((a, b) => a.name.localeCompare(b.name, language));
 }
 
-async function hashSource(kind: BundleDocumentKind, data: Record<string, unknown>): Promise<string> {
+export async function hashSource(kind: BundleDocumentKind, data: Record<string, unknown>): Promise<string> {
   if (kind === "Scene" || kind === "ActiveEffect") return displaySourceHash(kind, data);
   if (kind === "JournalEntry") return journalSourceHash(data as JournalData);
   if (kind === "Actor") return actorSourceHash(data as ActorData);
@@ -290,6 +292,7 @@ export async function importReviewMetadata(snapshot: ReviewSnapshot, records: Po
 export interface ReviewHistoryEntry {
   id: string; at: string; userName: string; sourceHash: string; label: string;
   agentRequestHash?: string;
+  correctionBatch?: BatchReceipt;
   referenceRepair?: true;
   identifierRepair?: true;
   referenceRebuild?: ReferenceRebuildReceipt;
@@ -348,7 +351,7 @@ function abortableHistoryRead<T>(pending: Promise<T>, signal?: AbortSignal): Pro
 
 /** Compile only schema-allowed text updates. One document update includes its embedded
  * changes and undo record, so a lost response can be resolved from persistent history. */
-export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; repairReferences?: boolean; identifierRepair?: boolean; referenceRebuild?: { fieldId: string; proofHash: string; restoreSourceNumbers?: boolean }; restoreEmbedSourceNumbers?: boolean; canWrite?: () => boolean; beforeWrite?: () => Promise<void> } = {}): Promise<ReviewSnapshot> {
+export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly ReviewChange[], options: { id?: string; label?: string; undoId?: string; agentRequestHash?: string; ordinaryBatch?: BatchReceipt; repairReferences?: boolean; identifierRepair?: boolean; referenceRebuild?: { fieldId: string; proofHash: string; restoreSourceNumbers?: boolean }; restoreEmbedSourceNumbers?: boolean; canWrite?: () => boolean; beforeWrite?: () => Promise<void> } = {}): Promise<ReviewSnapshot> {
   gmOnly();
   if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   const fresh = await loadReview(snapshot.entry);
@@ -365,7 +368,15 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
       JSON.stringify(fresh.rows.find(row => row.id === saved.rowId)?.translation) === JSON.stringify(saved.after));
   if (options.undoId && !exactUndo) fail("UndoConflict");
   const rebuildMode = !!options.referenceRebuild || !!undo?.referenceRebuild;
-  if (options.beforeWrite && !options.referenceRebuild) fail("ProtectedText");
+  const batchMode = !!options.ordinaryBatch || !!undo?.correctionBatch;
+  if (options.beforeWrite && !options.referenceRebuild && !options.ordinaryBatch) fail("ProtectedText");
+  if (batchMode && (options.referenceRebuild || options.identifierRepair || options.repairReferences || options.restoreEmbedSourceNumbers || (options.ordinaryBatch && options.undoId))) fail("ProtectedText");
+  if (options.ordinaryBatch) {
+    if (options.label !== `MCP batch: ${options.ordinaryBatch.payload.reason}` || options.agentRequestHash !== await batchRequestHash(options.ordinaryBatch.payloadHash,options.ordinaryBatch.planHash)) fail("Conflict");
+    const proved = await buildCorrectionBatch(fresh, options.ordinaryBatch.payload, await reviewCatalog(fresh.entry.language), await new GlossaryCompendiumRepository().loadExisting());
+    if (JSON.stringify(proved.receipt) !== JSON.stringify(options.ordinaryBatch) || JSON.stringify(proved.changes) !== JSON.stringify(changes)) fail("Conflict");
+  } else if (undo?.correctionBatch) await assertBatchApplicability(fresh, undo);
+  let batchSynchronousCheck: (() => void) | undefined;
   let rebuildReceipt: ReferenceRebuildReceipt | undefined;
   let rebuildTargets: { target: string; required: boolean }[] = [];
   if (rebuildMode) {
@@ -418,6 +429,7 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
     if (!/^[a-f0-9]{64}$/u.test(options.agentRequestHash)) fail("MissingField");
     history.agentRequestHash = options.agentRequestHash;
   }
+  if (options.ordinaryBatch) history.correctionBatch = structuredClone(options.ordinaryBatch);
   if (options.repairReferences) history.referenceRepair = true;
   if (options.identifierRepair) history.identifierRepair = true;
   if (rebuildReceipt) history.referenceRebuild = rebuildReceipt;
@@ -489,6 +501,11 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
     if (pack.locked) fail("Locked");
     if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   }
+  if (batchMode) {
+    batchSynchronousCheck = await assertBatchFinal(fresh, options.ordinaryBatch ?? undo!.correctionBatch!);
+    if (options.beforeWrite) await options.beforeWrite();
+    batchSynchronousCheck = await assertBatchFinal(fresh, options.ordinaryBatch ?? undo!.correctionBatch!);
+  }
   // Recheck immediately before the single persistence operation. Never restamp outputHash.
   if ((await captureTranslationWriteGuard(target))?.fingerprint !== fresh.guard.fingerprint) fail("Conflict");
   if (rebuildMode) assertReferenceRebuildEnvironment(rebuildReceipt ?? undo!.referenceRebuild!);
@@ -497,6 +514,7 @@ export async function saveReviewRows(snapshot: ReviewSnapshot, changes: readonly
     if (activeTranslations.list().some(run => run.finishedAt === undefined && run.pausedAt === undefined)) fail("PauseFirst");
   }
   if (options.canWrite && !options.canWrite()) throw new Error("Live.Disconnected");
+  batchSynchronousCheck?.();
   await target.update(patch);
   if (displayKind(fresh.entry.kind)) Hooks.callAll("foundryTranslateDisplayTextChanged");
   return loadReview(fresh.entry);
