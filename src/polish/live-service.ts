@@ -1,3 +1,4 @@
+import { isUnresolvedSourceRetentionError, UNRESOLVED_SOURCE_RETENTION_DENIED, unresolvedSourceFailureTrace } from "../review/unresolved-source-diagnostic";
 import { unresolvedSourceWarnings } from "../review/unresolved-source-references";
 import { batchEnvironment, batchScope, batchCatalogHash, batchSource, batchObject, batchHash, buildCorrectionBatch, normalizedBatch, batchPayloadHash, batchRequestHash, assertBatchApplicability, batchOperationValue, boundBatch, type BatchPayload } from "./correction-batch";
 import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, isMachineProofreadingCurrent, machineProofreadingSchemaProof } from "../review/machine-proofreading";
@@ -515,13 +516,16 @@ export function createLiveHandler(language: string, connected: () => boolean) {
       return { ok: true, value: { saved: true, operationId: args.operationId, documentId, rowId,
         revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])), warnings, verified: false } };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Live.Failed";
+      const retentionDenied = isUnresolvedSourceRetentionError(error);
+      const retentionTrace = unresolvedSourceFailureTrace(error);
+      const message = retentionDenied ? UNRESOLVED_SOURCE_RETENTION_DENIED : error instanceof Error ? error.message : "Live.Failed";
       if (input && typeof input === "object" && Object.getOwnPropertyDescriptor(input, "method")?.value === "get_reference_diagnostic") {
         const codes = ["Live.InvalidRequest", "Live.Disconnected", "Live.ScopeChanged", "Review.Conflict", "Review.TranslationMissing", "Review.MissingField", "Live.ContextTooLarge", "Live.ReferenceUnavailable"];
         return { ok: false, error: { code: codes.includes(message) ? message : "Live.DiagnosticUnavailable", message: "Reference diagnostic rejected." } };
       }
       return { ok: false, error: { code: message.startsWith("Review.") || message.startsWith("Live.") ? message : "Live.InvalidCorrection",
-        message: error instanceof Error && error.cause instanceof Error ? error.cause.message : message,
+        message: !retentionDenied && error instanceof Error && error.cause instanceof Error ? error.cause.message : message,
+        ...(retentionTrace ? { unresolvedSourceRetention: retentionTrace } : {}),
         ...(documentId ? { documentId } : {}), ...(rowId ? { rowId } : {}), ...(fieldId ? { fieldId } : {}),
         ...(message === "Review.Conflict" ? { retry: "Read get_context again; do not overwrite the newer translation." } : {}) } };
     }
