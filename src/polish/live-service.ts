@@ -1,3 +1,4 @@
+import { batchEnvironment, batchScope, batchCatalogHash, batchSource, batchObject, batchHash, buildCorrectionBatch, normalizedBatch, batchPayloadHash, batchRequestHash, assertBatchApplicability, batchOperationValue, boundBatch, type BatchPayload } from "./correction-batch";
 import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, isMachineProofreadingCurrent, machineProofreadingSchemaProof } from "../review/machine-proofreading";
 import { type PortableDocument } from "../bundles/fields";
 import { type ItemData } from "../translation/item";
@@ -13,7 +14,7 @@ import { maskReviewParts } from "../review/text-plan";
 import { referenceRepairDraft, type ReferenceRepairDraft } from "../review/reference-repair";
 import { correctionOptionChanges, correctionParts, correctionWarnings, sourceNumberRepair } from "./quality-guards";
 import { parseLiveRequest, type LiveResult } from "./live-protocol";
-import { readSourceReferenceContext, sourceReferences } from "./reference-context";
+import { readSourceReferenceContext, sourceReferences, diagnoseSourceReferenceContextBound } from "./reference-context";
 import { prepareReferenceRebuild, materializeReferenceRebuild, type ReferenceRebuildPlan } from "../review/reference-rebuild";
 import { referenceIdentifierRepairDraft } from "../review/reference-identifier-repair";
 
@@ -61,6 +62,15 @@ export function createLiveHandler(language: string, connected: () => boolean) {
     if (!world || !user || game.world?.id !== world || game.user?.id !== user || (game.system?.id ?? null) !== systemId || (currentEmber?.active === true) !== emberActive || String(currentEmber?.version ?? "") !== emberVersion || !game.user?.isGM || String(game.settings.get(MODULE_ID, "targetLanguage") ?? "cs") !== language) throw new Error("Live.ScopeChanged");
   };
   const canWrite = () => { try { check(); return true; } catch { return false; } };
+  const batchScopeAtPairing = batchScope();
+  const batchCheck = () => { check(); if (batchScope() !== batchScopeAtPairing) throw new Error("Live.ScopeChanged"); };
+  const batchQueues = new Map<string, Promise<void>>();
+  const batchQueue = async <T>(id: string, work: () => Promise<T>): Promise<T> => {
+    const pending = (batchQueues.get(id) ?? Promise.resolve()).then(work);
+    const settled = pending.then(() => undefined, () => undefined); batchQueues.set(id, settled);
+    try { return await pending; } finally { if (batchQueues.get(id) === settled) batchQueues.delete(id); }
+  };
+
   return async (input: unknown): Promise<LiveResult> => {
     let documentId: string | undefined, rowId: string | undefined, fieldId: string | undefined;
     try {
@@ -191,6 +201,51 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         if (new TextEncoder().encode(JSON.stringify({ ok: true, value: result })).length > diagnostic.maxResponseBytes) throw new Error("Live.ContextTooLarge");
         return { ok: true, value: result };
       }
+      if (request.method === "get_reference_diagnostic") {
+        if (revision !== args.revision) throw new Error("Review.Conflict");
+        if (!row) throw new Error("Review.MissingField");
+        const field = snapshot.fields.find(item => item.id === row.fieldId);
+        if (!field) throw new Error("Review.MissingField");
+        type Owner = { uuid?: string; documentName?: string; toObject?: () => unknown };
+        const owners = async () => [await fromUuid(entry.sourceUuid) as Owner | null,
+          await game.packs.get(entry.pack)!.getDocument(entry.id) as Owner | null];
+        const ownerStamp = (documents: (Owner | null)[]) => {
+          if (documents[0]?.uuid !== entry.sourceUuid || documents[0]?.documentName !== entry.kind ||
+              documents[1]?.uuid !== entry.uuid || documents.some(document => typeof document?.toObject !== "function")) throw new Error("Live.ReferenceUnavailable");
+          return JSON.stringify(documents.map(document => document!.toObject!()));
+        };
+        const ownerDocuments = await owners(), ownerProof = ownerStamp(ownerDocuments);
+        check();
+        const bound = await diagnoseSourceReferenceContextBound(snapshot, field, row, args.referenceIndex!);
+        const freshCatalog = await reviewCatalog(language);
+        const freshEntry = freshCatalog.find(item => item.uuid === entry.uuid);
+        if (!freshEntry || JSON.stringify(freshEntry) !== JSON.stringify(entry)) throw new Error("Review.Conflict");
+        const fresh = await loadReview(freshEntry, freshCatalog);
+        const freshGlossary = await new GlossaryCompendiumRepository().loadExisting();
+        const freshRevision = await sha256(JSON.stringify([fresh.guard.fingerprint, fresh.sourceHash,
+          await sha256(JSON.stringify(freshGlossary)), systemId, emberActive, emberVersion]));
+        const freshRow = fresh.rows.find(item => item.id === row.id);
+        const freshField = fresh.fields.find(item => item.id === field.id);
+        const provenance = (value: ReviewSnapshot) => JSON.stringify([...value.reverse.entries()].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+        check();
+        if (freshRevision !== revision || !freshRow || !freshField || provenance(fresh) !== provenance(snapshot) ||
+            JSON.stringify(freshRow.source) !== JSON.stringify(row.source) ||
+            JSON.stringify(sourceReferences(fresh, freshField, freshRow)) !== JSON.stringify(sourceReferences(snapshot, field, row))) throw new Error("Review.Conflict");
+        await bound.recheck();
+        if (await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting())) !== glossaryHash) throw new Error("Review.Conflict");
+        const finalCatalog = await reviewCatalog(language);
+        if (JSON.stringify(finalCatalog) !== JSON.stringify(freshCatalog)) throw new Error("Review.Conflict");
+        const finalOwners = await owners();
+        if (ownerStamp(finalOwners) !== ownerProof || ownerStamp(ownerDocuments) !== ownerProof) throw new Error("Review.Conflict");
+        bound.assertUnchanged();
+        // No awaits follow these final owning document and paired scope checks.
+        // loadReview guarded the source/output snapshot; exact target observations
+        // are independently rebound above. This is not an atomic Foundry CAS.
+        check();
+        const value = { ...bound.diagnostic, consistency: "repeat-observations-not-atomic" };
+        if (new TextEncoder().encode(JSON.stringify({ ok: true, value })).length > 4000) throw new Error("Live.ContextTooLarge");
+        return { ok: true, value };
+      }
       const target = await game.packs.get(entry.pack)!.getDocument(entry.id);
       const history = readReviewHistory(target?.flags).sort((a, b) => b.at.localeCompare(a.at));
       if (["prepare_machine_proofreading", "commit_machine_proofreading"].includes(request.method)) {
@@ -227,12 +282,73 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         return { ok: true, value: { saved: true, operationId: args.operationId, documentId, machineProofread: true, verified: false,
           coverageHash: plan.coverageHash, revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])) } };
       }
+      const completeBatchResult = (value: unknown): LiveResult => {boundBatch(value);return {ok:true,value};};
+      const readOperation = async (operationId: string) => {
+        const env = await batchEnvironment(entry), scope = batchScope(), source = await batchSource(env.snapshot);
+        const doc = await game.packs.get(entry.pack)!.getDocument(entry.id);
+        const matches = readReviewHistory(doc?.flags).filter(h => h.id === operationId);
+        if (matches.length > 1) throw new Error("Live.OperationConflict");
+        const operation = matches[0];
+        if (!operation?.correctionBatch) throw new Error("Live.UnknownOperation");
+        const value = {...await batchOperationValue(env.snapshot, operation, env.glossary),
+          glossaryCompatible:env.glossaryHash===operation.correctionBatch.glossaryHash,
+          catalogCompatible:await batchCatalogHash(env.catalog)===operation.correctionBatch.catalogHash,
+          scopeCompatible:batchScope()===operation.correctionBatch.scope};
+        const latest = await batchEnvironment(entry), latestSource = await batchSource(latest.snapshot);
+        if (latest.revision !== env.revision || await batchCatalogHash(latest.catalog) !== await batchCatalogHash(env.catalog) ||
+          latestSource.fullSourceHash !== source.fullSourceHash || batchObject(source.doc.toObject!()) !== source.proof || batchObject(latestSource.doc.toObject!()) !== latestSource.proof || batchScope() !== scope) throw new Error("Review.Conflict");
+        batchCheck(); boundBatch(value); return value;
+      };
+      if (["validate_correction_batch", "save_correction_batch", "get_correction_operation"].includes(request.method)) {
+        batchCheck();
+        if (request.method === "get_correction_operation") return completeBatchResult(await readOperation(args.operationId!));
+        const payload: BatchPayload = normalizedBatch({documentId:entry.uuid,revision:args.revision!,reason:args.reason!,changes:args.changes!});
+        if (request.method === "validate_correction_batch") {
+          const env = await batchEnvironment(entry), planned = await buildCorrectionBatch(env.snapshot,payload,env.catalog,env.glossary);
+          const latest = await batchEnvironment(entry), latestSource = await batchSource(latest.snapshot);
+          if (latest.revision !== env.revision || latestSource.fullSourceHash !== planned.receipt.fullSourceHash || await batchCatalogHash(latest.catalog) !== planned.receipt.catalogHash) throw new Error("Review.Conflict");
+          batchCheck(); return completeBatchResult(planned.preview);
+        }
+        return await batchQueue(entry.uuid,async () => {
+          const env = await batchEnvironment(entry); batchCheck();
+          const doc = await game.packs.get(entry.pack)!.getDocument(entry.id);
+          const matches = readReviewHistory(doc?.flags).filter(h=>h.id===args.operationId);
+          if(matches.length>1) throw new Error("Live.OperationConflict");
+          const previous = matches[0];
+          const requestHash = await batchRequestHash(await batchPayloadHash(payload),args.planHash!);
+          if (previous) {
+            if (previous.agentRequestHash !== requestHash) throw new Error("Live.OperationConflict");
+            await assertBatchApplicability(env.snapshot,previous);
+            if (env.glossaryHash !== previous.correctionBatch!.glossaryHash || await batchCatalogHash(env.catalog) !== previous.correctionBatch!.catalogHash) throw new Error("Live.OperationConflict");
+            batchCheck();
+            return completeBatchResult({...(await readOperation(previous.id)),alreadyApplied:true});
+          }
+          const planned = await buildCorrectionBatch(env.snapshot,payload,env.catalog,env.glossary);
+          if (planned.receipt.planHash !== args.planHash) throw new Error("Review.Conflict");
+          await saveReviewRows(env.snapshot,planned.changes,{id:args.operationId!,label:`MCP batch: ${payload.reason}`,agentRequestHash:requestHash,
+            ordinaryBatch:planned.receipt,beforeWrite:async()=>{batchCheck();},canWrite:()=>{try{batchCheck();return true;}catch{return false;}}});
+          Hooks.callAll("foundryTranslateMcpChanged",entry.uuid);
+          const actual = await readOperation(args.operationId!);
+          if (actual.operation.agentRequestHash !== requestHash || actual.operation.undoneAt || !actual.sourceCompatible || !actual.affectedRowsCompatible) throw new Error("Live.OperationConflict");
+          return completeBatchResult({...actual,saved:true});
+        });
+      }
       if (request.method === "list_history") return { ok: true, value: page(history.map(operation => ({ ...operation, totalRows: operation.rows.length,
         rows: operation.rows.slice(0, 20).map(change => ({ ...change, excerpt: true,
           before: [change.before.join("").slice(0, 1500)], after: [change.after.join("").slice(0, 1500)] })) })), args.offset, Math.min(args.limit, 10)) };
       if (request.method === "undo_correction") {
         const operation = history.find(item => item.id === args.operationId);
         if (!operation?.agentRequestHash) throw new Error("Live.UnknownOperation");
+        if (operation.correctionBatch) {
+          if(history.filter(h=>h.id===operation.id).length!==1) throw new Error("Live.OperationConflict");
+          batchCheck();
+          if (operation.undoneAt) return completeBatchResult({...(await readOperation(operation.id)),alreadyUndone:true});
+          await undoReview(entry,operation.id,()=>{try{batchCheck();return true;}catch{return false;}});
+          Hooks.callAll("foundryTranslateMcpChanged",entry.uuid);
+          const actual=await readOperation(operation.id);
+          if (!actual.operation.undoneAt || !actual.undoneRowsCompatible) throw new Error("Live.OperationConflict");
+          return completeBatchResult({...actual,undone:true,verified:false});
+        }
         if (operation.undoneAt) return { ok: true, value: { alreadyUndone: true, operationId: operation.id } };
         await undoReview(entry, operation.id, canWrite);
         Hooks.callAll("foundryTranslateMcpChanged", entry.uuid);
@@ -367,6 +483,10 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         revision: await sha256(JSON.stringify([saved.guard.fingerprint, saved.sourceHash, glossaryHash, systemId, emberActive, emberVersion])), warnings, verified: false } };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Live.Failed";
+      if (input && typeof input === "object" && Object.getOwnPropertyDescriptor(input, "method")?.value === "get_reference_diagnostic") {
+        const codes = ["Live.InvalidRequest", "Live.Disconnected", "Live.ScopeChanged", "Review.Conflict", "Review.TranslationMissing", "Review.MissingField", "Live.ContextTooLarge", "Live.ReferenceUnavailable"];
+        return { ok: false, error: { code: codes.includes(message) ? message : "Live.DiagnosticUnavailable", message: "Reference diagnostic rejected." } };
+      }
       return { ok: false, error: { code: message.startsWith("Review.") || message.startsWith("Live.") ? message : "Live.InvalidCorrection",
         message: error instanceof Error && error.cause instanceof Error ? error.cause.message : message,
         ...(documentId ? { documentId } : {}), ...(rowId ? { rowId } : {}), ...(fieldId ? { fieldId } : {}),
