@@ -1,3 +1,4 @@
+import type { UnresolvedSourceFailureTrace } from "../review/unresolved-source-diagnostic";
 import { BATCH_ROWS, BATCH_REQUEST_BYTES, type BatchChange } from "./correction-batch-contract";
 export const LIVE_PROTOCOL = 1;
 export const LIVE_PORT = 3112;
@@ -16,7 +17,7 @@ export interface LiveArgs {
   offset: number; limit: number; query: string; radius: number; fuzzy: boolean;
 }
 export interface LiveRequest { id: string; method: LiveMethod; args: Record<string, unknown> }
-export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string } }
+export interface LiveResult { ok: boolean; value?: unknown; error?: { code: string; message: string; documentId?: string; rowId?: string; fieldId?: string; retry?: string; unresolvedSourceRetention?: UnresolvedSourceFailureTrace } }
 export interface LiveClaim { protocol: number; worldId: string; worldName: string; userId: string; language: string; systemId: string; moduleVersion: string; clientId: string }
 const methods: readonly string[] = ["validate_correction_batch", "save_correction_batch", "get_correction_operation", "prepare_machine_proofreading", "commit_machine_proofreading", "status", "list_documents", "list_passages", "get_context", "get_context_batch", "get_field_diagnostic", "get_reference_context", "get_reference_diagnostic", "search_passages", "list_glossary", "validate_correction", "save_correction", "validate_reference_identifiers", "restore_reference_identifiers", "prepare_reference_rebuild", "validate_reference_rebuild", "apply_reference_rebuild", "list_history", "undo_correction"];
 const keys = new Set(["changes", "documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits", "coverageHash", "retainUnresolvedSourceReferences"]);

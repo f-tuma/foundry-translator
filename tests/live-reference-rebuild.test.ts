@@ -518,3 +518,83 @@ it('HTML-encoded retained anchor stays visibly unresolved through actual retenti
  assertPortableText(field.source,portableReviewText(final,field,field.translation),field.format);
  for(const actual of final.rows.filter(r=>r.fieldId===field.id))expect(planReviewText(field.translation,field.format).units.find(unit=>unit.id===actual.unitId)?.parts).toEqual(actual.translation);
 });
+
+
+// Retention diagnostics use the ordinary source-owned handler path. Entirely synthetic journals.
+async function journalRetentionDiagnosticFixture() {
+ const f = await rebuildFixture('<p>Use @UUID[JournalEntry.source.JournalEntryPage.missing#detail]{Place} for 3 rounds.</p><p>Unchanged.</p>',
+   '<p>Použij @UUID[JournalEntry.source]{Místo} na 3 kola.</p><p>Beze změny.</p>');
+ sourceDocument.getEmbeddedDocument = vi.fn(() => null);
+ copyDocument.getEmbeddedDocument = vi.fn(() => null); copyDocument.documentName = 'JournalEntry';
+ const lookup = vi.fn(async (uuid: string) => uuid === 'JournalEntry.source' ? sourceDocument : uuid === f.args.documentId ? copyDocument : null);
+ vi.stubGlobal('fromUuid', lookup);
+ const mode = { documentId: f.args.documentId, fieldId: f.args.fieldId, retainUnresolvedSourceReferences: true };
+ return { ...f, mode, lookup };
+}
+function padMappedJournal(length: number) {
+ const data = copy as any; data.syntheticPadding = '';
+ // Match the actual guard's normalized stamp, including translation flags.
+ return import('../src/polish/correction-batch').then(({batchObject}) => {
+  data.syntheticPadding = 'x'.repeat(length - batchObject(data).length);
+  expect(batchObject(data).length).toBe(length);
+ });
+}
+it('public source-owned Journal prepare reports mapped normalized size without extra probes or data', async () => {
+ const f = await journalRetentionDiagnosticFixture();
+ (copy.flags![MODULE_ID] as any).syntheticSecret = 'NEVER_RETURN_RETENTION_SECRET';
+ await padMappedJournal(2000001);
+ const result: any = await f.call('prepare_reference_rebuild', f.mode);
+ expect(result).toMatchObject({ok:false,error:{code:'Review.UnresolvedSourceRetentionDenied',message:'Review.UnresolvedSourceRetentionDenied',
+  unresolvedSourceRetention:{version:1,phase:'prepare-first',role:'mapped',pairIndex:0,predicate:'normalized-size-exceeded',normalizedCharacters:2000001,limitCharacters:2000000}}});
+ expect(sourceDocument.getEmbeddedDocument).toHaveBeenCalledTimes(1); expect(copyDocument.getEmbeddedDocument).not.toHaveBeenCalled();
+ const mappedChild = `${f.args.documentId}.JournalEntryPage.missing`;
+ expect(f.lookup.mock.calls.filter(([uuid]) => uuid === mappedChild)).toHaveLength(1);
+ expect(new Set(f.lookup.mock.calls.map(([uuid]) => uuid))).toEqual(new Set(['JournalEntry.source',f.args.documentId,'JournalEntry.source.JournalEntryPage.missing',mappedChild]));
+ expect(JSON.stringify(result)).not.toContain('NEVER_RETURN_RETENTION_SECRET'); expect(JSON.stringify(result)).not.toContain('syntheticPadding');
+ expect(writes).toHaveLength(0);
+});
+it('public Journal prepare at the exact size boundary still requires and returns six absence cues', async () => {
+ const f = await journalRetentionDiagnosticFixture(); await padMappedJournal(2000000);
+ const result: any = await f.call('prepare_reference_rebuild', f.mode);
+ expect(result.ok,JSON.stringify(result)).toBe(true); expect(result.value.canApply).toBe(true);
+ expect(result.value.plan.unresolvedSourceRetention.mappings[0].evidence).toEqual({sourceExactAbsent:true,mappedExactAbsent:true,
+  sourceSerializedChildAbsent:true,mappedSerializedChildAbsent:true,sourceEmbeddedAbsent:true,mappedEmbeddedAbsent:true});
+ expect(result.error).toBeUndefined(); expect(writes).toHaveLength(0);
+});
+it('public Journal prepare distinguishes malformed serialized IDs from the size guard', async () => {
+ const f = await journalRetentionDiagnosticFixture(); (copy.pages as any[]).push({name:'NEVER_RETURN_INVALID_CHILD_SECRET'});
+ const result: any = await f.call('prepare_reference_rebuild', f.mode);
+ expect(result).toMatchObject({ok:false,error:{code:'Review.UnresolvedSourceRetentionDenied',unresolvedSourceRetention:{
+  phase:'prepare-first',role:'mapped',pairIndex:0,predicate:'serialized-child-id-invalid',normalizedCharacters:null,limitCharacters:null}}});
+ expect(copyDocument.getEmbeddedDocument).not.toHaveBeenCalled(); expect(JSON.stringify(result)).not.toContain('NEVER_RETURN_INVALID_CHILD_SECRET');
+ expect(writes).toHaveLength(0);
+});
+it('public retention serialization failure never exposes the caught exception or cause', async () => {
+ const f = await journalRetentionDiagnosticFixture();
+ sourceDocument.getEmbeddedDocument = vi.fn(() => {copyDocument.toObject = () => {throw new Error('NEVER_RETURN_SERIALIZER_SECRET',{cause:new Error('NEVER_RETURN_CAUSE_SECRET')});};return null;});
+ const result: any = await f.call('prepare_reference_rebuild', f.mode);
+ expect(result).toMatchObject({ok:false,error:{code:'Review.UnresolvedSourceRetentionDenied',message:'Review.UnresolvedSourceRetentionDenied',
+  unresolvedSourceRetention:{role:'mapped',predicate:'serialization-threw',normalizedCharacters:null,limitCharacters:null}}});
+ expect(JSON.stringify(result)).not.toContain('NEVER_RETURN'); expect(writes).toHaveLength(0);
+});
+it('public handler preserves unrelated conflict semantics without inventing a retention trace', async () => {
+ const f = await journalRetentionDiagnosticFixture();
+ const module = await import('../src/review/reference-rebuild');
+ vi.spyOn(module,'prepareReferenceRebuild').mockRejectedValue(new Error('Review.Conflict'));
+ expect(await f.call('prepare_reference_rebuild',f.mode)).toEqual({ok:false,error:{code:'Review.Conflict',message:'Review.Conflict',
+  documentId:f.mode.documentId,fieldId:f.mode.fieldId,retry:'Read get_context again; do not overwrite the newer translation.'}});
+ expect(writes).toHaveLength(0);
+});
+it('public handler serializes only validated known retention errors and no injected properties', async () => {
+ const f = await journalRetentionDiagnosticFixture(); const module = await import('../src/review/reference-rebuild');
+ const {UnresolvedSourceRetentionError} = await import('../src/review/unresolved-source-diagnostic');
+ const error = new UnresolvedSourceRetentionError({phase:'bind',role:'mapped',pairIndex:0},'serialized-child-present');
+ Object.assign(error,{message:'NEVER_RETURN_MESSAGE_SECRET',cause:new Error('NEVER_RETURN_CAUSE_SECRET'),extra:'NEVER_RETURN_EXTRA_SECRET'});
+ Object.defineProperty(error,'trace',{get:()=>{throw new Error('NEVER_RETURN_TRACE_GETTER_SECRET');}});
+ vi.spyOn(module,'prepareReferenceRebuild').mockRejectedValue(error);
+ const result: any = await f.call('prepare_reference_rebuild',f.mode);
+ expect(result).toEqual({ok:false,error:{code:'Review.UnresolvedSourceRetentionDenied',message:'Review.UnresolvedSourceRetentionDenied',
+  documentId:f.mode.documentId,fieldId:f.mode.fieldId,unresolvedSourceRetention:{version:1,phase:'bind',role:'mapped',pairIndex:0,
+   predicate:'serialized-child-present',normalizedCharacters:null,limitCharacters:null}}});
+ expect(JSON.stringify(result)).not.toContain('NEVER_RETURN'); expect(writes).toHaveLength(0);
+});

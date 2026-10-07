@@ -2,6 +2,12 @@
 
 Reliable, glossary-aware adventure translation for **Foundry Virtual Tabletop v14**.
 
+Version **0.34.20** explains why a source-owned MCP reference rebuild was
+rejected, with a fixed diagnostic containing the failing check and observation
+phase. An oversized normalized parent reports its character count and the
+existing limit. This helps investigate blocked Journal page references without
+exposing document bodies or relaxing any identity, absence, or freshness checks.
+
 Version **0.34.19** adds an explicit MCP reference-rebuild mode that preserves an
 exact original child reference when fresh checks prove that the child is absent
 from both the original and mapped parent documents. The reference remains visibly

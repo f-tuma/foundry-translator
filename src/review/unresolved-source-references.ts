@@ -1,3 +1,4 @@
+import { UnresolvedSourceRetentionError, type UnresolvedSourceFailureContext, type UnresolvedSourceFailureTrace } from "./unresolved-source-diagnostic";
 import { sha256 } from "../translation/hash";
 import { planReviewText } from "./text-plan";
 import { parseDocumentReference, translationIdentity, TRANSLATION_IDENTITIES } from "../translation/document-identity";
@@ -18,52 +19,57 @@ export interface UnresolvedSourceRetention {
   mappings: UnresolvedSourceMapping[];
 }
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-const fail = (): never => { throw new Error("Review.UnresolvedSourceRetentionDenied"); };
+const fail = (context: UnresolvedSourceFailureContext, predicate: UnresolvedSourceFailureTrace["predicate"], normalizedCharacters?: number): never => {
+  throw new UnresolvedSourceRetentionError(context, predicate, normalizedCharacters);
+};
 type Observed = FoundryUuidDocument & { toObject: () => Record<string, unknown>; getEmbeddedDocument: (kind: string, id: string) => unknown };
-function childReference(uuid: string) {
+function childReference(uuid: string, context: UnresolvedSourceFailureContext) {
   const ref = parseDocumentReference(uuid), child = ref && /^\.(Item|JournalEntryPage)\.([A-Za-z0-9_-]+)$/u.exec(ref.suffix);
-  if (!ref || !child || !((ref.type === "Actor" && child[1] === "Item") || (ref.type === "JournalEntry" && child[1] === "JournalEntryPage"))) return fail();
+  if (!ref || !child || !((ref.type === "Actor" && child[1] === "Item") || (ref.type === "JournalEntry" && child[1] === "JournalEntryPage"))) return fail(context, "unsupported-child-reference");
   return { ...ref, kind: child[1]!, id: child[2]!, exact: ref.root + ref.suffix, collection: child[1] === "Item" ? "items" : "pages" };
 }
-async function absentChild(uuid: string, sourceRoot: string, original: boolean, language: string) {
-  const ref = childReference(uuid);
+async function absentChild(uuid: string, sourceRoot: string, original: boolean, language: string, context: UnresolvedSourceFailureContext) {
+  const ref = childReference(uuid, context);
   let parent: Observed | null, exact: FoundryUuidDocument | null, embedded: unknown;
-  try { parent = await fromUuid(ref.root) as Observed | null; } catch { return fail(); }
+  try { parent = await fromUuid(ref.root) as Observed | null; } catch { return fail(context, "parent-lookup-threw"); }
   if (!parent || parent.uuid !== ref.root || parent.documentName !== ref.type ||
-    typeof parent.toObject !== "function" || typeof parent.getEmbeddedDocument !== "function") return fail();
-  if (original && TRANSLATION_IDENTITIES.some(spec => ref.root.startsWith(`Compendium.${spec.pack}.`))) return fail();
+    typeof parent.toObject !== "function" || typeof parent.getEmbeddedDocument !== "function") return fail(context, "parent-identity-or-methods-mismatch");
+  if (original && TRANSLATION_IDENTITIES.some(spec => ref.root.startsWith(`Compendium.${spec.pack}.`))) return fail(context, "original-translated-root-forbidden");
   const identity = translationIdentity(parent, ref.type);
-  if (original ? !!identity : !identity || identity.sourceUuid !== sourceRoot || identity.targetLanguage !== language) return fail();
+  if (original ? !!identity : !identity || identity.sourceUuid !== sourceRoot || identity.targetLanguage !== language) return fail(context, "translation-provenance-mismatch");
   const identityStamp = JSON.stringify(identity);
   let data: Record<string, unknown>, stamp: string;
-  try { data = parent.toObject(); stamp = batchObject(data); } catch { return fail(); }
-  if (!data || typeof data !== "object" || Array.isArray(data) || stamp.length > 2000000) return fail();
+  try { data = parent.toObject(); stamp = batchObject(data); } catch { return fail(context, "serialization-threw"); }
+  if (!data || typeof data !== "object" || Array.isArray(data)) return fail(context, "serialized-parent-shape");
+  if (stamp.length > 2000000) return fail(context, "normalized-size-exceeded", stamp.length);
   const collection = data[ref.collection];
-  if (!Array.isArray(collection) || collection.some(child => !child || typeof child !== "object" || (typeof child._id !== "string" && typeof child.id !== "string") || (!child._id && !child.id)) ||
-    collection.some(child => child._id === ref.id || child.id === ref.id)) return fail();
-  try { embedded = await parent.getEmbeddedDocument(ref.kind, ref.id); exact = await fromUuid(ref.exact); } catch { return fail(); }
+  if (!Array.isArray(collection)) return fail(context, "serialized-collection-shape");
+  if (collection.some(child => !child || typeof child !== "object" || (typeof child._id !== "string" && typeof child.id !== "string") || (!child._id && !child.id))) return fail(context, "serialized-child-id-invalid");
+  if (collection.some(child => child._id === ref.id || child.id === ref.id)) return fail(context, "serialized-child-present");
+  try { embedded = await parent.getEmbeddedDocument(ref.kind, ref.id); exact = await fromUuid(ref.exact); } catch { return fail(context, "embedded-or-exact-lookup-threw"); }
   // A mismatched or inaccessible object is not an absent target. Only nullish
   // lookup results plus both independent child-absence cues qualify.
-  if (embedded != null || exact != null) return fail();
+  if (embedded != null || exact != null) return fail(context, "embedded-or-exact-nonnull");
   const check = () => {
     if (parent!.uuid !== ref.root || parent!.documentName !== ref.type || batchObject(parent!.toObject()) !== stamp ||
-      typeof parent!.getEmbeddedDocument !== "function" || JSON.stringify(translationIdentity(parent!, ref.type)) !== identityStamp) fail();
+      typeof parent!.getEmbeddedDocument !== "function" || JSON.stringify(translationIdentity(parent!, ref.type)) !== identityStamp) fail(context, "parent-or-identity-changed");
   };
   check();
   const binding = original ? stamp : JSON.stringify([ref.root, ref.type, identity!.sourceUuid, identity!.targetLanguage,
     collection.map(child => child._id ?? child.id).sort()]);
   return { hash: await sha256(binding), check };
 }
-async function observe(snapshot: ReviewSnapshot, pairs: { sourceTarget: string; mappedTarget: string }[]) {
+async function observe(snapshot: ReviewSnapshot, pairs: { sourceTarget: string; mappedTarget: string }[], phase: UnresolvedSourceFailureContext["phase"]) {
   const source = await batchSource(snapshot), scope = batchScope(), checks: (() => void)[] = [];
   const mappings: UnresolvedSourceMapping[] = [];
-  for (const pair of pairs) {
-    const original = childReference(pair.sourceTarget), mapped = childReference(pair.mappedTarget);
-    if (original.kind !== mapped.kind || original.id !== mapped.id || original.anchor !== mapped.anchor) return fail();
-    if (original.root !== mapped.root && snapshot.reverse.get(mapped.root) !== original.root) return fail();
-    const a = await absentChild(pair.sourceTarget, original.root, true, snapshot.entry.language);
-    const b = original.root === mapped.root ? await absentChild(pair.mappedTarget, original.root, true, snapshot.entry.language)
-      : await absentChild(pair.mappedTarget, original.root, false, snapshot.entry.language);
+  for (const [pairIndex, pair] of pairs.entries()) {
+    const context = { phase, role: "pair", pairIndex } as const;
+    const original = childReference(pair.sourceTarget, { ...context, role: "source" }), mapped = childReference(pair.mappedTarget, { ...context, role: "mapped" });
+    if (original.kind !== mapped.kind || original.id !== mapped.id || original.anchor !== mapped.anchor) return fail(context, "pair-identity-mismatch");
+    if (original.root !== mapped.root && snapshot.reverse.get(mapped.root) !== original.root) return fail(context, "reverse-provenance-mismatch");
+    const a = await absentChild(pair.sourceTarget, original.root, true, snapshot.entry.language, { ...context, role: "source" });
+    const b = original.root === mapped.root ? await absentChild(pair.mappedTarget, original.root, true, snapshot.entry.language, { ...context, role: "mapped" })
+      : await absentChild(pair.mappedTarget, original.root, false, snapshot.entry.language, { ...context, role: "mapped" });
     checks.push(a.check, b.check);
     mappings.push({ ...pair, retainedTarget: pair.sourceTarget, policy: "retain-exact-unresolved-original",
       sourceParentHash: a.hash, mappedParentHash: b.hash,
@@ -74,7 +80,7 @@ async function observe(snapshot: ReviewSnapshot, pairs: { sourceTarget: string; 
   const glossaryHash = await sha256(JSON.stringify(await new GlossaryCompendiumRepository().loadExisting()));
   const proof: UnresolvedSourceRetention = { version: 1, requested: true, scope, catalogHash, fullSourceHash: source.fullSourceHash, glossaryHash, mappings };
   const assertUnchanged = () => {
-    if (batchScope() !== scope || batchObject(source.doc.toObject!()) !== source.proof) fail();
+    if (batchScope() !== scope || batchObject(source.doc.toObject!()) !== source.proof) fail({ phase, role: "environment", pairIndex: null }, "scope-or-source-changed");
     checks.forEach(check => check());
   };
   assertUnchanged();
@@ -85,30 +91,31 @@ export async function prepareUnresolvedSourceRetention(snapshot: ReviewSnapshot,
   const pairs: { sourceTarget: string; mappedTarget: string }[] = [];
   for (const target of targets) {
     if (target.required === false) continue; // Existing source-gated policy.
+    const context = { phase: "preflight", role: "mapped", pairIndex: null } as const;
     const uuid = target.target.split("#")[0]!;
     let document: FoundryUuidDocument | null;
-    try { document = await fromUuid(uuid); } catch { return fail(); }
+    try { document = await fromUuid(uuid); } catch { return fail(context, "target-lookup-threw"); }
     if (document != null) {
       const ref = parseDocumentReference(uuid), kind = ref?.suffix ? /\.(Item|JournalEntryPage)\.[^.]+$/u.exec(ref.suffix)?.[1] : ref?.type;
-      if (document.uuid !== uuid || document.documentName !== kind) return fail();
+      if (document.uuid !== uuid || document.documentName !== kind) return fail(context, "target-identity-mismatch");
       continue;
     }
-    childReference(target.sourceTarget); // Bare missing roots remain held.
+    childReference(target.sourceTarget, { ...context, role: "source" }); // Bare missing roots remain held.
     pairs.push({ sourceTarget: target.sourceTarget, mappedTarget: target.target });
   }
-  const first = await observe(snapshot, pairs), second = await observe(snapshot, pairs);
-  if (!equal(first.proof, second.proof)) return fail();
+  const first = await observe(snapshot, pairs, "prepare-first"), second = await observe(snapshot, pairs, "prepare-second");
+  if (!equal(first.proof, second.proof)) return fail({ phase: "prepare-second", role: "environment", pairIndex: null }, "proof-observations-differ");
   first.assertUnchanged(); second.assertUnchanged();
   return second.proof;
 }
 export async function bindUnresolvedSourceRetention(snapshot: ReviewSnapshot, proof: UnresolvedSourceRetention) {
   if (proof.version !== 1 || proof.requested !== true || !Array.isArray(proof.mappings) || proof.mappings.length > 50 ||
-    new Set(proof.mappings.map(m => JSON.stringify([m.sourceTarget, m.mappedTarget]))).size !== proof.mappings.length) return fail();
-  let observed = await observe(snapshot, proof.mappings);
-  if (!equal(observed.proof, proof)) return fail();
+    new Set(proof.mappings.map(m => JSON.stringify([m.sourceTarget, m.mappedTarget]))).size !== proof.mappings.length) return fail({ phase: "bind", role: "environment", pairIndex: null }, "invalid-retention-proof");
+  let observed = await observe(snapshot, proof.mappings, "bind");
+  if (!equal(observed.proof, proof)) return fail({ phase: "bind", role: "environment", pairIndex: null }, "proof-observations-differ");
   return { recheck: async () => {
-    const next = await observe(snapshot, proof.mappings);
-    if (!equal(next.proof, proof)) return fail();
+    const next = await observe(snapshot, proof.mappings, "recheck");
+    if (!equal(next.proof, proof)) return fail({ phase: "recheck", role: "environment", pairIndex: null }, "proof-observations-differ");
     observed.assertUnchanged(); next.assertUnchanged(); observed = next;
   }, assertUnchanged: () => observed.assertUnchanged() };
 }
