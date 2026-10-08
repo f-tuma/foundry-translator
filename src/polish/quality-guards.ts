@@ -52,6 +52,19 @@ export function embedOptionNumbersChanged(before: readonly string[], after: read
  * cannot introduce a new quantity, remove a correct quantity or alter commands. */
 export function sourceNumberRepair(source: string[], before: string[], after: string[], toSource: (parts: string[]) => string[] = parts => parts) {
   const numbers = { source: proseNumbers(source), before: proseNumbers(before), after: proseNumbers(after) };
+  const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  // A global multiset cannot prove which formatted source part owns a quantity.
+  // Refuse ambiguous alignment and require the complete same-part source proof.
+  const aligned = source.length === before.length && source.length === after.length;
+  const parts = source.map((part, index) => ({ source: proseNumbers([part]),
+    before: proseNumbers([before[index] ?? ""]), after: proseNumbers([after[index] ?? ""]) }));
+  const partRestoration = aligned && parts.every(part => equal(part.after, part.source));
+  const placementOnly = partRestoration && equal(numbers.before, numbers.source) && equal(numbers.after, numbers.source)
+    && parts.some(part => !equal(part.before, part.source))
+    // Placement repair does not authorize moving or changing commands/options,
+    // even when their numeric text would compensate for a prose change.
+    && before.every((part, index) => equal(maskReviewParts([part]).references.flat().map(ref => ref.command),
+      maskReviewParts([after[index]!]).references.flat().map(ref => ref.command)));
   let optionsAllowed = true, optionMismatch = false;
   try {
     const sourceReferences = maskReviewParts(source).references.flat();
@@ -71,8 +84,9 @@ export function sourceNumberRepair(source: string[], before: string[], after: st
       optionMismatch ||= JSON.stringify(numbersIn(value)) !== JSON.stringify(numbersIn(change.before));
     }
   } catch { optionsAllowed = false; }
-  return { ...numbers, allowed: (JSON.stringify(numbers.before) !== JSON.stringify(numbers.source) || optionMismatch) &&
-    JSON.stringify(numbers.after) === JSON.stringify(numbers.source) && optionsAllowed };
+  return { ...numbers, parts, placementOnly, allowed: partRestoration &&
+    (!equal(numbers.before, numbers.source) || optionMismatch || placementOnly) &&
+    equal(numbers.after, numbers.source) && optionsAllowed };
 }
 /** Terminology and mechanics checks accompany structural checks, not replace them. */
 export function correctionWarnings(beforeParts: string[], afterParts: string[], glossary: GlossaryEntry[]): string[] {

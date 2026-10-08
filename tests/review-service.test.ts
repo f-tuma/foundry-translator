@@ -548,6 +548,47 @@ it('MCP cannot use source-number repair to change correct quantities or executab
   expect(writes).toHaveLength(0);
 });
 
+it.each([
+  '<p>Přednesete uklidňující verš, který prospívá všem spojencům, kteří vás vnímají do 12 stop.<strong> Provedete</strong> ověření dovednosti <strong>Uměleckého vystupování</strong> proti <strong>Prahu povzbuzení</strong> každého spojence. Při úspěchu se každému spojenci obnoví <strong>Morálka</strong>.</p>',
+  '<p>Přednesete uklidňující verš, který prospívá všem spojencům, kteří vás v okruhu 12 stop vnímají <strong>. Proveďte</strong> ověření <strong>Uměleckého vystupování</strong> proti <strong>Prahu povzbuzení</strong> každého spojence. Při úspěchu se každému z nich obnoví <strong>Morálka</strong>.</p>',
+])('MCP explicitly restores the nine-part Soothe formatting with source proof, persistent history and exact undo (%#)', async beforeHtml => {
+  source.pages[0]!.text!.content = "<p>You perform a calming verse, benefiting all allies who can perceive you within <strong>12 feet</strong>. Make a <strong>Performance</strong> check against the <strong>Rallying Threshold</strong> of each ally. On success, each ally's <strong>Morale</strong> is restored.</p>";
+  copy.pages[0]!.text!.content = beforeHtml;
+  (copy.flags![MODULE_ID]!.translation as any).sourceHash = await journalSourceHash(source);
+  const f = await liveFixture(), original = JSON.stringify(source), flagBefore = structuredClone(copy.flags![MODULE_ID]!.translation);
+  const text = ['Přednesete uklidňující verš, který prospívá všem spojencům, kteří vás vnímají do ', '12 stop',
+    '. Provedete ověření dovednosti ', 'Uměleckého vystupování', ' proti ', 'Prahu povzbuzení',
+    ' každého spojence. Při úspěchu se každému spojenci obnoví ', 'Morálka', '.'];
+  expect(f.row.source).toHaveLength(9); expect(f.row.translation).toHaveLength(9);
+  const args = { ...f.args, text, restoreSourceNumbers: true, reason: 'Vrátit12stop do stejné formatted části jako source při stejném celkovém počtu.' };
+  expect(await f.call('validate_correction', args)).toMatchObject({ ok: true, value: { numberRepair: {
+    allowed: true, requested: true, placementOnly: true, source: ['12'], before: ['12'], after: ['12'],
+  }, willVerify: false } });
+  expect(await f.call('save_correction', { ...args, restoreSourceNumbers: false })).toMatchObject({ ok: false, error: { code: 'Review.ProtectedText' } });
+  const wrongPart = [...text]; wrongPart[1] = 'stopy'; wrongPart[2] = '. Provedete 12 ověření dovednosti ';
+  const duplicate = [...text]; duplicate[0] += '12 ';
+  for (const invalid of [wrongPart, duplicate, text.map((part, index) => index === 1 ? '13 stop' : part)]) {
+    expect(await f.call('save_correction', { ...args, text: invalid })).toMatchObject({ ok: false, error: { code: 'Live.InvalidNumberRepair' } });
+  }
+  // The review-service path also demands the explicit same-part proof.
+  await expect(saveReviewRows(f.s, [{ rowId: f.row.id, parts: wrongPart }], { restoreEmbedSourceNumbers: true })).rejects.toThrow('Review.ProtectedText');
+  expect(writes).toHaveLength(0);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { saved: true, verified: false } });
+  expect(copy.pages[0]!.text!.content).toContain('<strong>12 stop</strong>');
+  expect(copy.flags![MODULE_ID]!.translation).toEqual(flagBefore);
+  expect(JSON.stringify(source)).toBe(original);
+  expect(readReviewHistory(copy.flags).find(h => h.id === args.operationId)?.rows).toEqual([
+    expect.objectContaining({ before: f.row.translation, after: text }),
+  ]);
+  expect(await f.call('save_correction', args)).toMatchObject({ ok: true, value: { alreadyApplied: true } });
+  expect(writes).toHaveLength(1);
+  await undoReview(f.s.entry, args.operationId);
+  expect(copy.pages[0]!.text!.content).toBe(beforeHtml);
+  expect(copy.flags![MODULE_ID]!.translation).toEqual(flagBefore);
+  expect(readReviewHistory(copy.flags).find(h => h.id === args.operationId)?.undoneAt).toBeTruthy();
+  expect(writes).toHaveLength(2); expect(JSON.stringify(source)).toBe(original);
+});
+
 it('MCP reports exact field integrity differences without unblocking or writing damaged fields', async () => {
   source.pages[0]!.text!.content = '<p>@UUID[Actor.a] @UUID[Actor.a]</p>';
   copy.pages[0]!.text!.content = '<p class="changed">@UUID[Actor.b]</p>';

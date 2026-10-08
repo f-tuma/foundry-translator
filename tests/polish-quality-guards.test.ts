@@ -65,4 +65,39 @@ describe("Embed prose corrections and quality guards", () => {
     expect(embedOptionNumbersChanged([a + b], [b + a])).toBe(false);
     expect(embedOptionNumbersChanged([a + b], [b.replace('hours', 'hodiny') + a.replace('hours', 'hodiny')])).toBe(false);
   });
+  it("restores Soothe's quantity to its exact formatted source part when the whole-row numbers already match", () => {
+    const source = ['You perform a calming verse, benefiting all allies who can perceive you within ', '12 feet', '. Make a ',
+      'Performance', ' check against the ', 'Rallying Threshold', " of each ally. On success, each ally's ", 'Morale', ' is restored.'];
+    const before = ['Přednesete uklidňující verš, který prospívá všem spojencům, kteří vás vnímají do 12 stop.', ' Provedete',
+      ' ověření dovednosti ', 'Uměleckého vystupování', ' proti ', 'Prahu povzbuzení',
+      ' každého spojence. Při úspěchu se každému spojenci obnoví ', 'Morálka', '.'];
+    const after = ['Přednesete uklidňující verš, který prospívá všem spojencům, kteří vás vnímají do ', '12 stop',
+      '. Provedete ověření dovednosti ', ...before.slice(3)];
+    expect(proseNumbers(before)).toEqual(proseNumbers(after));
+    expect(sourceNumberRepair(source, before, after)).toMatchObject({ allowed: true, placementOnly: true,
+      source: ['12'], before: ['12'], after: ['12'], parts: [
+        { source: [], before: ['12'], after: [] }, { source: ['12'], before: [], after: ['12'] },
+        ...source.slice(2).map(() => ({ source: [], before: [], after: [] })),
+      ] });
+    expect(sourceNumberRepair(source, after, after).allowed).toBe(false);
+    const wrongPart = [...after]; wrongPart[1] = 'stopy'; wrongPart[2] = '. Provedete 12 ověření dovednosti ';
+    const duplicate = [...after]; duplicate[0] += '12 ';
+    const unrelated = [...after]; unrelated[1] = '13 stop';
+    const command = [...after]; command[2] += '[[/r 12d6]]';
+    const lostPart = [...after]; lostPart.splice(2, 1);
+    for (const invalid of [wrongPart, duplicate, unrelated, command, lostPart]) {
+      expect(sourceNumberRepair(source, before, invalid).allowed).toBe(false);
+    }
+  });
+  it("rejects globally restored but redistributed quantities, ambiguous parts and command movement", () => {
+    expect(sourceNumberRepair(['Distance ', '12 feet', ' for 3 rounds'], ['Vzdálenost ', '99 stop', ' po 4 kola'],
+      ['Vzdálenost 12 ', 'stopy', ' po 3 kola']).allowed).toBe(false);
+    expect(sourceNumberRepair(['Distance ', '12 feet'], ['Vzdálenost 99 stop'], ['Vzdálenost ', '12 stop']).allowed).toBe(false);
+    const source = ['Within @UUID[Item.abc123]{Focus}', '12 feet'];
+    const before = ['Do 12 stop @UUID[Item.abc123]{Focus}', ' provedete'];
+    const after = ['Do @UUID[Item.abc123]{Focus}', '12 stop'];
+    expect(sourceNumberRepair(source, before, after).allowed).toBe(true);
+    expect(sourceNumberRepair(source, before, ['Do ', '12 stop @UUID[Item.abc123]{Focus}']).allowed).toBe(false);
+    expect(sourceNumberRepair(source, before, ['Do @UUID[Item.abc456]{Focus}', '12 stop']).allowed).toBe(false);
+  });
 });
