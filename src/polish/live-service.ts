@@ -1,4 +1,9 @@
 import { isUnresolvedSourceRetentionError, UNRESOLVED_SOURCE_RETENTION_DENIED, unresolvedSourceFailureTrace } from "../review/unresolved-source-diagnostic";
+import { DISPLAY_TEXT_PACK } from '../translation/display-text';
+import { AFFIX_APPEND_METHODS } from './affix-text-append-protocol';
+import { createFoundryAffixAppendBackend, affixAppendScope, journalApi, nativePageConstructor } from '../review/affix-append-foundry';
+import { probeAffixAppendParentSave } from '../review/affix-append-parent-probe';
+import { prepareAffixAppend, validateAffixAppend, applyAffixAppend, getAffixAppendOperation, undoAffixAppend, type AppendRequest } from '../review/affix-text-append-service';
 import { unresolvedSourceWarnings } from "../review/unresolved-source-references";
 import { batchEnvironment, batchScope, batchCatalogHash, batchSource, batchObject, batchHash, buildCorrectionBatch, normalizedBatch, batchPayloadHash, batchRequestHash, assertBatchApplicability, batchOperationValue, boundBatch, type BatchPayload } from "./correction-batch";
 import { prepareMachineProofreading, assertMachineProofreadingCoverage, readMachineProofreading, isMachineProofreadingCurrent, machineProofreadingSchemaProof } from "../review/machine-proofreading";
@@ -66,6 +71,8 @@ export function createLiveHandler(language: string, connected: () => boolean) {
   const canWrite = () => { try { check(); return true; } catch { return false; } };
   const batchScopeAtPairing = batchScope();
   const batchCheck = () => { check(); if (batchScope() !== batchScopeAtPairing) throw new Error("Live.ScopeChanged"); };
+  const affixPairingId=crypto.randomUUID();
+  const affixBackend=createFoundryAffixAppendBackend(language,affixPairingId,batchCheck);
   const batchQueues = new Map<string, Promise<void>>();
   const batchQueue = async <T>(id: string, work: () => Promise<T>): Promise<T> => {
     const pending = (batchQueues.get(id) ?? Promise.resolve()).then(work);
@@ -78,6 +85,21 @@ export function createLiveHandler(language: string, connected: () => boolean) {
     try {
       check();
       const { request, args } = parseLiveRequest(input); documentId = args.documentId; rowId = args.rowId;
+      if(AFFIX_APPEND_METHODS.includes(request.method)) {
+        const respond=(value:unknown):LiveResult=>{boundBatch(value);return {ok:true,value}};
+        if(request.method==='probe_affix_text_append_parent_save')return await batchQueue('affix-parent-probe',async()=>{
+          const scope=affixAppendScope(language,affixPairingId),scopeProof=batchObject(scope);
+          const probeCheck=()=>{batchCheck();if(batchObject(affixAppendScope(language,affixPairingId))!==scopeProof)throw new Error('Live.ScopeChanged')};
+          const pack=game.packs.get(DISPLAY_TEXT_PACK);if(!pack)throw new Error('Live.DisplayPackMissing');
+          return respond(await probeAffixAppendParentSave(scope,journalApi(),nativePageConstructor(),id=>pack.getDocument(id),probeCheck,args.operationId!));
+        });
+        if(request.method==='prepare_affix_text_append')return respond(await prepareAffixAppend(affixBackend,args.documentId!,args.revision!));
+        if(request.method==='validate_affix_text_append')return respond(await validateAffixAppend(affixBackend,args as unknown as AppendRequest));
+        if(request.method==='get_affix_text_append_operation')return respond(await getAffixAppendOperation(affixBackend,args.documentId!,args.operationId!));
+        return await batchQueue(args.documentId!,async()=>respond(request.method==='apply_affix_text_append'
+          ?await applyAffixAppend(affixBackend,args as unknown as AppendRequest)
+          :await undoAffixAppend(affixBackend,args.documentId!,args.operationId!,args.undoId!,args.revision!)));
+      }
       const catalog = await reviewCatalog(language);
       const glossary = await new GlossaryCompendiumRepository().loadExisting();
       const glossaryHash = await sha256(JSON.stringify(glossary));
@@ -292,6 +314,7 @@ export function createLiveHandler(language: string, connected: () => boolean) {
         const matches = readReviewHistory(doc?.flags).filter(h => h.id === operationId);
         if (matches.length > 1) throw new Error("Live.OperationConflict");
         const operation = matches[0];
+        if(operation?.affixTextAppend)return getAffixAppendOperation(affixBackend,entry.uuid,operationId);
         if (!operation?.correctionBatch && !operation?.referenceRebuild) throw new Error("Live.UnknownOperation");
         const rebuild = operation.referenceRebuild, retention = rebuild?.unresolvedSourceRetention;
         const value = rebuild ? {

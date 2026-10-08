@@ -1,3 +1,4 @@
+import type { AffixAppendReceipt } from "./affix-text-append";
 import { bindUnresolvedSourceRetention } from "./unresolved-source-references";
 import { GlossaryCompendiumRepository } from "../glossary/compendium-repository";
 import { batchObject, buildCorrectionBatch, assertBatchApplicability, assertBatchFinal, batchRequestHash, type BatchReceipt } from "../polish/correction-batch";
@@ -294,6 +295,7 @@ export interface ReviewHistoryEntry {
   id: string; at: string; userName: string; sourceHash: string; label: string;
   agentRequestHash?: string;
   correctionBatch?: BatchReceipt;
+  affixTextAppend?: AffixAppendReceipt;
   referenceRepair?: true;
   identifierRepair?: true;
   referenceRebuild?: ReferenceRebuildReceipt;
@@ -644,6 +646,7 @@ export async function undoReview(entry: ReviewDocument, operationId: string, can
   gmOnly();
   const snapshot = await loadReview(entry), doc = await game.packs.get(entry.pack)!.getDocument(entry.id);
   const operation = readReviewHistory(doc?.flags).find(item => item.id === operationId);
+  if (operation?.affixTextAppend) fail("AffixAppendUndoRequiresDedicatedGuard");
   if (!operation || operation.undoneAt || operation.sourceHash !== snapshot.sourceHash) fail("UndoConflict");
   if (operation.machineProofreading) return undoMachineProofreading(snapshot, operation, canWrite);
   const changes = operation.rows.map(change => {

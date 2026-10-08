@@ -1,9 +1,11 @@
 import type { UnresolvedSourceFailureTrace } from "../review/unresolved-source-diagnostic";
+import { AFFIX_APPEND_METHODS, parseAffixAppendRequest, type AffixAppendMethod } from './affix-text-append-protocol';
 import { BATCH_ROWS, BATCH_REQUEST_BYTES, type BatchChange } from "./correction-batch-contract";
 export const LIVE_PROTOCOL = 1;
 export const LIVE_PORT = 3112;
-export type LiveMethod = "validate_correction_batch" | "save_correction_batch" | "get_correction_operation" | "prepare_machine_proofreading" | "commit_machine_proofreading" | "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_field_diagnostic" | "get_reference_context" | "get_reference_diagnostic" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "prepare_reference_rebuild" | "validate_reference_rebuild" | "apply_reference_rebuild" | "list_history" | "undo_correction";
+export type LiveMethod = AffixAppendMethod | "validate_correction_batch" | "save_correction_batch" | "get_correction_operation" | "prepare_machine_proofreading" | "commit_machine_proofreading" | "status" | "list_documents" | "list_passages" | "get_context" | "get_context_batch" | "get_field_diagnostic" | "get_reference_context" | "get_reference_diagnostic" | "search_passages" | "list_glossary" | "validate_correction" | "save_correction" | "validate_reference_identifiers" | "restore_reference_identifiers" | "prepare_reference_rebuild" | "validate_reference_rebuild" | "apply_reference_rebuild" | "list_history" | "undo_correction";
 export interface LiveArgs {
+  undoId?: string; confirmIsolatedTestJournal?: true;
   changes?: BatchChange[];
   documentId?: string; rowId?: string; rowIds?: string[]; revision?: string; operationId?: string;
   fieldId?: string; planHash?: string; coverageHash?: string;
@@ -23,6 +25,10 @@ const methods: readonly string[] = ["validate_correction_batch", "save_correctio
 const keys = new Set(["changes", "documentId", "rowId", "rowIds", "revision", "operationId", "text", "labels", "options", "reason", "offset", "limit", "query", "radius", "fuzzy", "restoreSourceNumbers", "restoreSourceReferences", "referenceIndex", "fieldId", "planHash", "edits", "coverageHash", "retainUnresolvedSourceReferences"]);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 export function parseLiveRequest(value: unknown): { request: LiveRequest; args: LiveArgs } {
+  if (object(value) && AFFIX_APPEND_METHODS.includes(String(Object.getOwnPropertyDescriptor(value,'method')?.value))) {
+    const parsed=parseAffixAppendRequest(value);
+    return {request:{id:parsed.id,method:parsed.method,args:parsed.args as unknown as Record<string,unknown>},args:{offset:0,limit:20,query:'',radius:2,fuzzy:false,...parsed.args}};
+  }
   const fail = (): never => { throw new Error("Live.InvalidRequest"); };
   // Read-only diagnostic accepts only own data properties from a plain JSON envelope.
   // Preflight before normal property reads prevents accessor/prototype arguments.
