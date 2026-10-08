@@ -500,10 +500,10 @@ export function createLiveHandler(language: string, connected: () => boolean) {
       if (targets.some(target => !target.exists)) throw new Error("Live.ReferenceTargetMissing");
       const optionChanges = correctionOptionChanges(row.translation, args.options ?? []);
       const parts = correctionParts(row.translation, args.text!, args.labels ?? [], repair ?? undefined, args.options ?? []);
-      validateReviewCorrection(snapshot, row.id, parts, undefined, !!args.restoreSourceReferences, undefined, !!args.restoreSourceNumbers);
-      const warnings = correctionWarnings(row.translation, parts, glossary);
       const numberRepair = sourceNumberRepair(row.source, row.translation, parts, value => portableReviewText(snapshot, field, value));
       if (args.restoreSourceNumbers && !numberRepair.allowed) throw new Error("Live.InvalidNumberRepair");
+      validateReviewCorrection(snapshot, row.id, parts, undefined, !!args.restoreSourceReferences, undefined, !!args.restoreSourceNumbers);
+      const warnings = correctionWarnings(row.translation, parts, glossary);
       if (request.method === "validate_correction") return { ok: true, value: { documentId, rowId, revision, before: row.translation, after: parts, warnings,
         numberRepair: { ...numberRepair, requested: !!args.restoreSourceNumbers },
         referenceRepair: { requested: !!args.restoreSourceReferences, targetChanges: repair?.targetChanges ?? [], targets }, optionChanges, willVerify: false } };

@@ -27,7 +27,7 @@ import { activeTranslations } from "../translation/active-translations";
 import { sha256 } from "../translation/hash";
 import { planReviewText } from "./text-plan";
 import { assertEmbedOptionEdits } from "./embed-text-options";
-import { embedOptionNumbersChanged, sourceNumberRepair } from "../polish/quality-guards";
+import { embedOptionNumbersChanged, proseNumbers, sourceNumberRepair } from "../polish/quality-guards";
 import { referenceContext, sourceReferenceNotation } from "../bundles/reference-notation";
 
 const SPECS = [
@@ -544,6 +544,11 @@ export function validateReviewCorrection(snapshot: ReviewSnapshot, rowId: string
   const value = planReviewText(previous ?? field.translation, field.format).replace(row.unitId, parts);
   try {
     assertEmbedOptionEdits(row.translation, parts);
+    const sameTotal = JSON.stringify(proseNumbers(row.translation)) === JSON.stringify(proseNumbers(parts));
+    const changedPlacement = parts.some((part, index) => JSON.stringify(proseNumbers([part])) !== JSON.stringify(proseNumbers([row.translation[index]!]))) && sameTotal;
+    if (changedPlacement && !restoreEmbedSourceNumbers && !undoEmbedOptions) throw new Error("Numerical placement requires explicit source-part restoration.");
+    if (restoreEmbedSourceNumbers && !undoEmbedOptions && !sourceNumberRepair(row.source, row.translation, parts,
+      text => portableReviewText(snapshot, field, text)).allowed) throw new Error("Invalid source-part numerical restoration.");
     if (!undoEmbedOptions && embedOptionNumbersChanged(row.translation, parts) &&
         (!restoreEmbedSourceNumbers || !sourceNumberRepair(row.source, row.translation, parts,
           text => portableReviewText(snapshot, field, text)).allowed)) throw new Error("Numbers inside an embedded description changed.");
