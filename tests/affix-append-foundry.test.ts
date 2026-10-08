@@ -96,3 +96,31 @@ it('same constructor identity cannot retain capability after toObject behavior o
 
 it('in-place schema validation mutation invalidates observed capability even when native defaults are unchanged',async()=>{const x=await setup();await x.probe();const schema=Page.schema;try{Object.assign(Page.schema,{newValidationRule:true});expect(Page.schema).toBe(schema);expect(readAffixAppendParentCapability(x.scope,x.api,Page)).toBeNull();}finally{delete(Page.schema as any).newValidationRule;}});
 it('native schema parent cycles are finite exact witnesses; changed nested rule revokes capability',async()=>{const x=await setup(),original=Page.schema;const schema:any={fields:{text:{required:true}}};schema.fields.text.parent=schema;try{Page.schema=schema;const result=await x.probe();expect(result.capabilityGranted).toBe(true);schema.fields.text.required=false;expect(readAffixAppendParentCapability(x.scope,x.api,Page)).toBeNull();}finally{Page.schema=original;}});
+
+it('shared large native Field sources fit unchanged witness budget and nested/accessor/method mutations revoke capability',async()=>{
+ const x=await setup(),original=Page.schema;
+ const Field=Function('return class Field { constructor(){this.required=true} validate(){return true} /*'+ 'Native field source retained. '.repeat(250)+'*/ }')() as any;
+ const schema:any={fields:Array.from({length:95},()=>new Field())};schema.fields.forEach((f:any)=>f.parent=schema);
+ const getRule=function(){return true};Object.defineProperty(schema,'rule',{get:getRule,configurable:true});
+ try{Page.schema=schema;expect((await x.probe()).capabilityGranted).toBe(true);expect(x.calls.filter(c=>c.method==='create')).toHaveLength(1);
+  schema.fields[94].required=false;expect(readAffixAppendParentCapability(x.scope,x.api,Page)).toBeNull();schema.fields[94].required=true;
+  expect(readAffixAppendParentCapability(x.scope,x.api,Page)).not.toBeNull();
+  Object.defineProperty(schema,'rule',{get:()=>false,configurable:true});expect(readAffixAppendParentCapability(x.scope,x.api,Page)).toBeNull();
+  Object.defineProperty(schema,'rule',{get:getRule,configurable:true});expect(readAffixAppendParentCapability(x.scope,x.api,Page)).not.toBeNull();
+  Field.prototype.validate=function(){return false};expect(readAffixAppendParentCapability(x.scope,x.api,Page)).toBeNull();
+ }finally{Page.schema=original;}
+});
+it.each(['bytes','nodes','depth','unsupported']as const)('unchanged %s witness guard rejects BEFORE read or API create',async bound=>{
+ const x=await setup(),original=Page.schema,read=vi.fn(async(key:string)=>x.doc(key)as any);
+ let schema:any;if(bound==='bytes')schema={rule:Function('/*'+'X'.repeat(200001)+'*/')};
+ else if(bound==='nodes')schema={rules:Array.from({length:20001},()=>true)};
+ else if(bound==='depth'){schema={};let s=schema;for(let i=0;i<41;i++)s=s.child={};}
+ else schema={rule:Symbol('unsupported value')};
+ try{Page.schema=schema;await expect(probeAffixAppendParentSave(x.scope,x.api,Page,read,()=>{},'blocked-schema')).rejects.toThrow(bound==='unsupported'?'UnsupportedSchemaWitness':'SchemaWitnessOversize');expect(read).not.toHaveBeenCalled();expect(x.calls).toHaveLength(0);expect(readAffixAppendParentCapability(x.scope,x.api,Page)).toBeNull();}
+ finally{Page.schema=original;}
+});
+it('all isolated TEST and schema-probe IDs satisfy native sixteen-character alphanumeric ID validation',async()=>{
+ const x=await setup();class NativeIdPage extends Page {constructor(data:JournalPageData,options:unknown){if(!/^[A-Za-z0-9]{16}$/u.test(data._id!))throw new Error('Native DocumentIdField');super(data,options)}}
+ const result=await probeAffixAppendParentSave(x.scope,x.api,NativeIdPage,async key=>x.doc(key)as any,()=>{},'strict-id-test');expect(result.capabilityGranted).toBe(true);expect(result.cleaned).toBe(true);
+ for(const c of x.calls.filter(c=>c.method==='create'||c.method==='update'))for(const d of c.data as JournalData[]){expect(d._id).toMatch(/^[A-Za-z0-9]{16}$/u);for(const p of d.pages)expect(p._id).toMatch(/^[A-Za-z0-9]{16}$/u);}
+});

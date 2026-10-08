@@ -16,25 +16,28 @@ let verified:{scope:string;update:JournalApi['updateDocuments'];ctor:NativePageC
 const pageMethod=(ctor:NativePageConstructor)=>(ctor as unknown as {prototype:{toObject:unknown}}).prototype.toObject;
 /** Complete, bounded cycle-aware schema witness. No truncation or ignored rules.
  * DataField parent cycles are represented by traversal identity; getters are bound
- * by their source instead of being invoked. Oversized/unsupported schemas block. */
+ * by their source instead of being invoked. Every source occurrence is retained
+ * through a lossless shared string table; bounds are unchanged. Oversized or
+ * unsupported schemas still block before any TEST journal is created. */
 function schemaWitness(value:unknown):unknown{
- const seen=new Map<object,number>();let count=0;
+ const seen=new Map<object,number>(),sourceIds=new Map<string,number>(),sources:string[]=[];let count=0;
+ const source=(text:string)=>{let id=sourceIds.get(text);if(id===undefined){id=sources.length;sourceIds.set(text,id);sources.push(text);}return {sourceRef:id};};
  const visit=(v:unknown,depth:number):unknown=>{
   if(depth>40||++count>20000)throw new AffixAppendError('SchemaWitnessOversize');
   if(v===null||typeof v==='string'||typeof v==='number'||typeof v==='boolean')return v;
-  if(v===undefined)return {undefined:true};if(typeof v==='function')return {function:String(v)};
+  if(v===undefined)return {undefined:true};if(typeof v==='function')return {function:source(String(v))};
   if(typeof v!=='object')throw new AffixAppendError('UnsupportedSchemaWitness');
   const prior=seen.get(v);if(prior!==undefined)return {ref:prior};const id=seen.size;seen.set(v,id);
   const own=Reflect.ownKeys(v).sort((a,b)=>String(a).localeCompare(String(b))).map(key=>{
    const d=Object.getOwnPropertyDescriptor(v,key)!;return [typeof key==='symbol'?['symbol',String(key)]:key,
-    Object.hasOwn(d,'value')?visit(d.value,depth+1):{get:String(d.get),set:String(d.set)}];
+    Object.hasOwn(d,'value')?visit(d.value,depth+1):{get:source(String(d.get)),set:source(String(d.set))}];
   });
   const proto=Object.getPrototypeOf(v),methods=proto?['validate','cast','clean','getInitialValue','_validateType','_validateModel'].flatMap(k=>{
    const d=Object.getOwnPropertyDescriptor(proto,k);return d&&Object.hasOwn(d,'value')?[[k,visit(d.value,depth+1)]]:[];
   }):[];
-  return {id,constructor:typeof proto?.constructor==='function'?String(proto.constructor):null,own,methods};
+  return {id,constructor:typeof proto?.constructor==='function'?source(String(proto.constructor)):null,own,methods};
  };
- const witness=visit(value,0);if(new TextEncoder().encode(JSON.stringify(witness)).length>200000)throw new AffixAppendError('SchemaWitnessOversize');return witness;
+ const root=visit(value,0),witness={root,sources};if(new TextEncoder().encode(JSON.stringify(witness)).length>200000)throw new AffixAppendError('SchemaWitnessOversize');return witness;
 }
 const signature=(api:JournalApi,ctor:NativePageConstructor)=>batchObject([String(api.updateDocuments),String(ctor),String(pageMethod(ctor)),schemaWitness(ctor.schema),new ctor({_id:'schemaProbe00001',name:'Capability schema witness',type:'text',text:{format:1,content:''}},{parent:undefined}).toObject()]);
 export function readAffixAppendParentCapability(scope:Scope,api:JournalApi,ctor:NativePageConstructor):Capability|null {
@@ -50,14 +53,14 @@ export async function probeAffixAppendParentSave(scope:Scope,api:JournalApi,ctor
  const owns=(data:JournalData)=>batchObject(data.flags?.[MODULE_ID]?.affixAppendParentProbe)===batchObject(marker)&&data._id===id;
  const existing=await read(id);checkFresh();if(existing)throw new AffixAppendError('ProbeIdAlreadyExists');
  const page=(pageId:string,content:string)=>new ctor({_id:pageId,name:'Isolated API test',type:'text',text:{format:1,content}},{parent:undefined}).toObject();
- const seed:JournalData={_id:id,name:'[TEST ONLY] affix parent API '+operationId,pages:[page('testOldPage00001A','<p>OLD A</p>'),page('testOldPage00001B','<p>OLD B</p>')],flags:{[MODULE_ID]:{affixAppendParentProbe:marker,probeProvenance:{outputHash:'unchanged-generation-hash',providerId:'TEST',editor:'TEST'},probeHistory:{legacy:{before:['old'],after:['old']}}},unrelated:{literal:'keep'}}};
+ const seed:JournalData={_id:id,name:'[TEST ONLY] affix parent API '+operationId,pages:[page('testOldPage0001A','<p>OLD A</p>'),page('testOldPage0001B','<p>OLD B</p>')],flags:{[MODULE_ID]:{affixAppendParentProbe:marker,probeProvenance:{outputHash:'unchanged-generation-hash',providerId:'TEST',editor:'TEST'},probeHistory:{legacy:{before:['old'],after:['old']}}},unrelated:{literal:'keep'}}};
  const snapshots:Record<string,unknown>={seed};let created=false,cleaned=false,success=false,error:string|null=null;
  const bounded=()=>{if(new TextEncoder().encode(JSON.stringify(snapshots)).length>400000)throw new AffixAppendError('ProbeEvidenceOversize')};bounded();
  try{
   await api.createDocuments([seed],{pack:DISPLAY_TEXT_PACK,keepId:true});created=true;checkFresh();
   const doc=await read(id);checkFresh();if(!doc||!owns(doc.toObject() as JournalData))throw new AffixAppendError('ProbeOwnership');
   const baseline=doc.toObject() as JournalData;snapshots.baseline=structuredClone(baseline);
-  const append=structuredClone(baseline);append.pages.push(new ctor({_id:'testNewPage00001A',name:'Isolated API test',type:'text',text:{format:1,content:'<p>NEW A</p>'}},{parent:doc}).toObject(),new ctor({_id:'testNewPage00001B',name:'Isolated API test',type:'text',text:{format:1,content:'<p>NEW B</p>'}},{parent:doc}).toObject());
+  const append=structuredClone(baseline);append.pages.push(new ctor({_id:'testNewPage0001A',name:'Isolated API test',type:'text',text:{format:1,content:'<p>NEW A</p>'}},{parent:doc}).toObject(),new ctor({_id:'testNewPage0001B',name:'Isolated API test',type:'text',text:{format:1,content:'<p>NEW B</p>'}},{parent:doc}).toObject());
   append.flags![MODULE_ID]!.probeAppend={sourceHash:'new-source-hash',affixSourceHash:'new-affix-hash',rows:[{beforeMissing:true,before:[],after:['NEW A']}],humanVerified:false};
   snapshots.appendPayload=structuredClone(append);snapshots.undoPayload=structuredClone(baseline);bounded();checkFresh();
   await api.updateDocuments([append],{pack:DISPLAY_TEXT_PACK,...options});checkFresh();
