@@ -117,7 +117,7 @@ export async function getAffixAppendOperation(backend: AffixAppendBackend, docum
     if (!operation)
         fail('OperationMissing');
     const undone=!!operation.undoneAt;
-    if(undone)await assertAffixAppendUndone(env,operation);else await assertAffixAppendAfter(env, operation);
+    if(undone)await assertAffixAppendUndone(env,operation);else await assertAffixAppendAfter(env, operation, true);
     guard();
     const operationHash = await (await import('../translation/hash')).sha256(JSON.stringify(operation));
     guard();

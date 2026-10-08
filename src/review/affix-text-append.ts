@@ -351,7 +351,7 @@ export async function affixAppendOperation(plan: AffixAppendPlan, preview: Affix
     return { data, operation };
 }
 async function assertPlanProof(plan: AffixAppendPlan) { const { proofHash, planHash, ...body } = plan; need(proofHash === await hash(body) && planHash === await hash(['affix-text-append-v1', proofHash]), 'PersistedPlanProof'); }
-export async function assertAffixAppendAfter(env: AffixAppendEnvironment, operation: AffixAppendOperation): Promise<void> {
+export async function assertAffixAppendAfter(env: AffixAppendEnvironment, operation: AffixAppendOperation, committedRead = false): Promise<void> {
     need(!operation.undoneAt && operation.affixTextAppend?.version === 1 && operation.affixTextAppend.humanVerified === false, 'OperationConflict');
     const receipt = operation.affixTextAppend, plan = receipt.plan, o = observe(env), data = structuredClone(o.data);
     await bound(env, o.proof, assertPlanProof(plan));
@@ -377,15 +377,33 @@ export async function assertAffixAppendAfter(env: AffixAppendEnvironment, operat
         delete data.flags![MODULE_ID]!.reviewHistory;
     need(await bound(env, o.proof, whole(data)) === receipt.afterCoreHash, 'AfterDataChanged');
     need(await bound(env, o.proof, affixActionSourceHash(o.source)) === plan.affixSourceHash && await bound(env, o.proof, displaySourceHash('ActiveEffect', o.source)) === plan.sourceHash, 'SourceChanged');
-    need(await bound(env, o.proof, hash(o.owner)) === plan.ownerProof && await bound(env, o.proof, hash(o.schema)) === plan.schemaProof && await bound(env, o.proof, hash(env.claims)) === plan.catalogProof && env.glossaryHash === plan.glossaryHash && (env.pageSchemaProof ?? null) === plan.pageSchemaProof && eq({ ...env.scope, clientId: '' }, { ...plan.scope, clientId: '' }), 'EnvironmentChanged');
+    // Only committed receipt reads/undo admit this specific corrective release pair.
+    // Apply (including retry) remains exact, and this grants no save capability.
+    const receiptScope = { ...plan.scope, clientId: '' };
+    if (committedRead && receiptScope.moduleVersion === '0.34.24' && env.scope.moduleVersion === '0.34.25')
+        receiptScope.moduleVersion = env.scope.moduleVersion;
+    need(await bound(env, o.proof, hash(o.owner)) === plan.ownerProof && await bound(env, o.proof, hash(o.schema)) === plan.schemaProof && await bound(env, o.proof, hash(env.claims)) === plan.catalogProof && env.glossaryHash === plan.glossaryHash && (env.pageSchemaProof ?? null) === plan.pageSchemaProof && eq({ ...env.scope, clientId: '' }, receiptScope), 'EnvironmentChanged');
     const flag = readDisplayTextFlag(o.data.flags)!;
     need(flag.sourceHash === plan.sourceHash && flag.affixSourceHash === plan.affixSourceHash, 'AfterFlag');
     for (const f of receipt.fields)
         need(readDisplayTranslationContent(o.data, f.field) === f.afterRaw, 'AfterField');
-    need(eq(o.data.pages.slice(0, plan.beforeData.pages.length), plan.beforeData.pages), 'OldPagesChanged');
+    // A whole-parent save rehydrates existing pages with fresh native timestamps.
+    // Preserve key presence, literal nulls and every other value, including other _stats.
+    const oldPageWithoutSaveTimes = (page: JournalPageData) => {
+        const copy = structuredClone(page);
+        if (record(copy._stats))
+            for (const key of ['createdTime', 'modifiedTime'])
+                if (Object.hasOwn(copy._stats, key)) {
+                    const value = copy._stats[key];
+                    need(value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0), 'OldPagesChanged');
+                    if (value !== null) copy._stats[key] = 0;
+                }
+        return copy;
+    };
+    need(eq(o.data.pages.slice(0, plan.beforeData.pages.length).map(oldPageWithoutSaveTimes), plan.beforeData.pages.map(oldPageWithoutSaveTimes)), 'OldPagesChanged');
 }
 export async function undoAffixTextAppend(env: AffixAppendEnvironment, operation: AffixAppendOperation, undoId: string, userName: string, at: string): Promise<JournalData> {
-    await assertAffixAppendAfter(env, operation);
+    await assertAffixAppendAfter(env, operation, true);
     need(/^[a-zA-Z0-9-]{1,80}$/u.test(undoId) && undoId !== operation.id, 'UndoId');
     const data = structuredClone(operation.affixTextAppend.plan.beforeData), flags = data.flags![MODULE_ID]!;
     const history = (flags.reviewHistory ?? {}) as Record<string, unknown>;

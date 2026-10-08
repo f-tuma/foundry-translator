@@ -228,3 +228,83 @@ it('adds schema-owned condition text only with fresh StringField proof', async (
 it('allows exact editable source caption text while keeping resolver identity and all options', async () => { const f = await fixture('Luminous'), p = await prepareAffixTextAppend(f.env), e = edits(p), r = p.rows.find(x => x.edit.references.flat().some(x => x.marker === '⟦1⟧'))!; e.find(x => x.rowId === r.rowId)!.labels = [{ marker: '⟦1⟧', label: 'předmět' }]; const v = await validateAffixTextAppend(f.env, p, e); expect(v.fields.map(x => x.afterRaw).join(' ')).toContain('@ref[item.name]{předmět}'); e.find(x => x.rowId === r.rowId)!.labels = [{ marker: '⟦1⟧', label: 'předmět 99' }]; await expect(validateAffixTextAppend(f.env, p, e)).rejects.toThrow('SourcePartNumbers'); });
 it('missing required reference check rejects before persistence, with no unresolved retention escape', async () => { const f = await fixture(), b = backend(f), r = await request(f); b.references = async () => { throw new Error('ReferenceTargetMissing'); }; await expect(applyAffixAppend(b, r)).rejects.toThrow('ReferenceTargetMissing'); expect(b.writes).toBe(0); });
 it('oversized complete source plan rejects without truncating or mutating the target', async () => { const f = await fixture(); f.data.system.actions[0].description = '<p>' + 'text '.repeat(100001) + '</p>'; const before = structuredClone(f.get()); await expect(prepareAffixTextAppend(f.env)).rejects.toThrow('CompletePlanBounds'); expect(f.get()).toEqual(before); });
+
+function oldPageStats(f: Awaited<ReturnType<typeof fixture>>) {
+    for (const page of f.get().pages) page._stats = { createdTime: 1000, modifiedTime: 1000, coreVersion: '14.368', systemId: 'crucible', systemVersion: '0.11.0', lastModifiedBy: 'gm', compendiumSource: null };
+}
+function resetOldPageTimes(f: Awaited<ReturnType<typeof fixture>>, count = 2) {
+    for (const page of f.get().pages.slice(0, count)) { page._stats.createdTime = 2000; page._stats.modifiedTime = 2001; }
+}
+it.each(['Disguise', 'Focusing', 'Luminous'] as const)('accepts only native old-page save timestamps in %s apply, getter and undo', async kind => {
+    const f = await fixture(kind); oldPageStats(f);
+    const before = structuredClone(f.get()), original = structuredClone(f.data), b = backend(f), r = await request(f);
+    const persist = b.persist.bind(b);
+    b.persist = async (data, env) => { await persist(data, env); resetOldPageTimes(f); };
+    await applyAffixAppend(b, r);
+    expect((await getAffixAppendOperation(b, r.documentId, r.operationId)).complete).toBe(true);
+    expect(f.get().flags[MODULE_ID].reviewHistory.old).toEqual(before.flags[MODULE_ID].reviewHistory.old);
+    expect(f.get().flags[MODULE_ID].editorProtection).toEqual(before.flags[MODULE_ID].editorProtection);
+    expect(f.data).toEqual(original);
+    const oldPages = structuredClone(f.get().pages.slice(0, 2));
+    for (const page of oldPages) { page._stats.createdTime = 1000; page._stats.modifiedTime = 1000; }
+    expect(oldPages).toEqual(before.pages);
+    await undoAffixAppend(b, r.documentId, r.operationId, 'undo1');
+    expect((await getAffixAppendOperation(b, r.documentId, r.operationId)).undoneRowsCompatible).toBe(true);
+    expect(b.writes).toBe(2);
+});
+it.each([
+    ['old text', (f: any) => { f.get().pages[0].text.content += '!'; }],
+    ['coreVersion', (f: any) => { f.get().pages[0]._stats.coreVersion = '14.999'; }],
+    ['lastModifiedBy', (f: any) => { f.get().pages[0]._stats.lastModifiedBy = 'other'; }],
+    ['stats deletion', (f: any) => { delete f.get().pages[0]._stats; }],
+    ['timestamp deletion', (f: any) => { delete f.get().pages[0]._stats.createdTime; }],
+    ['timestamp string', (f: any) => { f.get().pages[0]._stats.createdTime = '2000'; }],
+    ['timestamp null', (f: any) => { f.get().pages[0]._stats.createdTime = null; }],
+    ['timestamp negative', (f: any) => { f.get().pages[0]._stats.modifiedTime = -1; }],
+    ['timestamp unsafe', (f: any) => { f.get().pages[0]._stats.modifiedTime = Number.MAX_SAFE_INTEGER + 1; }],
+    ['page id', (f: any) => { f.get().pages[0]._id = 'changed'; }],
+    ['page order', (f: any) => { f.get().pages.reverse(); }],
+    ['new page default', (f: any) => { f.get().pages[2].name += '!'; }],
+    ['provenance', (f: any) => { readDisplayTextFlag(f.get().flags)!.outputHash = 'b'.repeat(64); }],
+    ['previous receipt', (f: any) => { f.get().flags[MODULE_ID].reviewHistory.old.at = 'changed'; }],
+] as const)('rejects %s mutation alongside allowed timestamps on getter and undo', async (_label, mutate) => {
+    const f = await fixture(); oldPageStats(f); const b = backend(f), r = await request(f);
+    await applyAffixAppend(b, r); resetOldPageTimes(f); mutate(f);
+    await expect(getAffixAppendOperation(b, r.documentId, r.operationId)).rejects.toThrow();
+    await expect(undoAffixAppend(b, r.documentId, r.operationId, 'undo1')).rejects.toThrow();
+    expect(b.writes).toBe(1);
+});
+it('preserves literal null timestamps and rejects null to numeric transitions', async () => {
+    const f = await fixture(); oldPageStats(f); f.get().pages[0]._stats.createdTime = null;
+    const b = backend(f), r = await request(f); await applyAffixAppend(b, r);
+    expect((await getAffixAppendOperation(b, r.documentId, r.operationId)).complete).toBe(true);
+    f.get().pages[0]._stats.createdTime = 2000;
+    await expect(getAffixAppendOperation(b, r.documentId, r.operationId)).rejects.toThrow('OldPagesChanged');
+});
+it('reads/undoes committed v24 receipt in v25 without admitting apply retry or stale capability', async () => {
+    const f = await fixture(); oldPageStats(f); f.env.scope.moduleVersion = '0.34.24';
+    const b = backend(f); b.atomicCapability = () => ({ foundryVersion: f.env.scope.foundryVersion, systemVersion: f.env.scope.systemVersion, moduleVersion: f.env.scope.moduleVersion, evidenceHash: 'a'.repeat(64) });
+    const r = await request(f); await applyAffixAppend(b, r); resetOldPageTimes(f);
+    const saved = structuredClone(f.get().flags[MODULE_ID].reviewHistory.append1);
+    f.env.scope.moduleVersion = '0.34.25';
+    b.atomicCapability = () => null;
+    expect((await getAffixAppendOperation(b, r.documentId, r.operationId)).complete).toBe(true);
+    await expect(undoAffixAppend(b, r.documentId, r.operationId, 'undo1')).rejects.toThrow('ParentSaveBehaviorUnproven');
+    b.atomicCapability = () => ({ foundryVersion: f.env.scope.foundryVersion, systemVersion: f.env.scope.systemVersion, moduleVersion: f.env.scope.moduleVersion, evidenceHash: 'a'.repeat(64) });
+    await expect(applyAffixAppend(b, r)).rejects.toThrow('EnvironmentChanged');
+    expect(b.writes).toBe(1); expect(f.get().flags[MODULE_ID].reviewHistory.append1).toEqual(saved);
+    await undoAffixAppend(b, r.documentId, r.operationId, 'undo1');
+    expect((await getAffixAppendOperation(b, r.documentId, r.operationId)).undoneRowsCompatible).toBe(true);
+    expect(f.get().flags[MODULE_ID].reviewHistory.append1.affixTextAppend.plan.scope.moduleVersion).toBe('0.34.24');
+    expect(b.writes).toBe(2);
+});
+it.each([['0.34.24', '0.34.26'], ['0.34.23', '0.34.25'], ['0.34.25', '0.34.24']])('rejects unrelated committed version pair %s -> %s', async (prior, runtime) => {
+    const f = await fixture(); f.env.scope.moduleVersion = prior; const s = await staged(f); f.set(s.data); f.env.scope.moduleVersion = runtime;
+    await expect(getAffixAppendOperation(backend(f), f.env.target.uuid!, s.operation.id)).rejects.toThrow('EnvironmentChanged');
+    await expect(undoAffixTextAppend(f.env, s.operation, 'undo1', 'GM', 'now')).rejects.toThrow('EnvironmentChanged');
+});
+it.each(['systemVersion', 'userId', 'worldId', 'emberVersion'] as const)('v24 -> v25 keeps %s guard exact', async key => {
+    const f = await fixture(); f.env.scope.moduleVersion = '0.34.24'; const s = await staged(f); f.set(s.data);
+    f.env.scope.moduleVersion = '0.34.25'; f.env.scope[key] += '-changed';
+    await expect(assertAffixAppendAfter(f.env, s.operation, true)).rejects.toThrow(key === 'userId' ? 'UserIdentity' : 'EnvironmentChanged');
+});
